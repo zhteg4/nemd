@@ -1,0 +1,7 @@
+#!/bin/bash
+
+args=("$@")
+SCRIPT_BASENAME=`basename ${args[0]}`
+SCRIPT_PATH=$NEMD_SCRIPTS/$SCRIPT_BASENAME
+SCRIPT_ARGS="$SCRIPT_PATH ${@:2}"
+echo $(python $SCRIPT_ARGS)
