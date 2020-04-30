@@ -1,5 +1,0 @@
-REVIEWBOARD_URL = "https://review.cloudera.org"
-REPOSITORY = "origin"
-REPOSITORY_TYPE = "git"
-BRANCH = "master"
-LAND_DEST_BRANCH = "master"
