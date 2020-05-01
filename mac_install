@@ -14,3 +14,5 @@ python get-pip.py
 brew install python
 brew update && brew upgrade python
 #https://gethue.com/rbtools-example-how-do-easily-do-code-reviews-with-review-board/
+brew install sshfs
+
