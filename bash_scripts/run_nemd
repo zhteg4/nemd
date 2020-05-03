@@ -1,7 +1,25 @@
 #!/bin/bash
 
+if [ -z "$1" ]; then
+    echo "Please provide a python script name after "$0"."
+    exit
+fi
+
+SCRIPT_ABS_PATH="$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
+if [ -f $SCRIPT_ABS_PATH ]; then
+    SCRIPT_PATH=$SCRIPT_ABS_PATH
+fi
+
 args=("$@")
 SCRIPT_BASENAME=`basename ${args[0]}`
 SCRIPT_PATH=$NEMD_SCRIPTS/$SCRIPT_BASENAME
+
+if [ ! -f $SCRIPT_PATH ]; then
+    echo "Either $SCRIPT_PATH or $SCRIPT_ABS_PATH exist."
+    exit
+fi
+
 SCRIPT_ARGS="$SCRIPT_PATH ${@:2}"
+echo "Running python $SCRIPT_PATH $SCRIPT_ARGS"
+
 echo $(python $SCRIPT_ARGS)

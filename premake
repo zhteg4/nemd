@@ -1,12 +1,20 @@
+MODULE=module
+SCRIPTS=scripts
+BASH_SCRIPTS=bash_scripts
+
 export NEMD_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo \$NEMD_SRC=$NEMD_SRC
-export MODULE=module
-export NEMD_MODULE=$NEMD_SRC/$MODULE
-export SCRIPTS=scripts
-export NEMD_SCRIPTS=$NEMD_SRC/$SCRIPTS
+
+NEMD_MODULE=$NEMD_SRC/$MODULE
 export PYTHONPATH=$NEMD_MODULE
 echo \$PYTHONPATH=$PYTHONPATH
 
-# export PATH=$NEMD_SRC/$NEMD_SCRIPTS:$PATH
+export NEMD_SCRIPTS=$NEMD_SRC/$SCRIPTS
 echo \$NEMD_SCRIPTS=$NEMD_SCRIPTS
+export PATH=$NEMD_SCRIPTS/:$PATH
+
+export NEMD_BASH=$NEMD_SRC/$BASH_SCRIPTS
+echo \$NEMD_BASH=$NEMD_BASH
+export PATH=$NEMD_BASH/:$PATH
+
 # export PATH=/usr/local/opt/python/libexec/bin/:/Users/tzhang/Library/Python/2.7/bin/:$PATH
