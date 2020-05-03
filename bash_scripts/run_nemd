@@ -15,11 +15,11 @@ SCRIPT_BASENAME=`basename ${args[0]}`
 SCRIPT_PATH=$NEMD_SCRIPTS/$SCRIPT_BASENAME
 
 if [ ! -f $SCRIPT_PATH ]; then
-    echo "Either $SCRIPT_PATH or $SCRIPT_ABS_PATH exist."
+    echo "Neither $SCRIPT_PATH or $SCRIPT_ABS_PATH exist."
     exit
 fi
 
 SCRIPT_ARGS="$SCRIPT_PATH ${@:2}"
 echo "Running python $SCRIPT_PATH $SCRIPT_ARGS"
 
-echo $(python $SCRIPT_ARGS)
+python $SCRIPT_ARGS
