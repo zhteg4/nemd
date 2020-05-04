@@ -1,0 +1,11 @@
+pip install numpy
+# We need gfortran to compile SciPy
+brew cask install gfortran
+pip install scipy
+# To install matplotlib, we need to install pkg-config
+brew install pkg-config
+pip install matplotlib
+pip install pandas
+brew install opencv
+pip install tensorflow
+pip install keras

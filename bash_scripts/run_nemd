@@ -22,4 +22,5 @@ fi
 SCRIPT_ARGS="$SCRIPT_PATH ${@:2}"
 echo "Running python $SCRIPT_PATH $SCRIPT_ARGS"
 
+python --version
 python $SCRIPT_ARGS

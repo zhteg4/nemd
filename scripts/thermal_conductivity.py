@@ -28,6 +28,13 @@ def validate_options(argv):
 def main(argv):
 
     option = validate_options(argv)
+    import ipdb;
+    ipdb.set_trace()
+    with open(option.energy_file, 'r') as energy_file:
+        energy_file.readline()
+
+        import ipdb;ipdb.set_trace()
+        pass
     hello.world()
 
 
