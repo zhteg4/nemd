@@ -1,0 +1,18 @@
+# https://brew.sh # install brew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+brew update
+brew doctor
+brew cleanup
+brew install memcached
+mkdir -p ~/Library/LaunchAgents
+ln -sfv /usr/local/opt/memcached/*.plist ~/Library/LaunchAgents
+launchctl load ~/Library/LaunchAgents/homebrew.mxcl.memcached.plist
+# https://pip.pypa.io/en/stable/installing/
+curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+python get-pip.py
+# https://gist.github.com/stephenll/8762279
+brew install python
+brew update && brew upgrade python
+#https://gethue.com/rbtools-example-how-do-easily-do-code-reviews-with-review-board/
+brew install sshfs
+
