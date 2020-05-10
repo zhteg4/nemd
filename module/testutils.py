@@ -1,6 +1,5 @@
 import pathlib
 import os
-import pytest
 
 TEST = 'test'
 TEST_FIELS = 'test_files'

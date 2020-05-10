@@ -1,6 +1,14 @@
 import math
 import numpy as np
+import logutils
 
+logger = logutils.createModuleLogger()
+
+def log_debug(msg):
+
+    if logger is None:
+        return
+    logger.debug(msg)
 
 class EnergyReader(object):
 
@@ -29,10 +37,10 @@ class EnergyReader(object):
                 self.start_line_num += 1
                 if one_line.startswith(self.THERMO_SPACE):
                     # thermo 1000
-                    # log_debug(one_line)
+                    log_debug(one_line)
                     self.thermo_intvl = int(one_line.split()[-1])
                 elif one_line.startswith(self.RUN):
-                    # log_debug(one_line)
+                    log_debug(one_line)
                     # run 400000000
                     self.total_step_num = int(one_line.split()[-1])
                 one_line = file_energy.readline()
@@ -45,7 +53,7 @@ class EnergyReader(object):
             }
 
     def loadData(self):
-        #log_debug(f'Loading {self.total_line_num} lines of {self.energy_file} starting from line {self.start_line_num}')
+        log_debug(f'Loading {self.total_line_num} lines of {self.energy_file} starting from line {self.start_line_num}')
         try:
             self.data = np.loadtxt(self.energy_file,
                                    dtype=self.data_type,
@@ -54,7 +62,7 @@ class EnergyReader(object):
         except ValueError as err:
             # Wrong number of columns at line 400003
             err_str = str(err)
-            #log_debug(err_str + f' in loading {self.energy_file}')
+            log_debug(err_str + f' in loading {self.energy_file}')
             self.total_line_num = int(
                 err_str.split()[-1]) - self.start_line_num - 1
         else:

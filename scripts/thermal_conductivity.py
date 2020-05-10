@@ -1,8 +1,8 @@
 import sys
-import math
+import logutils
 import os
 import parserutils
-import numpy as np
+import fileutils
 
 FLAG_TEMP_FILE = 'temp_file'
 FlAG_ENEGER_FILE = 'energy_file'
@@ -42,11 +42,12 @@ logger = None
 def main(argv):
     global logger
     jobname = JOBNAME
-    logger = createLogger(jobname=jobname)
+    logger = logutils.createDriverLogger(jobname=jobname)
     options = validate_options(argv)
-    energy_reader = EnergyFileReader(options.energy_file)
+    logutils.logOptions(logger, options)
+    energy_reader = fileutils.EnergyReader(options.energy_file)
     energy_reader.run()
-    temp_dat = load_temp_file(options.temp_file)
+    temp_dat = fileutils.load_temp(options.temp_file)
 
 
 if __name__ == "__main__":
