@@ -1,0 +1,1 @@
+python3 $(which yapf) -i $NEMD_SRC/module/*.py $NEMD_SRC/scripts/*.py

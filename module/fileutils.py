@@ -1,13 +1,21 @@
+import math
 import numpy as np
 
 
-class EnergyFileReader(object):
+class EnergyReader(object):
+
+    THERMO = 'thermo'
+    THERMO_SPACE = THERMO + ' '
+    THERMO_STYLE = 'thermo_style'
+    RUN = 'run'
+
     def __init__(self, energy_file):
         self.energy_file = energy_file
         self.start_line_num = 1
         self.thermo_intvl = 1
         self.total_step_num = 1
         self.total_line_num = 1
+        self.data_formats = ('int', 'float', 'float', 'float')
         self.data_type = None
 
     def run(self):
@@ -19,20 +27,22 @@ class EnergyFileReader(object):
             one_line = file_energy.readline()
             while not one_line.startswith('Step'):
                 self.start_line_num += 1
-                if one_line.startswith(THERMO_SPACE):
+                if one_line.startswith(self.THERMO_SPACE):
                     # thermo 1000
-                    log_debug(one_line)
+                    # log_debug(one_line)
                     self.thermo_intvl = int(one_line.split()[-1])
-                elif one_line.startswith(RUN):
-                    log_debug(one_line)
+                elif one_line.startswith(self.RUN):
+                    # log_debug(one_line)
                     # run 400000000
                     self.total_step_num = int(one_line.split()[-1])
                 one_line = file_energy.readline()
             self.total_line_num = math.floor(self.total_step_num /
                                              self.thermo_intvl)
             data_names = one_line.split()
-            data_formats = ('int', 'float', 'float', 'float')
-            self.data_type = {'names': data_names, 'formats': data_formats}
+            self.data_type = {
+                'names': data_names,
+                'formats': self.data_formats
+            }
 
     def loadData(self):
         #log_debug(f'Loading {self.total_line_num} lines of {self.energy_file} starting from line {self.start_line_num}')
@@ -44,7 +54,7 @@ class EnergyFileReader(object):
         except ValueError as err:
             # Wrong number of columns at line 400003
             err_str = str(err)
-            log_debug(err_str + f' in loading {self.energy_file}')
+            #log_debug(err_str + f' in loading {self.energy_file}')
             self.total_line_num = int(
                 err_str.split()[-1]) - self.start_line_num - 1
         else:
@@ -56,7 +66,7 @@ class EnergyFileReader(object):
                                max_rows=self.total_line_num)
 
 
-def load_temp_file(temp_file):
+def load_temp(temp_file):
     with open(temp_file, 'r') as file_temp:
         step_nbin_nave = np.loadtxt(file_temp, skiprows=3, max_rows=1)
         nbin = int(step_nbin_nave[1])

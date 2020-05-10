@@ -3,15 +3,9 @@ import math
 import os
 import parserutils
 import numpy as np
-import logging
 
 FLAG_TEMP_FILE = 'temp_file'
 FlAG_ENEGER_FILE = 'energy_file'
-
-THERMO = 'thermo'
-THERMO_SPACE = THERMO + ' '
-THERMO_STYLE = 'thermo_style'
-RUN = 'run'
 
 JOBNAME = os.path.basename(__file__).split('.')[0]
 
@@ -19,20 +13,6 @@ JOBNAME = os.path.basename(__file__).split('.')[0]
 def log_debug(msg):
     if logger:
         logger.debug(msg)
-
-
-def createLogger(jobname, verbose=True):
-    logger = logging.getLogger(jobname)
-    hdlr = logging.FileHandler(jobname + '-driver.log')
-    if verbose:
-        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-        hdlr.setFormatter(formatter)
-        logger.setLevel(logging.DEBUG)
-    logger.addHandler(hdlr)
-    return logger
-
-
-
 
 
 def get_parser():
