@@ -41,8 +41,7 @@ logger = None
 
 def main(argv):
     global logger
-    jobname = JOBNAME
-    logger = logutils.createDriverLogger(jobname=jobname)
+    logger = logutils.createDriverLogger(jobname=JOBNAME)
     options = validate_options(argv)
     logutils.logOptions(logger, options)
     energy_reader = fileutils.EnergyReader(options.energy_file)

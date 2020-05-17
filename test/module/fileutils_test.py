@@ -5,7 +5,7 @@ import pytest
 
 
 def test_load_temp():
-    temp_file = testutils.test_file(os.path.join('lammps_22Aug18','tmp.profile'))
+    temp_file = testutils.test_file(os.path.join('lammps_22Aug18', 'tmp.profile'))
     data = fileutils.load_temp(temp_file)
     assert (50, 4) == data.shape
 
@@ -20,3 +20,15 @@ def test_set_start_end(energy_reader):
     assert 50000 == energy_reader.thermo_intvl
     assert 400000000 == energy_reader.total_step_num
 
+@pytest.fixture
+def lammps_input_reader():
+    input_file = testutils.test_file(os.path.join('lammps_22Aug18', 'in.nemd_cff91'))
+    lammps_in = fileutils.LammpsInput(input_file)
+    return lammps_in
+
+def test_run(lammps_input_reader):
+    lammps_input_reader.run()
+    'real' == lammps_input_reader.cmd_items['units']
+    'full' == lammps_input_reader.cmd_items['atom_style']
+    '*' == lammps_input_reader.cmd_items['processors'].x
+    1 == lammps_input_reader.cmd_items['processors'].y

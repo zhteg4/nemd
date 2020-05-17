@@ -1,14 +1,147 @@
+import environutils
 import math
+from dataclasses import dataclass
 import numpy as np
 import logutils
 
 logger = logutils.createModuleLogger()
+
 
 def log_debug(msg):
 
     if logger is None:
         return
     logger.debug(msg)
+
+
+@dataclass
+class Processors:
+    x: str
+    y: str
+    z: str
+
+    def __post_init__(self):
+        try_int = lambda x: int(x) if isinstance(x, str) and x.isdigit() else x
+        self.x = try_int(self.x)
+        self.y = try_int(self.y)
+        self.z = try_int(self.z)
+
+
+class LammpsInput(object):
+
+    HASH = '#'
+    # SUPPORTED COMMANDS
+    PAIR_MODIFY = 'pair_modify'
+    REGION = 'region'
+    CHANGE_BOX = 'change_box'
+    THERMO = 'thermo'
+    GROUP = 'group'
+    VELOCITY = 'velocity'
+    DIHEDRAL_STYLE = 'dihedral_style'
+    COMPUTE = 'compute'
+    THERMO_STYLE = 'thermo_style'
+    READ_DATA = 'read_data'
+    FIX = 'fix'
+    DUMP_MODIFY = 'dump_modify'
+    PAIR_STYLE = 'pair_style'
+    RUN = 'run'
+    MINIMIZE = 'minimize'
+    ANGLE_STYLE = 'angle_style'
+    PROCESSORS = 'processors'
+    VARIABLE = 'variable'
+    BOND_STYLE = 'bond_style'
+    NEIGHBOR = 'neighbor'
+    DUMP = 'dump'
+    NEIGH_MODIFY = 'neigh_modify'
+    THERMO_MODIFY = 'thermo_modify'
+    UNITS = 'units'
+    ATOM_STYLE = 'atom_style'
+    TIMESTEP = 'timestep'
+    UNFIX = 'unfix'
+    RESTART = 'restart'
+    LOG = 'log'
+    COMMANDS_KEYS = set([
+        PAIR_MODIFY, REGION, CHANGE_BOX, THERMO, GROUP, VELOCITY,
+        DIHEDRAL_STYLE, COMPUTE, THERMO_STYLE, READ_DATA, FIX, DUMP_MODIFY,
+        PAIR_STYLE, RUN, MINIMIZE, ANGLE_STYLE, PROCESSORS, VARIABLE,
+        BOND_STYLE, NEIGHBOR, DUMP, NEIGH_MODIFY, THERMO_MODIFY, UNITS,
+        ATOM_STYLE, TIMESTEP, UNFIX, RESTART, LOG
+    ])
+    # Set parameters that need to be defined before atoms are created or read-in from a file.
+    # The relevant commands are units, dimension, newton, processors, boundary, atom_style, atom_modify.
+    INITIALIZATION_KEYS = [
+        UNITS, PROCESSORS, ATOM_STYLE, PAIR_STYLE, BOND_STYLE, ANGLE_STYLE,
+        DIHEDRAL_STYLE
+    ]
+    # There are 3 ways to define the simulation cell and reserve space for force field info and fill it with atoms in LAMMPS
+    # Read them in from (1) a data file or (2) a restart file via the read_data or read_restart commands
+    SYSTEM_DEFINITION_KEYS = [READ_DATA]
+
+    REAL = 'real'
+    UNITS_VALUES = set([REAL])
+    FULL = 'full'
+    ATOM_STYLE_VALUES = set([FULL])
+    PROCESSORS_VALUES = Processors
+
+    INITIALIZATION_ITEMS = {
+        UNITS: UNITS_VALUES,
+        ATOM_STYLE: ATOM_STYLE_VALUES,
+        PROCESSORS: PROCESSORS_VALUES
+    }
+
+    def __init__(self, input_file):
+        self.input_file = input_file
+        self.lines = None
+        self.commands = []
+        self.cmd_items = {}
+        self.is_debug = environutils.is_debug()
+
+    def run(self):
+        self.load()
+        self.parser()
+
+    def load(self):
+        with open(self.input_file, 'r') as fh:
+            self.raw_data = fh.read()
+
+    def parser(self):
+        self.loadCommands()
+        self.setCmdKeys()
+        self.setCmdItems()
+
+    def loadCommands(self):
+        commands = self.raw_data.split('\n')
+        commands = [
+            command.split() for command in commands
+            if not command.startswith(self.HASH)
+        ]
+        self.commands = [command for command in commands if command]
+
+    def setCmdKeys(self):
+        self.cmd_keys = set([command[0] for command in self.commands])
+        if not self.cmd_keys.issubset(self.COMMANDS_KEYS):
+            unknown_keys = [
+                key for key in self.data_keys if key not in self.COMMANDS_KEYS
+            ]
+            raise ValueError(f"{unknown_keys} are unknown.")
+
+    def setCmdItems(self):
+        self.setInitializationCmdItems()
+
+    def setInitializationCmdItems(self):
+        for command in self.commands:
+            cmd_key = command[0]
+            cmd_values = command[1:]
+            expect_range = self.INITIALIZATION_ITEMS.get(cmd_key)
+            if not expect_range:
+                continue
+
+            if len(cmd_values) == 1 and cmd_values[0] in expect_range:
+                self.cmd_items[cmd_key] = cmd_values[0]
+                continue
+
+            self.cmd_items[cmd_key] = expect_range(*cmd_values)
+
 
 class EnergyReader(object):
 
@@ -53,7 +186,9 @@ class EnergyReader(object):
             }
 
     def loadData(self):
-        log_debug(f'Loading {self.total_line_num} lines of {self.energy_file} starting from line {self.start_line_num}')
+        log_debug(
+            f'Loading {self.total_line_num} lines of {self.energy_file} starting from line {self.start_line_num}'
+        )
         try:
             self.data = np.loadtxt(self.energy_file,
                                    dtype=self.data_type,
