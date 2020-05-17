@@ -69,25 +69,37 @@ class LammpsInput(object):
     ])
     # Set parameters that need to be defined before atoms are created or read-in from a file.
     # The relevant commands are units, dimension, newton, processors, boundary, atom_style, atom_modify.
-    INITIALIZATION_KEYS = [
-        UNITS, PROCESSORS, ATOM_STYLE, PAIR_STYLE, BOND_STYLE, ANGLE_STYLE,
-        DIHEDRAL_STYLE
-    ]
-    # There are 3 ways to define the simulation cell and reserve space for force field info and fill it with atoms in LAMMPS
-    # Read them in from (1) a data file or (2) a restart file via the read_data or read_restart commands
-    SYSTEM_DEFINITION_KEYS = [READ_DATA]
+    # INITIALIZATION_KEYS = [
+    #     UNITS, PROCESSORS, ATOM_STYLE, PAIR_STYLE, BOND_STYLE, ANGLE_STYLE,
+    #     DIHEDRAL_STYLE
+    # ]
 
     REAL = 'real'
-    UNITS_VALUES = set([REAL])
     FULL = 'full'
-    ATOM_STYLE_VALUES = set([FULL])
-    PROCESSORS_VALUES = Processors
 
     INITIALIZATION_ITEMS = {
-        UNITS: UNITS_VALUES,
-        ATOM_STYLE: ATOM_STYLE_VALUES,
-        PROCESSORS: PROCESSORS_VALUES
+        UNITS: set([REAL]),
+        ATOM_STYLE: set([FULL]),
+        PROCESSORS: Processors
     }
+
+    # There are 3 ways to define the simulation cell and reserve space for force field info and fill it with atoms in LAMMPS
+    # Read them in from (1) a data file or (2) a restart file via the read_data or read_restart commands
+    # SYSTEM_DEFINITION_KEYS = [READ_DATA]
+    SYSTEM_DEFINITION_ITEMS = {READ_DATA: str}
+
+    # SIMULATION_SETTINGS_KEYS = [TIMESTEP, THERMO]
+    TIMESTEP = 'timestep'
+    THERMO = 'thermo'
+    SIMULATION_SETTINGS_KEYS_ITEMS = {
+        TIMESTEP: float,
+        THERMO: int,
+    }
+
+    ALL_ITEMS = {}
+    ALL_ITEMS.update(INITIALIZATION_ITEMS)
+    ALL_ITEMS.update(SYSTEM_DEFINITION_ITEMS)
+    ALL_ITEMS.update(SIMULATION_SETTINGS_KEYS_ITEMS)
 
     def __init__(self, input_file):
         self.input_file = input_file
@@ -126,21 +138,24 @@ class LammpsInput(object):
             raise ValueError(f"{unknown_keys} are unknown.")
 
     def setCmdItems(self):
-        self.setInitializationCmdItems()
-
-    def setInitializationCmdItems(self):
         for command in self.commands:
             cmd_key = command[0]
             cmd_values = command[1:]
-            expect_range = self.INITIALIZATION_ITEMS.get(cmd_key)
-            if not expect_range:
-                continue
 
-            if len(cmd_values) == 1 and cmd_values[0] in expect_range:
-                self.cmd_items[cmd_key] = cmd_values[0]
+            expected = self.ALL_ITEMS.get(cmd_key)
+            if not expected:
+                log_debug(f"{cmd_key} is not a known key.")
                 continue
-
-            self.cmd_items[cmd_key] = expect_range(*cmd_values)
+            if len(cmd_values) == 1:
+                cmd_value = cmd_values[0]
+                if isinstance(expected, set):
+                    if cmd_value not in expected:
+                        raise ValueError(f"{cmd_value} not in {expected} for {cmd_key}")
+                    self.cmd_items[cmd_key] = cmd_value
+                    continue
+                if callable(expected):
+                    self.cmd_items[cmd_key] = expected(cmd_value)
+            self.cmd_items[cmd_key] = expected(*cmd_values)
 
 
 class EnergyReader(object):
@@ -209,14 +224,30 @@ class EnergyReader(object):
                                max_rows=self.total_line_num)
 
 
-def load_temp(temp_file):
+def blocks(files, size=65536):
+    while True:
+        b = files.read(size)
+        if not b: break
+        yield b
+
+
+def load_temp(temp_file, block_num=5):
+
+    with open(temp_file, "r", encoding="utf-8", errors='ignore') as f:
+        line_num = sum(bl.count("\n") for bl in blocks(f))
+
+    header_line_num = 3
     with open(temp_file, 'r') as file_temp:
-        step_nbin_nave = np.loadtxt(file_temp, skiprows=3, max_rows=1)
+        step_nbin_nave = np.loadtxt(file_temp, skiprows=header_line_num, max_rows=1)
         nbin = int(step_nbin_nave[1])
-        data = np.zeros((nbin, 4))
-        data_num = 0
-        while file_temp:
-            data_num += 1
-            data += np.array(np.loadtxt(file_temp, max_rows=nbin))
-            if not file_temp.readline():
-                return data / data_num
+        frame_num = math.floor((line_num - header_line_num) / (nbin + 1))
+        frame_per_block = math.floor(frame_num / block_num)
+        data = np.zeros((nbin, 4, block_num + 1))
+        for data_index in range(block_num):
+            for iframe in range(frame_per_block):
+                tmp_data = np.array(np.loadtxt(file_temp, max_rows=nbin))
+                data[:,:, data_index] +=  (tmp_data/frame_per_block)
+                file_temp.readline()
+        import pdb;pdb.set_trace()
+        data[:, :, -1] = data[:, :, 0:block_num].mean(axis=2)
+        return data, frame_num

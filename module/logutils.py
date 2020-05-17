@@ -2,6 +2,7 @@ import os
 import environutils
 import logging
 import pathlib
+from datetime import datetime
 
 
 def createLogger(basename, verbose=None, file_ext='-driver.log'):
@@ -48,8 +49,15 @@ def createModuleLogger(basename=None, verbose=True, file_ext='.log'):
 
 
 def logOptions(logger, options):
-    logger.info(f"Command Options:")
-    logger.info(f"")
+    command_options = 'Command Options'
+    logger.info(f"."*10 + command_options + f"."*10)
     for key, val in options.__dict__.items():
         logger.info(f"{key}: {val}")
-    logger.info(f"")
+    logger.info(f"."* (20 + len(command_options)))
+
+
+def log(logger, msg, timestamp=False):
+    logger.info(msg)
+    if timestamp:
+        time = datetime.now().isoformat(sep=' ', timespec='minutes')
+        logger.info(time)
