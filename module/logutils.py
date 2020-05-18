@@ -50,10 +50,10 @@ def createModuleLogger(basename=None, verbose=True, file_ext='.log'):
 
 def logOptions(logger, options):
     command_options = 'Command Options'
-    logger.info(f"."*10 + command_options + f"."*10)
+    logger.info(f"." * 10 + command_options + f"." * 10)
     for key, val in options.__dict__.items():
         logger.info(f"{key}: {val}")
-    logger.info(f"."* (20 + len(command_options)))
+    logger.info(f"." * (20 + len(command_options)))
 
 
 def log(logger, msg, timestamp=False):

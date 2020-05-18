@@ -150,7 +150,8 @@ class LammpsInput(object):
                 cmd_value = cmd_values[0]
                 if isinstance(expected, set):
                     if cmd_value not in expected:
-                        raise ValueError(f"{cmd_value} not in {expected} for {cmd_key}")
+                        raise ValueError(
+                            f"{cmd_value} not in {expected} for {cmd_key}")
                     self.cmd_items[cmd_key] = cmd_value
                     continue
                 if callable(expected):
@@ -238,7 +239,9 @@ def load_temp(temp_file, block_num=5):
 
     header_line_num = 3
     with open(temp_file, 'r') as file_temp:
-        step_nbin_nave = np.loadtxt(file_temp, skiprows=header_line_num, max_rows=1)
+        step_nbin_nave = np.loadtxt(file_temp,
+                                    skiprows=header_line_num,
+                                    max_rows=1)
         nbin = int(step_nbin_nave[1])
         frame_num = math.floor((line_num - header_line_num) / (nbin + 1))
         frame_per_block = math.floor(frame_num / block_num)
@@ -246,8 +249,7 @@ def load_temp(temp_file, block_num=5):
         for data_index in range(block_num):
             for iframe in range(frame_per_block):
                 tmp_data = np.array(np.loadtxt(file_temp, max_rows=nbin))
-                data[:,:, data_index] +=  (tmp_data/frame_per_block)
+                data[:, :, data_index] += (tmp_data / frame_per_block)
                 file_temp.readline()
-        import pdb;pdb.set_trace()
-        data[:, :, -1] = data[:, :, 0:block_num].mean(axis=2)
+        data[:, :, -1] = data[:, :, 1:block_num].mean(axis=2)
         return data, frame_num
