@@ -232,9 +232,11 @@ class EnergyReader(object):
         self.data[orig_time_key] = self.data[orig_time_key] * self.timestep
         time_key = 'Time'
         if unit == 'ns':
-            self.data[orig_time_key] = self.data[orig_time_key] / units.NANO2FETO
+            self.data[
+                orig_time_key] = self.data[orig_time_key] / units.NANO2FETO
             time_key += ' ns'
-        self.data.dtype.names =  tuple([time_key] + list(self.data.dtype.names[1:]))
+        self.data.dtype.names = tuple([time_key] +
+                                      list(self.data.dtype.names[1:]))
 
     def setUnits(self):
         self.setTimeUnit()
@@ -244,22 +246,27 @@ class EnergyReader(object):
     def setTimeUnit(self, unit='ns', reset=True):
         orig_time_key = self.data.dtype.names[0]
         if reset:
-            self.data[orig_time_key] = self.data[orig_time_key] - self.data[orig_time_key][0]
+            self.data[orig_time_key] = self.data[orig_time_key] - self.data[
+                orig_time_key][0]
         self.data[orig_time_key] = self.data[orig_time_key] * self.timestep
         time_key = 'Time'
         if unit == ' (ns)':
-            self.data[orig_time_key] = self.data[orig_time_key] / units.NANO2FETO
+            self.data[
+                orig_time_key] = self.data[orig_time_key] / units.NANO2FETO
             time_key += ' ns'
-        self.data.dtype.names =  tuple([time_key] + list(self.data.dtype.names[1:]))
+        self.data.dtype.names = tuple([time_key] +
+                                      list(self.data.dtype.names[1:]))
 
     def setTempUnit(self, unit='K'):
         temp_key = 'Temperature (K)'
-        self.data.dtype.names = tuple([self.data.dtype.names[0]] + [temp_key] + list(self.data.dtype.names[2:]))
+        self.data.dtype.names = tuple([self.data.dtype.names[0]] + [temp_key] +
+                                      list(self.data.dtype.names[2:]))
 
     def setEnergyUnit(self):
         energy_in_key = 'Energy In (Kcal/mole)'
         energy_out_key = 'Energy Out (Kcal/mole)'
-        self.data.dtype.names = tuple(list(self.data.dtype.names[:2]) + [energy_in_key, energy_out_key])
+        self.data.dtype.names = tuple(
+            list(self.data.dtype.names[:2]) + [energy_in_key, energy_out_key])
 
 
 def blocks(files, size=65536):

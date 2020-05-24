@@ -1,6 +1,6 @@
-
 FLAG_INTERACTIVE = '-INTERACTIVE'
 FLAG_JOBNAME = '-JOBNAME'
+
 
 def add_job_arguments(parser, arg_flags=None):
     if arg_flags is None:

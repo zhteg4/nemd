@@ -22,12 +22,18 @@ fi
 SCRIPT_ARGS="$SCRIPT_PATH ${@:2}"
 
 for ((i=0; i<=$#; i++)); do
+
   if [ ${!i} == '-JOBNAME' ]; then
     j=$(( $i + 1 ))
     export JOBNAME=${!j}
     [[ -z "$JOBNAME" ]] && echo "Please provide a jobname after -JOBNAME flag" && exit
     echo "$JOBNAME set as the JOBNAME"
   fi
+
+  if [ ${!i} == '-INTERACTIVE' ]; then
+    export INTERACTIVE='1'
+  fi
+
 done
 
 echo "Running python3 $SCRIPT_PATH $SCRIPT_ARGS"
