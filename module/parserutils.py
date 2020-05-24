@@ -14,8 +14,7 @@ def get_parser(**kwargs):
     return argparse.ArgumentParser(formatter_class=CapitalisedHelpFormatter,
                                    **kwargs)
 
-
 def type_file(arg):
     if os.path.isfile(arg):
         return arg
-    return None
+    raise argparse.ArgumentTypeError(f'{arg} not found.')

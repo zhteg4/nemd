@@ -17,3 +17,12 @@ def get_module_path():
     if not nemd_src:
         return
     return os.path.join(nemd_src, 'module')
+
+def get_jobname(default_jobname):
+    jobname = os.environ.get('JOBNAME')
+    if jobname:
+        return jobname
+    return default_jobname
+
+def is_interactive():
+    return os.environ.get('INTERACTIVE')

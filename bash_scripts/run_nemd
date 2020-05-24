@@ -20,6 +20,16 @@ if [ ! -f $SCRIPT_PATH ]; then
 fi
 
 SCRIPT_ARGS="$SCRIPT_PATH ${@:2}"
+
+for ((i=0; i<=$#; i++)); do
+  if [ ${!i} == '-JOBNAME' ]; then
+    j=$(( $i + 1 ))
+    export JOBNAME=${!j}
+    [[ -z "$JOBNAME" ]] && echo "Please provide a jobname after -JOBNAME flag" && exit
+    echo "$JOBNAME set as the JOBNAME"
+  fi
+done
+
 echo "Running python3 $SCRIPT_PATH $SCRIPT_ARGS"
 
-python3 $SCRIPT_ARGS
+env FOO=BAR python3 $SCRIPT_ARGS

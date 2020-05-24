@@ -1,9 +1,14 @@
+import environutils
 from matplotlib import pyplot as plt
 
+
 class TempEnePlotter(object):
-    def __init__(self, temp_data, ene_data):
+    def __init__(self, temp_data, ene_data, jobname):
         self.temp_data = temp_data
         self.ene_data = ene_data
+        self.jobname = jobname
+        self.interactive = environutils.is_interactive()
+        self.fig_file = jobname + '.png'
         self.fig_nrows = 2
         self.fig_ncols = 1
 
@@ -21,6 +26,10 @@ class TempEnePlotter(object):
         self.plotEne()
         self.setLayout()
         self.show()
+        self.save()
+
+    def save(self):
+        self.fig.savefig(self.fig_file)
 
     def plotEne(self):
         self.ene_axis.plot(self.ene_data[self.ene_names[0]],
@@ -50,5 +59,8 @@ class TempEnePlotter(object):
         plt.tight_layout()
 
     def show(self):
+        if not self.interactive:
+            return
+
         self.fig.show()
-        input()
+        input('Press any keys to continue...')
