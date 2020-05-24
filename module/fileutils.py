@@ -3,6 +3,7 @@ import math
 from dataclasses import dataclass
 import numpy as np
 import logutils
+import units
 
 logger = logutils.createModuleLogger()
 
@@ -166,18 +167,20 @@ class EnergyReader(object):
     THERMO_STYLE = 'thermo_style'
     RUN = 'run'
 
-    def __init__(self, energy_file):
+    def __init__(self, energy_file, timestep):
         self.energy_file = energy_file
+        self.timestep = timestep
         self.start_line_num = 1
         self.thermo_intvl = 1
         self.total_step_num = 1
         self.total_line_num = 1
-        self.data_formats = ('int', 'float', 'float', 'float')
+        self.data_formats = ('float', 'float', 'float', 'float')
         self.data_type = None
 
     def run(self):
         self.setStartEnd()
         self.loadData()
+        self.setUnits()
 
     def setStartEnd(self):
         with open(self.energy_file, 'r') as file_energy:
@@ -223,6 +226,40 @@ class EnergyReader(object):
                                dtype=self.data_type,
                                skiprows=self.start_line_num,
                                max_rows=self.total_line_num)
+
+    def setTimeUnit(self, unit='ns'):
+        orig_time_key = self.data.dtype.names[0]
+        self.data[orig_time_key] = self.data[orig_time_key] * self.timestep
+        time_key = 'Time'
+        if unit == 'ns':
+            self.data[orig_time_key] = self.data[orig_time_key] / units.NANO2FETO
+            time_key += ' ns'
+        self.data.dtype.names =  tuple([time_key] + list(self.data.dtype.names[1:]))
+
+    def setUnits(self):
+        self.setTimeUnit()
+        self.setTempUnit()
+        self.setEnergyUnit()
+
+    def setTimeUnit(self, unit='ns', reset=True):
+        orig_time_key = self.data.dtype.names[0]
+        if reset:
+            self.data[orig_time_key] = self.data[orig_time_key] - self.data[orig_time_key][0]
+        self.data[orig_time_key] = self.data[orig_time_key] * self.timestep
+        time_key = 'Time'
+        if unit == ' (ns)':
+            self.data[orig_time_key] = self.data[orig_time_key] / units.NANO2FETO
+            time_key += ' ns'
+        self.data.dtype.names =  tuple([time_key] + list(self.data.dtype.names[1:]))
+
+    def setTempUnit(self, unit='K'):
+        temp_key = 'Temperature (K)'
+        self.data.dtype.names = tuple([self.data.dtype.names[0]] + [temp_key] + list(self.data.dtype.names[2:]))
+
+    def setEnergyUnit(self):
+        energy_in_key = 'Energy In (Kcal/mole)'
+        energy_out_key = 'Energy Out (Kcal/mole)'
+        self.data.dtype.names = tuple(list(self.data.dtype.names[:2]) + [energy_in_key, energy_out_key])
 
 
 def blocks(files, size=65536):

@@ -20,7 +20,6 @@ if [ ! -f $SCRIPT_PATH ]; then
 fi
 
 SCRIPT_ARGS="$SCRIPT_PATH ${@:2}"
-echo "Running python $SCRIPT_PATH $SCRIPT_ARGS"
+echo "Running python3 $SCRIPT_PATH $SCRIPT_ARGS"
 
-python --version
-python $SCRIPT_ARGS
+python3 $SCRIPT_ARGS

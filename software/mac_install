@@ -1,16 +1,17 @@
+# zsh to bash shell
+# Head to System Preferences > Users & Groups on your Mac. Click the lock icon and enter your password. Hold the Ctrl key, click your user account’s name in the left pane, and select “Advanced Options.”
+
 # https://brew.sh # install brew
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
 brew update
 
-# https://www.python.org/downloads/mac-osx/
-curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-python3 get-pip.py
-
-#You must reboot for the installation of osxfuse to take effect.
+# You must reboot for the installation of osxfuse to take effect.
 brew cask install osxfuse
 brew install sshfs
 
-# zsh to bash shell
-# Head to System Preferences > Users & Groups on your Mac. Click the lock icon and enter your password. Hold the Ctrl key, click your user account’s name in the left pane, and select “Advanced Options.”
-
-
+# https://www.python.org/downloads/mac-osx/
+curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+python3 get-pip.py
+pip3 install pytest
+pip3 install numpy
+pip3 instaill matplotlib

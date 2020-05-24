@@ -5,9 +5,9 @@ import pytest
 
 
 def test_load_temp():
-    temp_file = testutils.test_file(os.path.join('lammps_22Aug18', 'tmp.profile'))
-    data = fileutils.load_temp(temp_file)
-    assert (50, 4) == data.shape
+    temp_file = testutils.test_file(os.path.join('lammps_22Aug18', 'temp.profile'))
+    data, frame_num = fileutils.load_temp(temp_file)
+    assert (50, 4, 6) == data.shape
 
 @pytest.fixture
 def energy_reader():
