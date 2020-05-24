@@ -17,3 +17,6 @@ pip3 install pytest
 pip3 install numpy
 pip3 install matplotlib
 pip3 install yapf
+
+# ssh is looking for xauth in /usr/X11R6/bin and on macOS with XQuartz it is in /opt/X11/bin
+# Edit ~/.ssh/config, add XAuthLocation /opt/X11/bin/xauth to the host config.

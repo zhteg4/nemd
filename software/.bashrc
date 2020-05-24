@@ -9,6 +9,7 @@ alias cdgmm='cd $NEMD_SRC'
 alias yp='python3 -m yapf -i'
 alias cdgmm='cd ~/nemd'
 alias sshme='sshpass -p **** ssh -X tzhang1@memtfe.crc.nd.edu'
+alias gitadd='git add $NEMD_SRC/module/*.py $NEMD_SRC/scripts/*.py $NEMD_SRC/bash_scripts $NEMD_SRC/software'
 
 [[ -r "/usr/local/etc/profile.d/bash_completion.sh" ]] && . "/usr/local/etc/profile.d/bash_completion.sh"
 
