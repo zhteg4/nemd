@@ -39,6 +39,7 @@ class TempEnePlotter(object):
         self.ene_axis.plot(self.ene_data[self.ene_names[0]],
                            self.ene_data[self.ene_names[3]],
                            label=self.ene_names[3])
+
         self.ene_axis.set_xlabel(self.ene_names[0])
         self.ene_axis.set_ylabel(f'Energy {self.ene_names[3].split()[-1]}')
         self.ene_axis.legend(loc='upper left', prop={'size': 6})

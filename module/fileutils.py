@@ -250,10 +250,10 @@ class EnergyReader(object):
                 orig_time_key][0]
         self.data[orig_time_key] = self.data[orig_time_key] * self.timestep
         time_key = 'Time'
-        if unit == ' (ns)':
+        if unit == 'ns':
             self.data[
                 orig_time_key] = self.data[orig_time_key] / units.NANO2FETO
-            time_key += ' ns'
+            time_key += ' (ns)'
         self.data.dtype.names = tuple([time_key] +
                                       list(self.data.dtype.names[1:]))
 
