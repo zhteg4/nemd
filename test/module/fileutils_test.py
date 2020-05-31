@@ -3,16 +3,16 @@ import testutils
 import fileutils
 import pytest
 
-
+SINGLE_NEMD = 'lammps_22Aug18/polyacetylene/single_chain/nemd'
 def test_load_temp():
-    temp_file = testutils.test_file(os.path.join('lammps_22Aug18', 'temp.profile'))
+    temp_file = testutils.test_file(os.path.join(SINGLE_NEMD, 'temp.profile'))
     data, frame_num = fileutils.load_temp(temp_file)
     assert (50, 4, 6) == data.shape
 
 @pytest.fixture
 def energy_reader():
-    ene_file = testutils.test_file(os.path.join('lammps_22Aug18', 'en_ex.log'))
-    return fileutils.EnergyReader(ene_file)
+    ene_file = testutils.test_file(os.path.join(SINGLE_NEMD, 'en_ex.log'))
+    return fileutils.EnergyReader(ene_file, 0.25)
 
 def test_set_start_end(energy_reader):
     energy_reader.setStartEnd()
@@ -22,7 +22,7 @@ def test_set_start_end(energy_reader):
 
 @pytest.fixture
 def lammps_input_reader():
-    input_file = testutils.test_file(os.path.join('lammps_22Aug18', 'in.nemd_cff91'))
+    input_file = testutils.test_file(os.path.join(SINGLE_NEMD, 'in.nemd_cff91'))
     lammps_in = fileutils.LammpsInput(input_file)
     return lammps_in
 
