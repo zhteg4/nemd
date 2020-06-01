@@ -159,6 +159,12 @@ class LammpsInput(object):
                     self.cmd_items[cmd_key] = expected(cmd_value)
             self.cmd_items[cmd_key] = expected(*cmd_values)
 
+    def getUnits(self):
+        return self.cmd_items[self.UNITS]
+
+    def getTimestep(self):
+        return self.cmd_items[self.TIMESTEP]
+
 
 class EnergyReader(object):
 
@@ -166,6 +172,9 @@ class EnergyReader(object):
     THERMO_SPACE = THERMO + ' '
     THERMO_STYLE = 'thermo_style'
     RUN = 'run'
+
+    ENERGY_IN_KEY = 'Energy In (Kcal/mole)'
+    ENERGY_OUT_KEY = 'Energy Out (Kcal/mole)'
 
     def __init__(self, energy_file, timestep):
         self.energy_file = energy_file
@@ -181,6 +190,7 @@ class EnergyReader(object):
         self.setStartEnd()
         self.loadData()
         self.setUnits()
+        self.setHeatflux()
 
     def setStartEnd(self):
         with open(self.energy_file, 'r') as file_energy:
@@ -227,17 +237,6 @@ class EnergyReader(object):
                                skiprows=self.start_line_num,
                                max_rows=self.total_line_num)
 
-    def setTimeUnit(self, unit='ns'):
-        orig_time_key = self.data.dtype.names[0]
-        self.data[orig_time_key] = self.data[orig_time_key] * self.timestep
-        time_key = 'Time'
-        if unit == 'ns':
-            self.data[
-                orig_time_key] = self.data[orig_time_key] / units.NANO2FETO
-            time_key += ' ns'
-        self.data.dtype.names = tuple([time_key] +
-                                      list(self.data.dtype.names[1:]))
-
     def setUnits(self):
         self.setTimeUnit()
         self.setTempUnit()
@@ -263,10 +262,24 @@ class EnergyReader(object):
                                       list(self.data.dtype.names[2:]))
 
     def setEnergyUnit(self):
-        energy_in_key = 'Energy In (Kcal/mole)'
-        energy_out_key = 'Energy Out (Kcal/mole)'
+
         self.data.dtype.names = tuple(
-            list(self.data.dtype.names[:2]) + [energy_in_key, energy_out_key])
+            list(self.data.dtype.names[:2]) +
+            [self.ENERGY_IN_KEY, self.ENERGY_OUT_KEY])
+
+    def setHeatflux(self, qstart=0.2):
+        start_idx = int(self.data.shape[0] * qstart)
+        qdata = np.concatenate(
+            (self.data[self.ENERGY_IN_KEY][..., np.newaxis],
+             self.data[self.ENERGY_OUT_KEY][..., np.newaxis]),
+            axis=1)
+        sel_qdata = qdata[start_idx:, :]
+        sel_q_mean = np.abs(sel_qdata).mean(axis=1)
+        sel_time = self.data['Time (ns)'][start_idx:]
+        self.slope, self.intercept = np.polyfit(sel_time, sel_q_mean, 1)
+        fitted_q = np.polyval([self.slope, self.intercept], sel_time)
+        self.fitted_data = np.concatenate(
+            (sel_time[..., np.newaxis], fitted_q[..., np.newaxis]), axis=1)
 
 
 def blocks(files, size=65536):
@@ -276,24 +289,50 @@ def blocks(files, size=65536):
         yield b
 
 
-def load_temp(temp_file, block_num=5):
+class TempReader(object):
+    def __init__(self, temp_file, block_num=5):
+        self.temp_file = temp_file
+        self.block_num = block_num
+        self.data = None
+        self.frame_num = None
+        self.fitted_data = None
+        self.slope = None
+        self.intercept = None
 
-    with open(temp_file, "r", encoding="utf-8", errors='ignore') as f:
-        line_num = sum(bl.count("\n") for bl in blocks(f))
+    def run(self):
+        self.load()
+        self.setTempGradient()
 
-    header_line_num = 3
-    with open(temp_file, 'r') as file_temp:
-        step_nbin_nave = np.loadtxt(file_temp,
-                                    skiprows=header_line_num,
-                                    max_rows=1)
-        nbin = int(step_nbin_nave[1])
-        frame_num = math.floor((line_num - header_line_num) / (nbin + 1))
-        frame_per_block = math.floor(frame_num / block_num)
-        data = np.zeros((nbin, 4, block_num + 1))
-        for data_index in range(block_num):
-            for iframe in range(frame_per_block):
-                tmp_data = np.array(np.loadtxt(file_temp, max_rows=nbin))
-                data[:, :, data_index] += (tmp_data / frame_per_block)
-                file_temp.readline()
-        data[:, :, -1] = data[:, :, 1:block_num].mean(axis=2)
-        return data, frame_num
+    def load(self):
+        with open(self.temp_file, "r", encoding="utf-8", errors='ignore') as f:
+            line_num = sum(bl.count("\n") for bl in blocks(f))
+
+        header_line_num = 3
+        with open(self.temp_file, 'r') as file_temp:
+            step_nbin_nave = np.loadtxt(file_temp,
+                                        skiprows=header_line_num,
+                                        max_rows=1)
+            nbin = int(step_nbin_nave[1])
+            self.frame_num = math.floor(
+                (line_num - header_line_num) / (nbin + 1))
+            frame_per_block = math.floor(self.frame_num / self.block_num)
+            self.data = np.zeros((nbin, 4, self.block_num + 1))
+            for data_index in range(self.block_num):
+                for iframe in range(frame_per_block):
+                    tmp_data = np.array(np.loadtxt(file_temp, max_rows=nbin))
+                    self.data[:, :, data_index] += (tmp_data / frame_per_block)
+                    file_temp.readline()
+            self.data[:, :, -1] = self.data[:, :, :self.block_num].mean(axis=2)
+
+    def setTempGradient(self, crange=(0.15, 0.85)):
+        coords = self.data[:, 1, -1]
+        temps = self.data[:, 3, -1]
+        coord_num = len(coords)
+        indexes = [int(coord_num * x) for x in crange]
+        sel_coords = coords[indexes[0]:indexes[-1] + 1]
+        sel_temps = temps[indexes[0]:indexes[-1] + 1]
+        self.slope, self.intercept = np.polyfit(sel_coords, sel_temps, 1)
+        fitted_temps = np.polyval([self.slope, self.intercept], sel_coords)
+        self.fitted_data = np.concatenate(
+            (sel_coords[..., np.newaxis], fitted_temps[..., np.newaxis]),
+            axis=1)

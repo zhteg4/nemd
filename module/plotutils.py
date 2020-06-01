@@ -3,12 +3,23 @@ from matplotlib import pyplot as plt
 
 
 class TempEnePlotter(object):
-    def __init__(self, temp_data, ene_data, jobname):
-        self.temp_data = temp_data
-        self.ene_data = ene_data
+    def __init__(
+        self,
+        lammp_temp,
+        lammps_energy,
+        jobname,
+    ):
+        self.lammp_temp = lammp_temp
+        self.lammps_energy = lammps_energy
         self.jobname = jobname
+
+    def load(self):
+        self.temp_data = self.lammp_temp.data
+        self.ene_data = self.lammps_energy.data
+        self.fitted_temp_data = self.lammp_temp.fitted_data
+        self.fitted_ene_data = self.lammps_energy.fitted_data
         self.interactive = environutils.is_interactive()
-        self.fig_file = jobname + '.png'
+        self.fig_file = self.jobname + '.png'
         self.fig_nrows = 2
         self.fig_ncols = 1
 
@@ -16,6 +27,7 @@ class TempEnePlotter(object):
         self.ene_names = self.ene_data.dtype.names
 
     def setup(self):
+        self.load()
         self.fig = plt.figure()
         self.temp_axis = self.fig.add_subplot(self.fig_nrows, self.fig_ncols,
                                               1)
@@ -39,7 +51,10 @@ class TempEnePlotter(object):
         self.ene_axis.plot(self.ene_data[self.ene_names[0]],
                            self.ene_data[self.ene_names[3]],
                            label=self.ene_names[3])
-
+        if self.fitted_ene_data is not None:
+            self.ene_axis.plot(self.fitted_ene_data[:, 0],
+                               self.fitted_ene_data[:, 1],
+                               label='Fitted')
         self.ene_axis.set_xlabel(self.ene_names[0])
         self.ene_axis.set_ylabel(f'Energy {self.ene_names[3].split()[-1]}')
         self.ene_axis.legend(loc='upper left', prop={'size': 6})
@@ -54,6 +69,10 @@ class TempEnePlotter(object):
         self.temp_axis.plot(self.temp_data[:, 1, -1],
                             self.temp_data[:, 3, -1],
                             label='Average')
+        if self.fitted_temp_data is not None:
+            self.temp_axis.plot(self.fitted_temp_data[:, 0],
+                                self.fitted_temp_data[:, 1],
+                                label='Fitted')
         self.temp_axis.legend(loc='upper right', prop={'size': 6})
         self.temp_axis.set_ylim([270, 330])
         self.temp_axis.set_xlabel('Coordinate (Angstrom)')
