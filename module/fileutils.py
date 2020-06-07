@@ -1,9 +1,10 @@
 import environutils
 import math
-from dataclasses import dataclass
 import numpy as np
 import logutils
 import units
+from io import StringIO
+from dataclasses import dataclass
 
 logger = logutils.createModuleLogger()
 
@@ -282,11 +283,47 @@ class EnergyReader(object):
             (sel_time[..., np.newaxis], fitted_q[..., np.newaxis]), axis=1)
 
 
-def blocks(files, size=65536):
-    while True:
-        b = files.read(size)
-        if not b: break
-        yield b
+def get_line_num(filename):
+
+    def blocks(files, size=65536):
+        while True:
+            b = files.read(size)
+            if not b: break
+            yield b
+
+    with open(filename, "r", encoding="utf-8", errors='ignore') as f:
+        line_num = sum(bl.count("\n") for bl in blocks(f))
+
+    return line_num
+
+
+class LammpsLogReader(object):
+
+    STEP = 'Step'
+    LOOP = 'Loop'
+
+    def __init__(self, lammps_log):
+        self.lammps_log = lammps_log
+        self.all_data = []
+
+    def run(self):
+        with open(self.lammps_log, "r", encoding="utf-8", errors='ignore') as file_log:
+            line = file_log.readline()
+            while line:
+                line = file_log.readline()
+                if line.startswith(self.STEP):
+                    names = line.split()
+                    formats = [int if x == self.STEP else float for x in names]
+                    data_type = {'names': names, 'formats': formats}
+                    data_type[self.STEP] = int
+
+                    data_str = ""
+                    line = file_log.readline()
+                    while line and not line.startswith(self.LOOP):
+                        data_str += line
+                        line = file_log.readline()
+                    data = np.loadtxt(StringIO(data_str), dtype=data_type)
+                    self.all_data.append(data)
 
 
 class TempReader(object):
@@ -304,9 +341,8 @@ class TempReader(object):
         self.setTempGradient()
 
     def load(self):
-        with open(self.temp_file, "r", encoding="utf-8", errors='ignore') as f:
-            line_num = sum(bl.count("\n") for bl in blocks(f))
 
+        line_num = get_line_num(self.temp_file)
         header_line_num = 3
         with open(self.temp_file, 'r') as file_temp:
             step_nbin_nave = np.loadtxt(file_temp,

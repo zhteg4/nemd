@@ -1,2 +1,2 @@
-echo pytest  -s --pdb $NEMD_SRC/test/module/*_test.py
+echo python3 -m pytest  -s --pdb $NEMD_SRC/test/module/*_test.py
 python3 -m pytest  -s --pdb $NEMD_SRC/test/module/*_test.py
