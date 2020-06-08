@@ -12,17 +12,16 @@ class TempEnePlotter(object):
         self.lammp_temp = lammp_temp
         self.lammps_energy = lammps_energy
         self.jobname = jobname
+        self.interactive = environutils.is_interactive()
+        self.fig_file = self.jobname + '.png'
+        self.fig_nrows = 2
+        self.fig_ncols = 1
 
     def load(self):
         self.temp_data = self.lammp_temp.data
         self.ene_data = self.lammps_energy.data
         self.fitted_temp_data = self.lammp_temp.fitted_data
         self.fitted_ene_data = self.lammps_energy.fitted_data
-        self.interactive = environutils.is_interactive()
-        self.fig_file = self.jobname + '.png'
-        self.fig_nrows = 2
-        self.fig_ncols = 1
-
         self.temp_data_nrow, self.temp_data_ncol, self.temp_data_nblock = self.temp_data.shape
         self.ene_names = self.ene_data.dtype.names
 
@@ -79,7 +78,7 @@ class TempEnePlotter(object):
         self.temp_axis.set_ylabel('Temperature (K)')
 
     def setLayout(self):
-        plt.tight_layout()
+        self.fig.tight_layout()
 
     def show(self):
         if not self.interactive:

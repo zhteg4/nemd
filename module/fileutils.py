@@ -5,6 +5,7 @@ import logutils
 import units
 from io import StringIO
 from dataclasses import dataclass
+from matplotlib import pyplot as plt
 
 logger = logutils.createModuleLogger()
 
@@ -307,23 +308,54 @@ class LammpsLogReader(object):
         self.all_data = []
 
     def run(self):
+        self.loadAllData()
+        self.plot()
+
+    def loadAllData(self):
         with open(self.lammps_log, "r", encoding="utf-8", errors='ignore') as file_log:
             line = file_log.readline()
             while line:
                 line = file_log.readline()
-                if line.startswith(self.STEP):
-                    names = line.split()
-                    formats = [int if x == self.STEP else float for x in names]
-                    data_type = {'names': names, 'formats': formats}
-                    data_type[self.STEP] = int
+                if not line.startswith(self.STEP):
+                    continue
 
-                    data_str = ""
+                names = line.split()
+                formats = [int if x == self.STEP else float for x in names]
+                data_type = {'names': names, 'formats': formats}
+                data_type[self.STEP] = int
+
+                data_str = ""
+                line = file_log.readline()
+                while line and not line.startswith(self.LOOP):
+                    data_str += line
                     line = file_log.readline()
-                    while line and not line.startswith(self.LOOP):
-                        data_str += line
-                        line = file_log.readline()
-                    data = np.loadtxt(StringIO(data_str), dtype=data_type)
-                    self.all_data.append(data)
+                data = np.loadtxt(StringIO(data_str), dtype=data_type)
+                self.all_data.append(data)
+
+    def plot(self):
+        names = set([y for x in self.all_data for y in x.dtype.names])
+        names.remove(self.STEP)
+        fig_ncols = 2
+        fig_nrows = math.ceil(len(names)/fig_ncols)
+        self.fig = plt.figure(figsize=(12,7))
+        self.axises = []
+        data = self.all_data[-1]
+        for fig_index, name in enumerate(names, start=1):
+            axis = self.fig.add_subplot(fig_nrows, fig_ncols, fig_index)
+            self.axises.append(axis)
+            for data in self.all_data:
+                try:
+                    y_data = data[name]
+                except IndexError:
+                    pass
+                axis.plot(data[self.STEP], y_data)
+                axis.set_ylabel(name)
+        self.fig.tight_layout()
+
+        if not environutils.is_interactive():
+            return
+        self.fig.show()
+        input('Press any keys to continue...')
 
 
 class TempReader(object):
