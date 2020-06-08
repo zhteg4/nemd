@@ -8,9 +8,12 @@ import plotutils
 import environutils
 import jobutils
 
+from scipy import constants
+
 FLAG_IN_FILE = 'in_file'
 FLAG_TEMP_FILE = 'temp_file'
 FlAG_ENEGER_FILE = 'energy_file'
+FlAG_LOG_FILE = 'log_file'
 
 JOBNAME = os.path.basename(__file__).split('.')[0]
 
@@ -35,6 +38,7 @@ def get_parser():
                         metavar=FLAG_IN_FILE.upper(),
                         type=parserutils.type_file,
                         help='')
+    parser.add_argument(FlAG_LOG_FILE, metavar=FlAG_LOG_FILE.upper(), help='')
     parser.add_argument(FLAG_TEMP_FILE,
                         metavar=FLAG_TEMP_FILE.upper(),
                         help='')
@@ -56,32 +60,40 @@ class Nemd(object):
         self.options = options
         self.jobname = jobname
         self.lammps_in = None
-        self.temp_data = None
+        self.lammps_temp = None
         self.lammps_energy = None
         self.timestep = None
 
     def run(self):
         self.loadLammpsIn()
+        self.loadLog()
         self.loadTemp()
         self.loadEne()
         self.plot()
+        self.setThermalConductivity()
 
     def loadLammpsIn(self):
         self.lammps_in = fileutils.LammpsInput(self.options.in_file)
         self.lammps_in.run()
 
         self.lammps_units = self.lammps_in.getUnits()
-        log(f"{self.lammps_units} is the units.")
+        log(f"Lammps units is {self.lammps_units}.")
         self.timestep = self.lammps_in.getTimestep()
-        log(f"{self.timestep} is the timestep.")
+        log(f"Timestep is {self.timestep} fs.")
+
+    def loadLog(self):
+        self.lammps_log = fileutils.LammpsLogReader(self.options.log_file)
+        self.lammps_log.run()
+        log(f"The cross sectional area is {self.lammps_log.cross_sectional_area:0.4f} Angstroms^2"
+            )
 
     def loadTemp(self):
         block_num = 5
-        self.lammp_temp = fileutils.TempReader(self.options.temp_file,
-                                               block_num=block_num)
-        self.lammp_temp.run()
-        log(f"Every {int(self.lammp_temp.frame_num / block_num)} successive temperature profiles out of "
-            f"{self.lammp_temp.frame_num} are block averaged")
+        self.lammps_temp = fileutils.TempReader(self.options.temp_file,
+                                                block_num=block_num)
+        self.lammps_temp.run()
+        log(f"Every {int(self.lammps_temp.frame_num / block_num)} successive temperature profiles out of "
+            f"{self.lammps_temp.frame_num} are block-averaged")
 
     def loadEne(self):
         self.lammps_energy = fileutils.EnergyReader(self.options.energy_file,
@@ -92,10 +104,39 @@ class Nemd(object):
             )
 
     def plot(self):
-        temp_ene_plotter = plotutils.TempEnePlotter(self.lammp_temp,
+        temp_ene_plotter = plotutils.TempEnePlotter(self.lammps_temp,
                                                     self.lammps_energy,
                                                     self.jobname)
         temp_ene_plotter.plot()
+
+    def setThermalConductivity(self):
+        thermal_conductivity = ThermalConductivity(self.lammps_in,
+                                                   self.lammps_log,
+                                                   self.lammps_temp,
+                                                   self.lammps_energy)
+        thermal_conductivity.run()
+
+
+class ThermalConductivity(object):
+    def __init__(self, lammps_in, lammps_log, lammps_temp, lammps_energy):
+        self.lammps_in = lammps_in
+        self.lammps_log = lammps_log
+        self.lammps_temp = lammps_temp
+        self.lammps_energy = lammps_energy
+        self.thermal_conductivity = None
+
+    def run(self):
+        temp_gradient = self.lammps_temp.slope  # Temperature (K) / Coordinate (Angstrom)
+        temp_gradient_iu = temp_gradient / constants.angstrom
+        heat_flow = self.lammps_energy.slope  # Energy (Kcal/mole) / Time (ns)
+        heat_flow_ui = heat_flow * constants.calorie / constants.N_A * 1000 / constants.nano
+        cross_section = self.lammps_log.cross_sectional_area  # Angstrom^2
+        cross_section_ui = cross_section * (constants.angstrom**2)
+        # Fourier's law qx = -k dT/Dx
+        self.thermal_conductivity = heat_flow_ui / cross_section_ui / abs(
+            temp_gradient_iu)
+        log(f"Thermal conductivity is {self.thermal_conductivity:.4f} W / (m * K)"
+            )
 
 
 logger = None
@@ -108,7 +149,6 @@ def main(argv):
     logger = logutils.createDriverLogger(jobname=jobname)
     options = validate_options(argv)
     logutils.logOptions(logger, options)
-
     nemd = Nemd(options, jobname)
     nemd.run()
 

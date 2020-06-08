@@ -177,6 +177,7 @@ class EnergyReader(object):
 
     ENERGY_IN_KEY = 'Energy In (Kcal/mole)'
     ENERGY_OUT_KEY = 'Energy Out (Kcal/mole)'
+    TIME_NS = 'Time (ns)'
 
     def __init__(self, energy_file, timestep):
         self.energy_file = energy_file
@@ -277,7 +278,8 @@ class EnergyReader(object):
             axis=1)
         sel_qdata = qdata[start_idx:, :]
         sel_q_mean = np.abs(sel_qdata).mean(axis=1)
-        sel_time = self.data['Time (ns)'][start_idx:]
+        sel_time = self.data[self.TIME_NS][start_idx:]
+        # Energy In (Kcal/mole) / Time (ns)
         self.slope, self.intercept = np.polyfit(sel_time, sel_q_mean, 1)
         fitted_q = np.polyval([self.slope, self.intercept], sel_time)
         self.fitted_data = np.concatenate(
@@ -285,7 +287,6 @@ class EnergyReader(object):
 
 
 def get_line_num(filename):
-
     def blocks(files, size=65536):
         while True:
             b = files.read(size)
@@ -302,17 +303,23 @@ class LammpsLogReader(object):
 
     STEP = 'Step'
     LOOP = 'Loop'
+    LX = 'Lx'
+    LY = 'Ly'
+    LZ = 'Lz'
 
     def __init__(self, lammps_log):
         self.lammps_log = lammps_log
         self.all_data = []
+        self.cross_sectional_area = None
 
     def run(self):
         self.loadAllData()
+        self.setCrossSectionalArea()
         self.plot()
 
     def loadAllData(self):
-        with open(self.lammps_log, "r", encoding="utf-8", errors='ignore') as file_log:
+        with open(self.lammps_log, "r", encoding="utf-8",
+                  errors='ignore') as file_log:
             line = file_log.readline()
             while line:
                 line = file_log.readline()
@@ -332,12 +339,32 @@ class LammpsLogReader(object):
                 data = np.loadtxt(StringIO(data_str), dtype=data_type)
                 self.all_data.append(data)
 
+    def setCrossSectionalArea(self,
+                              first_dimension_lb=LY,
+                              second_dimension_lb=LZ):
+        d1_length, d2_length = None, None
+        for data in reversed(self.all_data):
+            try:
+                d1_length = data[first_dimension_lb]
+            except ValueError:
+                continue
+
+            try:
+                d2_length = data[second_dimension_lb]
+            except ValueError:
+                d1_length = None
+                continue
+
+            if d1_length is not None and d2_length is not None:
+                break
+        self.cross_sectional_area = np.mean(d1_length * d2_length)
+
     def plot(self):
         names = set([y for x in self.all_data for y in x.dtype.names])
         names.remove(self.STEP)
         fig_ncols = 2
-        fig_nrows = math.ceil(len(names)/fig_ncols)
-        self.fig = plt.figure(figsize=(12,7))
+        fig_nrows = math.ceil(len(names) / fig_ncols)
+        self.fig = plt.figure(figsize=(12, 7))
         self.axises = []
         data = self.all_data[-1]
         for fig_index, name in enumerate(names, start=1):
@@ -346,7 +373,7 @@ class LammpsLogReader(object):
             for data in self.all_data:
                 try:
                     y_data = data[name]
-                except IndexError:
+                except ValueError:
                     pass
                 axis.plot(data[self.STEP], y_data)
                 axis.set_ylabel(name)
@@ -399,6 +426,7 @@ class TempReader(object):
         indexes = [int(coord_num * x) for x in crange]
         sel_coords = coords[indexes[0]:indexes[-1] + 1]
         sel_temps = temps[indexes[0]:indexes[-1] + 1]
+        # Temperature (K) / Coordinate (Angstrom)
         self.slope, self.intercept = np.polyfit(sel_coords, sel_temps, 1)
         fitted_temps = np.polyval([self.slope, self.intercept], sel_coords)
         self.fitted_data = np.concatenate(
