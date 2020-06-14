@@ -6,9 +6,11 @@ import units
 from io import StringIO
 from dataclasses import dataclass
 from matplotlib import pyplot as plt
+from collections import namedtuple
 
 logger = logutils.createModuleLogger()
 
+LogData = namedtuple('LogData', ['fix', 'data'])
 
 def log_debug(msg):
 
@@ -229,7 +231,7 @@ class EnergyReader(object):
         except ValueError as err:
             # Wrong number of columns at line 400003
             err_str = str(err)
-            log_debug(err_str + f' in loading {self.energy_file}')
+            log_debug(err_str + f' in loading {self.energy_file}: {err_str}')
             self.total_line_num = int(
                 err_str.split()[-1]) - self.start_line_num - 1
         else:
@@ -301,6 +303,7 @@ def get_line_num(filename):
 
 class LammpsLogReader(object):
 
+    FIX = 'fix' # fix NPT all npt temp 0.1 0.1 25  x 0 0 2500  y 0 0 2500    z 0 0 2500
     STEP = 'Step'
     LOOP = 'Loop'
     LX = 'Lx'
@@ -320,9 +323,12 @@ class LammpsLogReader(object):
     def loadAllData(self):
         with open(self.lammps_log, "r", encoding="utf-8",
                   errors='ignore') as file_log:
+            fix_line = None
             line = file_log.readline()
             while line:
                 line = file_log.readline()
+                if line.startswith(self.FIX):
+                    fix_line = line
                 if not line.startswith(self.STEP):
                     continue
 
@@ -337,7 +343,7 @@ class LammpsLogReader(object):
                     data_str += line
                     line = file_log.readline()
                 data = np.loadtxt(StringIO(data_str), dtype=data_type)
-                self.all_data.append(data)
+                self.all_data.append(LogData(fix=fix_line, data=data))
 
     def setCrossSectionalArea(self,
                               first_dimension_lb=LY,
@@ -345,12 +351,12 @@ class LammpsLogReader(object):
         d1_length, d2_length = None, None
         for data in reversed(self.all_data):
             try:
-                d1_length = data[first_dimension_lb]
+                d1_length = data.data[first_dimension_lb]
             except ValueError:
                 continue
 
             try:
-                d2_length = data[second_dimension_lb]
+                d2_length = data.data[second_dimension_lb]
             except ValueError:
                 d1_length = None
                 continue
@@ -360,7 +366,7 @@ class LammpsLogReader(object):
         self.cross_sectional_area = np.mean(d1_length * d2_length)
 
     def plot(self):
-        names = set([y for x in self.all_data for y in x.dtype.names])
+        names = set([y for x in self.all_data for y in x.data.dtype.names])
         names.remove(self.STEP)
         fig_ncols = 2
         fig_nrows = math.ceil(len(names) / fig_ncols)
@@ -372,17 +378,20 @@ class LammpsLogReader(object):
             self.axises.append(axis)
             for data in self.all_data:
                 try:
-                    y_data = data[name]
+                    y_data = data.data[name]
                 except ValueError:
                     pass
-                axis.plot(data[self.STEP], y_data)
+                line, = axis.plot(data.data[self.STEP], y_data)
                 axis.set_ylabel(name)
-        self.fig.tight_layout()
+
+        self.fig.legend(axis.lines, [x.fix.replace('\t', '') for x in self.all_data], loc="upper right", ncol=3, prop={'size': 8.3})
+        self.fig.tight_layout(rect= (0.0, 0.0, 1.0, 1.0 - self.fig.legends[0].handleheight / self.fig.get_figheight() ))
 
         if not environutils.is_interactive():
             return
         self.fig.show()
-        input('Press any keys to continue...')
+        import pdb; pdb.set_trace()
+        input('Press any keys to close the lammps log plot ...')
 
 
 class TempReader(object):
