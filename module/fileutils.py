@@ -390,7 +390,7 @@ class LammpsLogReader(object):
         if not environutils.is_interactive():
             return
         self.fig.show()
-        import pdb; pdb.set_trace()
+
         input('Press any keys to close the lammps log plot ...')
 
 

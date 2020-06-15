@@ -15,8 +15,7 @@ FLAG_TEMP_FILE = 'temp_file'
 FlAG_ENEGER_FILE = 'energy_file'
 FlAG_LOG_FILE = 'log_file'
 
-JOBNAME = os.path.basename(__file__).split('.')[0]
-
+JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 
 def log_debug(msg):
     if logger:
