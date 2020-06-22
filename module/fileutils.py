@@ -1,5 +1,6 @@
 import environutils
 import math
+import os
 import numpy as np
 import logutils
 import units
@@ -7,10 +8,13 @@ from io import StringIO
 from dataclasses import dataclass
 from matplotlib import pyplot as plt
 from collections import namedtuple
+from _collections import defaultdict
 
 logger = logutils.createModuleLogger()
 
 LogData = namedtuple('LogData', ['fix', 'data'])
+FixCommand = namedtuple('FixCommand', ['id', 'group_id', 'style', 'args'])
+
 
 def log_debug(msg):
 
@@ -96,9 +100,14 @@ class LammpsInput(object):
     # SIMULATION_SETTINGS_KEYS = [TIMESTEP, THERMO]
     TIMESTEP = 'timestep'
     THERMO = 'thermo'
+    FIX = 'fix'
+    AVE_CHUNK = 'ave/chunk'
+    FILE = 'file'
     SIMULATION_SETTINGS_KEYS_ITEMS = {
         TIMESTEP: float,
         THERMO: int,
+        FIX: FixCommand,
+        LOG: str
     }
 
     ALL_ITEMS = {}
@@ -154,14 +163,54 @@ class LammpsInput(object):
             if len(cmd_values) == 1:
                 cmd_value = cmd_values[0]
                 if isinstance(expected, set):
+                    # e.g. units can be real, metal, lj, ... but not anything
                     if cmd_value not in expected:
                         raise ValueError(
                             f"{cmd_value} not in {expected} for {cmd_key}")
                     self.cmd_items[cmd_key] = cmd_value
                     continue
-                if callable(expected):
-                    self.cmd_items[cmd_key] = expected(cmd_value)
-            self.cmd_items[cmd_key] = expected(*cmd_values)
+
+            if cmd_key == self.FIX:
+                fix_command = expected(id=cmd_values[0],
+                                       group_id=cmd_values[1],
+                                       style=cmd_values[2],
+                                       args=cmd_values[3:])
+                self.cmd_items.setdefault(self.FIX.upper(),
+                                          []).append(fix_command)
+                continue
+
+            if callable(expected):
+                self.cmd_items[cmd_key] = expected(*cmd_values)
+
+    def getTempFile(self):
+        tempfile_basename = self.getTempFileBaseName()
+        if tempfile_basename is None:
+            return None
+        return os.path.join(os.path.dirname(self.input_file),
+                            tempfile_basename)
+
+    def getEnergyFile(self):
+        ene_file = self.cmd_items.get('log', None)
+        if ene_file is None:
+            return None
+        return os.path.join(os.path.dirname(self.input_file), ene_file)
+
+    def getTempFileBaseName(self):
+        ave_chunk_comands = [
+            x for x in self.cmd_items[self.FIX.upper()]
+            if x.style == self.AVE_CHUNK
+        ]
+        if not ave_chunk_comands:
+            return None
+        ave_chunk_args = ave_chunk_comands[-1].args
+        try:
+            file_index = ave_chunk_args.index(self.FILE)
+        except ValueError:
+            return None
+        try:
+            return ave_chunk_args[file_index + 1]
+        except IndexError:
+            return None
 
     def getUnits(self):
         return self.cmd_items[self.UNITS]
@@ -303,7 +352,7 @@ def get_line_num(filename):
 
 class LammpsLogReader(object):
 
-    FIX = 'fix' # fix NPT all npt temp 0.1 0.1 25  x 0 0 2500  y 0 0 2500    z 0 0 2500
+    FIX = 'fix'  # fix NPT all npt temp 0.1 0.1 25  x 0 0 2500  y 0 0 2500    z 0 0 2500
     STEP = 'Step'
     LOOP = 'Loop'
     LX = 'Lx'
@@ -384,8 +433,14 @@ class LammpsLogReader(object):
                 line, = axis.plot(data.data[self.STEP], y_data)
                 axis.set_ylabel(name)
 
-        self.fig.legend(axis.lines, [x.fix.replace('\t', '') for x in self.all_data], loc="upper right", ncol=3, prop={'size': 8.3})
-        self.fig.tight_layout(rect= (0.0, 0.0, 1.0, 1.0 - self.fig.legends[0].handleheight / self.fig.get_figheight() ))
+        self.fig.legend(axis.lines,
+                        [x.fix.replace('\t', '') for x in self.all_data],
+                        loc="upper right",
+                        ncol=3,
+                        prop={'size': 8.3})
+        self.fig.tight_layout(
+            rect=(0.0, 0.0, 1.0, 1.0 -
+                  self.fig.legends[0].handleheight / self.fig.get_figheight()))
 
         if not environutils.is_interactive():
             return

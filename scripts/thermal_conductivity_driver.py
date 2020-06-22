@@ -11,11 +11,14 @@ import jobutils
 from scipy import constants
 
 FLAG_IN_FILE = 'in_file'
-FLAG_TEMP_FILE = 'temp_file'
-FlAG_ENEGER_FILE = 'energy_file'
-FlAG_LOG_FILE = 'log_file'
+FLAG_TEMP_FILE = '-temp_file'
+FlAG_ENEGER_FILE = '-energy_file'
+FlAG_LOG_FILE = '-log_file'
+
+LOG_LAMMPS = 'log.lammps'
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
+
 
 def log_debug(msg):
     if logger:
@@ -37,12 +40,17 @@ def get_parser():
                         metavar=FLAG_IN_FILE.upper(),
                         type=parserutils.type_file,
                         help='')
-    parser.add_argument(FlAG_LOG_FILE, metavar=FlAG_LOG_FILE.upper(), help='')
+    parser.add_argument(FlAG_LOG_FILE,
+                        metavar=FlAG_LOG_FILE.upper(),
+                        type=parserutils.type_file,
+                        help='')
     parser.add_argument(FLAG_TEMP_FILE,
                         metavar=FLAG_TEMP_FILE.upper(),
+                        type=parserutils.type_file,
                         help='')
     parser.add_argument(FlAG_ENEGER_FILE,
                         metavar=FlAG_ENEGER_FILE.upper(),
+                        type=parserutils.type_file,
                         help='')
     jobutils.add_job_arguments(parser)
     return parser
@@ -51,6 +59,47 @@ def get_parser():
 def validate_options(argv):
     parser = get_parser()
     options = parser.parse_args(argv)
+
+    if options.log_file is None:
+        in_file_dir = os.path.dirname(options.in_file)
+        log_file = os.path.join(in_file_dir, LOG_LAMMPS)
+        try:
+            options.log_file = parserutils.type_file(log_file)
+        except argparse.ArgumentTypeError:
+            parser.error(f'{log_file} not found. ({FlAG_LOG_FILE})')
+
+    if options.temp_file and options.energy_file:
+        return options
+
+    lammps_in = fileutils.LammpsInput(options.in_file)
+    lammps_in.run()
+
+    if options.temp_file is None:
+        temp_file = lammps_in.getTempFile()
+        if temp_file is None:
+            parser.error(
+                f"{options.in_file} doesn't define a temperature file. ({FLAG_TEMP_FILE})"
+            )
+        try:
+            options.temp_file = parserutils.type_file(temp_file)
+        except argparse.ArgumentTypeError:
+            parser.error(
+                f'{temp_file} from {options.in_file} not found. ({FLAG_TEMP_FILE})'
+            )
+
+    if options.energy_file is None:
+        energy_file = lammps_in.getEnergyFile()
+        if energy_file is None:
+            parser.error(
+                f"{options.in_file} doesn't define a energy file. ({FlAG_ENEGER_FILE})"
+            )
+        try:
+            options.energy_file = parserutils.type_file(energy_file)
+        except argparse.ArgumentTypeError:
+            parser.error(
+                f'{energy_file} from {options.in_file} not found. ({FlAG_ENEGER_FILE})'
+            )
+
     return options
 
 
@@ -70,6 +119,7 @@ class Nemd(object):
         self.loadEne()
         self.plot()
         self.setThermalConductivity()
+        log('Finished', timestamp=True)
 
     def loadLammpsIn(self):
         self.lammps_in = fileutils.LammpsInput(self.options.in_file)
