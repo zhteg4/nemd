@@ -246,6 +246,23 @@ class EnergyReader(object):
         self.setUnits()
         self.setHeatflux()
 
+    def write(self, filename):
+        time = self.data['Time (ns)']
+        ene_in = self.data['Energy In (Kcal/mole)']
+        ene_out = self.data['Energy In (Kcal/mole)']
+        ene_data = np.concatenate((ene_in.reshape(1,
+                                                  -1), ene_out.reshape(1, -1)))
+        ene_data = np.transpose(ene_data)
+        data = np.concatenate(
+            (time.reshape(1, -1), ene_data.mean(axis=1).reshape(1, -1),
+             ene_data.std(axis=1).reshape(1, -1)))
+        data = np.transpose(data)
+        col_titles = [
+            'Time (ns)', 'Energy (Kcal/mole)',
+            'Energy Standard Deviation (Kcal/mole)'
+        ]
+        np.savez(filename, data, header=','.join(col_titles))
+
     def setStartEnd(self):
         with open(self.energy_file, 'r') as file_energy:
             one_line = file_energy.readline()
@@ -446,7 +463,7 @@ class LammpsLogReader(object):
             return
         self.fig.show()
 
-        input('Press any keys to close the lammps log plot ...')
+        input('Showing the lammps log plot. Press any keys to continue...')
 
 
 class TempReader(object):
@@ -462,6 +479,20 @@ class TempReader(object):
     def run(self):
         self.load()
         self.setTempGradient()
+
+    def write(self, filename):
+        coords = self.data[:, 1, -1]
+        temps = self.data[:, 3, -1]
+        block_temps = self.data[:, 3, :-1]
+        std_temps = np.std(block_temps, axis=1)
+        data = np.concatenate((coords.reshape(1, -1), temps.reshape(1, -1),
+                               std_temps.reshape(1, -1)))
+        data = np.transpose(data)
+        col_titles = [
+            'Coordinates (Angstrom)', 'Temperature (K)',
+            'Temperature Standard Deviation (K)'
+        ]
+        np.savez(filename, data, header=','.join(col_titles))
 
     def load(self):
 

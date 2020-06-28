@@ -1,0 +1,16 @@
+..........Command Options..........
+in_file: ../in.nemd_cff91
+log_file: ../log.lammps
+temp_file: ../temp.profile
+energy_file: ../en_ex.log
+interactive: False
+jobname: None
+...................................
+Lammps units is real.
+Timestep is 0.25 fs.
+The cross sectional area is 855.5744 Angstroms^2
+Every 399 successive temperature profiles out of 1999 are block-averaged
+Found 40000000 steps of energy logging, corresponding to 10.0 ns
+Thermal conductivity is 10.6464 W / (m * K)
+Finished
+2020-06-28 17:17

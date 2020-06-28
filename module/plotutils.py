@@ -85,4 +85,6 @@ class TempEnePlotter(object):
             return
 
         self.fig.show()
-        input('Press any keys to continue...')
+        input(
+            'Showing the temperature profile and energy plots. Press any keys to continue...'
+        )

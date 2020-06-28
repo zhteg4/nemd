@@ -8,6 +8,7 @@ import plotutils
 import environutils
 import jobutils
 
+import numpy as np
 from scipy import constants
 
 FLAG_IN_FILE = 'in_file'
@@ -141,6 +142,7 @@ class Nemd(object):
         self.lammps_temp = fileutils.TempReader(self.options.temp_file,
                                                 block_num=block_num)
         self.lammps_temp.run()
+        self.lammps_temp.write(self.jobname + '_temp')
         log(f"Every {int(self.lammps_temp.frame_num / block_num)} successive temperature profiles out of "
             f"{self.lammps_temp.frame_num} are block-averaged")
 
@@ -148,6 +150,7 @@ class Nemd(object):
         self.lammps_energy = fileutils.EnergyReader(self.options.energy_file,
                                                     self.timestep)
         self.lammps_energy.run()
+        self.lammps_energy.write(self.jobname + '_ene')
         log(f"Found {self.lammps_energy.total_step_num} steps of energy logging, "
             f"corresponding to {self.lammps_energy.total_step_num * self.timestep / units.NANO2FETO} ns"
             )
