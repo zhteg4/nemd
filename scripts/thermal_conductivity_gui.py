@@ -22,6 +22,11 @@ class MainWindow(QtWidgets.QMainWindow):
         central_widget.setLayout(self.central_layout)
         self.setCentralWidget(central_widget)
 
+        self.load_data_bn = widgets.PushButton('Load Data',
+                                               after_label='not set',
+                                               layout=self.central_layout,
+                                               command=self.loadData)
+
         self.canvas = Canvas()
         self.central_layout.addWidget(self.canvas)
 
@@ -38,6 +43,15 @@ class MainWindow(QtWidgets.QMainWindow):
         # self.statusBar().showMessage('Ready')
 
         self.setWindowTitle('Thermal Conductivity Viewer')
+
+    def loadData(self):
+        dlg = QtWidgets.QFileDialog(self)
+        dlg.setFileMode(QtWidgets.QFileDialog.AnyFile)
+        dlg.setNameFilters(["Driver log (*-driver.log)"])
+        if dlg.exec_():
+            filenames = dlg.selectedFiles()
+        self.load_data_bn.after_label.setText(os.path.basename(filenames[0]))
+        self.load_data_bn.after_label.setToolTip(filenames[0])
 
 
 def main():
