@@ -248,8 +248,8 @@ class EnergyReader(object):
 
     def write(self, filename):
         time = self.data['Time (ns)']
-        ene_in = self.data['Energy In (Kcal/mole)']
-        ene_out = self.data['Energy In (Kcal/mole)']
+        ene_in = np.abs(self.data['Energy In (Kcal/mole)'])
+        ene_out = self.data['Energy Out (Kcal/mole)']
         ene_data = np.concatenate((ene_in.reshape(1,
                                                   -1), ene_out.reshape(1, -1)))
         ene_data = np.transpose(ene_data)
