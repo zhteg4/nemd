@@ -261,7 +261,7 @@ class EnergyReader(object):
             'Time (ns)', 'Energy (Kcal/mole)',
             'Energy Standard Deviation (Kcal/mole)'
         ]
-        np.savez(filename, data, header=','.join(col_titles))
+        np.savez(filename, data=data, header=','.join(col_titles))
 
     def setStartEnd(self):
         with open(self.energy_file, 'r') as file_energy:
@@ -492,7 +492,7 @@ class TempReader(object):
             'Coordinates (Angstrom)', 'Temperature (K)',
             'Temperature Standard Deviation (K)'
         ]
-        np.savez(filename, data, header=','.join(col_titles))
+        np.savez(filename, data=data, header=','.join(col_titles))
 
     def load(self):
 

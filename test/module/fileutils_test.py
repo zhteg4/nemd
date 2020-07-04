@@ -2,10 +2,8 @@ import os
 import testutils
 import fileutils
 import pytest
+from testutils import SINGLE_NEMD, CRYSTAL_NEMD
 
-
-SINGLE_NEMD = 'lammps_22Aug18/polyacetylene/single_chain/nemd'
-CRYSTAL_NEMD = 'lammps_22Aug18/polyacetylene/crystal_cell/nemd'
 
 
 class TestTempReader(object):
