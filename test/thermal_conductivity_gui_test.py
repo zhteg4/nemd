@@ -21,6 +21,3 @@ class TestMainWindow(object):
     def testLoadAndDraw(self, panel):
         panel.loadAndDraw(file_path=DRIVER_LOG)
         panel.show()
-        import pdb;
-        pdb.set_trace()
-        pass

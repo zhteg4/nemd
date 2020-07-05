@@ -12,7 +12,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
 
-class DraggableLine:
+class DraggableLine(object):
     HORIZONTAL = 'horizontal'
     VERTICAL = 'vertical'
 
@@ -22,11 +22,16 @@ class DraggableLine:
         self.kind = kind
         self.position = position
 
-        x = [position, position]
-        y = [-1, 1]
+        x_line = [position, position]
+        y_line = [-1, 1]
         if kind == self.HORIZONTAL:
-            x, y = y, x
-        self.line = lines.Line2D(x, y, picker=5)
+            x_line, y_line = y_line, x_line
+        self.line = lines.Line2D(x_line,
+                                 y_line,
+                                 color='m',
+                                 linewidth=2.5,
+                                 alpha=0.3,
+                                 picker=5)
         self.axis.add_line(self.line)
         self.canvas.draw_idle()
         self.sid = self.canvas.mpl_connect('pick_event', self.clickonline)
@@ -38,20 +43,29 @@ class DraggableLine:
             self.releaser = self.canvas.mpl_connect("button_press_event",
                                                     self.releaseonclick)
 
-    def followmouse(self, event, other_demension=None):
-        if self.kind == self.HORIZONTAL:
-            self.line.set_ydata([event.ydata, event.ydata])
-            if other_demension:
-                self.line.set_xdata(
-                    [other_demension.min_data, other_demension.max_data])
-        else:
-            self.line.set_xdata([event.xdata, event.xdata])
-            if other_demension:
-                self.line.set_ydata(
-                    [other_demension.min_data, other_demension.max_data])
-        if other_demension:
-            return
+    def followmouse(self, event):
+        self.setLinePosition(event)
         self.canvas.draw_idle()
+
+    def update(self, event):
+        self.setLinePosition(event)
+        self.setLineLength()
+
+    def setLineLength(self):
+        if self.kind == self.VERTICAL:
+            y_min, y_max = self.axis.get_ylim()
+            self.line.set_ydata([y_min, y_max])
+        else:
+            x_min, x_max = self.axis.get_xlim()
+            self.line.set_xdata([x_min, x_max])
+
+    def setLinePosition(self, event):
+        if self.kind == self.VERTICAL:
+            x_point = event.xdata
+            self.line.set_xdata([x_point, x_point])
+        else:
+            y_point = event.ydata
+            self.line.set_ydata([y_point, y_point])
 
     def releaseonclick(self, event):
         if self.kind == self.HORIZONTAL:
@@ -63,34 +77,68 @@ class DraggableLine:
         self.canvas.mpl_disconnect(self.follower)
 
 
+class LineWithVSpan(DraggableLine):
+
+    LEFT = 'left'
+    RIGHT = 'right'
+
+    def __init__(self, *args, fill_direction='right', **kwargs):
+        self.fill_direction = fill_direction
+        super().__init__(*args, **kwargs)
+        xrange = list(self.axis.get_xlim())
+        edge_index = 0 if fill_direction == self.RIGHT else 1
+        xrange[edge_index] = self.position
+        self.polygon = self.axis.axvspan(*xrange, alpha=0.3, color='grey')
+
+    def followmouse(self, event):
+        self.setLinePosition(event)
+        self.resizeVSpan(event)
+        self.canvas.draw_idle()
+
+    def update(self, event):
+        self.resizeVSpan(event)
+        super().update(event)
+
+    def resizeVSpan(self, event):
+        vpan_xy = self.polygon.get_xy()
+        xmin, xmax = self.axis.get_xlim()
+        x_lim = xmax if self.fill_direction == self.RIGHT else xmin
+        vpan_xy[:, 0] = [event.xdata, event.xdata, x_lim, x_lim, event.xdata]
+        self.polygon.set_xy(vpan_xy)
+
+
 class Canvas(FigureCanvasQTAgg):
     def __init__(self, width=5, height=4, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         self.temp_axis = self.fig.add_subplot(211)
         self.ene_axis = self.fig.add_subplot(212)
         super().__init__(self.fig)
-        self.temp_lline = DraggableLine(self.temp_axis)
-        self.temp_uline = DraggableLine(self.temp_axis, position=0.9)
+        self.temp_axis.set_xlim((0, 1))
+        self.temp_lline = LineWithVSpan(self.temp_axis, fill_direction = LineWithVSpan.LEFT)
+        self.temp_uline = LineWithVSpan(self.temp_axis, position=0.9)
 
-    def plot(self, temp_data, ene_data):
+    def plot(self,
+             temp_data,
+             ene_data,
+             lim_frac=(-0.1, 1.1),
+             line_frac=(0.1, 0.9)):
 
         coordinates = temp_data[:, 0]
         temp = temp_data[:, 1]
-        self.x = coordinates
-        self.y = temp
-        x_min = min(self.x)
-        x_span = max(self.x) - x_min
-        y_min = min(self.y)
-        y_span = max(self.y) - y_min
+        coord_min = min(coordinates)
+        coord_span = max(coordinates) - coord_min
+        temp_min = min(temp)
+        temp_span = max(temp) - temp_min
 
-        self.temp_lline.followmouse(
-            SimpleNamespace(xdata=0.1 * x_span + x_min),
-            other_demension=SimpleNamespace(min_data=-0.1 * y_span + y_min,
-                                            max_data=1.1 * y_span + y_min))
-        self.temp_uline.followmouse(
-            SimpleNamespace(xdata=0.9 * x_span + x_min),
-            other_demension=SimpleNamespace(min_data=-0.1 * y_span + y_min,
-                                            max_data=1.1 * y_span + y_min))
+        self.temp_axis.set_xlim(lim_frac[0] * coord_span + coord_min,
+                                lim_frac[1] * coord_span + coord_min)
+        self.temp_axis.set_ylim(lim_frac[0] * temp_span + temp_min,
+                                lim_frac[1] * temp_span + temp_min)
+
+        self.temp_lline.update(
+            SimpleNamespace(xdata=line_frac[0] * coord_span + coord_min))
+        self.temp_uline.update(
+            SimpleNamespace(xdata=line_frac[1] * coord_span + coord_min))
 
         temp_lower_bound = temp - temp_data[:, 2]
         temp_upper_bound = temp + temp_data[:, 2]
@@ -100,8 +148,6 @@ class Canvas(FigureCanvasQTAgg):
                                     temp_upper_bound,
                                     alpha=0.2,
                                     picker=5)
-        self.temp_axis.set_xlim(-0.1 * x_span + x_min, 1.1 * x_span + x_min)
-        self.temp_axis.set_ylim(-0.1 * y_span + y_min, 1.1 * y_span + y_min)
 
         time = ene_data[:, 0]
         energy = ene_data[:, 1]
@@ -136,12 +182,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.toolbar = NavigationToolbar(self.canvas, self)
         self.central_layout.addWidget(self.toolbar)
         self.central_layout.addWidget(self.canvas)
-        # matplotlib.widgets.Cursor(self.canvas.temp_axis, vertOn=True)
-        # self.slider = QtWidgets.QSlider(QtCore.Qt.Vertical)
-        # self.central_layout.addWidget(self.slider)
-        # self.slider.setMinimum(10)
-        # self.slider.setMaximum(30)
-        # self.slider.setValue(20)
 
         self.thermal_conductivity_le = widgets.LineEdit(
             '',
@@ -150,9 +190,6 @@ class MainWindow(QtWidgets.QMainWindow):
             layout=self.central_layout,
             readonly=True)
 
-        # hour = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        # temperature = [30, 32, 34, 32, 33, 31, 29, 32, 35, 45]
-        # self.canvas.axes.plot(hour, temperature)
         # self.statusBar().showMessage('Ready')
 
     def loadAndDraw(self, file_path=None):
