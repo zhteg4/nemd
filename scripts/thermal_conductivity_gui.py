@@ -13,6 +13,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 
 
 class DraggableLine(object):
+
     HORIZONTAL = 'horizontal'
     VERTICAL = 'vertical'
 
@@ -114,7 +115,8 @@ class Canvas(FigureCanvasQTAgg):
         self.ene_axis = self.fig.add_subplot(212)
         super().__init__(self.fig)
         self.temp_axis.set_xlim((0, 1))
-        self.temp_lline = LineWithVSpan(self.temp_axis, fill_direction = LineWithVSpan.LEFT)
+        self.temp_lline = LineWithVSpan(self.temp_axis,
+                                        fill_direction=LineWithVSpan.LEFT)
         self.temp_uline = LineWithVSpan(self.temp_axis, position=0.9)
 
     def plot(self,
@@ -162,11 +164,11 @@ class Canvas(FigureCanvasQTAgg):
         self.draw_idle()
 
 
-class MainWindow(QtWidgets.QMainWindow):
+class NemdPanel(QtWidgets.QMainWindow):
     def __init__(self, app, *args, **kwargs):
         self.app = app
         self.file_path = None
-        super(MainWindow, self).__init__(*args, **kwargs)
+        super(NemdPanel, self).__init__(*args, **kwargs)
         self.setWindowTitle('Thermal Conductivity Viewer')
         self.central_layout = QtWidgets.QVBoxLayout()
         central_widget = QtWidgets.QWidget()
@@ -183,13 +185,32 @@ class MainWindow(QtWidgets.QMainWindow):
         self.central_layout.addWidget(self.toolbar)
         self.central_layout.addWidget(self.canvas)
 
+        hlayout = QtWidgets.QHBoxLayout()
+        self.central_layout.addLayout(hlayout)
         self.thermal_conductivity_le = widgets.LineEdit(
             '',
             label='Thermal Conductivity:',
             after_label='W/(m⋅K)',
-            layout=self.central_layout,
+            layout=hlayout,
             readonly=True)
+        self.temp_gradient = widgets.LineEdit('',
+                                             label='Temperature Gradient:',
+                                             after_label='W/m^2',
+                                             layout=hlayout,
+                                             readonly=True)
+        self.heat_flux_le = widgets.LineEdit('',
+                                             label='Heat Flux:',
+                                             after_label=u'K/\u212B',
+                                             layout=hlayout,
+                                             readonly=True)
+        self.cross_area_le = widgets.LineEdit('',
+                                             label='Cross Sectional Area:',
+                                             after_label=u"\u212B<sup>2<sup>",
+                                             layout=hlayout,
+                                             readonly=True)
 
+        hlayout.addStretch(1000)
+        self.setMinimumHeight(600)
         # self.statusBar().showMessage('Ready')
 
     def loadAndDraw(self, file_path=None):
@@ -223,12 +244,12 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         temp_file = self.file_path.replace('-driver.log', '_temp.npz')
-        ene_file = self.file_path.replace('-driver.log', '_ene.npz')
         try:
             self.temp_data = np.load(temp_file)['data']
         except FileNotFoundError:
             self.reset()
 
+        ene_file = self.file_path.replace('-driver.log', '_ene.npz')
         try:
             self.ene_data = np.load(ene_file)['data']
         except FileNotFoundError:
@@ -247,7 +268,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 def get_panel():
     app = QtWidgets.QApplication(sys.argv)
-    panel = MainWindow(app)
+    panel = NemdPanel(app)
     return panel
 
 

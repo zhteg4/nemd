@@ -12,7 +12,7 @@ import thermal_conductivity_gui as gui
 DRIVER_LOG = testutils.test_file(os.path.join(CRYSTAL_NEMD, 'results', 'thermal_conductivity-driver.log'))
 
 
-class TestMainWindow(object):
+class TestNemdPanel(object):
 
     @pytest.fixture
     def panel(self):
@@ -21,3 +21,5 @@ class TestMainWindow(object):
     def testLoadAndDraw(self, panel):
         panel.loadAndDraw(file_path=DRIVER_LOG)
         panel.show()
+        import pdb;pdb.set_trace()
+        pass
