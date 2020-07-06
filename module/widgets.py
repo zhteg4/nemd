@@ -46,6 +46,7 @@ class LineEdit(QtWidgets.QFrame):
                  *args,
                  **kwargs):
 
+        self.command = kwargs.pop('command', None)
         super().__init__()
         layout.addWidget(self)
         self.layout = QtWidgets.QHBoxLayout()
@@ -62,6 +63,8 @@ class LineEdit(QtWidgets.QFrame):
             self.after_label = QtWidgets.QLabel(after_label)
             self.layout.addWidget(self.after_label)
         self.layout.addStretch(1000)
+        if self.command:
+            self.line_edit.textChanged.connect(self.command)
 
     def setText(self, text):
         self.line_edit.setText(text)
@@ -69,16 +72,24 @@ class LineEdit(QtWidgets.QFrame):
     def text(self):
         return self.line_edit.text()
 
-class FloatLineEdit(LineEdit):
-    def __init__(self,
-                 *args,
-                 **kwargs):
 
-        super().__init__(*args,
-                 **kwargs)
+class FloatLineEdit(LineEdit):
+    def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
 
     def value(self):
-        return float(super().text())
+        try:
+            value = float(super().text())
+        except ValueError:
+            return None
+        return value
 
     def setValue(self, value):
-        self.line_edit.setText(str(value))
+        try:
+            value = float(value)
+        except TypeError:
+            self.line_edit.setText('')
+            return
+
+        self.line_edit.setText(f"{value:.6g}")

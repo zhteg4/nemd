@@ -7,10 +7,13 @@ import nemd
 import widgets
 import matplotlib
 from PyQt5 import QtCore, QtGui, QtWidgets
+from matplotlib import colors as mcolors
 from matplotlib import lines
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+
+COLORS = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
 
 
 class DraggableLine(object):
@@ -18,11 +21,13 @@ class DraggableLine(object):
     HORIZONTAL = 'horizontal'
     VERTICAL = 'vertical'
 
-    def __init__(self, axis, position=0.1, kind=VERTICAL):
+    def __init__(self, axis, position=0.1, command=None, kind=VERTICAL):
         self.axis = axis
-        self.canvas = self.axis.get_figure().canvas
         self.kind = kind
         self.position = position
+        self.command = command
+
+        self.canvas = self.axis.get_figure().canvas
 
         x_line = [position, position]
         y_line = [-1, 1]
@@ -30,7 +35,7 @@ class DraggableLine(object):
             x_line, y_line = y_line, x_line
         self.line = lines.Line2D(x_line,
                                  y_line,
-                                 color='m',
+                                 color=COLORS['orange'],
                                  linewidth=2.5,
                                  alpha=0.3,
                                  picker=5)
@@ -73,6 +78,8 @@ class DraggableLine(object):
         self.setPosition()
         self.canvas.mpl_disconnect(self.releaser)
         self.canvas.mpl_disconnect(self.follower)
+        if self.command:
+            self.command()
 
     def setPosition(self):
         if self.kind == self.HORIZONTAL:
@@ -108,21 +115,59 @@ class LineWithVSpan(DraggableLine):
         vpan_xy = self.polygon.get_xy()
         xmin, xmax = self.axis.get_xlim()
         x_lim = xmax if self.fill_direction == self.RIGHT else xmin
-        print(vpan_xy[:, 0])
         vpan_xy[:, 0] = [event.xdata, event.xdata, x_lim, x_lim, event.xdata]
         self.polygon.set_xy(vpan_xy)
 
 
 class Canvas(FigureCanvasQTAgg):
-    def __init__(self, width=5, height=4, dpi=100):
+    def __init__(self, width=5, height=4, dpi=100, command=None):
+        self.command = command
         self.fig = Figure(figsize=(width, height), dpi=dpi)
+        super().__init__(self.fig)
         self.temp_axis = self.fig.add_subplot(211)
         self.ene_axis = self.fig.add_subplot(212)
-        super().__init__(self.fig)
+        self.setUpAxises()
+        self.temp_lline = LineWithVSpan(
+            self.temp_axis,
+            fill_direction=LineWithVSpan.LEFT,
+            command=self.setGradientsAndConductivity)
+        self.temp_rline = LineWithVSpan(
+            self.temp_axis,
+            position=0.9,
+            command=self.setGradientsAndConductivity)
+        self.fig.tight_layout()
+
+        self.temp_gradient = None
+        self.heat_flow = None
+
+    def setGradientsAndConductivity(self):
+        self.setGradients()
+        if self.command:
+            self.command()
+
+    def setGradients(self):
+
+        coord_min = self.temp_lline.position
+        coord_max = self.temp_rline.position
+        temp_data = self.temp_axis.lines[-1].get_xydata()
+        sel_temp_data = temp_data[(temp_data[:, 0] > coord_min)
+                                  & (temp_data[:, 0] < coord_max)]
+        self.temp_gradient, temp_intercept = np.polyfit(
+            sel_temp_data[:, 0], sel_temp_data[:, 1], 1)
+
+        ene_temp_data = self.ene_axis.lines[-1].get_xydata()
+        self.heat_flow, ene_intercept = np.polyfit(ene_temp_data[:, 0],
+                                                   ene_temp_data[:, 1], 1)
+
+    def setUpAxises(self):
         self.temp_axis.set_xlim((0, 1))
-        self.temp_lline = LineWithVSpan(self.temp_axis,
-                                        fill_direction=LineWithVSpan.LEFT)
-        self.temp_rline = LineWithVSpan(self.temp_axis, position=0.9)
+        self.temp_axis.set_xlabel(u"Coordinates (\u212B)")
+        self.temp_axis.set_ylabel('Temperature (K)')
+        self.ene_axis.ticklabel_format(style='scientific',
+                                       scilimits=(-3, 3),
+                                       useMathText=True)
+        self.ene_axis.set_xlabel("Time (ns)")
+        self.ene_axis.set_ylabel('Energy (Kcal/mol)')
 
     def plot(self,
              temp_data,
@@ -149,12 +194,14 @@ class Canvas(FigureCanvasQTAgg):
 
         temp_lower_bound = temp - temp_data[:, 2]
         temp_upper_bound = temp + temp_data[:, 2]
-        self.temp_axis.plot(coordinates, temp)
+        self.temp_axis.plot(coordinates, temp, label='Mean', c='k')
         self.temp_axis.fill_between(coordinates,
                                     temp_lower_bound,
                                     temp_upper_bound,
                                     alpha=0.2,
-                                    picker=5)
+                                    picker=5,
+                                    label='Standard deviation')
+        self.temp_axis.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
 
         time = ene_data[:, 0]
         energy = ene_data[:, 1]
@@ -166,6 +213,7 @@ class Canvas(FigureCanvasQTAgg):
                                    energy_upper_bound,
                                    alpha=0.2)
 
+        self.fig.tight_layout()
         self.draw_idle()
 
 
@@ -185,7 +233,7 @@ class NemdPanel(QtWidgets.QMainWindow):
                                                layout=self.central_layout,
                                                command=self.loadAndDraw)
 
-        self.canvas = Canvas()
+        self.canvas = Canvas(command=self.setGradientsAndConductivity)
         self.toolbar = NavigationToolbar(self.canvas, self)
         self.central_layout.addWidget(self.toolbar)
         self.central_layout.addWidget(self.canvas)
@@ -198,20 +246,23 @@ class NemdPanel(QtWidgets.QMainWindow):
             after_label='W/(m⋅K)',
             layout=hlayout,
             readonly=True)
-        self.temp_gradient = widgets.FloatLineEdit('',
-                                             label='Temperature Gradient:',
-                                             after_label='W/m^2',
-                                             layout=hlayout,
-                                             readonly=True)
+        self.temp_gradient_le = widgets.FloatLineEdit(
+            '',
+            label='Temperature Gradient:',
+            after_label='W/m^2',
+            layout=hlayout,
+            readonly=True)
         self.heat_flow_le = widgets.FloatLineEdit('',
-                                             label='Heat Flux:',
-                                             after_label=u'K/\u212B',
-                                             layout=hlayout,
-                                             readonly=True)
-        self.cross_area_le = widgets.FloatLineEdit('',
-                                             label='Cross Sectional Area:',
-                                             after_label=u"\u212B<sup>2<sup>",
-                                             layout=hlayout)
+                                                  label='Heat Flux:',
+                                                  after_label=u'K/\u212B',
+                                                  layout=hlayout,
+                                                  readonly=True)
+        self.cross_area_le = widgets.FloatLineEdit(
+            '',
+            label='Cross Sectional Area:',
+            after_label=u"\u212B<sup>2<sup>",
+            layout=hlayout,
+            command=self.setThermalConductivity)
 
         hlayout.addStretch(1000)
         self.setMinimumHeight(600)
@@ -239,7 +290,7 @@ class NemdPanel(QtWidgets.QMainWindow):
 
     def loadLogFile(self):
         prefix = 'The cross sectional area is'
-        with open(self.file_path,'r') as fh:
+        with open(self.file_path, 'r') as fh:
             line = fh.readline()
             while line:
                 if not line.startswith(prefix):
@@ -277,21 +328,23 @@ class NemdPanel(QtWidgets.QMainWindow):
             return
 
         self.canvas.plot(self.temp_data, self.ene_data)
-        coord_min = self.canvas.temp_lline.position
-        coord_max = self.canvas.temp_rline.position
-        temp_data = self.canvas.temp_axis.lines[-1].get_xydata()
-        sel_temp_data = temp_data[(temp_data[:, 0]>coord_min) & (temp_data[:, 0]<coord_max)]
-        temp_gradient, temp_intercept = np.polyfit(sel_temp_data[:, 0], sel_temp_data[:, 1], 1)
-        print(temp_gradient)
-        self.temp_gradient.setValue(temp_gradient)
-        ene_temp_data = self.canvas.ene_axis.lines[-1].get_xydata()
-        heat_flow, ene_intercept = np.polyfit(ene_temp_data[:, 0], ene_temp_data[:, 1], 1)
-        print(heat_flow)
-        self.heat_flow_le.setValue(heat_flow)
-        thermal_conductivity = nemd.ThermalConductivity(abs(temp_gradient), heat_flow, self.cross_area_le.value())
+        self.canvas.setGradientsAndConductivity()
+
+    def setGradientsAndConductivity(self):
+        self.setGradients()
+        self.setThermalConductivity()
+
+    def setThermalConductivity(self):
+        thermal_conductivity = nemd.ThermalConductivity(
+            self.temp_gradient_le.value(), self.heat_flow_le.value(),
+            self.cross_area_le.value())
         thermal_conductivity.run()
-        print(thermal_conductivity.thermal_conductivity)
-        self.thermal_conductivity_le.setValue(thermal_conductivity.thermal_conductivity)
+        self.thermal_conductivity_le.setValue(
+            thermal_conductivity.thermal_conductivity)
+
+    def setGradients(self):
+        self.temp_gradient_le.setValue(self.canvas.temp_gradient)
+        self.heat_flow_le.setValue(self.canvas.heat_flow)
 
     def panel(self):
         self.show()

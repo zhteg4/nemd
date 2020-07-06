@@ -161,9 +161,11 @@ class Nemd(object):
         temp_ene_plotter.plot()
 
     def setThermalConductivity(self):
-        thermal_conductivity = nemd.ThermalConductivity(self.lammps_temp.slope,
-                                                   self.lammps_energy.slope,
-                                                   self.lammps_log.cross_sectional_area,)
+        thermal_conductivity = nemd.ThermalConductivity(
+            self.lammps_temp.slope,
+            self.lammps_energy.slope,
+            self.lammps_log.cross_sectional_area,
+        )
         thermal_conductivity.run()
         log(f"Thermal conductivity is {thermal_conductivity.thermal_conductivity:.4f} W / (m * K)"
             )
