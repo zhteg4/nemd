@@ -3,6 +3,7 @@ import sys  # We need sys so that we can pass argv to QApplication
 import numpy as np
 from types import SimpleNamespace
 
+import nemd
 import widgets
 import matplotlib
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -69,13 +70,15 @@ class DraggableLine(object):
             self.line.set_ydata([y_point, y_point])
 
     def releaseonclick(self, event):
+        self.setPosition()
+        self.canvas.mpl_disconnect(self.releaser)
+        self.canvas.mpl_disconnect(self.follower)
+
+    def setPosition(self):
         if self.kind == self.HORIZONTAL:
             self.position = self.line.get_ydata()[0]
         else:
             self.position = self.line.get_xdata()[0]
-
-        self.canvas.mpl_disconnect(self.releaser)
-        self.canvas.mpl_disconnect(self.follower)
 
 
 class LineWithVSpan(DraggableLine):
@@ -99,11 +102,13 @@ class LineWithVSpan(DraggableLine):
     def update(self, event):
         self.resizeVSpan(event)
         super().update(event)
+        self.setPosition()
 
     def resizeVSpan(self, event):
         vpan_xy = self.polygon.get_xy()
         xmin, xmax = self.axis.get_xlim()
         x_lim = xmax if self.fill_direction == self.RIGHT else xmin
+        print(vpan_xy[:, 0])
         vpan_xy[:, 0] = [event.xdata, event.xdata, x_lim, x_lim, event.xdata]
         self.polygon.set_xy(vpan_xy)
 
@@ -117,7 +122,7 @@ class Canvas(FigureCanvasQTAgg):
         self.temp_axis.set_xlim((0, 1))
         self.temp_lline = LineWithVSpan(self.temp_axis,
                                         fill_direction=LineWithVSpan.LEFT)
-        self.temp_uline = LineWithVSpan(self.temp_axis, position=0.9)
+        self.temp_rline = LineWithVSpan(self.temp_axis, position=0.9)
 
     def plot(self,
              temp_data,
@@ -139,7 +144,7 @@ class Canvas(FigureCanvasQTAgg):
 
         self.temp_lline.update(
             SimpleNamespace(xdata=line_frac[0] * coord_span + coord_min))
-        self.temp_uline.update(
+        self.temp_rline.update(
             SimpleNamespace(xdata=line_frac[1] * coord_span + coord_min))
 
         temp_lower_bound = temp - temp_data[:, 2]
@@ -187,27 +192,26 @@ class NemdPanel(QtWidgets.QMainWindow):
 
         hlayout = QtWidgets.QHBoxLayout()
         self.central_layout.addLayout(hlayout)
-        self.thermal_conductivity_le = widgets.LineEdit(
+        self.thermal_conductivity_le = widgets.FloatLineEdit(
             '',
             label='Thermal Conductivity:',
             after_label='W/(m⋅K)',
             layout=hlayout,
             readonly=True)
-        self.temp_gradient = widgets.LineEdit('',
+        self.temp_gradient = widgets.FloatLineEdit('',
                                              label='Temperature Gradient:',
                                              after_label='W/m^2',
                                              layout=hlayout,
                                              readonly=True)
-        self.heat_flux_le = widgets.LineEdit('',
+        self.heat_flow_le = widgets.FloatLineEdit('',
                                              label='Heat Flux:',
                                              after_label=u'K/\u212B',
                                              layout=hlayout,
                                              readonly=True)
-        self.cross_area_le = widgets.LineEdit('',
+        self.cross_area_le = widgets.FloatLineEdit('',
                                              label='Cross Sectional Area:',
                                              after_label=u"\u212B<sup>2<sup>",
-                                             layout=hlayout,
-                                             readonly=True)
+                                             layout=hlayout)
 
         hlayout.addStretch(1000)
         self.setMinimumHeight(600)
@@ -216,6 +220,7 @@ class NemdPanel(QtWidgets.QMainWindow):
     def loadAndDraw(self, file_path=None):
         self.setLogFilePath(file_path=file_path)
         self.setLoadDataLabels()
+        self.loadLogFile()
         self.loadData()
         self.draw()
 
@@ -231,6 +236,18 @@ class NemdPanel(QtWidgets.QMainWindow):
             return
 
         self.file_path = file_path
+
+    def loadLogFile(self):
+        prefix = 'The cross sectional area is'
+        with open(self.file_path,'r') as fh:
+            line = fh.readline()
+            while line:
+                if not line.startswith(prefix):
+                    line = fh.readline()
+                    continue
+                line = line[len(prefix):]
+                self.cross_area_le.setText(line.split()[0])
+                break
 
     def setLoadDataLabels(self):
         if not self.file_path:
@@ -260,6 +277,21 @@ class NemdPanel(QtWidgets.QMainWindow):
             return
 
         self.canvas.plot(self.temp_data, self.ene_data)
+        coord_min = self.canvas.temp_lline.position
+        coord_max = self.canvas.temp_rline.position
+        temp_data = self.canvas.temp_axis.lines[-1].get_xydata()
+        sel_temp_data = temp_data[(temp_data[:, 0]>coord_min) & (temp_data[:, 0]<coord_max)]
+        temp_gradient, temp_intercept = np.polyfit(sel_temp_data[:, 0], sel_temp_data[:, 1], 1)
+        print(temp_gradient)
+        self.temp_gradient.setValue(temp_gradient)
+        ene_temp_data = self.canvas.ene_axis.lines[-1].get_xydata()
+        heat_flow, ene_intercept = np.polyfit(ene_temp_data[:, 0], ene_temp_data[:, 1], 1)
+        print(heat_flow)
+        self.heat_flow_le.setValue(heat_flow)
+        thermal_conductivity = nemd.ThermalConductivity(abs(temp_gradient), heat_flow, self.cross_area_le.value())
+        thermal_conductivity.run()
+        print(thermal_conductivity.thermal_conductivity)
+        self.thermal_conductivity_le.setValue(thermal_conductivity.thermal_conductivity)
 
     def panel(self):
         self.show()

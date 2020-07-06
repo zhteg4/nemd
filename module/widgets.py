@@ -54,7 +54,7 @@ class LineEdit(QtWidgets.QFrame):
             self.label = QtWidgets.QLabel(label)
             self.layout.addWidget(self.label)
         self.line_edit = QtWidgets.QLineEdit(text)
-        self.line_edit.setFixedWidth(60)
+        self.line_edit.setFixedWidth(65)
         if readonly:
             self.line_edit.setReadOnly(True)
         self.layout.addWidget(self.line_edit)
@@ -62,3 +62,23 @@ class LineEdit(QtWidgets.QFrame):
             self.after_label = QtWidgets.QLabel(after_label)
             self.layout.addWidget(self.after_label)
         self.layout.addStretch(1000)
+
+    def setText(self, text):
+        self.line_edit.setText(text)
+
+    def text(self):
+        return self.line_edit.text()
+
+class FloatLineEdit(LineEdit):
+    def __init__(self,
+                 *args,
+                 **kwargs):
+
+        super().__init__(*args,
+                 **kwargs)
+
+    def value(self):
+        return float(super().text())
+
+    def setValue(self, value):
+        self.line_edit.setText(str(value))

@@ -4,12 +4,11 @@ import os
 import units
 import parserutils
 import fileutils
+import nemd
 import plotutils
 import environutils
 import jobutils
-
 import numpy as np
-from scipy import constants
 
 FLAG_IN_FILE = 'in_file'
 FLAG_TEMP_FILE = '-temp_file'
@@ -162,32 +161,11 @@ class Nemd(object):
         temp_ene_plotter.plot()
 
     def setThermalConductivity(self):
-        thermal_conductivity = ThermalConductivity(self.lammps_in,
-                                                   self.lammps_log,
-                                                   self.lammps_temp,
-                                                   self.lammps_energy)
+        thermal_conductivity = nemd.ThermalConductivity(self.lammps_temp.slope,
+                                                   self.lammps_energy.slope,
+                                                   self.lammps_log.cross_sectional_area,)
         thermal_conductivity.run()
-
-
-class ThermalConductivity(object):
-    def __init__(self, lammps_in, lammps_log, lammps_temp, lammps_energy):
-        self.lammps_in = lammps_in
-        self.lammps_log = lammps_log
-        self.lammps_temp = lammps_temp
-        self.lammps_energy = lammps_energy
-        self.thermal_conductivity = None
-
-    def run(self):
-        temp_gradient = self.lammps_temp.slope  # Temperature (K) / Coordinate (Angstrom)
-        temp_gradient_iu = temp_gradient / constants.angstrom
-        heat_flow = self.lammps_energy.slope  # Energy (Kcal/mole) / Time (ns)
-        heat_flow_ui = heat_flow * constants.calorie / constants.N_A * 1000 / constants.nano
-        cross_section = self.lammps_log.cross_sectional_area  # Angstrom^2
-        cross_section_ui = cross_section * (constants.angstrom**2)
-        # Fourier's law qx = -k dT/Dx
-        self.thermal_conductivity = heat_flow_ui / cross_section_ui / abs(
-            temp_gradient_iu)
-        log(f"Thermal conductivity is {self.thermal_conductivity:.4f} W / (m * K)"
+        log(f"Thermal conductivity is {thermal_conductivity.thermal_conductivity:.4f} W / (m * K)"
             )
 
 
