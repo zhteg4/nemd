@@ -55,7 +55,7 @@ class LineEdit(QtWidgets.QFrame):
             self.label = QtWidgets.QLabel(label)
             self.layout.addWidget(self.label)
         self.line_edit = QtWidgets.QLineEdit(text)
-        self.line_edit.setFixedWidth(65)
+        self.line_edit.setFixedWidth(68)
         if readonly:
             self.line_edit.setReadOnly(True)
         self.layout.addWidget(self.line_edit)

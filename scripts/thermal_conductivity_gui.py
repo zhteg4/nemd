@@ -93,8 +93,9 @@ class LineWithVSpan(DraggableLine):
     LEFT = 'left'
     RIGHT = 'right'
 
-    def __init__(self, *args, fill_direction='right', **kwargs):
+    def __init__(self, *args, fill_direction='right', line_lim=None, **kwargs):
         self.fill_direction = fill_direction
+        self.line_lim = line_lim
         super().__init__(*args, **kwargs)
         xrange = list(self.axis.get_xlim())
         edge_index = 0 if fill_direction == self.RIGHT else 1
@@ -102,9 +103,44 @@ class LineWithVSpan(DraggableLine):
         self.polygon = self.axis.axvspan(*xrange, alpha=0.3, color='grey')
 
     def followmouse(self, event):
+        if event.xdata == None:
+            return
+        self.modifyEvent(event)
         self.setLinePosition(event)
         self.resizeVSpan(event)
         self.canvas.draw_idle()
+
+    def modifyEvent(self, event):
+
+        if len(self.axis.lines) <= 2:
+            return
+
+        if event.xdata == None:
+            return
+
+        xdata = self.axis.lines[-1].get_xdata()
+        x_min, x_max = min(xdata), max(xdata)
+        print(x_min, x_max, event.xdata)
+        if event.xdata < x_min:
+            event.xdata = x_min
+        elif event.xdata > x_max:
+            event.xdata = x_max
+
+        if not self.line_lim:
+            return event
+        if self.fill_direction == 'right':
+            avail_xdata = xdata[xdata > self.line_lim.position]
+            if len(avail_xdata[avail_xdata < event.xdata]) < 3:
+                avail_min, avail_min2, avail_min3 = np.partition(
+                    avail_xdata, 3)[:3]
+                event.xdata = (avail_min2 + avail_min3) / 2
+        else:
+            avail_xdata = xdata[xdata < self.line_lim.position]
+            if len(avail_xdata[avail_xdata > event.xdata]) < 3:
+                avail_max3, avail_max2, avail_max = np.partition(
+                    avail_xdata, -3)[-3:]
+                event.xdata = (avail_max2 + avail_max3) / 2
+        return event
 
     def update(self, event):
         self.resizeVSpan(event)
@@ -134,13 +170,21 @@ class Canvas(FigureCanvasQTAgg):
         self.temp_rline = LineWithVSpan(
             self.temp_axis,
             position=0.9,
-            command=self.setGradientsAndConductivity)
+            command=self.setGradientsAndConductivity,
+            line_lim=self.temp_lline)
+        self.temp_lline.line_lim = self.temp_rline
         self.fig.tight_layout()
 
         self.temp_gradient = None
         self.heat_flow = None
+        self.temp_line = None
+        self.temp_poly = None
+        self.ene_line = None
+        self.ene_poly = None
 
     def setGradientsAndConductivity(self):
+        if len(self.temp_axis.lines) <= 2:
+            return
         self.setGradients()
         if self.command:
             self.command()
@@ -149,7 +193,7 @@ class Canvas(FigureCanvasQTAgg):
 
         coord_min = self.temp_lline.position
         coord_max = self.temp_rline.position
-        temp_data = self.temp_axis.lines[-1].get_xydata()
+        temp_data = self.temp_line.get_xydata()
         sel_temp_data = temp_data[(temp_data[:, 0] > coord_min)
                                   & (temp_data[:, 0] < coord_max)]
         self.temp_gradient, temp_intercept = np.polyfit(
@@ -169,11 +213,18 @@ class Canvas(FigureCanvasQTAgg):
         self.ene_axis.set_xlabel("Time (ns)")
         self.ene_axis.set_ylabel('Energy (Kcal/mol)')
 
-    def plot(self,
-             temp_data,
-             ene_data,
-             lim_frac=(-0.1, 1.1),
-             line_frac=(0.1, 0.9)):
+    def plot(self, temp_data, ene_data):
+
+        self.plotTempLines(temp_data)
+        self.plotTemp(temp_data)
+        self.plotEne(ene_data)
+        self.fig.tight_layout()
+        self.draw_idle()
+
+    def plotTempLines(self,
+                      temp_data,
+                      lim_frac=(-0.1, 1.1),
+                      line_frac=(0.1, 0.9)):
 
         coordinates = temp_data[:, 0]
         temp = temp_data[:, 1]
@@ -182,39 +233,64 @@ class Canvas(FigureCanvasQTAgg):
         temp_min = min(temp)
         temp_span = max(temp) - temp_min
 
-        self.temp_axis.set_xlim(lim_frac[0] * coord_span + coord_min,
-                                lim_frac[1] * coord_span + coord_min)
-        self.temp_axis.set_ylim(lim_frac[0] * temp_span + temp_min,
-                                lim_frac[1] * temp_span + temp_min)
+        xlims = [x * coord_span + coord_min for x in lim_frac]
+        self.temp_axis.set_xlim(*xlims)
+        ylims = [x * temp_span + temp_min for x in lim_frac]
+        self.temp_axis.set_ylim(*ylims)
 
-        self.temp_lline.update(
-            SimpleNamespace(xdata=line_frac[0] * coord_span + coord_min))
-        self.temp_rline.update(
-            SimpleNamespace(xdata=line_frac[1] * coord_span + coord_min))
+        line_events = [
+            SimpleNamespace(xdata=x * coord_span + coord_min)
+            for x in line_frac
+        ]
+        print(line_events)
+        self.temp_lline.update(line_events[0])
+        self.temp_rline.update(line_events[1])
 
+    def plotTemp(self, temp_data):
+        coordinates = temp_data[:, 0]
+        temp = temp_data[:, 1]
         temp_lower_bound = temp - temp_data[:, 2]
         temp_upper_bound = temp + temp_data[:, 2]
-        self.temp_axis.plot(coordinates, temp, label='Mean', c='k')
-        self.temp_axis.fill_between(coordinates,
-                                    temp_lower_bound,
-                                    temp_upper_bound,
-                                    alpha=0.2,
-                                    picker=5,
-                                    label='Standard deviation')
+
+        if self.temp_line is None:
+            self.temp_line = lines.Line2D(coordinates,
+                                          temp,
+                                          label='Mean',
+                                          c='k')
+            self.temp_axis.add_line(self.temp_line)
+        else:
+            self.temp_line.set_data(coordinates, temp)
+        if self.temp_poly is not None:
+            self.temp_axis.collections.remove(self.temp_poly)
+        self.temp_poly = self.temp_axis.fill_between(
+            coordinates,
+            temp_lower_bound,
+            temp_upper_bound,
+            alpha=0.2,
+            label='Standard deviation',
+            color='b')
         self.temp_axis.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
 
+    def plotEne(self, ene_data):
         time = ene_data[:, 0]
         energy = ene_data[:, 1]
         energy_lower_bound = energy - ene_data[:, 2]
         energy_upper_bound = energy + ene_data[:, 2]
-        self.ene_axis.plot(time, energy)
-        self.ene_axis.fill_between(time,
-                                   energy_lower_bound,
-                                   energy_upper_bound,
-                                   alpha=0.2)
+        if self.ene_line is None:
+            self.ene_line = lines.Line2D(time, energy, label='Mean', c='k')
+            self.ene_axis.add_line(self.ene_line)
+        else:
+            self.ene_line.set_data(time, energy)
 
-        self.fig.tight_layout()
-        self.draw_idle()
+        if self.ene_poly is not None:
+            self.ene_axis.collections.remove(self.ene_poly)
+        self.ene_poly = self.ene_axis.fill_between(time,
+                                                   energy_lower_bound,
+                                                   energy_upper_bound,
+                                                   alpha=0.2,
+                                                   label='Standard deviation',
+                                                   color='b')
+        self.ene_axis.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
 
 
 class NemdPanel(QtWidgets.QMainWindow):
