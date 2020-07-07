@@ -120,7 +120,7 @@ class LineWithVSpan(DraggableLine):
 
         xdata = self.axis.lines[-1].get_xdata()
         x_min, x_max = min(xdata), max(xdata)
-        print(x_min, x_max, event.xdata)
+
         if event.xdata < x_min:
             event.xdata = x_min
         elif event.xdata > x_max:
@@ -166,11 +166,11 @@ class Canvas(FigureCanvasQTAgg):
         self.temp_lline = LineWithVSpan(
             self.temp_axis,
             fill_direction=LineWithVSpan.LEFT,
-            command=self.setGradientsAndConductivity)
+            command=self.fit)
         self.temp_rline = LineWithVSpan(
             self.temp_axis,
             position=0.9,
-            command=self.setGradientsAndConductivity,
+            command=self.fit,
             line_lim=self.temp_lline)
         self.temp_lline.line_lim = self.temp_rline
         self.fig.tight_layout()
@@ -178,9 +178,18 @@ class Canvas(FigureCanvasQTAgg):
         self.temp_gradient = None
         self.heat_flow = None
         self.temp_line = None
+        self.temp_fit = None
         self.temp_poly = None
         self.ene_line = None
         self.ene_poly = None
+
+    def fit(self):
+        self.setGradientsAndConductivity()
+        self.temp_axis.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+        self.ene_axis.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+        self.fig.tight_layout()
+        self.draw_idle()
+
 
     def setGradientsAndConductivity(self):
         if len(self.temp_axis.lines) <= 2:
@@ -199,6 +208,13 @@ class Canvas(FigureCanvasQTAgg):
         self.temp_gradient, temp_intercept = np.polyfit(
             sel_temp_data[:, 0], sel_temp_data[:, 1], 1)
 
+        fitted = np.polyval([self.temp_gradient, temp_intercept], sel_temp_data[:, 0])
+        if self.temp_fit is None:
+            self.temp_fit = lines.Line2D(sel_temp_data[:, 0], fitted, dashes=[6, 2], label='Fitted',c='r')
+            self.temp_axis.add_line(self.temp_fit)
+        else:
+            self.temp_fit.set_data(sel_temp_data[:, 0], fitted)
+
         ene_temp_data = self.ene_axis.lines[-1].get_xydata()
         self.heat_flow, ene_intercept = np.polyfit(ene_temp_data[:, 0],
                                                    ene_temp_data[:, 1], 1)
@@ -213,13 +229,11 @@ class Canvas(FigureCanvasQTAgg):
         self.ene_axis.set_xlabel("Time (ns)")
         self.ene_axis.set_ylabel('Energy (Kcal/mol)')
 
-    def plot(self, temp_data, ene_data):
+    def plotData(self, temp_data, ene_data):
 
         self.plotTempLines(temp_data)
         self.plotTemp(temp_data)
         self.plotEne(ene_data)
-        self.fig.tight_layout()
-        self.draw_idle()
 
     def plotTempLines(self,
                       temp_data,
@@ -242,7 +256,6 @@ class Canvas(FigureCanvasQTAgg):
             SimpleNamespace(xdata=x * coord_span + coord_min)
             for x in line_frac
         ]
-        print(line_events)
         self.temp_lline.update(line_events[0])
         self.temp_rline.update(line_events[1])
 
@@ -269,7 +282,6 @@ class Canvas(FigureCanvasQTAgg):
             alpha=0.2,
             label='Standard deviation',
             color='b')
-        self.temp_axis.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
 
     def plotEne(self, ene_data):
         time = ene_data[:, 0]
@@ -290,7 +302,6 @@ class Canvas(FigureCanvasQTAgg):
                                                    alpha=0.2,
                                                    label='Standard deviation',
                                                    color='b')
-        self.ene_axis.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
 
 
 class NemdPanel(QtWidgets.QMainWindow):
@@ -403,8 +414,9 @@ class NemdPanel(QtWidgets.QMainWindow):
         if self.file_path is None:
             return
 
-        self.canvas.plot(self.temp_data, self.ene_data)
-        self.canvas.setGradientsAndConductivity()
+        self.canvas.plotData(self.temp_data, self.ene_data)
+        self.canvas.fit()
+
 
     def setGradientsAndConductivity(self):
         self.setGradients()
