@@ -1,10 +1,12 @@
 import os
+import re
 import sys  # We need sys so that we can pass argv to QApplication
 import numpy as np
 from types import SimpleNamespace
 
 import nemd
 import widgets
+import fileutils
 import matplotlib
 from PyQt5 import QtCore, QtGui, QtWidgets
 from matplotlib import colors as mcolors
@@ -309,7 +311,6 @@ class Canvas(FigureCanvasQTAgg):
 class NemdPanel(QtWidgets.QMainWindow):
     def __init__(self, app, *args, **kwargs):
         self.app = app
-        self.file_path = None
         super(NemdPanel, self).__init__(*args, **kwargs)
         self.setWindowTitle('Thermal Conductivity Viewer')
         self.central_layout = QtWidgets.QVBoxLayout()
@@ -359,64 +360,71 @@ class NemdPanel(QtWidgets.QMainWindow):
         hlayout.addStretch(1000)
         self.setMinimumHeight(600)
         # self.statusBar().showMessage('Ready')
+        self.log_file = None
+        self.dirver_log_lines = None
+        self.area_line_index = None
 
-    def loadAndDraw(self, file_path=None):
-        self.setLogFilePath(file_path=file_path)
+    def loadAndDraw(self, log_file=None):
+        self.setLogFilePath(log_file=log_file)
         self.setLoadDataLabels()
         self.loadLogFile()
+        self.setArea()
         self.loadData()
         self.draw()
 
-    def setLogFilePath(self, file_path=None):
-        if not file_path:
+    def setLogFilePath(self, log_file=None):
+        if not log_file:
             dlg = QtWidgets.QFileDialog(self)
             dlg.setFileMode(QtWidgets.QFileDialog.AnyFile)
             dlg.setNameFilters(["Driver log (*-driver.log)"])
             if dlg.exec_():
-                file_path = dlg.selectedFiles()[0]
+                log_file = dlg.selectedFiles()[0]
 
-        if not file_path:
+        if not log_file:
             return
 
-        self.file_path = file_path
+        self.log_file = log_file
 
     def loadLogFile(self):
-        prefix = 'The cross sectional area is'
-        with open(self.file_path, 'r') as fh:
-            line = fh.readline()
-            while line:
-                if not line.startswith(prefix):
-                    line = fh.readline()
-                    continue
-                line = line[len(prefix):]
-                self.cross_area_le.setText(line.split()[0])
-                break
+
+        with open(self.log_file, 'r') as fh:
+            self.dirver_log_lines = fh.readlines()
+
+    def setArea(self):
+        re_area_compiled = re.compile(fileutils.REX_AREA)
+        matched_line_gn = (index
+                           for index, line in enumerate(self.dirver_log_lines)
+                           if re_area_compiled.findall(line))
+        self.area_line_index = next(matched_line_gn)
+        cross_area = re_area_compiled.findall(
+            self.dirver_log_lines[self.area_line_index])[0]
+        self.cross_area_le.setText(cross_area)
 
     def setLoadDataLabels(self):
-        if not self.file_path:
+        if not self.log_file:
             return
 
-        self.load_data_bn.after_label.setText(os.path.basename(self.file_path))
-        self.load_data_bn.after_label.setToolTip(self.file_path)
+        self.load_data_bn.after_label.setText(os.path.basename(self.log_file))
+        self.load_data_bn.after_label.setToolTip(self.log_file)
 
     def loadData(self):
-        if not self.file_path:
+        if not self.log_file:
             return
 
-        temp_file = self.file_path.replace('-driver.log', '_temp.npz')
+        temp_file = self.log_file.replace('-driver.log', '_temp.npz')
         try:
             self.temp_data = np.load(temp_file)['data']
         except FileNotFoundError:
             self.reset()
 
-        ene_file = self.file_path.replace('-driver.log', '_ene.npz')
+        ene_file = self.log_file.replace('-driver.log', '_ene.npz')
         try:
             self.ene_data = np.load(ene_file)['data']
         except FileNotFoundError:
             self.reset()
 
     def draw(self):
-        if self.file_path is None:
+        if self.log_file is None:
             return
 
         self.canvas.plotData(self.temp_data, self.ene_data)
@@ -439,8 +447,9 @@ class NemdPanel(QtWidgets.QMainWindow):
         sys.exit(self.app.exec_())
 
 
-def get_panel():
-    app = QtWidgets.QApplication(sys.argv)
+def get_panel(app=None):
+    if app is None:
+        app = QtWidgets.QApplication(sys.argv)
     panel = NemdPanel(app)
     return panel
 

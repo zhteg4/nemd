@@ -15,6 +15,9 @@ logger = logutils.createModuleLogger()
 LogData = namedtuple('LogData', ['fix', 'data'])
 FixCommand = namedtuple('FixCommand', ['id', 'group_id', 'style', 'args'])
 
+AREA_LINE = 'The cross sectional area is %.6g Angstroms^2\n'
+REX_AREA = 'The cross sectional area is (?P<name>\d*\.?\d*) Angstroms\^2\n'
+
 
 def log_debug(msg):
 
