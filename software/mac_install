@@ -15,6 +15,7 @@ curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 python3 get-pip.py
 pip3 install pytest
 pip3 install numpy
+pip3 install scipy
 pip3 install matplotlib
 pip3 install yapf
 pip3 install PyQt5
