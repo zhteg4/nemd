@@ -19,3 +19,12 @@ def type_file(arg):
     if os.path.isfile(arg):
         return arg
     raise argparse.ArgumentTypeError(f'{arg} not found.')
+
+def type_positive_int(arg):
+    try:
+        value = int(arg)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'{arg} cannot be converted to integer.')
+    if value <= 1:
+        raise argparse.ArgumentTypeError(f'{value} is not a possitive integer.')
+    return value
