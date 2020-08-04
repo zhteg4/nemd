@@ -14,6 +14,7 @@ FLAG_IN_FILE = 'in_file'
 FLAG_TEMP_FILE = '-temp_file'
 FlAG_ENEGER_FILE = '-energy_file'
 FlAG_LOG_FILE = '-log_file'
+FLAG_CROSS_SECTIONAL_AREA = '-cross_sectional_area'
 
 LOG_LAMMPS = 'log.lammps'
 
@@ -51,6 +52,10 @@ def get_parser():
     parser.add_argument(FlAG_ENEGER_FILE,
                         metavar=FlAG_ENEGER_FILE.upper(),
                         type=parserutils.type_file,
+                        help='')
+    parser.add_argument(FLAG_CROSS_SECTIONAL_AREA,
+                        metavar='ANGSTROM^2',
+                        type=parserutils.type_positive_float,
                         help='')
     jobutils.add_job_arguments(parser)
     return parser
@@ -131,7 +136,7 @@ class Nemd(object):
         log(f"Timestep is {self.timestep} fs.")
 
     def loadLog(self):
-        self.lammps_log = fileutils.LammpsLogReader(self.options.log_file)
+        self.lammps_log = fileutils.LammpsLogReader(self.options.log_file, self.options.cross_sectional_area)
         self.lammps_log.run()
         log(f"The cross sectional area is {self.lammps_log.cross_sectional_area:0.4f} Angstroms^2"
             )

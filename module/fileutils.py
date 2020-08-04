@@ -379,10 +379,10 @@ class LammpsLogReader(object):
     LY = 'Ly'
     LZ = 'Lz'
 
-    def __init__(self, lammps_log):
+    def __init__(self, lammps_log, cross_sectional_area=None):
         self.lammps_log = lammps_log
+        self.cross_sectional_area = cross_sectional_area
         self.all_data = []
-        self.cross_sectional_area = None
 
     def run(self):
         self.loadAllData()
@@ -417,6 +417,8 @@ class LammpsLogReader(object):
     def setCrossSectionalArea(self,
                               first_dimension_lb=LY,
                               second_dimension_lb=LZ):
+        if self.cross_sectional_area is not None:
+            return
         d1_length, d2_length = None, None
         for data in reversed(self.all_data):
             try:
@@ -449,8 +451,11 @@ class LammpsLogReader(object):
                 try:
                     y_data = data.data[name]
                 except ValueError:
-                    pass
-                line, = axis.plot(data.data[self.STEP], y_data)
+                    continue
+                try:
+                    line, = axis.plot(data.data[self.STEP], y_data)
+                except:
+                    import pdb;pdb.set_trace()
                 axis.set_ylabel(name)
 
         self.fig.legend(axis.lines,
