@@ -30,7 +30,7 @@ def log_debug(msg):
 def log(msg, timestamp=False):
     if not logger:
         return
-    logutils.log(logger, msg, timestamp=timestamp)
+    logutils.log(logger, msg + '\nAborting...', timestamp=timestamp)
 
 
 def log_error(msg):
