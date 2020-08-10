@@ -30,12 +30,13 @@ def log_debug(msg):
 def log(msg, timestamp=False):
     if not logger:
         return
-    logutils.log(logger, msg + '\nAborting...', timestamp=timestamp)
+    logutils.log(logger, msg, timestamp=timestamp)
 
 
 def log_error(msg):
-    log(msg, timestamp=True)
+    log(msg + '\nAborting...', timestamp=True)
     sys.exit(1)
+
 
 def get_parser():
     parser = parserutils.get_parser(
@@ -144,7 +145,8 @@ class Nemd(object):
         log(f"Timestep is {self.timestep} fs.")
 
     def loadLog(self):
-        self.lammps_log = fileutils.LammpsLogReader(self.options.log_file, self.options.cross_sectional_area)
+        self.lammps_log = fileutils.LammpsLogReader(
+            self.options.log_file, self.options.cross_sectional_area)
         self.lammps_log.run()
         log(f"The cross sectional area is {self.lammps_log.cross_sectional_area:0.4f} Angstroms^2"
             )

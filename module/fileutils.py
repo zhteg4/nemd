@@ -437,7 +437,9 @@ class LammpsLogReader(object):
                 break
 
         if not all([d1_length, d2_length]):
-            raise ValueError("Please define a cross-sectional area via -cross_sectional_area")
+            raise ValueError(
+                "Please define a cross-sectional area via -cross_sectional_area"
+            )
         self.cross_sectional_area = np.mean(d1_length * d2_length)
 
     def plot(self):
@@ -463,7 +465,8 @@ class LammpsLogReader(object):
                 try:
                     line, = axis.plot(data.data[self.STEP], y_data)
                 except:
-                    import pdb;pdb.set_trace()
+                    import pdb
+                    pdb.set_trace()
                 axis.set_ylabel(name)
 
         self.fig.legend(axis.lines,

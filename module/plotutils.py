@@ -1,5 +1,4 @@
 import environutils
-from matplotlib import pyplot as plt
 
 
 class TempEnePlotter(object):
@@ -25,23 +24,39 @@ class TempEnePlotter(object):
         self.temp_data_nrow, self.temp_data_ncol, self.temp_data_nblock = self.temp_data.shape
         self.ene_names = self.ene_data.dtype.names
 
-    def setup(self):
-        self.load()
+    def setFigure(self):
+        if self.interactive:
+            return
+
+        import matplotlib
+        self.old_backed = matplotlib.pyplot.get_backend()
+        matplotlib.use("agg", force=True)
+        from matplotlib import pyplot as plt
+
         self.fig = plt.figure()
         self.temp_axis = self.fig.add_subplot(self.fig_nrows, self.fig_ncols,
                                               1)
         self.ene_axis = self.fig.add_subplot(self.fig_nrows, self.fig_ncols, 2)
 
     def plot(self):
-        self.setup()
+        self.load()
+        self.setFigure()
         self.plotTemp()
         self.plotEne()
         self.setLayout()
         self.show()
         self.save()
+        self.resetMatplotlib()
 
     def save(self):
         self.fig.savefig(self.fig_file)
+
+    def resetMatplotlib(self):
+
+        if self.interactive:
+            return
+        import matplotlib
+        matplotlib.use(self.old_backed)
 
     def plotEne(self):
         self.ene_axis.plot(self.ene_data[self.ene_names[0]],

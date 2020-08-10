@@ -20,6 +20,7 @@ def type_file(arg):
         return arg
     raise argparse.ArgumentTypeError(f'{arg} not found.')
 
+
 def type_positive_float(arg):
     try:
         value = float(arg)
@@ -27,9 +28,9 @@ def type_positive_float(arg):
         raise argparse.ArgumentTypeError(
             f'{arg} cannot be converted to float.')
     if value <= 0:
-        raise argparse.ArgumentTypeError(
-            f'{value} is not a possitive float.')
+        raise argparse.ArgumentTypeError(f'{value} is not a possitive float.')
     return value
+
 
 def type_positive_int(arg):
     try:
