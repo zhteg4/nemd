@@ -308,10 +308,21 @@ class Canvas(FigureCanvasQTAgg):
                                                    color='b')
 
 
-class NemdPanel(QtWidgets.QMainWindow):
+class QMainWindow(QtWidgets.QMainWindow):
     def __init__(self, app, *args, **kwargs):
         self.app = app
-        super(NemdPanel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
+        self.error_dialog = QtWidgets.QMessageBox(self)
+        self.error_dialog.setIcon(QtWidgets.QMessageBox.Critical)
+
+    def error(self, msg):
+        self.error_dialog.setText(msg)
+        self.error_dialog.exec_()
+
+
+class NemdPanel(QMainWindow):
+    def __init__(self, app, *args, **kwargs):
+        super(NemdPanel, self).__init__(app, *args, **kwargs)
         self.setWindowTitle('Thermal Conductivity Viewer')
         self.central_layout = QtWidgets.QVBoxLayout()
         central_widget = QtWidgets.QWidget()
@@ -363,6 +374,7 @@ class NemdPanel(QtWidgets.QMainWindow):
         self.log_file = None
         self.dirver_log_lines = None
         self.area_line_index = None
+        self.previous_dir = os.path.curdir
 
     def loadAndDraw(self, log_file=None):
         self.setLogFilePath(log_file=log_file)
@@ -375,22 +387,30 @@ class NemdPanel(QtWidgets.QMainWindow):
     def setLogFilePath(self, log_file=None):
         if not log_file:
             dlg = QtWidgets.QFileDialog(self)
+            dlg.setDirectory(self.previous_dir)
             dlg.setFileMode(QtWidgets.QFileDialog.AnyFile)
             dlg.setNameFilters(["Driver log (*-driver.log)"])
             if dlg.exec_():
                 log_file = dlg.selectedFiles()[0]
 
-        if not log_file:
+        if not log_file or not os.path.isfile(log_file):
+            self.error('Please select a driver.log file.')
             return
 
         self.log_file = log_file
+        self.previous_dir = os.path.dirname(self.log_file)
 
     def loadLogFile(self):
+        if self.log_file is None:
+            return
 
         with open(self.log_file, 'r') as fh:
             self.dirver_log_lines = fh.readlines()
 
     def setArea(self):
+        if self.log_file is None:
+            return
+
         re_area_compiled = re.compile(fileutils.REX_AREA)
         matched_line_gn = (index
                            for index, line in enumerate(self.dirver_log_lines)
