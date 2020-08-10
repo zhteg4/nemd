@@ -437,6 +437,10 @@ class LammpsLogReader(object):
         self.cross_sectional_area = np.mean(d1_length * d2_length)
 
     def plot(self):
+
+        if not environutils.is_interactive():
+            return
+
         names = set([y for x in self.all_data for y in x.data.dtype.names])
         names.remove(self.STEP)
         fig_ncols = 2
@@ -466,10 +470,6 @@ class LammpsLogReader(object):
         self.fig.tight_layout(
             rect=(0.0, 0.0, 1.0, 1.0 -
                   self.fig.legends[0].handleheight / self.fig.get_figheight()))
-
-        if not environutils.is_interactive():
-            return
-        self.fig.show()
 
         input('Showing the lammps log plot. Press any keys to continue...')
 
