@@ -419,6 +419,7 @@ class LammpsLogReader(object):
                               second_dimension_lb=LZ):
         if self.cross_sectional_area is not None:
             return
+
         d1_length, d2_length = None, None
         for data in reversed(self.all_data):
             try:
@@ -434,6 +435,9 @@ class LammpsLogReader(object):
 
             if d1_length is not None and d2_length is not None:
                 break
+
+        if not all([d1_length, d2_length]):
+            raise ValueError("Please define cross-sectional via -cross_sectional_area")
         self.cross_sectional_area = np.mean(d1_length * d2_length)
 
     def plot(self):

@@ -33,6 +33,10 @@ def log(msg, timestamp=False):
     logutils.log(logger, msg, timestamp=timestamp)
 
 
+def log_error(msg):
+    log(msg, timestamp=True)
+    sys.exit(1)
+
 def get_parser():
     parser = parserutils.get_parser(
         description=
@@ -120,7 +124,10 @@ class Nemd(object):
 
     def run(self):
         self.loadLammpsIn()
-        self.loadLog()
+        try:
+            self.loadLog()
+        except ValueError as err:
+            log_error(str(err))
         self.loadTemp()
         self.loadEne()
         self.plot()
