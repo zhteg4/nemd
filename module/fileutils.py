@@ -436,7 +436,7 @@ class LammpsLogReader(object):
             if d1_length is not None and d2_length is not None:
                 break
 
-        if not all([d1_length, d2_length]):
+        if any([d1_length is None, d2_length is None]):
             raise ValueError(
                 "Please define a cross-sectional area via -cross_sectional_area"
             )
