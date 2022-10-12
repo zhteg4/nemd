@@ -1,4 +1,5 @@
 # zsh to bash shell
+chsh -s /bin/bash
 # Head to System Preferences > Users & Groups on your Mac. Click the lock icon and enter your password. Hold the Ctrl key, click your user account’s name in the left pane, and select “Advanced Options.”
 
 # https://brew.sh # install brew
@@ -6,7 +7,8 @@
 brew update
 
 # You must reboot for the installation of osxfuse to take effect.
-brew cask install osxfuse
+# `brew cask` is no longer a `brew` command. Use `brew <command> --cask` instead.
+brew install osxfuse --cask
 brew install sshfs
 brew install https://raw.githubusercontent.com/kadwanev/bigboybrew/master/Library/Formula/sshpass.rb
 
