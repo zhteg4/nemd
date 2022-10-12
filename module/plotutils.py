@@ -2,6 +2,7 @@ import environutils
 
 
 class TempEnePlotter(object):
+
     def __init__(
         self,
         lammp_temp,

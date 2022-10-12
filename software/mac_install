@@ -9,8 +9,9 @@ brew update
 # You must reboot for the installation of osxfuse to take effect.
 # `brew cask` is no longer a `brew` command. Use `brew <command> --cask` instead.
 brew install osxfuse --cask
-brew install sshfs
-brew install https://raw.githubusercontent.com/kadwanev/bigboybrew/master/Library/Formula/sshpass.rb
+# deprecated due to closed-source macFUSE!
+# brew install sshfs
+# brew install https://raw.githubusercontent.com/kadwanev/bigboybrew/master/Library/Formula/sshpass.rb
 
 # https://www.python.org/downloads/mac-osx/
 curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py

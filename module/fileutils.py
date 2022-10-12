@@ -358,6 +358,7 @@ class EnergyReader(object):
 
 
 def get_line_num(filename):
+
     def blocks(files, size=65536):
         while True:
             b = files.read(size)
@@ -482,6 +483,7 @@ class LammpsLogReader(object):
 
 
 class TempReader(object):
+
     def __init__(self, temp_file, block_num=5):
         self.temp_file = temp_file
         self.block_num = block_num
