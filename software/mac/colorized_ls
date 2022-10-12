@@ -1,0 +1,8 @@
+# http://t.zoukankan.com/litifeng-p-8442529.html
+brew install coreutils
+# add gnu coreutils in your /etc/profile
+PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+MANPATH="/usr/local/opt/coreutils/libexec/gnuman:$MANPATH"
+cp .dircolors ~/.dircolors
+eval `discolors ~/.dircolors`
+alias ls="ls --color=auto"
