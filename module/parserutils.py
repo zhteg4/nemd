@@ -1,5 +1,7 @@
 import os
+import symbols
 import argparse
+from rdkit import Chem
 
 
 class CapitalisedHelpFormatter(argparse.HelpFormatter):
@@ -42,4 +44,25 @@ def type_positive_int(arg):
     if value <= 1:
         raise argparse.ArgumentTypeError(
             f'{value} is not a possitive integer.')
+    return value
+
+
+def type_smiles(arg):
+    try:
+        value = Chem.MolFromSmiles(arg)
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f'{arg} cannot be converted to integer.')
+    if not value:
+        raise argparse.ArgumentTypeError(f'{arg} is not a valid SMILES.')
+    return value
+
+
+def type_monomer_smiles(arg):
+    value = type_smiles(arg)
+    ht_count = [x.GetSymbol()
+                for x in value.GetAtoms()].count(symbols.WILD_CARD)
+    if ht_count != 2:
+        raise argparse.ArgumentTypeError(
+            f"{arg} doesn't contain two {symbols.WILD_CARD}.")
     return value
