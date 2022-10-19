@@ -1,4 +1,5 @@
 import math
+import copy
 import sys
 import argparse
 import logutils
@@ -10,6 +11,7 @@ import nemd
 import plotutils
 import environutils
 import jobutils
+import symbols
 import numpy as np
 from rdkit import Chem
 
@@ -83,15 +85,40 @@ class Polymer(object):
         self.options = options
         self.jobname = jobname
         self.outfile = self.jobname + MOLT_OUT_EXT
+        self.polym = None
 
     def run(self):
-        self.setBondProj()
+        self.polymerize()
         log('Finished', timestamp=True)
 
     def setBondProj(self):
         bond_ang = self.options.bond_ang / 2. / 180. * math.pi
         bond_proj = self.options.bond_len * math.sin(bond_ang)
         pass
+
+    def polymerize(self):
+        mols = [
+            copy.copy(self.options.cru) for x in range(self.options.cru_num)
+        ]
+        combo = mols[0]
+        for mol in mols[1:]:
+            combo = Chem.CombineMols(combo, mol)
+        capping_atoms = [
+            x for x in combo.GetAtoms() if x.GetSymbol() == symbols.WILD_CARD
+        ]
+        ht_atoms = [x.GetNeighbors()[0] for x in capping_atoms]
+        ht_atom_idxs = [x.GetIdx() for x in ht_atoms]
+        edcombo = Chem.EditableMol(combo)
+        for t_atom_idx, h_atom_idx in zip(
+                ht_atom_idxs[1:-1:2],
+                ht_atom_idxs[2::2],
+        ):
+            edcombo.AddBond(t_atom_idx,
+                            h_atom_idx,
+                            order=Chem.rdchem.BondType.SINGLE)
+        polym = edcombo.GetMol()
+        self.polym = Chem.DeleteSubstructs(polym, Chem.MolFromSmiles('*'))
+        log(f"{Chem.MolToSmiles(self.polym)}")
 
 
 logger = None

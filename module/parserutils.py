@@ -60,9 +60,14 @@ def type_smiles(arg):
 
 def type_monomer_smiles(arg):
     value = type_smiles(arg)
-    ht_count = [x.GetSymbol()
-                for x in value.GetAtoms()].count(symbols.WILD_CARD)
-    if ht_count != 2:
+    ht_atoms = [
+        x for x in value.GetAtoms() if x.GetSymbol() == symbols.WILD_CARD
+    ]
+    if len(ht_atoms) != 2:
         raise argparse.ArgumentTypeError(
             f"{arg} doesn't contain two {symbols.WILD_CARD}.")
+    for atom in ht_atoms:
+        if len(atom.GetNeighbors()) != 1:
+            raise argparse.ArgumentTypeError(
+                f"{symbols.WILD_CARD} connects more than one atom.")
     return value
