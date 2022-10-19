@@ -3,8 +3,10 @@ import types
 import symbols
 import fileutils
 from rdkit import Chem
+from collections import namedtuple
 
-opls_fp = fileutils.get_ff()
+
+OPLSUA = namedtuple('OPLSUA', ['smiles', 'map', 'comment'])
 
 
 class OPLS_Parser:
@@ -13,8 +15,13 @@ class OPLS_Parser:
     WRITE_ONCE = 'write_once'
     CHARGE = 'charge'
     IN_CHARGES = 'In Charges'
+    DO_NOT_UA = 'DON\'T USE(OPLSUA)'
 
-    def __int__(self):
+    OPLSUA_MOLS = [OPLSUA(smiles='CC(=O)O', map=(6, 3, 4, 5, None, None, None, 7,), comment='Acetic Acid'),
+                   OPLSUA(smiles='CC(=O)O', map=(13,), comment='Alkanes')]
+
+    def __init__(self, all_atom=False):
+        self.all_atom = all_atom
         self.lines = None
         self.markers = None
         self.atoms = None
@@ -38,8 +45,11 @@ class OPLS_Parser:
         indexes = sorted(self.markers.values())
         eidx = indexes[indexes.index(sidx) + 1]
         lines = [
-            x.strip().strip('set type').strip('DON\'T USE(OPLSUA)').split(':')
-            [1] for x in self.lines[sidx + 1:eidx]
+            x.strip().strip('set type') for x in self.lines[sidx + 1:eidx]
+        ]
+        lines = [
+            x.strip(self.DO_NOT_UA).split(':')[1] for x in lines
+            if self.all_atom ^ x.endswith(self.DO_NOT_UA)
         ]
         self.atoms = []
         for line in lines:
@@ -49,11 +59,16 @@ class OPLS_Parser:
                                          charge=float(charge),
                                          comment=comment)
             self.atoms.append(atom)
-        import pdb
-        pdb.set_trace()
+
+    def setSmiles(self):
+        # FIXME: manually match smiles with the comments and then
+        # parse the *.lt to generate OPLSUA_MOLS
+        # mass for element, neighbor atom and bond type to find matches
+        import pdb; pdb.set_trace()
         pass
 
 
 opls_parser = OPLS_Parser()
 opls_parser.read()
 opls_parser.setCharge()
+opls_parser.setSmiles()
