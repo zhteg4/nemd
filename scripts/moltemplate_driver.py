@@ -13,6 +13,7 @@ import environutils
 import jobutils
 import symbols
 import numpy as np
+import opls
 from rdkit import Chem
 
 FlAG_CRU = 'cru'
@@ -20,7 +21,7 @@ FlAG_CRU_NUM = '-cru_num'
 FlAG_BOND_LEN = '-bond_len'
 FLAG_BOND_ANG = '-bond_ang'
 
-MOLT_OUT_EXT = '.lt'
+MOLT_OUT_EXT = fileutils.MOLT_FF_EXT
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 

@@ -18,6 +18,26 @@ FixCommand = namedtuple('FixCommand', ['id', 'group_id', 'style', 'args'])
 AREA_LINE = 'The cross sectional area is %.6g Angstroms^2\n'
 REX_AREA = 'The cross sectional area is (?P<name>\d*\.?\d*) Angstroms\^2\n'
 
+NEMD_SRC = 'NEMD_SRC'
+MODULE = 'module'
+OPLSAA = 'oplsaa'
+MOLT_FF_EXT = '.lt'
+FF = 'ff'
+
+
+def get_src():
+    return os.environ.get(NEMD_SRC)
+
+
+def get_module():
+    return os.path.join(get_src(), MODULE)
+
+
+def get_ff(fn=None, name=OPLSAA, ext=MOLT_FF_EXT):
+    if not fn:
+        fn = f"{name}{ext}"
+    return os.path.join(get_module(), FF, fn)
+
 
 def log_debug(msg):
 
