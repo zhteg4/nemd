@@ -18,7 +18,7 @@ class OPLS_Parser:
     DO_NOT_UA = 'DON\'T USE(OPLSUA)'
 
     OPLSUA_MOLS = [OPLSUA(smiles='CC(=O)O', map=(6, 3, 4, 5, None, None, None, 7,), comment='Acetic Acid'),
-                   OPLSUA(smiles='CC(=O)O', map=(13,), comment='Alkanes')]
+                   OPLSUA(smiles='C', map=(13,), comment='Alkanes')]
 
     def __init__(self, all_atom=False):
         self.all_atom = all_atom
@@ -64,6 +64,7 @@ class OPLS_Parser:
         # FIXME: manually match smiles with the comments and then
         # parse the *.lt to generate OPLSUA_MOLS
         # mass for element, neighbor atom and bond type to find matches
+        # Chem.AddHs(mol)
         import pdb; pdb.set_trace()
         pass
 
