@@ -21,7 +21,8 @@ def createLogger(basename, verbose=None, file_ext='-driver.log'):
         formatter = logging.Formatter('%(message)s')
 
     hdlr.setFormatter(formatter)
-    logger.setLevel(logging.DEBUG)
+    lvl = logging.DEBUG if verbose else logging.INFO
+    logger.setLevel(lvl)
     return logger
 
 

@@ -4,6 +4,7 @@ import sys
 import argparse
 import logutils
 import os
+import sys
 import units
 import parserutils
 import fileutils
@@ -90,6 +91,7 @@ class Polymer(object):
 
     def run(self):
         self.polymerize()
+        self.assignAtomType()
         log('Finished', timestamp=True)
 
     def setBondProj(self):
@@ -120,6 +122,32 @@ class Polymer(object):
         polym = edcombo.GetMol()
         self.polym = Chem.DeleteSubstructs(polym, Chem.MolFromSmiles('*'))
         log(f"{Chem.MolToSmiles(self.polym)}")
+
+    def assignAtomType(self):
+
+        polym_smile = Chem.CanonSmiles(Chem.MolToSmiles(self.polym))
+        for opls_mol in opls.OPLS_Parser.OPLSUA_MOLS:
+            if polym_smile == opls_mol.smiles:
+                for atom, atom_type_id in zip(self.polym.GetAtoms(),
+                                              opls_mol.map):
+                    atom.SetIntProp(opls.TYPE_ID, atom_type_id)
+                return
+
+        for opls_frag in opls.OPLS_Parser.OPLSUA_FRAGS:
+            frag = Chem.MolFromSmiles(opls_frag.smiles)
+            matches = self.polym.GetSubstructMatches(frag)
+            for match in matches:
+                for atom_id, type_id in zip(match, opls_frag.map):
+                    if not type_id:
+                        continue
+                    atom = self.polym.GetAtoms()[atom_id]
+                    try:
+                        atom.GetIntProp(opls.TYPE_ID)
+                    except KeyError:
+                        atom.SetIntProp(opls.TYPE_ID, type_id)
+                    else:
+                        continue
+                    log_debug(f"{atom_id} {type_id}")
 
 
 logger = None

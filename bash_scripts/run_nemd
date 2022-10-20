@@ -34,6 +34,10 @@ for ((i=0; i<=$#; i++)); do
     export INTERACTIVE='1'
   fi
 
+  if [ ${!i} == '-DEBUG' ]; then
+    export DEBUG='1'
+  fi
+
 done
 
 echo "Running python3 $SCRIPT_PATH"

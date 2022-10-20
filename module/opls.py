@@ -1,12 +1,14 @@
 import os
+import sys
 import types
 import symbols
 import fileutils
 from rdkit import Chem
 from collections import namedtuple
 
-
 OPLSUA = namedtuple('OPLSUA', ['smiles', 'map', 'comment'])
+
+TYPE_ID = 'type_id'
 
 
 class OPLS_Parser:
@@ -17,8 +19,37 @@ class OPLS_Parser:
     IN_CHARGES = 'In Charges'
     DO_NOT_UA = 'DON\'T USE(OPLSUA)'
 
-    OPLSUA_MOLS = [OPLSUA(smiles='CC(=O)O', map=(6, 3, 4, 5, None, None, None, 7,), comment='Acetic Acid'),
-                   OPLSUA(smiles='C', map=(13,), comment='Alkanes')]
+    OPLSUA_MOLS = [
+        OPLSUA(smiles='CC(=O)O', map=(
+            6,
+            3,
+            4,
+            5,
+            7,
+        ), comment='Acetic Acid'),
+        OPLSUA(smiles='CC', map=(
+            10,
+            10,
+        ), comment='Ethane'),
+        OPLSUA(smiles='C', map=(10, ), comment='Methane')
+    ]
+    OPLSUA_FRAGS = [
+        OPLSUA(smiles='CC(=O)O',
+               map=(
+                   None,
+                   3,
+                   4,
+                   5,
+                   7,
+               ),
+               comment='Acetic Acid'),
+        OPLSUA(smiles='CCC', map=(
+            None,
+            13,
+            None,
+        ), comment='Alkanes'),
+        OPLSUA(smiles='CCC', map=(10, None, 10), comment='Alkanes')
+    ]
 
     def __init__(self, all_atom=False):
         self.all_atom = all_atom
@@ -65,11 +96,17 @@ class OPLS_Parser:
         # parse the *.lt to generate OPLSUA_MOLS
         # mass for element, neighbor atom and bond type to find matches
         # Chem.AddHs(mol)
-        import pdb; pdb.set_trace()
+        import pdb
+        pdb.set_trace()
         pass
 
 
-opls_parser = OPLS_Parser()
-opls_parser.read()
-opls_parser.setCharge()
-opls_parser.setSmiles()
+def main(argv):
+    opls_parser = OPLS_Parser()
+    opls_parser.read()
+    opls_parser.setCharge()
+    opls_parser.setSmiles()
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

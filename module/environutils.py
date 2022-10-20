@@ -5,7 +5,7 @@ NEMD_SRC = 'NEMD_SRC'
 
 
 def is_debug():
-    return bool(os.environ.get(NEMD_DEBUG))
+    return bool(os.environ.get(NEMD_DEBUG)) or os.environ.get('DEBUG')
 
 
 def get_nemd_src():

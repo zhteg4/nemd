@@ -41,7 +41,7 @@ def type_positive_int(arg):
     except ValueError:
         raise argparse.ArgumentTypeError(
             f'{arg} cannot be converted to integer.')
-    if value <= 1:
+    if value < 1:
         raise argparse.ArgumentTypeError(
             f'{value} is not a possitive integer.')
     return value
