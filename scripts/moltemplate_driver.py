@@ -16,6 +16,7 @@ import symbols
 import numpy as np
 import opls
 from rdkit import Chem
+from rdkit.Chem import AllChem
 
 FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
@@ -82,16 +83,20 @@ def validate_options(argv):
 
 
 class Polymer(object):
+    ATOM_ID = 'atom_id'
 
     def __init__(self, options, jobname):
         self.options = options
         self.jobname = jobname
         self.outfile = self.jobname + MOLT_OUT_EXT
         self.polym = None
+        self.polym_Hs = None
 
     def run(self):
         self.polymerize()
         self.assignAtomType()
+        self.embedMol()
+        self.write()
         log('Finished', timestamp=True)
 
     def setBondProj(self):
@@ -148,6 +153,36 @@ class Polymer(object):
                     else:
                         continue
                     log_debug(f"{atom_id} {type_id}")
+
+    def embedMol(self):
+        self.polym_Hs = Chem.AddHs(self.polym)
+        AllChem.EmbedMolecule(self.polym_Hs)
+        self.polym = Chem.RemoveHs(self.polym_Hs)
+
+    def write(self):
+        with open(self.outfile, 'w') as fh:
+            fh.write('import "oplsaa.lt"\n\n\n')
+            fh.write("%s inherits OPLSAA {\n\n" % self.jobname.capitalize())
+            fh.write('# atomID   molID  atomTyle  charge     X        Y          Z\n')
+            fh.write('write("Data Atoms") {\n')
+            conformer = self.polym.GetConformer(0)
+
+            atom_id = 0
+            for atom in self.polym.GetAtoms():
+                xyz = ' '.join(map(str, conformer.GetAtomPosition(atom.GetIdx())))
+                fh.write(f"  $atom:{atom_id} $mol:. @atom:{atom.GetIntProp(opls.TYPE_ID)} 0. {xyz}\n")
+                atom.SetIntProp(self.ATOM_ID, atom_id)
+                atom_id += 1
+            fh.write("}\n\n")
+
+            fh.write('write("Data Bond List") {\n')
+            for id, bond in enumerate(self.polym.GetBonds()):
+                batom_id = bond.GetBeginAtom().GetIntProp(self.ATOM_ID)
+                eatom_id = bond.GetEndAtom().GetIntProp(self.ATOM_ID)
+                fh.write(f"  $bond:{id} $atom:{batom_id} $atom:{eatom_id}\n")
+            fh.write("}\n\n")
+
+            fh.write("}\n\n")
 
 
 logger = None
