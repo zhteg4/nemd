@@ -10,6 +10,8 @@ from matplotlib import pyplot as plt
 from collections import namedtuple
 from _collections import defaultdict
 
+TYPE_ID = 'type_id'
+
 logger = logutils.createModuleLogger()
 
 LogData = namedtuple('LogData', ['fix', 'data'])
@@ -21,7 +23,9 @@ REX_AREA = 'The cross sectional area is (?P<name>\d*\.?\d*) Angstroms\^2\n'
 NEMD_SRC = 'NEMD_SRC'
 MODULE = 'module'
 OPLSAA = 'oplsaa'
+OPLSUA = 'oplsua'
 MOLT_FF_EXT = '.lt'
+RRM_EXT = '.prm'
 FF = 'ff'
 
 
@@ -70,12 +74,18 @@ class LammpsInput(object):
     GROUP = 'group'
     VELOCITY = 'velocity'
     DIHEDRAL_STYLE = 'dihedral_style'
+    IMPROPER_STYLE = 'improper_style'
     COMPUTE = 'compute'
     THERMO_STYLE = 'thermo_style'
     READ_DATA = 'read_data'
     FIX = 'fix'
     DUMP_MODIFY = 'dump_modify'
     PAIR_STYLE = 'pair_style'
+    PAIR_MODIFY = 'pair_modify'
+    SPECIAL_BONDS = 'special_bonds'
+    KSPACE_STYLE = 'kspace_style'
+    KSPACE_MODIFY = 'kspace_modify'
+    GEWALD = 'gewald'
     RUN = 'run'
     MINIMIZE = 'minimize'
     ANGLE_STYLE = 'angle_style'
@@ -240,6 +250,181 @@ class LammpsInput(object):
 
     def getTimestep(self):
         return self.cmd_items[self.TIMESTEP]
+
+
+class LammpsWriter(LammpsInput):
+    IN_EXT = '.in'
+    DATA_EXT = '.data'
+    LAMMPS_DESCRIPTION = 'LAMMPS Description'
+
+    ATOMS = 'atoms'
+    BONDS = 'bonds'
+    ANGLES = 'angles'
+    DIHEDRALS = 'dihedrals'
+    IMPROPERS = 'impropers'
+
+    ATOM_TYPES = 'atom types'
+    BOND_TYPES = 'bond types'
+    ANGLE_TYPES = 'angle types'
+    DIHEDRAL_TYPES = 'dihedral types'
+    IMPROPER_TYPES = 'improper types'
+
+    XLO_XHI = 'xlo xhi'
+    YLO_YHI = 'ylo yhi'
+    ZLO_ZHI = 'zlo zhi'
+    LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
+
+    MASSES = 'Masses'
+    PAIR_COEFFS = 'Pair Coeffs'
+
+    def __init__(self, ff, jobname, mols=None):
+        self.ff = ff
+        self.jobname = jobname
+        self.mols = mols
+        self.lammps_in = self.jobname + self.IN_EXT
+        self.lammps_data = self.jobname + self.DATA_EXT
+        self.units = 'real'
+        self.atom_style = 'full'
+        self.bond_style = 'harmonic'
+        self.angle_style = 'harmonic'
+        self.dihedral_style = 'opls'
+        self.improper_style = 'harmonic'
+        self.pair_style = {
+            'lj/cut/coul/long': (
+                11.0,
+                11.0,
+            )
+        }
+        self.pair_modify = {'mix': 'geometric'}
+        self.special_bonds = {
+            'lj/coul': (
+                0.0,
+                0.0,
+                0.5,
+            )
+        }
+        self.kspace_style = {'pppm': 0.0001}
+
+    def writeLammpsIn(self):
+        with open(self.lammps_in, 'w') as fh:
+            fh.write(f"{self.UNITS} {self.units}\n")
+            fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
+            fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
+            fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
+            fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
+            fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
+            pair_style = [
+                f"{x} {' '.join(map(str, y))}"
+                for x, y in self.pair_style.items()
+            ][0]
+            fh.write(f"{self.PAIR_STYLE} {pair_style}\n")
+            fh.write(
+                f"{self.PAIR_MODIFY} {' '.join([(x,y) for x, y in self.pair_modify.items()][0])}\n"
+            )
+            special_bond = [
+                f"{x} {' '.join(map(str, y))}"
+                for x, y in self.special_bonds.items()
+            ][0]
+            fh.write(f"{self.SPECIAL_BONDS} {special_bond}\n")
+            kspace_style = [f"{x} {y}"
+                            for x, y in self.kspace_style.items()][0]
+            fh.write(f"{self.KSPACE_STYLE} {kspace_style}\n")
+            if not self.hasCharge():
+                fh.write(f"{self.KSPACE_MODIFY} {self.GEWALD} 1\n")
+            fh.write(f"{self.READ_DATA} {self.lammps_data}\n")
+
+            fh.write("minimize 1.0e-4 1.0e-6 100 1000")
+
+    def hasCharge(self, default=True):
+        if self.mols is None:
+            return default
+        charges = [
+            self.ff.charges[y.GetIntProp(TYPE_ID)] for x in self.mols.values()
+            for y in x.GetAtoms()
+        ]
+        return any(charges)
+
+    def writeLammpsData(self):
+
+        with open(self.lammps_data, 'w') as self.data_fh:
+            self.writeDescription()
+            self.writeTopoType()
+            self.writeBox()
+            self.writeMasses()
+            self.writePairCoeffs()
+            self.writeAtoms()
+
+    def writeDescription(self):
+        if self.mols is None:
+            raise ValueError(f"Mols are not set.")
+
+        self.data_fh.write(f"{self.LAMMPS_DESCRIPTION}\n\n")
+        atoms = [len(x.GetAtoms()) for x in self.mols.values()]
+        self.data_fh.write(f"{sum(atoms)} {self.ATOMS}\n")
+        bonds = [len(x.GetBonds()) for x in self.mols.values()]
+        self.data_fh.write(f"{sum(bonds)} {self.BONDS}\n")
+        neighbors = [
+            len(y.GetNeighbors()) for x in self.mols.values()
+            for y in x.GetAtoms()
+        ]
+        # FIXME: I guess improper angles may reduce this num
+        angles = [max(0, x - 1) for x in neighbors]
+        self.data_fh.write(f"{sum(angles)} {self.ANGLES}\n")
+        # FIXME: dihedral and improper are set to be zeros at this point
+        self.data_fh.write(f"0 {self.DIHEDRALS}\n")
+        self.data_fh.write(f"0 {self.IMPROPERS}\n\n")
+
+    def writeTopoType(self):
+        self.data_fh.write(f"{len(self.ff.atoms)} {self.ATOM_TYPES}\n")
+        self.data_fh.write(f"{len(self.ff.bonds)} {self.BOND_TYPES}\n")
+        self.data_fh.write(f"{len(self.ff.angles)} {self.ANGLE_TYPES}\n")
+        self.data_fh.write(f"{len(self.ff.torsions)} {self.DIHEDRAL_TYPES}\n")
+        self.data_fh.write(
+            f"{len(self.ff.impropers)} {self.IMPROPER_TYPES}\n\n")
+
+    def writeBox(self, min_box=None, buffer=None):
+        if min_box is None:
+            min_box = (20., 20., 20.,) # yapf: disable
+        if buffer is None:
+            buffer = (2., 2., 2.,) # yapf: disable
+        xyzs = np.concatenate(
+            [x.GetConformer(0).GetPositions() for x in self.mols.values()])
+        box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
+        box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
+        centroid = xyzs.mean(axis=0)
+        for dim in range(3):
+            self.data_fh.write(
+                f"{centroid[dim]-box_hf[dim]:.2f} {centroid[dim]+box_hf[dim]:.2f} {self.LO_HI[dim]}\n"
+            )
+        self.data_fh.write("\n")
+
+    def writeMasses(self):
+        self.data_fh.write(f"{self.MASSES}\n\n")
+        for atom_id, atom in self.ff.atoms.items():
+            self.data_fh.write(f"{atom_id} {atom.mass} # {atom.description}\n")
+        self.data_fh.write(f"\n")
+
+    def writePairCoeffs(self):
+        self.data_fh.write(f"{self.PAIR_COEFFS}\n\n")
+        for atom in self.ff.atoms.values():
+            vdw = self.ff.vdws[atom.id]
+            self.data_fh.write(f"{atom.id} {atom.id} {vdw.ene} {vdw.dist}\n")
+        self.data_fh.write("\n")
+
+    def writeAtoms(self):
+        self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
+        atom_id = 0
+        for mol_id, mol in self.mols.items():
+            conformer = mol.GetConformer()
+            for atom in mol.GetAtoms():
+                atom_id += 1
+                type_id = atom.GetIntProp(TYPE_ID)
+                xyz = conformer.GetAtomPosition(atom.GetIdx())
+                xyz = ' '.join(map(lambda x: f'{x:.3f}', xyz))
+                charge = self.ff.charges[type_id]
+                self.data_fh.write(
+                    f"{atom_id} {mol_id} {type_id} {charge} {xyz}\n")
+        self.data_fh.write(f"\n")
 
 
 class EnergyReader(object):

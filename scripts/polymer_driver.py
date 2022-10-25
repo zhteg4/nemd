@@ -9,19 +9,19 @@ import units
 import parserutils
 import fileutils
 import nemd
+import itertools
 import plotutils
 import environutils
 import jobutils
 import symbols
 import numpy as np
-import opls
+import oplsua
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
 FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
-FlAG_BOND_LEN = '-bond_len'
-FLAG_BOND_ANG = '-bond_ang'
+FlAG_MOL_NUM = '-mol_num'
 
 MOLT_OUT_EXT = fileutils.MOLT_FF_EXT
 
@@ -58,20 +58,14 @@ def get_parser():
     parser.add_argument(FlAG_CRU_NUM,
                         metavar=FlAG_CRU_NUM[1:].upper(),
                         type=parserutils.type_positive_int,
+                        default=1,
+                        help='')
+    parser.add_argument(FlAG_MOL_NUM,
+                        metavar=FlAG_MOL_NUM[1:].upper(),
+                        type=parserutils.type_positive_int,
+                        default=1,
                         help='')
 
-    parser.add_argument(
-        FlAG_BOND_LEN,
-        metavar=FlAG_BOND_LEN[1:].upper(),
-        type=parserutils.type_positive_float,
-        default=1.5350,  # length of the C-H bond
-        help='')
-    parser.add_argument(
-        FLAG_BOND_ANG,
-        metavar=FLAG_BOND_ANG[1:].upper(),
-        type=parserutils.type_positive_float,
-        default=109.5,  # Tetrahedronal angle (C-C-C angle)
-        help='')
     jobutils.add_job_arguments(parser)
     return parser
 
@@ -84,18 +78,26 @@ def validate_options(argv):
 
 class Polymer(object):
     ATOM_ID = 'atom_id'
+    TYPE_ID = 'type_id'
+    MOL_NUM = 'mol_num'
 
-    def __init__(self, options, jobname):
+    def __init__(self, options, jobname, ff=None):
         self.options = options
         self.jobname = jobname
+        self.ff = ff
         self.outfile = self.jobname + MOLT_OUT_EXT
         self.polym = None
         self.polym_Hs = None
+        self.mols = {}
+        self.buffer = [2., 2., 2.]
+        if self.ff is None:
+            self.ff = oplsua.get_opls_parser()
 
     def run(self):
         self.polymerize()
         self.assignAtomType()
         self.embedMol()
+        self.setMols()
         self.write()
         log('Finished', timestamp=True)
 
@@ -125,20 +127,20 @@ class Polymer(object):
                             h_atom_idx,
                             order=Chem.rdchem.BondType.SINGLE)
         polym = edcombo.GetMol()
-        self.polym = Chem.DeleteSubstructs(polym, Chem.MolFromSmiles('*'))
+        self.polym = Chem.DeleteSubstructs(
+            polym, Chem.MolFromSmiles(symbols.WILD_CARD))
         log(f"{Chem.MolToSmiles(self.polym)}")
 
     def assignAtomType(self):
-
         polym_smile = Chem.CanonSmiles(Chem.MolToSmiles(self.polym))
-        for opls_mol in opls.OPLS_Parser.OPLSUA_MOLS:
-            if polym_smile == opls_mol.smiles:
-                for atom, atom_type_id in zip(self.polym.GetAtoms(),
-                                              opls_mol.map):
-                    atom.SetIntProp(opls.TYPE_ID, atom_type_id)
+        for sml in self.ff.SMILES:
+            if polym_smile == sml.sml:
+                for atom, atom_type_id in zip(self.polym.GetAtoms(), sml.mp):
+                    atom.SetIntProp(self.TYPE_ID, atom_type_id)
+                    log_debug(f"{atom.GetIdx()} {atom_type_id}")
                 return
 
-        for opls_frag in opls.OPLS_Parser.OPLSUA_FRAGS:
+        for opls_frag in ff_frag:
             frag = Chem.MolFromSmiles(opls_frag.smiles)
             matches = self.polym.GetSubstructMatches(frag)
             for match in matches:
@@ -159,30 +161,63 @@ class Polymer(object):
         AllChem.EmbedMolecule(self.polym_Hs)
         self.polym = Chem.RemoveHs(self.polym_Hs)
 
+    def setMols(self):
+
+        conformer = self.polym.GetConformer(0)
+        xyzs = np.array([
+            conformer.GetAtomPosition(x.GetIdx())
+            for x in self.polym.GetAtoms()
+        ])
+        mol_bndr = xyzs.max(axis=0) - xyzs.min(axis=0)
+        mol_vec = mol_bndr + self.buffer
+        idxs = range(math.ceil(math.pow(self.options.mol_num, 1. / 3)))
+        idxs_3d = itertools.product(idxs, idxs, idxs)
+        for mol_id, idxs in enumerate(idxs_3d, 1):
+            if mol_id > self.options.mol_num:
+                return
+            polym = copy.copy(self.polym)
+            self.mols[mol_id] = polym
+            polym.SetIntProp(self.MOL_NUM, mol_id)
+            polym_conformer = polym.GetConformer(0)
+            for atom in polym.GetAtoms():
+                atom_id = atom.GetIdx()
+                xyz = list(conformer.GetAtomPosition(atom_id))
+                xyz += mol_vec * idxs
+                polym_conformer.SetAtomPosition(atom_id, xyz)
+
     def write(self):
-        with open(self.outfile, 'w') as fh:
-            fh.write('import "oplsaa.lt"\n\n\n')
-            fh.write("%s inherits OPLSAA {\n\n" % self.jobname.capitalize())
-            fh.write('# atomID   molID  atomTyle  charge     X        Y          Z\n')
-            fh.write('write("Data Atoms") {\n')
-            conformer = self.polym.GetConformer(0)
+        lmw = fileutils.LammpsWriter(self.ff, self.jobname, mols=self.mols)
+        lmw.writeLammpsIn()
+        lmw.writeLammpsData()
 
-            atom_id = 0
-            for atom in self.polym.GetAtoms():
-                xyz = ' '.join(map(str, conformer.GetAtomPosition(atom.GetIdx())))
-                fh.write(f"  $atom:{atom_id} $mol:. @atom:{atom.GetIntProp(opls.TYPE_ID)} 0. {xyz}\n")
-                atom.SetIntProp(self.ATOM_ID, atom_id)
-                atom_id += 1
-            fh.write("}\n\n")
-
-            fh.write('write("Data Bond List") {\n')
-            for id, bond in enumerate(self.polym.GetBonds()):
-                batom_id = bond.GetBeginAtom().GetIntProp(self.ATOM_ID)
-                eatom_id = bond.GetEndAtom().GetIntProp(self.ATOM_ID)
-                fh.write(f"  $bond:{id} $atom:{batom_id} $atom:{eatom_id}\n")
-            fh.write("}\n\n")
-
-            fh.write("}\n\n")
+        # with open(self.outfile, 'w') as fh:
+        #     fh.write('import "oplsaa.lt"\n\n\n')
+        #     fh.write("%s inherits OPLSAA {\n\n" % self.jobname.capitalize())
+        #     fh.write(
+        #         '# atomID   molID  atomTyle  charge     X        Y          Z\n'
+        #     )
+        #
+        #     fh.write('write("Data Atoms") {\n')
+        #     conformer = self.polym.GetConformer(0)
+        #     atom_id = 0
+        #     for atom in self.polym.GetAtoms():
+        #         xyz = ' '.join(
+        #             map(str, conformer.GetAtomPosition(atom.GetIdx())))
+        #         fh.write(
+        #             f"  $atom:{atom_id} $mol:. @atom:{atom.GetIntProp(self.TYPE_ID)} 0. {xyz}\n"
+        #         )
+        #         atom.SetIntProp(self.ATOM_ID, atom_id)
+        #         atom_id += 1
+        #     fh.write("}\n\n")
+        #
+        #     fh.write('write("Data Bond List") {\n')
+        #     for id, bond in enumerate(self.polym.GetBonds()):
+        #         batom_id = bond.GetBeginAtom().GetIntProp(self.ATOM_ID)
+        #         eatom_id = bond.GetEndAtom().GetIntProp(self.ATOM_ID)
+        #         fh.write(f"  $bond:{id} $atom:{batom_id} $atom:{eatom_id}\n")
+        #     fh.write("}\n\n")
+        #
+        #     fh.write("}\n\n")
 
 
 logger = None

@@ -10,6 +10,11 @@ OPLSUA = namedtuple('OPLSUA', ['smiles', 'map', 'comment'])
 
 TYPE_ID = 'type_id'
 
+OPLSUA_MOLS = [
+    OPLSUA(smiles='C', map=(81, ), comment='CH4 Methane'),
+    # OPLSUA(smiles='C', map=(1,), comment='CH4 Methane'),
+]
+
 
 class OPLS_Parser:
 

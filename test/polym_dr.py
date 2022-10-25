@@ -1,3 +1,4 @@
+# /Users/tzhang/git/lammps/tools/tinker/
 from rdkit import Chem
 mol1 = Chem.MolFromSmiles('*CC*')
 mol2 = Chem.MolFromSmiles('C(=O)O')
