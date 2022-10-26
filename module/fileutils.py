@@ -11,6 +11,7 @@ from collections import namedtuple
 from _collections import defaultdict
 
 TYPE_ID = 'type_id'
+ATOM_ID = 'atom_id'
 
 logger = logutils.createModuleLogger()
 
@@ -276,11 +277,17 @@ class LammpsWriter(LammpsInput):
 
     MASSES = 'Masses'
     PAIR_COEFFS = 'Pair Coeffs'
+    BOND_COEFFS = 'Bond Coeffs'
 
-    def __init__(self, ff, jobname, mols=None):
+    LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
+    LJ_CUT = 'lj/cut'
+
+    def __init__(self, ff, jobname, mols=None, lj_cut=11., coul_cut=11.):
         self.ff = ff
         self.jobname = jobname
         self.mols = mols
+        self.lj_cut = lj_cut
+        self.coul_cut = coul_cut
         self.lammps_in = self.jobname + self.IN_EXT
         self.lammps_data = self.jobname + self.DATA_EXT
         self.units = 'real'
@@ -290,10 +297,9 @@ class LammpsWriter(LammpsInput):
         self.dihedral_style = 'opls'
         self.improper_style = 'harmonic'
         self.pair_style = {
-            'lj/cut/coul/long': (
-                11.0,
-                11.0,
-            )
+            self.LJ_CUT_COUL_LONG:
+            f"{self.LJ_CUT_COUL_LONG} {self.lj_cut} {self.coul_cut}",
+            self.LJ_CUT: f"{self.LJ_CUT} {self.lj_cut}"
         }
         self.pair_modify = {'mix': 'geometric'}
         self.special_bonds = {
@@ -313,11 +319,9 @@ class LammpsWriter(LammpsInput):
             fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
             fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
             fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
-            pair_style = [
-                f"{x} {' '.join(map(str, y))}"
-                for x, y in self.pair_style.items()
-            ][0]
-            fh.write(f"{self.PAIR_STYLE} {pair_style}\n")
+            pair_style = self.LJ_CUT_COUL_LONG if self.hasCharge(
+            ) else self.LJ_CUT
+            fh.write(f"{self.PAIR_STYLE} {self.pair_style[pair_style]}\n")
             fh.write(
                 f"{self.PAIR_MODIFY} {' '.join([(x,y) for x, y in self.pair_modify.items()][0])}\n"
             )
@@ -326,11 +330,11 @@ class LammpsWriter(LammpsInput):
                 for x, y in self.special_bonds.items()
             ][0]
             fh.write(f"{self.SPECIAL_BONDS} {special_bond}\n")
-            kspace_style = [f"{x} {y}"
-                            for x, y in self.kspace_style.items()][0]
-            fh.write(f"{self.KSPACE_STYLE} {kspace_style}\n")
-            if not self.hasCharge():
-                fh.write(f"{self.KSPACE_MODIFY} {self.GEWALD} 1\n")
+            if self.hasCharge():
+                kspace_style = [
+                    f"{x} {y}" for x, y in self.kspace_style.items()
+                ][0]
+                fh.write(f"{self.KSPACE_STYLE} {kspace_style}\n")
             fh.write(f"{self.READ_DATA} {self.lammps_data}\n")
 
             fh.write("minimize 1.0e-4 1.0e-6 100 1000")
@@ -352,7 +356,9 @@ class LammpsWriter(LammpsInput):
             self.writeBox()
             self.writeMasses()
             self.writePairCoeffs()
+            self.writeBondCoeffs()
             self.writeAtoms()
+            self.writeBonds()
 
     def writeDescription(self):
         if self.mols is None:
@@ -411,6 +417,12 @@ class LammpsWriter(LammpsInput):
             self.data_fh.write(f"{atom.id} {atom.id} {vdw.ene} {vdw.dist}\n")
         self.data_fh.write("\n")
 
+    def writeBondCoeffs(self):
+        self.data_fh.write(f"{self.BOND_COEFFS}\n\n")
+        for bond in self.ff.bonds.values():
+            self.data_fh.write(f"{bond.id}  {bond.ene} {bond.dist}\n")
+        self.data_fh.write("\n")
+
     def writeAtoms(self):
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
         atom_id = 0
@@ -418,12 +430,37 @@ class LammpsWriter(LammpsInput):
             conformer = mol.GetConformer()
             for atom in mol.GetAtoms():
                 atom_id += 1
+                atom.SetIntProp(ATOM_ID, atom_id)
                 type_id = atom.GetIntProp(TYPE_ID)
                 xyz = conformer.GetAtomPosition(atom.GetIdx())
                 xyz = ' '.join(map(lambda x: f'{x:.3f}', xyz))
                 charge = self.ff.charges[type_id]
                 self.data_fh.write(
                     f"{atom_id} {mol_id} {type_id} {charge} {xyz}\n")
+        self.data_fh.write(f"\n")
+
+    def writeBonds(self):
+        self.data_fh.write(f"{self.BONDS.capitalize()}\n\n")
+        bond_id = 0
+        for mol in self.mols.values():
+            for bond in mol.GetBonds():
+                bond_id += 1
+                bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
+                bonded_atoms = sorted(bonded_atoms,
+                                      key=lambda x: x.GetIntProp(TYPE_ID))
+                atoms_types = [x.GetIntProp(TYPE_ID) for x in bonded_atoms]
+                matches = [
+                    x for x in self.ff.bonds.values()
+                    if [x.id1, x.id2] == atoms_types
+                ]
+                if not matches:
+                    raise ValueError(
+                        f"Cannot find params for bond between atom {b_type_id} and {s_type_id}."
+                    )
+                bond = matches[0]
+                self.data_fh.write(
+                    f"{bond_id} {bond.id} {bonded_atoms[0].GetIntProp(ATOM_ID)} {bonded_atoms[1].GetIntProp(ATOM_ID)}\n"
+                )
         self.data_fh.write(f"\n")
 
 

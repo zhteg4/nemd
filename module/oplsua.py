@@ -10,7 +10,7 @@ ATOM_TYPE = namedtuple(
     'ATOM_TYPE',
     ['id', 'formula', 'description', 'atomic_number', 'mass', 'connectivity'])
 VDW = namedtuple('VDW', ['id', 'dist', 'ene'])
-BOND = namedtuple('BOND', ['id1', 'id2', 'dist', 'ene'])
+BOND = namedtuple('BOND', ['id', 'id1', 'id2', 'dist', 'ene'])
 ANGLE = namedtuple('ANGLE', ['id1', 'id2', 'id3', 'ene', 'angle'])
 UREY_BRADLEY = namedtuple('UREY_BRADLEY', ['id1', 'id2', 'id3', 'ene', 'dist'])
 IMPROPER = namedtuple('IMPROPER',
@@ -92,7 +92,10 @@ class OPLS_Parser:
     #     OPLSUA(smiles='CCC', map=(10, None, 10), comment='Alkanes')
     # ]
 
-    SMILES = [UA(sml='C', mp=(81, ), dsc='CH4 Methane')]
+    # yapf: disable
+    SMILES = [UA(sml='C', mp=(81, ), dsc='CH4 Methane'),
+              UA(sml='CC', mp=(82, 82,), dsc='Ethane')]
+    # yapf: enable
 
     DESCRIPTION_SMILES = {
         'CH4 Methane': 'C',
@@ -202,9 +205,10 @@ class OPLS_Parser:
             self.charges[int(type_id)] = float(charge)
 
     def setBond(self):
-        for id, line in enumerate(self.raw_content[self.BOND_MK]):
+        for id, line in enumerate(self.raw_content[self.BOND_MK], 1):
             _, id1, id2, ene, dist = line.split()
-            self.bonds[id] = BOND(id1=int(id1),
+            self.bonds[id] = BOND(id=id,
+                                  id1=int(id1),
                                   id2=int(id2),
                                   ene=float(ene),
                                   dist=float(dist))
