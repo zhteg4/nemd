@@ -11,12 +11,13 @@ ATOM_TYPE = namedtuple(
     ['id', 'formula', 'description', 'atomic_number', 'mass', 'connectivity'])
 VDW = namedtuple('VDW', ['id', 'dist', 'ene'])
 BOND = namedtuple('BOND', ['id', 'id1', 'id2', 'dist', 'ene'])
-ANGLE = namedtuple('ANGLE', ['id1', 'id2', 'id3', 'ene', 'angle'])
+ANGLE = namedtuple('ANGLE', ['id', 'id1', 'id2', 'id3', 'ene', 'angle'])
 UREY_BRADLEY = namedtuple('UREY_BRADLEY', ['id1', 'id2', 'id3', 'ene', 'dist'])
 IMPROPER = namedtuple('IMPROPER',
                       ['id1', 'id2', 'id3', 'id4', 'ene', 'angle', 'n_parm'])
 ENE_ANG_N = namedtuple('ENE_ANG_N', ['ene', 'angle', 'n_parm'])
-TORSION = namedtuple('TORSION', ['id1', 'id2', 'id3', 'id4', 'constants'])
+DIHEDRAL = namedtuple('DIHEDRAL',
+                      ['id', 'id1', 'id2', 'id3', 'id4', 'constants'])
 
 UA = namedtuple('UA', ['sml', 'mp', 'dsc'])
 
@@ -94,7 +95,9 @@ class OPLS_Parser:
 
     # yapf: disable
     SMILES = [UA(sml='C', mp=(81, ), dsc='CH4 Methane'),
-              UA(sml='CC', mp=(82, 82,), dsc='Ethane')]
+              UA(sml='CC', mp=(82, 82,), dsc='Ethane'),
+              UA(sml='CCCC', mp=(83, 86, 86, 83,), dsc='n-Butane'),
+              UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), dsc='Isobutane')]
     # yapf: enable
 
     DESCRIPTION_SMILES = {
@@ -146,7 +149,7 @@ class OPLS_Parser:
         self.angles = {}
         self.urey_bradleys = {}
         self.impropers = {}
-        self.torsions = {}
+        self.dihedrals = {}
         self.charges = {}
         self.mol_smiles = {}
         self.frag_smiles = {}
@@ -159,7 +162,7 @@ class OPLS_Parser:
         self.setAngle()
         self.setUreyBradley()
         self.setImproper()
-        self.setTorsion()
+        self.setDihedral()
         self.setUACharge()
 
     def setRawContent(self):
@@ -214,9 +217,10 @@ class OPLS_Parser:
                                   dist=float(dist))
 
     def setAngle(self):
-        for id, line in enumerate(self.raw_content[self.ANGLE_MK]):
+        for id, line in enumerate(self.raw_content[self.ANGLE_MK], 1):
             _, id1, id2, id3, ene, angle = line.split()
-            self.angles[id] = ANGLE(id1=int(id1),
+            self.angles[id] = ANGLE(id=id,
+                                    id1=int(id1),
                                     id2=int(id2),
                                     id3=int(id3),
                                     ene=float(ene),
@@ -242,19 +246,20 @@ class OPLS_Parser:
                                           angle=float(angle),
                                           n_parm=int(n_parm))
 
-    def setTorsion(self):
-        for id, line in enumerate(self.raw_content[self.TORSIONAL_MK]):
+    def setDihedral(self):
+        for id, line in enumerate(self.raw_content[self.TORSIONAL_MK], 1):
             line_splitted = line.split()
             ids, enes = line_splitted[1:5], line_splitted[5:]
             ene_ang_ns = [
-                ENE_ANG_N(ene=float(x), angle=float(y), n_parm=float(z))
+                ENE_ANG_N(ene=float(x), angle=float(y), n_parm=int(z))
                 for x, y, z in zip(enes[::3], enes[1::3], enes[2::3])
             ]
-            self.torsions[id] = TORSION(id1=int(ids[0]),
-                                        id2=int(ids[1]),
-                                        id3=int(ids[2]),
-                                        id4=int(ids[3]),
-                                        constants=ene_ang_ns)
+            self.dihedrals[id] = DIHEDRAL(id=id,
+                                          id1=int(ids[0]),
+                                          id2=int(ids[1]),
+                                          id3=int(ids[2]),
+                                          id4=int(ids[3]),
+                                          constants=ene_ang_ns)
 
     def setCharge(self):
         sidx = self.markers[self.IN_CHARGES]

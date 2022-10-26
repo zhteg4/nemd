@@ -5,6 +5,7 @@ import numpy as np
 import logutils
 import units
 from io import StringIO
+import itertools
 from dataclasses import dataclass
 from matplotlib import pyplot as plt
 from collections import namedtuple
@@ -278,6 +279,8 @@ class LammpsWriter(LammpsInput):
     MASSES = 'Masses'
     PAIR_COEFFS = 'Pair Coeffs'
     BOND_COEFFS = 'Bond Coeffs'
+    ANGLE_COEFFS = 'Angle Coeffs'
+    DIHEDRAL_COEFFS = 'Dihedral Coeffs'
 
     LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
     LJ_CUT = 'lj/cut'
@@ -357,8 +360,12 @@ class LammpsWriter(LammpsInput):
             self.writeMasses()
             self.writePairCoeffs()
             self.writeBondCoeffs()
+            self.writeAngleCoeffs()
+            self.writeDihedralCoeffs()
             self.writeAtoms()
             self.writeBonds()
+            self.writeAngles()
+            self.writeDihedrals()
 
     def writeDescription(self):
         if self.mols is None:
@@ -384,7 +391,7 @@ class LammpsWriter(LammpsInput):
         self.data_fh.write(f"{len(self.ff.atoms)} {self.ATOM_TYPES}\n")
         self.data_fh.write(f"{len(self.ff.bonds)} {self.BOND_TYPES}\n")
         self.data_fh.write(f"{len(self.ff.angles)} {self.ANGLE_TYPES}\n")
-        self.data_fh.write(f"{len(self.ff.torsions)} {self.DIHEDRAL_TYPES}\n")
+        self.data_fh.write(f"{len(self.ff.dihedrals)} {self.DIHEDRAL_TYPES}\n")
         self.data_fh.write(
             f"{len(self.ff.impropers)} {self.IMPROPER_TYPES}\n\n")
 
@@ -421,6 +428,27 @@ class LammpsWriter(LammpsInput):
         self.data_fh.write(f"{self.BOND_COEFFS}\n\n")
         for bond in self.ff.bonds.values():
             self.data_fh.write(f"{bond.id}  {bond.ene} {bond.dist}\n")
+        self.data_fh.write("\n")
+
+    def writeAngleCoeffs(self):
+        self.data_fh.write(f"{self.ANGLE_COEFFS}\n\n")
+        for angle in self.ff.angles.values():
+            self.data_fh.write(f"{angle.id} {angle.ene} {angle.angle}\n")
+        self.data_fh.write("\n")
+
+    def writeDihedralCoeffs(self):
+        self.data_fh.write(f"{self.DIHEDRAL_COEFFS}\n\n")
+        for dihedral in self.ff.dihedrals.values():
+            params = [0., 0., 0., 0.]
+            for ene_ang_n in dihedral.constants:
+                params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
+                if (ene_ang_n.angle == 180.) ^ (ene_ang_n.n_parm in (
+                        2,
+                        4,
+                )):
+                    params[ene_ang_n.n_parm] *= -1
+            self.data_fh.write(
+                f"{dihedral.id}  {' '.join(map(str, params))}\n")
         self.data_fh.write("\n")
 
     def writeAtoms(self):
@@ -460,6 +488,90 @@ class LammpsWriter(LammpsInput):
                 bond = matches[0]
                 self.data_fh.write(
                     f"{bond_id} {bond.id} {bonded_atoms[0].GetIntProp(ATOM_ID)} {bonded_atoms[1].GetIntProp(ATOM_ID)}\n"
+                )
+        self.data_fh.write(f"\n")
+
+    def writeAngles(self):
+        self.data_fh.write(f"{self.ANGLES.capitalize()}\n\n")
+        angle_id = 0
+        for mol in self.mols.values():
+            for atom in mol.GetAtoms():
+                for atoms in self.getAngleAtoms(atom):
+                    angle_id += 1
+                    type_ids = [x.GetIntProp(TYPE_ID) for x in atoms]
+                    matches = [
+                        x for x in self.ff.angles.values()
+                        if type_ids == [x.id1, x.id2, x.id3]
+                    ]
+                    if not matches:
+                        raise ValueError(
+                            f"Cannot find params for angle between atom {', '.join(map(str, type_ids))}."
+                        )
+                    angle = matches[0]
+                    self.data_fh.write(
+                        f"{angle_id} {angle.id} {' '.join(map(str, [x.GetIntProp(ATOM_ID) for x in atoms]))}\n"
+                    )
+        self.data_fh.write(f"\n")
+
+    def getAngleAtoms(self, atom):
+        neighbors = atom.GetNeighbors()
+        if len(neighbors) < 2:
+            return []
+        neighbors = sorted(neighbors, key=lambda x: x.GetIntProp(TYPE_ID))
+        return [[x, atom, y] for x, y in itertools.combinations(neighbors, 2)]
+
+    def getDihedralAtoms(self, atom):
+        dihe_atoms = []
+        atomss = self.getAngleAtoms(atom)
+        for satom, matom, eatom in atomss:
+            eatomss = self.getAngleAtoms(eatom)
+            matom_id = matom.GetIdx()
+            eatom_id = eatom.GetIdx()
+            for eatoms in eatomss:
+                eatom_ids = [x.GetIdx() for x in eatoms]
+                eatom_ids.remove(eatom_id)
+                try:
+                    eatom_ids.remove(matom_id)
+                except ValueError:
+                    continue
+                dihe_4th = [x for x in eatoms if x.GetIdx() == eatom_ids[0]][0]
+                dihe_atoms.append([satom, matom, eatom, dihe_4th])
+        return dihe_atoms
+
+    def writeDihedrals(self):
+        self.data_fh.write(f"{self.DIHEDRALS.capitalize()}\n\n")
+        dihedral_id = 0
+        for mol in self.mols.values():
+            atomss = [
+                y for x in mol.GetAtoms() for y in self.getDihedralAtoms(x)
+            ]
+            # 1-2-3-4 and 4-3-2-1 are the same dihedral
+            atomss_no_flip = []
+            atom_idss = set()
+            for atoms in atomss:
+                atom_ids = tuple(x.GetIdx() for x in atoms)
+                if atom_ids in atom_idss:
+                    continue
+                atom_idss.add(atom_ids)
+                atom_idss.add(atom_ids[::-1])
+                atomss_no_flip.append(atoms)
+
+            for atoms in atomss_no_flip:
+                dihedral_id += 1
+                type_ids = [x.GetIntProp(TYPE_ID) for x in atoms]
+                if type_ids[1] > type_ids[2]:
+                    type_ids = type_ids[::-1]
+                matches = [
+                    x for x in self.ff.dihedrals.values()
+                    if type_ids == [x.id1, x.id2, x.id3, x.id4]
+                ]
+                if not matches:
+                    raise ValueError(
+                        f"Cannot find params for angle between atom {', '.join(map(str, type_ids))}."
+                    )
+                dihedral = matches[0]
+                self.data_fh.write(
+                    f"{dihedral_id} {dihedral.id} {' '.join(map(str, [x.GetIntProp(ATOM_ID) for x in atoms]))}\n"
                 )
         self.data_fh.write(f"\n")
 
