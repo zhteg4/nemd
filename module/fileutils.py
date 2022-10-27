@@ -314,6 +314,10 @@ class LammpsWriter(LammpsInput):
             )
         }
         self.kspace_style = {'pppm': 0.0001}
+        self.bonds = {}
+        self.angles = {}
+        self.dihedrals = {}
+        self.impropers = {}
 
     def writeLammpsIn(self):
         with open(self.lammps_in, 'w') as fh:
@@ -365,6 +369,10 @@ class LammpsWriter(LammpsInput):
             self.writeDihedralCoeffs()
             self.writeImproperCoeffs()
             self.writeAtoms()
+            self.setBonds()
+            self.setAngles()
+            self.setDihedrals()
+            # self.setImpropers()
             self.writeBonds()
             self.writeAngles()
             self.writeDihedrals()
@@ -478,8 +486,7 @@ class LammpsWriter(LammpsInput):
                     f"{atom_id} {mol_id} {type_id} {charge} {xyz}\n")
         self.data_fh.write(f"\n")
 
-    def writeBonds(self):
-        self.data_fh.write(f"{self.BONDS.capitalize()}\n\n")
+    def setBonds(self):
         bond_id = 0
         for mol in self.mols.values():
             for bond in mol.GetBonds():
@@ -521,13 +528,22 @@ class LammpsWriter(LammpsInput):
                         f"No params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
                     )
                 bond = matches[0]
-                self.data_fh.write(
-                    f"{bond_id} {bond.id} {bonded_atoms[0].GetIntProp(ATOM_ID)} {bonded_atoms[1].GetIntProp(ATOM_ID)}\n"
+                self.bonds[bond_id] = (
+                    bond.id,
+                    bonded_atoms[0].GetIntProp(ATOM_ID),
+                    bonded_atoms[1].GetIntProp(ATOM_ID),
                 )
+
+    def writeBonds(self):
+        if not self.bonds:
+            return
+
+        self.data_fh.write(f"{self.BONDS.capitalize()}\n\n")
+        for bond_id, (bond_type, id1, id2) in self.bonds.items():
+            self.data_fh.write(f"{bond_id} {bond_type} {id1} {id2}\n")
         self.data_fh.write(f"\n")
 
-    def writeAngles(self):
-        self.data_fh.write(f"{self.ANGLES.capitalize()}\n\n")
+    def setAngles(self):
         angle_id = 0
         for mol in self.mols.values():
             for atom in mol.GetAtoms():
@@ -566,9 +582,15 @@ class LammpsWriter(LammpsInput):
                             f"No params for angle between atom {', '.join(map(str, type_ids))}."
                         )
                     angle = matches[0]
-                    self.data_fh.write(
-                        f"{angle_id} {angle.id} {' '.join(map(str, [x.GetIntProp(ATOM_ID) for x in atoms]))}\n"
-                    )
+                    self.angles[angle_id] = (angle.id, ) + tuple(
+                        x.GetIntProp(ATOM_ID) for x in atoms)
+
+    def writeAngles(self):
+        if not self.angles:
+            return
+        self.data_fh.write(f"{self.ANGLES.capitalize()}\n\n")
+        for angle_id, (type_id, id1, id2, id3) in self.angles.items():
+            self.data_fh.write(f"{angle_id} {type_id} {id1} {id2} {id3}\n")
         self.data_fh.write(f"\n")
 
     def getAngleAtoms(self, atom):
@@ -596,8 +618,7 @@ class LammpsWriter(LammpsInput):
                 dihe_atoms.append([satom, matom, eatom, dihe_4th])
         return dihe_atoms
 
-    def writeDihedrals(self):
-        self.data_fh.write(f"{self.DIHEDRALS.capitalize()}\n\n")
+    def setDihedrals(self):
         dihedral_id = 0
         for mol in self.mols.values():
             atomss = [
@@ -628,9 +649,18 @@ class LammpsWriter(LammpsInput):
                         f"Cannot find params for angle between atom {', '.join(map(str, type_ids))}."
                     )
                 dihedral = matches[0]
-                self.data_fh.write(
-                    f"{dihedral_id} {dihedral.id} {' '.join(map(str, [x.GetIntProp(ATOM_ID) for x in atoms]))}\n"
-                )
+                self.dihedrals[dihedral_id] = (dihedral.id, ) + tuple(
+                    [x.GetIntProp(ATOM_ID) for x in atoms])
+
+    def writeDihedrals(self):
+        if not self.dihedrals:
+            return
+
+        self.data_fh.write(f"{self.DIHEDRALS.capitalize()}\n\n")
+        for dihedral_id, (type_id, id1, id2, id3,
+                          id4) in self.dihedrals.items():
+            self.data_fh.write(
+                f"{dihedral_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
 
     def writeImpropers(self):
