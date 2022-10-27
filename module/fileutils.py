@@ -281,6 +281,7 @@ class LammpsWriter(LammpsInput):
     BOND_COEFFS = 'Bond Coeffs'
     ANGLE_COEFFS = 'Angle Coeffs'
     DIHEDRAL_COEFFS = 'Dihedral Coeffs'
+    IMPROPER_COEFFS = 'Improper Coeffs'
 
     LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
     LJ_CUT = 'lj/cut'
@@ -362,10 +363,12 @@ class LammpsWriter(LammpsInput):
             self.writeBondCoeffs()
             self.writeAngleCoeffs()
             self.writeDihedralCoeffs()
+            self.writeImproperCoeffs()
             self.writeAtoms()
             self.writeBonds()
             self.writeAngles()
             self.writeDihedrals()
+            self.writeImpropers()
 
     def writeDescription(self):
         if self.mols is None:
@@ -451,6 +454,14 @@ class LammpsWriter(LammpsInput):
                 f"{dihedral.id}  {' '.join(map(str, params))}\n")
         self.data_fh.write("\n")
 
+    def writeImproperCoeffs(self):
+        self.data_fh.write(f"{self.IMPROPER_COEFFS}\n\n")
+        for improper in self.ff.impropers.values():
+            sign = 1 if improper.ene == 0. else -1
+            self.data_fh.write(
+                f"{improper.id} {improper.ene} {sign} {improper.n_parm}\n")
+        self.data_fh.write("\n")
+
     def writeAtoms(self):
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
         atom_id = 0
@@ -482,8 +493,32 @@ class LammpsWriter(LammpsInput):
                     if [x.id1, x.id2] == atoms_types
                 ]
                 if not matches:
+                    log_debug(
+                        f"No exact params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
+                    )
+                    type_set = set(atoms_types)
+                    partial_matches = {
+                        x: type_set.intersection([x.id1, x.id2])
+                        for x in self.ff.bonds.values()
+                    }
+                    partial_matches = {
+                        x: y.pop()
+                        for x, y in partial_matches.items() if y
+                    }
+                    for bond, mtype in partial_matches.items():
+                        o_type_id = [x for x in atoms_types if x != mtype][0]
+                        o_atom = [
+                            x for x in bonded_atoms
+                            if x.GetIntProp(TYPE_ID) == o_type_id
+                        ][0]
+                        # FIXME: Bond type ranking beyond first symbol match
+                        o_symbol = o_atom.GetSymbol()
+                        if self.ff.atoms[o_type_id].symbol == o_symbol:
+                            matches = [bond]
+                            break
+                if not matches:
                     raise ValueError(
-                        f"Cannot find params for bond between atom {b_type_id} and {s_type_id}."
+                        f"No params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
                     )
                 bond = matches[0]
                 self.data_fh.write(
@@ -504,8 +539,31 @@ class LammpsWriter(LammpsInput):
                         if type_ids == [x.id1, x.id2, x.id3]
                     ]
                     if not matches:
+                        log_debug(
+                            f"No exact params for angle between atom {', '.join(map(str, type_ids))}."
+                        )
+
+                        partial_matches = [
+                            x for x in self.ff.angles.values()
+                            if x.id2 == type_ids[1]
+                        ]
+                        if not partial_matches:
+                            raise ValueError(
+                                f"No params for angle (middle atom type {type_ids[1]})."
+                            )
+                        for angle in partial_matches:
+                            # FIXME: Bond type ranking beyond first symbol match
+                            o_symbols = [x.GetSymbol() for x in atoms[::2]]
+                            if o_symbols == [
+                                    self.ff.atoms[angle.id1].symbol,
+                                    self.ff.atoms[angle.id3].symbol
+                            ]:
+                                matches = [angle]
+                                break
+
+                    if not matches:
                         raise ValueError(
-                            f"Cannot find params for angle between atom {', '.join(map(str, type_ids))}."
+                            f"No params for angle between atom {', '.join(map(str, type_ids))}."
                         )
                     angle = matches[0]
                     self.data_fh.write(
@@ -573,6 +631,18 @@ class LammpsWriter(LammpsInput):
                 self.data_fh.write(
                     f"{dihedral_id} {dihedral.id} {' '.join(map(str, [x.GetIntProp(ATOM_ID) for x in atoms]))}\n"
                 )
+        self.data_fh.write(f"\n")
+
+    def writeImpropers(self):
+        return
+        self.data_fh.write(f"{self.IMPROPERS.capitalize()}\n\n")
+        dihedral_id = 0
+        for mol in self.mols.values():
+            import pdb
+            pdb.set_trace()
+            atomss = [
+                y for x in mol.GetAtoms() for y in self.getDihedralAtoms(x)
+            ]
         self.data_fh.write(f"\n")
 
 

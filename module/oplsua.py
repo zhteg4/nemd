@@ -6,15 +6,16 @@ import fileutils
 from rdkit import Chem
 from collections import namedtuple
 
-ATOM_TYPE = namedtuple(
-    'ATOM_TYPE',
-    ['id', 'formula', 'description', 'atomic_number', 'mass', 'connectivity'])
+ATOM_TYPE = namedtuple('ATOM_TYPE', [
+    'id', 'formula', 'symbol', 'description', 'atomic_number', 'mass',
+    'connectivity'
+])
 VDW = namedtuple('VDW', ['id', 'dist', 'ene'])
 BOND = namedtuple('BOND', ['id', 'id1', 'id2', 'dist', 'ene'])
 ANGLE = namedtuple('ANGLE', ['id', 'id1', 'id2', 'id3', 'ene', 'angle'])
 UREY_BRADLEY = namedtuple('UREY_BRADLEY', ['id1', 'id2', 'id3', 'ene', 'dist'])
-IMPROPER = namedtuple('IMPROPER',
-                      ['id1', 'id2', 'id3', 'id4', 'ene', 'angle', 'n_parm'])
+IMPROPER = namedtuple(
+    'IMPROPER', ['id', 'id1', 'id2', 'id3', 'id4', 'ene', 'angle', 'n_parm'])
 ENE_ANG_N = namedtuple('ENE_ANG_N', ['ene', 'angle', 'n_parm'])
 DIHEDRAL = namedtuple('DIHEDRAL',
                       ['id', 'id1', 'id2', 'id3', 'id4', 'constants'])
@@ -190,6 +191,7 @@ class OPLS_Parser:
             atomic_number, mass, connectivity = acomment.split()
             self.atoms[int(id)] = ATOM_TYPE(id=int(id),
                                             formula=formula,
+                                            symbol=formula.split('H')[0],
                                             description=comment,
                                             atomic_number=int(atomic_number),
                                             mass=float(mass),
@@ -227,7 +229,7 @@ class OPLS_Parser:
                                     angle=float(angle))
 
     def setUreyBradley(self):
-        for id, line in enumerate(self.raw_content[self.UREY_MK]):
+        for id, line in enumerate(self.raw_content[self.UREY_MK], 1):
             _, id1, id2, id3, ene, dist = line.split()
             self.urey_bradleys[id] = UREY_BRADLEY(id1=int(id1),
                                                   id2=int(id2),
@@ -236,9 +238,10 @@ class OPLS_Parser:
                                                   dist=float(dist))
 
     def setImproper(self):
-        for id, line in enumerate(self.raw_content[self.IMPROPER_MK]):
+        for id, line in enumerate(self.raw_content[self.IMPROPER_MK], 1):
             _, id1, id2, id3, id4, ene, angle, n_parm = line.split()
-            self.impropers[id] = IMPROPER(id1=int(id1),
+            self.impropers[id] = IMPROPER(id=id,
+                                          id1=int(id1),
                                           id2=int(id2),
                                           id3=int(id3),
                                           id4=int(id4),
