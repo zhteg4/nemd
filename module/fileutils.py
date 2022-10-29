@@ -299,7 +299,7 @@ class LammpsWriter(LammpsInput):
         self.bond_style = 'harmonic'
         self.angle_style = 'harmonic'
         self.dihedral_style = 'opls'
-        self.improper_style = 'harmonic'
+        self.improper_style = 'cvff'
         self.pair_style = {
             self.LJ_CUT_COUL_LONG:
             f"{self.LJ_CUT_COUL_LONG} {self.lj_cut} {self.coul_cut}",
@@ -318,6 +318,8 @@ class LammpsWriter(LammpsInput):
         self.angles = {}
         self.dihedrals = {}
         self.impropers = {}
+        self.symbol_impropers = {}
+        self.is_debug = environutils.is_debug()
 
     def writeLammpsIn(self):
         with open(self.lammps_in, 'w') as fh:
@@ -367,12 +369,13 @@ class LammpsWriter(LammpsInput):
             self.writeBondCoeffs()
             self.writeAngleCoeffs()
             self.writeDihedralCoeffs()
+            self.setImproperSymbols()
             self.writeImproperCoeffs()
             self.writeAtoms()
             self.setBonds()
             self.setAngles()
             self.setDihedrals()
-            # self.setImpropers()
+            self.setImpropers()
             self.writeBonds()
             self.writeAngles()
             self.writeDihedrals()
@@ -465,7 +468,7 @@ class LammpsWriter(LammpsInput):
     def writeImproperCoeffs(self):
         self.data_fh.write(f"{self.IMPROPER_COEFFS}\n\n")
         for improper in self.ff.impropers.values():
-            sign = 1 if improper.ene == 0. else -1
+            sign = 1 if improper.angle == 0. else -1
             self.data_fh.write(
                 f"{improper.id} {improper.ene} {sign} {improper.n_parm}\n")
         self.data_fh.write("\n")
@@ -663,17 +666,99 @@ class LammpsWriter(LammpsInput):
                 f"{dihedral_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
 
-    def writeImpropers(self):
-        return
-        self.data_fh.write(f"{self.IMPROPERS.capitalize()}\n\n")
-        dihedral_id = 0
+    def setImpropers(self, symbols='CN'):
+        improper_id = 0
         for mol in self.mols.values():
-            import pdb
-            pdb.set_trace()
-            atomss = [
-                y for x in mol.GetAtoms() for y in self.getDihedralAtoms(x)
-            ]
+            for atom in mol.GetAtoms():
+                atom_symbol = atom.GetSymbol()
+                if atom_symbol not in symbols:
+                    continue
+                neighbors = atom.GetNeighbors()
+                # FIXME: H-N should be counted as one neighbor
+                if atom.GetSymbol() not in 'CN' or len(neighbors) != 3:
+                    continue
+                if atom.GetSymbol() == 'N' and atom.GetHybridization(
+                ) == rdkit.Chem.rdchem.HybridizationType.SP3:
+                    continue
+                # Sp2 carbon for planar, Sp3 with one H (CHR1R2R3) for chirality, Sp2 N in Amino Acid
+                improper_id += 1
+                neighbor_symbols = [x.GetSymbol() for x in neighbors]
+                counted = self.getCountedSymbols([atom_symbol] +
+                                                 neighbor_symbols)
+                for symb, improper_ids in self.symbol_impropers.items():
+                    print(f"{symb} {self.ff.impropers[improper_ids[0]]}")
+                    impropers = [self.ff.impropers[x] for x in improper_ids]
+                    for improper in impropers:
+                        print(
+                            f"{[self.ff.atoms[x].description for x in [improper.id1, improper.id2, improper.id3, improper.id4]]}"
+                        )
+                improper_type_id = self.symbol_impropers[counted][0]
+                neighbors = sorted(neighbors,
+                                   key=lambda x: len(x.GetNeighbors()))
+                for neighbor in neighbors:
+                    if neighbor.GetSymbol(
+                    ) == 'O' and neighbor.GetHybridization(
+                    ) == rdkit.Chem.rdchem.HybridizationType.SP2:
+                        neighbors.remove(neighbor)
+                        neighbors = [neighbor] + neighbors
+                len(neighbors[0].GetNeighbors())
+                self.impropers[improper_id] = (
+                    improper_type_id,
+                    atom.GetIntProp(ATOM_ID),
+                ) + tuple([x.GetIntProp(ATOM_ID) for x in neighbors])
+
+    def writeImpropers(self):
+
+        if not self.impropers:
+            return
+
+        self.data_fh.write(f"{self.IMPROPERS.capitalize()}\n\n")
+        for improper_id, (type_id, id1, id2, id3,
+                          id4) in self.impropers.items():
+            self.data_fh.write(
+                f"{improper_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
+
+    def setImproperSymbols(self):
+
+        symbolss = {
+            z: ''.join([
+                self.ff.atoms[y].symbol for y in [x.id1, x.id2, x.id3, x.id4]
+            ])
+            for z, x in self.ff.impropers.items()
+        }
+        symbol_impropers = {}
+        for id, symbols in symbolss.items():
+            improper = self.ff.impropers[id]
+            if symbols not in symbol_impropers:
+                symbol_impropers[symbols] = (
+                    improper.ene,
+                    improper.angle,
+                    improper.n_parm,
+                )
+            assert symbol_impropers[symbols][:3] == (
+                improper.ene,
+                improper.angle,
+                improper.n_parm,
+            )
+            symbol_impropers[symbols] += (improper.id, )
+        log_debug(f"Impropers from the same symbols share the same constants.")
+        orig_types = len(symbol_impropers)
+        neighbors = [[x[2], x[0], x[1], x[3]] for x in symbol_impropers.keys()]
+        # The csmbls in getCountedSymbols is from the following collections
+        csmbls = sorted(set([y for x in neighbors[1:] for y in x]))
+        counted = [(x[0], ) + tuple(y + str(x[1:].count(y)) for y in csmbls)
+                   for x in neighbors]
+        assert orig_types == len(counted)
+        log_debug(f"Impropers neighbor counts based on symbols are unique.")
+        for id, (symbols, constants) in enumerate(symbol_impropers.items()):
+            counted_symbols = ''.join(counted[id])
+            log_debug(f"{counted_symbols} ({symbols}) : {constants}")
+            self.symbol_impropers[counted_symbols] = constants[3:]
+
+    def getCountedSymbols(self, symbols, csmbls='CHNO'):
+        return ''.join((symbols[0], ) + tuple(y + str(symbols[1:].count(y))
+                                              for y in csmbls))
 
 
 class EnergyReader(object):

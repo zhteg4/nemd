@@ -98,7 +98,8 @@ class OPLS_Parser:
     SMILES = [UA(sml='C', mp=(81, ), dsc='CH4 Methane'),
               UA(sml='CC', mp=(82, 82,), dsc='Ethane'),
               UA(sml='CCCC', mp=(83, 86, 86, 83,), dsc='n-Butane'),
-              UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), dsc='Isobutane')]
+              UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), dsc='Isobutane'),
+              UA(sml='CC=CC', mp=(84, 89, 89, 84, ), dsc='2-Butene')]
     # yapf: enable
 
     DESCRIPTION_SMILES = {
@@ -109,6 +110,7 @@ class OPLS_Parser:
         "CH2 (generic)": '*-C-*',
         "Benzene": 'C1=CC=CC=C1',
         "Phenol": '	OC1=CC=CC=C1',
+        "2-Butene": 'CC=CC',
         'Li+ Lithium Ion': '[Li+]',
         'Na+ Sodium Ion': '[Na+]',
         'K+ Potassium Ion': '[K+]',
@@ -189,9 +191,13 @@ class OPLS_Parser:
             bcomment, comment, acomment = line.split('"')
             _, id, formula = bcomment.split()
             atomic_number, mass, connectivity = acomment.split()
+            symbol = formula.split('H')[0]
+            if not symbol:
+                # CH3 -> C; H -> H
+                symbol = formula
             self.atoms[int(id)] = ATOM_TYPE(id=int(id),
                                             formula=formula,
-                                            symbol=formula.split('H')[0],
+                                            symbol=symbol,
                                             description=comment,
                                             atomic_number=int(atomic_number),
                                             mass=float(mass),
