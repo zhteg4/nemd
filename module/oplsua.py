@@ -2,7 +2,10 @@ import os
 import sys
 import types
 import symbols
+import logutils
 import fileutils
+import environutils
+import numpy as np
 from rdkit import Chem
 from collections import namedtuple
 
@@ -20,14 +23,21 @@ ENE_ANG_N = namedtuple('ENE_ANG_N', ['ene', 'angle', 'n_parm'])
 DIHEDRAL = namedtuple('DIHEDRAL',
                       ['id', 'id1', 'id2', 'id3', 'id4', 'constants'])
 
-UA = namedtuple('UA', ['sml', 'mp', 'dsc'])
-
-TYPE_ID = fileutils.TYPE_ID
+UA = namedtuple('UA', ['sml', 'mp', 'hs', 'dsc'])
 
 # OPLSUA_MOLS = [
 #     OPLSUA(smiles='C', map=(81, ), comment='CH4 Methane'),
 #     # OPLSUA(smiles='C', map=(1,), comment='CH4 Methane'),
 # ]
+
+logger = logutils.createModuleLogger(file_path=__file__)
+
+
+def log_debug(msg):
+
+    if logger is None:
+        return
+    logger.debug(msg)
 
 
 def get_opls_parser():
@@ -95,12 +105,17 @@ class OPLS_Parser:
     # ]
 
     # yapf: disable
-    SMILES = [UA(sml='C', mp=(81, ), dsc='CH4 Methane'),
-              UA(sml='CC', mp=(82, 82,), dsc='Ethane'),
-              UA(sml='CCCC', mp=(83, 86, 86, 83,), dsc='n-Butane'),
-              UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), dsc='Isobutane'),
-              UA(sml='CC=CC', mp=(84, 89, 89, 84, ), dsc='2-Butene')]
+    SMILES = [UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
+              UA(sml='CC', mp=(82, 82,), hs=None, dsc='Ethane'),
+              UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
+              UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
+              UA(sml='CC=CC', mp=(84, 89, 89, 84, ), hs=None, dsc='2-Butene'),
+              # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
+              UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid')]
     # yapf: enable
+    SMILES = reversed(SMILES)
+    # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
+    BOND_ATOM = {134: 2, 133: 26, 135: 24, 136: 76}
 
     DESCRIPTION_SMILES = {
         'CH4 Methane': 'C',
@@ -306,6 +321,522 @@ class OPLS_Parser:
         import pdb
         pdb.set_trace()
         pass
+
+
+class LammpsWriter(fileutils.LammpsInput):
+    IN_EXT = '.in'
+    DATA_EXT = '.data'
+    LAMMPS_DESCRIPTION = 'LAMMPS Description'
+
+    TYPE_ID = 'type_id'
+    ATOM_ID = 'atom_id'
+    BOND_ATM_ID = 'bond_atm_id'
+
+    ATOMS = 'atoms'
+    BONDS = 'bonds'
+    ANGLES = 'angles'
+    DIHEDRALS = 'dihedrals'
+    IMPROPERS = 'impropers'
+
+    ATOM_TYPES = 'atom types'
+    BOND_TYPES = 'bond types'
+    ANGLE_TYPES = 'angle types'
+    DIHEDRAL_TYPES = 'dihedral types'
+    IMPROPER_TYPES = 'improper types'
+
+    XLO_XHI = 'xlo xhi'
+    YLO_YHI = 'ylo yhi'
+    ZLO_ZHI = 'zlo zhi'
+    LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
+
+    MASSES = 'Masses'
+    PAIR_COEFFS = 'Pair Coeffs'
+    BOND_COEFFS = 'Bond Coeffs'
+    ANGLE_COEFFS = 'Angle Coeffs'
+    DIHEDRAL_COEFFS = 'Dihedral Coeffs'
+    IMPROPER_COEFFS = 'Improper Coeffs'
+
+    LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
+    LJ_CUT = 'lj/cut'
+
+    def __init__(self, ff, jobname, mols=None, lj_cut=11., coul_cut=11.):
+        self.ff = ff
+        self.jobname = jobname
+        self.mols = mols
+        self.lj_cut = lj_cut
+        self.coul_cut = coul_cut
+        self.lammps_in = self.jobname + self.IN_EXT
+        self.lammps_data = self.jobname + self.DATA_EXT
+        self.units = 'real'
+        self.atom_style = 'full'
+        self.bond_style = 'harmonic'
+        self.angle_style = 'harmonic'
+        self.dihedral_style = 'opls'
+        self.improper_style = 'cvff'
+        self.pair_style = {
+            self.LJ_CUT_COUL_LONG:
+            f"{self.LJ_CUT_COUL_LONG} {self.lj_cut} {self.coul_cut}",
+            self.LJ_CUT: f"{self.LJ_CUT} {self.lj_cut}"
+        }
+        self.pair_modify = {'mix': 'geometric'}
+        self.special_bonds = {
+            'lj/coul': (
+                0.0,
+                0.0,
+                0.5,
+            )
+        }
+        self.kspace_style = {'pppm': 0.0001}
+        self.bonds = {}
+        self.angles = {}
+        self.dihedrals = {}
+        self.impropers = {}
+        self.symbol_impropers = {}
+        self.is_debug = environutils.is_debug()
+
+    def writeLammpsIn(self):
+        with open(self.lammps_in, 'w') as fh:
+            fh.write(f"{self.UNITS} {self.units}\n")
+            fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
+            fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
+            fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
+            fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
+            fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
+            pair_style = self.LJ_CUT_COUL_LONG if self.hasCharge(
+            ) else self.LJ_CUT
+            fh.write(f"{self.PAIR_STYLE} {self.pair_style[pair_style]}\n")
+            fh.write(
+                f"{self.PAIR_MODIFY} {' '.join([(x,y) for x, y in self.pair_modify.items()][0])}\n"
+            )
+            special_bond = [
+                f"{x} {' '.join(map(str, y))}"
+                for x, y in self.special_bonds.items()
+            ][0]
+            fh.write(f"{self.SPECIAL_BONDS} {special_bond}\n")
+            if self.hasCharge():
+                kspace_style = [
+                    f"{x} {y}" for x, y in self.kspace_style.items()
+                ][0]
+                fh.write(f"{self.KSPACE_STYLE} {kspace_style}\n")
+            fh.write(f"{self.READ_DATA} {self.lammps_data}\n")
+
+            fh.write("minimize 1.0e-4 1.0e-6 100 1000")
+
+    def hasCharge(self, default=True):
+        if self.mols is None:
+            return default
+        charges = [
+            self.ff.charges[y.GetIntProp(self.TYPE_ID)]
+            for x in self.mols.values() for y in x.GetAtoms()
+        ]
+        return any(charges)
+
+    def writeLammpsData(self):
+
+        with open(self.lammps_data, 'w') as self.data_fh:
+            self.writeDescription()
+            self.writeTopoType()
+            self.writeBox()
+            self.writeMasses()
+            self.writePairCoeffs()
+            self.writeBondCoeffs()
+            self.writeAngleCoeffs()
+            self.writeDihedralCoeffs()
+            self.setImproperSymbols()
+            self.writeImproperCoeffs()
+            self.writeAtoms()
+            self.setBonds()
+            self.setAngles()
+            self.setDihedrals()
+            self.setImpropers()
+            self.writeBonds()
+            self.writeAngles()
+            self.writeDihedrals()
+            self.writeImpropers()
+
+    def writeDescription(self):
+        if self.mols is None:
+            raise ValueError(f"Mols are not set.")
+
+        self.data_fh.write(f"{self.LAMMPS_DESCRIPTION}\n\n")
+        atoms = [len(x.GetAtoms()) for x in self.mols.values()]
+        self.data_fh.write(f"{sum(atoms)} {self.ATOMS}\n")
+        bonds = [len(x.GetBonds()) for x in self.mols.values()]
+        self.data_fh.write(f"{sum(bonds)} {self.BONDS}\n")
+        neighbors = [
+            len(y.GetNeighbors()) for x in self.mols.values()
+            for y in x.GetAtoms()
+        ]
+        # FIXME: I guess improper angles may reduce this num
+        angles = [max(0, x - 1) for x in neighbors]
+        self.data_fh.write(f"{sum(angles)} {self.ANGLES}\n")
+        # FIXME: dihedral and improper are set to be zeros at this point
+        self.data_fh.write(f"0 {self.DIHEDRALS}\n")
+        self.data_fh.write(f"0 {self.IMPROPERS}\n\n")
+
+    def writeTopoType(self):
+        self.data_fh.write(f"{len(self.ff.atoms)} {self.ATOM_TYPES}\n")
+        self.data_fh.write(f"{len(self.ff.bonds)} {self.BOND_TYPES}\n")
+        self.data_fh.write(f"{len(self.ff.angles)} {self.ANGLE_TYPES}\n")
+        self.data_fh.write(f"{len(self.ff.dihedrals)} {self.DIHEDRAL_TYPES}\n")
+        self.data_fh.write(
+            f"{len(self.ff.impropers)} {self.IMPROPER_TYPES}\n\n")
+
+    def writeBox(self, min_box=None, buffer=None):
+        if min_box is None:
+            min_box = (20., 20., 20.,) # yapf: disable
+        if buffer is None:
+            buffer = (2., 2., 2.,) # yapf: disable
+        xyzs = np.concatenate(
+            [x.GetConformer(0).GetPositions() for x in self.mols.values()])
+        box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
+        box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
+        centroid = xyzs.mean(axis=0)
+        for dim in range(3):
+            self.data_fh.write(
+                f"{centroid[dim]-box_hf[dim]:.2f} {centroid[dim]+box_hf[dim]:.2f} {self.LO_HI[dim]}\n"
+            )
+        self.data_fh.write("\n")
+
+    def writeMasses(self):
+        self.data_fh.write(f"{self.MASSES}\n\n")
+        for atom_id, atom in self.ff.atoms.items():
+            self.data_fh.write(f"{atom_id} {atom.mass} # {atom.description}\n")
+        self.data_fh.write(f"\n")
+
+    def writePairCoeffs(self):
+        self.data_fh.write(f"{self.PAIR_COEFFS}\n\n")
+        for atom in self.ff.atoms.values():
+            vdw = self.ff.vdws[atom.id]
+            self.data_fh.write(f"{atom.id} {atom.id} {vdw.ene} {vdw.dist}\n")
+        self.data_fh.write("\n")
+
+    def writeBondCoeffs(self):
+        self.data_fh.write(f"{self.BOND_COEFFS}\n\n")
+        for bond in self.ff.bonds.values():
+            self.data_fh.write(f"{bond.id}  {bond.ene} {bond.dist}\n")
+        self.data_fh.write("\n")
+
+    def writeAngleCoeffs(self):
+        self.data_fh.write(f"{self.ANGLE_COEFFS}\n\n")
+        for angle in self.ff.angles.values():
+            self.data_fh.write(f"{angle.id} {angle.ene} {angle.angle}\n")
+        self.data_fh.write("\n")
+
+    def writeDihedralCoeffs(self):
+        self.data_fh.write(f"{self.DIHEDRAL_COEFFS}\n\n")
+        for dihedral in self.ff.dihedrals.values():
+            params = [0., 0., 0., 0.]
+            for ene_ang_n in dihedral.constants:
+                params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
+                if (ene_ang_n.angle == 180.) ^ (ene_ang_n.n_parm in (
+                        2,
+                        4,
+                )):
+                    params[ene_ang_n.n_parm] *= -1
+            self.data_fh.write(
+                f"{dihedral.id}  {' '.join(map(str, params))}\n")
+        self.data_fh.write("\n")
+
+    def writeImproperCoeffs(self):
+        self.data_fh.write(f"{self.IMPROPER_COEFFS}\n\n")
+        for improper in self.ff.impropers.values():
+            sign = 1 if improper.angle == 0. else -1
+            self.data_fh.write(
+                f"{improper.id} {improper.ene} {sign} {improper.n_parm}\n")
+        self.data_fh.write("\n")
+
+    def writeAtoms(self):
+        self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
+        atom_id = 0
+        for mol_id, mol in self.mols.items():
+            conformer = mol.GetConformer()
+            for atom in mol.GetAtoms():
+                atom_id += 1
+                atom.SetIntProp(self.ATOM_ID, atom_id)
+                type_id = atom.GetIntProp(self.TYPE_ID)
+                xyz = conformer.GetAtomPosition(atom.GetIdx())
+                xyz = ' '.join(map(lambda x: f'{x:.3f}', xyz))
+                charge = self.ff.charges[type_id]
+                self.data_fh.write(
+                    f"{atom_id} {mol_id} {type_id} {charge} {xyz}\n")
+        self.data_fh.write(f"\n")
+
+    def setBonds(self):
+        bond_id = 0
+        for mol in self.mols.values():
+            for bond in mol.GetBonds():
+                bond_id += 1
+                bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
+                bonded_atoms = sorted(
+                    bonded_atoms, key=lambda x: x.GetIntProp(self.BOND_ATM_ID))
+                atoms_types = [
+                    x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms
+                ]
+                matches = [
+                    x for x in self.ff.bonds.values()
+                    if [x.id1, x.id2] == atoms_types
+                ]
+                if not matches:
+                    log_debug(
+                        f"No exact params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
+                    )
+                    type_set = set(atoms_types)
+                    partial_matches = {
+                        x: type_set.intersection([x.id1, x.id2])
+                        for x in self.ff.bonds.values()
+                    }
+                    partial_matches = {
+                        x: y.pop()
+                        for x, y in partial_matches.items() if y
+                    }
+                    for bond, mtype in partial_matches.items():
+                        o_type_id = [x for x in atoms_types if x != mtype][0]
+                        o_atom = [
+                            x for x in bonded_atoms
+                            if x.GetIntProp(self.BOND_ATM_ID) == o_type_id
+                        ][0]
+                        # FIXME: Bond type ranking beyond first symbol match
+                        o_symbol = o_atom.GetSymbol()
+                        if self.ff.atoms[o_type_id].symbol == o_symbol:
+                            matches = [bond]
+                            log_debug(
+                                f"{[[x.GetSymbol(), x.GetNumImplicitHs()] for x in bonded_atoms]} {atoms_types} "
+                                f"replaced by {bond.id1}~{bond.id2}")
+                            break
+                if not matches:
+                    raise ValueError(
+                        f"No params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
+                    )
+                bond = matches[0]
+                self.bonds[bond_id] = (
+                    bond.id,
+                    bonded_atoms[0].GetIntProp(self.ATOM_ID),
+                    bonded_atoms[1].GetIntProp(self.ATOM_ID),
+                )
+
+    def writeBonds(self):
+        if not self.bonds:
+            return
+
+        self.data_fh.write(f"{self.BONDS.capitalize()}\n\n")
+        for bond_id, (bond_type, id1, id2) in self.bonds.items():
+            self.data_fh.write(f"{bond_id} {bond_type} {id1} {id2}\n")
+        self.data_fh.write(f"\n")
+
+    def setAngles(self):
+        angle_id = 0
+        for mol in self.mols.values():
+            for atom in mol.GetAtoms():
+                for atoms in self.getAngleAtoms(atom):
+                    angle_id += 1
+                    type_ids = [x.GetIntProp(TYPE_ID) for x in atoms]
+                    matches = [
+                        x for x in self.ff.angles.values()
+                        if type_ids == [x.id1, x.id2, x.id3]
+                    ]
+                    if not matches:
+                        log_debug(
+                            f"No exact params for angle between atom {', '.join(map(str, type_ids))}."
+                        )
+
+                        partial_matches = [
+                            x for x in self.ff.angles.values()
+                            if x.id2 == type_ids[1]
+                        ]
+                        if not partial_matches:
+                            raise ValueError(
+                                f"No params for angle (middle atom type {type_ids[1]})."
+                            )
+                        for angle in partial_matches:
+                            # FIXME: Bond type ranking beyond first symbol match
+                            o_symbols = [x.GetSymbol() for x in atoms[::2]]
+                            if o_symbols == [
+                                    self.ff.atoms[angle.id1].symbol,
+                                    self.ff.atoms[angle.id3].symbol
+                            ]:
+                                matches = [angle]
+                                break
+
+                    if not matches:
+                        raise ValueError(
+                            f"No params for angle between atom {', '.join(map(str, type_ids))}."
+                        )
+                    angle = matches[0]
+                    self.angles[angle_id] = (angle.id, ) + tuple(
+                        x.GetIntProp(ATOM_ID) for x in atoms)
+
+    def writeAngles(self):
+        if not self.angles:
+            return
+        self.data_fh.write(f"{self.ANGLES.capitalize()}\n\n")
+        for angle_id, (type_id, id1, id2, id3) in self.angles.items():
+            self.data_fh.write(f"{angle_id} {type_id} {id1} {id2} {id3}\n")
+        self.data_fh.write(f"\n")
+
+    def getAngleAtoms(self, atom):
+        neighbors = atom.GetNeighbors()
+        if len(neighbors) < 2:
+            return []
+        neighbors = sorted(neighbors, key=lambda x: x.GetIntProp(TYPE_ID))
+        return [[x, atom, y] for x, y in itertools.combinations(neighbors, 2)]
+
+    def getDihedralAtoms(self, atom):
+        dihe_atoms = []
+        atomss = self.getAngleAtoms(atom)
+        for satom, matom, eatom in atomss:
+            eatomss = self.getAngleAtoms(eatom)
+            matom_id = matom.GetIdx()
+            eatom_id = eatom.GetIdx()
+            for eatoms in eatomss:
+                eatom_ids = [x.GetIdx() for x in eatoms]
+                eatom_ids.remove(eatom_id)
+                try:
+                    eatom_ids.remove(matom_id)
+                except ValueError:
+                    continue
+                dihe_4th = [x for x in eatoms if x.GetIdx() == eatom_ids[0]][0]
+                dihe_atoms.append([satom, matom, eatom, dihe_4th])
+        return dihe_atoms
+
+    def setDihedrals(self):
+        dihedral_id = 0
+        for mol in self.mols.values():
+            atomss = [
+                y for x in mol.GetAtoms() for y in self.getDihedralAtoms(x)
+            ]
+            # 1-2-3-4 and 4-3-2-1 are the same dihedral
+            atomss_no_flip = []
+            atom_idss = set()
+            for atoms in atomss:
+                atom_ids = tuple(x.GetIdx() for x in atoms)
+                if atom_ids in atom_idss:
+                    continue
+                atom_idss.add(atom_ids)
+                atom_idss.add(atom_ids[::-1])
+                atomss_no_flip.append(atoms)
+
+            for atoms in atomss_no_flip:
+                dihedral_id += 1
+                type_ids = [x.GetIntProp(TYPE_ID) for x in atoms]
+                if type_ids[1] > type_ids[2]:
+                    type_ids = type_ids[::-1]
+                matches = [
+                    x for x in self.ff.dihedrals.values()
+                    if type_ids == [x.id1, x.id2, x.id3, x.id4]
+                ]
+                if not matches:
+                    raise ValueError(
+                        f"Cannot find params for angle between atom {', '.join(map(str, type_ids))}."
+                    )
+                dihedral = matches[0]
+                self.dihedrals[dihedral_id] = (dihedral.id, ) + tuple(
+                    [x.GetIntProp(ATOM_ID) for x in atoms])
+
+    def writeDihedrals(self):
+        if not self.dihedrals:
+            return
+
+        self.data_fh.write(f"{self.DIHEDRALS.capitalize()}\n\n")
+        for dihedral_id, (type_id, id1, id2, id3,
+                          id4) in self.dihedrals.items():
+            self.data_fh.write(
+                f"{dihedral_id} {type_id} {id1} {id2} {id3} {id4}\n")
+        self.data_fh.write(f"\n")
+
+    def setImpropers(self, symbols='CN'):
+        improper_id = 0
+        for mol in self.mols.values():
+            for atom in mol.GetAtoms():
+                atom_symbol = atom.GetSymbol()
+                if atom_symbol not in symbols:
+                    continue
+                neighbors = atom.GetNeighbors()
+                # FIXME: H-N should be counted as one neighbor
+                if atom.GetSymbol() not in 'CN' or len(neighbors) != 3:
+                    continue
+                if atom.GetSymbol() == 'N' and atom.GetHybridization(
+                ) == rdkit.Chem.rdchem.HybridizationType.SP3:
+                    continue
+                # Sp2 carbon for planar, Sp3 with one H (CHR1R2R3) for chirality, Sp2 N in Amino Acid
+                improper_id += 1
+                neighbor_symbols = [x.GetSymbol() for x in neighbors]
+                counted = self.getCountedSymbols([atom_symbol] +
+                                                 neighbor_symbols)
+                for symb, improper_ids in self.symbol_impropers.items():
+                    print(f"{symb} {self.ff.impropers[improper_ids[0]]}")
+                    impropers = [self.ff.impropers[x] for x in improper_ids]
+                    for improper in impropers:
+                        print(
+                            f"{[self.ff.atoms[x].description for x in [improper.id1, improper.id2, improper.id3, improper.id4]]}"
+                        )
+                improper_type_id = self.symbol_impropers[counted][0]
+                neighbors = sorted(neighbors,
+                                   key=lambda x: len(x.GetNeighbors()))
+                for neighbor in neighbors:
+                    if neighbor.GetSymbol(
+                    ) == 'O' and neighbor.GetHybridization(
+                    ) == rdkit.Chem.rdchem.HybridizationType.SP2:
+                        neighbors.remove(neighbor)
+                        neighbors = [neighbor] + neighbors
+                len(neighbors[0].GetNeighbors())
+                self.impropers[improper_id] = (
+                    improper_type_id,
+                    atom.GetIntProp(ATOM_ID),
+                ) + tuple([x.GetIntProp(ATOM_ID) for x in neighbors])
+
+    def writeImpropers(self):
+
+        if not self.impropers:
+            return
+
+        self.data_fh.write(f"{self.IMPROPERS.capitalize()}\n\n")
+        for improper_id, (type_id, id1, id2, id3,
+                          id4) in self.impropers.items():
+            self.data_fh.write(
+                f"{improper_id} {type_id} {id1} {id2} {id3} {id4}\n")
+        self.data_fh.write(f"\n")
+
+    def setImproperSymbols(self):
+
+        symbolss = {
+            z: ''.join([
+                self.ff.atoms[y].symbol for y in [x.id1, x.id2, x.id3, x.id4]
+            ])
+            for z, x in self.ff.impropers.items()
+        }
+        symbol_impropers = {}
+        for id, symbols in symbolss.items():
+            improper = self.ff.impropers[id]
+            if symbols not in symbol_impropers:
+                symbol_impropers[symbols] = (
+                    improper.ene,
+                    improper.angle,
+                    improper.n_parm,
+                )
+            assert symbol_impropers[symbols][:3] == (
+                improper.ene,
+                improper.angle,
+                improper.n_parm,
+            )
+            symbol_impropers[symbols] += (improper.id, )
+        log_debug(f"Impropers from the same symbols share the same constants.")
+        orig_types = len(symbol_impropers)
+        neighbors = [[x[2], x[0], x[1], x[3]] for x in symbol_impropers.keys()]
+        # The csmbls in getCountedSymbols is from the following collections
+        csmbls = sorted(set([y for x in neighbors[1:] for y in x]))
+        counted = [(x[0], ) + tuple(y + str(x[1:].count(y)) for y in csmbls)
+                   for x in neighbors]
+        assert orig_types == len(counted)
+        log_debug(f"Impropers neighbor counts based on symbols are unique.")
+        for id, (symbols, constants) in enumerate(symbol_impropers.items()):
+            counted_symbols = ''.join(counted[id])
+            log_debug(f"{counted_symbols} ({symbols}) : {constants}")
+            self.symbol_impropers[counted_symbols] = constants[3:]
+
+    def getCountedSymbols(self, symbols, csmbls='CHNO'):
+        return ''.join((symbols[0], ) + tuple(y + str(symbols[1:].count(y))
+                                              for y in csmbls))
 
 
 def main(argv):

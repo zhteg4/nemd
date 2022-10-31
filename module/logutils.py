@@ -1,4 +1,5 @@
 import os
+import fileutils
 import environutils
 import logging
 import pathlib
@@ -30,22 +31,28 @@ def createDriverLogger(jobname, verbose=None):
     return createLogger(jobname, verbose=verbose)
 
 
-def createModuleLogger(basename=None, verbose=True, file_ext='.log'):
+def createModuleLogger(basename=None,
+                       verbose=True,
+                       file_path=None,
+                       file_ext='.log'):
     if not environutils.is_debug():
         return
 
     if basename:
         return createLogger(basename, verbose=verbose, file_ext=file_ext)
 
-    file_path = pathlib.Path(__file__)
+    if not file_path:
+        raise ValueError(f"Either basename or file_path should be provided.")
+
+    file_path = pathlib.Path(file_path)
     module_path = environutils.get_module_path()
     if module_path:
-        basename = module_path.replace(os.path.sep, '.')
+        relpath = os.path.relpath(file_path, environutils.get_nemd_src())
+        basename = relpath.replace(os.path.sep, '.')
     else:
         basename = str(file_path.name)
     if basename.endswith('.py'):
         basename = basename[:-3]
-
     return createLogger(basename, verbose=verbose, file_ext=file_ext)
 
 

@@ -58,11 +58,13 @@ def type_smiles(arg):
     return value
 
 
-def type_monomer_smiles(arg):
+def type_monomer_smiles(arg, allow_mol=False, canonize=True):
     value = type_smiles(arg)
     ht_atoms = [
         x for x in value.GetAtoms() if x.GetSymbol() == symbols.WILD_CARD
     ]
+    if len(ht_atoms) == 0 and allow_mol:
+        return Chem.CanonSmiles(arg) if canonize else arg
     if len(ht_atoms) != 2:
         raise argparse.ArgumentTypeError(
             f"{arg} doesn't contain two {symbols.WILD_CARD}.")
@@ -70,4 +72,4 @@ def type_monomer_smiles(arg):
         if len(atom.GetNeighbors()) != 1:
             raise argparse.ArgumentTypeError(
                 f"{symbols.WILD_CARD} connects more than one atom.")
-    return value
+    return Chem.CanonSmiles(arg) if canonize else arg
