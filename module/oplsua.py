@@ -2,6 +2,7 @@ import os
 import sys
 import types
 import symbols
+import itertools
 import logutils
 import fileutils
 import environutils
@@ -114,8 +115,12 @@ class OPLS_Parser:
               UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid')]
     # yapf: enable
     SMILES = reversed(SMILES)
+    ATOM_TOTAL = {i: i for i in range(1, 214)}
+    BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
-    BOND_ATOM = {134: 2, 133: 26, 135: 24, 136: 76}
+    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24})
+    ANGLE_ATOM = ATOM_TOTAL.copy()
+    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24})
 
     DESCRIPTION_SMILES = {
         'CH4 Methane': 'C',
@@ -339,6 +344,7 @@ class LammpsWriter(fileutils.LammpsInput):
     TYPE_ID = 'type_id'
     ATOM_ID = 'atom_id'
     BOND_ATM_ID = 'bond_atm_id'
+    IMPLICIT_H = 'implicit_h'
 
     ATOMS = 'atoms'
     BONDS = 'bonds'
@@ -578,7 +584,7 @@ class LammpsWriter(fileutils.LammpsInput):
                 bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
                 bonded_atoms = sorted(
                     bonded_atoms, key=lambda x: x.GetIntProp(self.BOND_ATM_ID))
-                matches = self.getMatched(bonded_atoms)
+                matches = self.getMatchedBonds(bonded_atoms)
                 bond = matches[0]
                 self.bonds[bond_id] = (
                     bond.id,
@@ -586,7 +592,11 @@ class LammpsWriter(fileutils.LammpsInput):
                     bonded_atoms[1].GetIntProp(self.ATOM_ID),
                 )
 
-    def getMatched(self, bonded_atoms):
+    def getMatchedBonds(self, bonded_atoms):
+        """
+        :param bonded_atoms: list of two bonded atoms sorted by BOND_ATM_ID
+        :return:
+        """
         atoms_types = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
         # Exact match between two atom type ids
         matches = [
@@ -623,13 +633,11 @@ class LammpsWriter(fileutils.LammpsInput):
             ]
             for bond, (utype, rtype) in bond_utype.items()
         }
-        bond_score = {
-            b: [
-                self.ff.atoms[r].symbol == t.GetSymbol(),
-                self.ff.atoms[r].connectivity == t.GetTotalValence()
-            ]
-            for b, (u, r, t) in bond_utype.items()
-        }
+        bond_score = {}
+        for bond, (uatm, _, atm) in bond_utype.items():
+            ssymbol = self.ff.atoms[uatm].symbol == atm.GetSymbol()
+            scnnt = self.ff.atoms[uatm].connectivity == self.getAtomConnt(atm)
+            bond_score[bond] = [ssymbol, scnnt]
         symbol_matched = [x for x, (y, z) in bond_score.items() if y]
         smbl_cnnt_matched = [x for x, y_z in bond_score.items() if all(y_z)]
         matches = smbl_cnnt_matched if smbl_cnnt_matched else symbol_matched
@@ -637,10 +645,23 @@ class LammpsWriter(fileutils.LammpsInput):
             raise ValueError(
                 f"No params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
             )
-        log_debug(
-            f"{[[x.GetSymbol(), x.GetNumImplicitHs()] for x in bonded_atoms]} {atoms_types} "
-            f"replaced by {matches[0].id1}~{matches[0].id2}")
+        self.debugPrintReplacement(bonded_atoms, matches)
         return matches
+
+    def debugPrintReplacement(self, atoms, matches):
+        smbl_cnnts = [f'{x.GetSymbol()}{self.getAtomConnt(x)}' for x in atoms]
+        ids = [getattr(matches[0], x, '') for x in ['id1', 'id2', 'id3', 'id4']]
+        ids = [x for x in ids if x]
+        id_smbl_cnnts = [f'{self.ff.atoms[x].symbol}{self.ff.atoms[x].connectivity}' for x in ids]
+        log_debug(
+            f"{'~'.join(smbl_cnnts)} "
+            f"{'~'.join(map(str, [x.GetIntProp(self.TYPE_ID) for x in atoms]))} "
+            f"replaced by {'~'.join(map(str, id_smbl_cnnts))} {'~'.join(map(str, ids))}")
+
+    def getAtomConnt(self, atom):
+        implicit_h_num = atom.GetIntProp(self.IMPLICIT_H) if atom.HasProp(
+            self.IMPLICIT_H) else 0
+        return atom.GetDegree() + implicit_h_num
 
     def writeBonds(self):
         if not self.bonds:
@@ -657,41 +678,54 @@ class LammpsWriter(fileutils.LammpsInput):
             for atom in mol.GetAtoms():
                 for atoms in self.getAngleAtoms(atom):
                     angle_id += 1
-                    type_ids = [x.GetIntProp(TYPE_ID) for x in atoms]
-                    matches = [
-                        x for x in self.ff.angles.values()
-                        if type_ids == [x.id1, x.id2, x.id3]
-                    ]
-                    if not matches:
-                        log_debug(
-                            f"No exact params for angle between atom {', '.join(map(str, type_ids))}."
-                        )
-
-                        partial_matches = [
-                            x for x in self.ff.angles.values()
-                            if x.id2 == type_ids[1]
-                        ]
-                        if not partial_matches:
-                            raise ValueError(
-                                f"No params for angle (middle atom type {type_ids[1]})."
-                            )
-                        for angle in partial_matches:
-                            # FIXME: Bond type ranking beyond first symbol match
-                            o_symbols = [x.GetSymbol() for x in atoms[::2]]
-                            if o_symbols == [
-                                    self.ff.atoms[angle.id1].symbol,
-                                    self.ff.atoms[angle.id3].symbol
-                            ]:
-                                matches = [angle]
-                                break
-
-                    if not matches:
-                        raise ValueError(
-                            f"No params for angle between atom {', '.join(map(str, type_ids))}."
-                        )
+                    matches = self.getMatchedAngles(atoms)
                     angle = matches[0]
                     self.angles[angle_id] = (angle.id, ) + tuple(
-                        x.GetIntProp(ATOM_ID) for x in atoms)
+                        x.GetIntProp(self.ATOM_ID) for x in atoms)
+
+    def getMatchedAngles(self, atoms):
+        type_ids = [x.GetIntProp(self.TYPE_ID) for x in atoms]
+        type_ids = [OPLS_Parser.ANGLE_ATOM[x] for x in type_ids]
+        matches = [
+            x for x in self.ff.angles.values()
+            if type_ids == [x.id1, x.id2, x.id3]
+        ]
+        if matches:
+            return matches
+
+        log_debug(
+            f"No exact params for angle between atom {', '.join(map(str, type_ids))}."
+        )
+        partial_matches = [
+            x for x in self.ff.angles.values() if x.id2 == type_ids[1]
+        ]
+        if not partial_matches:
+            raise ValueError(
+                f"No params for angle (middle atom type {type_ids[1]}).")
+        o_symbols = set([(
+            x.GetSymbol(),
+            self.getAtomConnt(x),
+        ) for x in atoms[::2]])
+        ff_symbols = {
+            x: set([(
+                self.ff.atoms[y].symbol,
+                self.ff.atoms[y].connectivity,
+            ) for y in [x.id1, x.id3]])
+            for x in partial_matches
+        }
+        matches = [x for x, y in ff_symbols.items() if y == o_symbols]
+        if not matches:
+            o_symbols = set(x[0] for x in o_symbols)
+            matches = [
+                x for x, y in ff_symbols.items()
+                if set(z[0] for z in y) == o_symbols
+            ]
+        if not matches:
+            raise ValueError(
+                f"No params for angle between atom {', '.join(map(str, type_ids))}."
+            )
+        self.debugPrintReplacement(atoms, matches)
+        return matches
 
     def writeAngles(self):
         if not self.angles:
@@ -705,7 +739,7 @@ class LammpsWriter(fileutils.LammpsInput):
         neighbors = atom.GetNeighbors()
         if len(neighbors) < 2:
             return []
-        neighbors = sorted(neighbors, key=lambda x: x.GetIntProp(TYPE_ID))
+        neighbors = sorted(neighbors, key=lambda x: x.GetIntProp(self.TYPE_ID))
         return [[x, atom, y] for x, y in itertools.combinations(neighbors, 2)]
 
     def getDihedralAtoms(self, atom):
@@ -745,7 +779,7 @@ class LammpsWriter(fileutils.LammpsInput):
 
             for atoms in atomss_no_flip:
                 dihedral_id += 1
-                type_ids = [x.GetIntProp(TYPE_ID) for x in atoms]
+                type_ids = [x.GetIntProp(self.TYPE_ID) for x in atoms]
                 if type_ids[1] > type_ids[2]:
                     type_ids = type_ids[::-1]
                 matches = [
