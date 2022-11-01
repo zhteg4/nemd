@@ -578,85 +578,69 @@ class LammpsWriter(fileutils.LammpsInput):
                 bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
                 bonded_atoms = sorted(
                     bonded_atoms, key=lambda x: x.GetIntProp(self.BOND_ATM_ID))
-                atoms_types = [
-                    x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms
-                ]
-                # Exact match between two atom type ids
-                matches = [
-                    x for x in self.ff.bonds.values()
-                    if [x.id1, x.id2] == atoms_types
-                ]
-                if not matches:
-                    log_debug(
-                        f"No exact params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
-                    )
-                    type_set = set(atoms_types)
-                    partial_matches = {
-                        x: type_set.intersection([x.id1, x.id2])
-                        for x in self.ff.bonds.values()
-                    }
-                    # {ff bond: one share atom type}
-                    partial_matches = {
-                        x: y.pop()
-                        for x, y in partial_matches.items() if y
-                    }
-                    bond_utype = {
-                        bond: [
-                            set([bond.id1,
-                                 bond.id2]).difference([mtype]).pop(),
-                            set(atoms_types).difference([mtype]).pop()
-                        ]
-                        for bond, mtype in partial_matches.items()
-                    }
-                    # ff bond: [unmatched atom type in ff bond, replaced unmatched atom type in ff, unmatched atom]
-                    bond_utype = {
-                        b: [
-                            u, r,
-                            [
-                                x for x in bonded_atoms
-                                if x.GetIntProp(self.BOND_ATM_ID) == r
-                            ][0]
-                        ]
-                        for b, (u, r) in bond_utype.items()
-                    }
-                    bond_score = {
-                        b: [
-                            self.ff.atoms[r].symbol == t.GetSymbol(),
-                            self.ff.atoms[r].connectivity ==
-                            t.GetTotalValence()
-                        ]
-                        for b, (u, r, t) in bond_utype.items()
-                    }
-                    symbol_matched = {
-                        x: (
-                            y,
-                            z,
-                        )
-                        for x, (y, z) in bond_score.items() if y
-                    }
-                    smbl_cnnt_matched = {
-                        x: (
-                            y,
-                            z,
-                        )
-                        for x, (y, z) in symbol_matched.items() if z
-                    }
-                    matches = list(smbl_cnnt_matched.keys(
-                    )) if smbl_cnnt_matched else list(symbol_matched.keys())
-                    log_debug(
-                        f"{[[x.GetSymbol(), x.GetNumImplicitHs()] for x in bonded_atoms]} {atoms_types} "
-                        f"replaced by {matches[0].id1}~{matches[0].id2}")
-
-                if not matches:
-                    raise ValueError(
-                        f"No params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
-                    )
+                matches = self.getMatched(bonded_atoms)
                 bond = matches[0]
                 self.bonds[bond_id] = (
                     bond.id,
                     bonded_atoms[0].GetIntProp(self.ATOM_ID),
                     bonded_atoms[1].GetIntProp(self.ATOM_ID),
                 )
+
+    def getMatched(self, bonded_atoms):
+        atoms_types = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
+        # Exact match between two atom type ids
+        matches = [
+            x for x in self.ff.bonds.values() if [x.id1, x.id2] == atoms_types
+        ]
+        if matches:
+            return matches
+
+        log_debug(
+            f"No exact params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
+        )
+        type_set = set(atoms_types)
+        partial_matches = {
+            x: type_set.intersection([x.id1, x.id2])
+            for x in self.ff.bonds.values()
+        }
+        # {ff bond: one share atom type}
+        partial_matches = {x: y.pop() for x, y in partial_matches.items() if y}
+        bond_utype = {
+            bond: [
+                set([bond.id1, bond.id2]).difference([mtype]).pop(),
+                type_set.difference([mtype]).pop()
+            ]
+            for bond, mtype in partial_matches.items()
+        }
+        # ff bond: [unmatched atom type in ff bond, replaced unmatched atom type in ff, unmatched atom]
+        bond_utype = {
+            bond: [
+                utype, rtype,
+                [
+                    x for x in bonded_atoms
+                    if x.GetIntProp(self.BOND_ATM_ID) == rtype
+                ][0]
+            ]
+            for bond, (utype, rtype) in bond_utype.items()
+        }
+        bond_score = {
+            b: [
+                self.ff.atoms[r].symbol == t.GetSymbol(),
+                self.ff.atoms[r].connectivity == t.GetTotalValence()
+            ]
+            for b, (u, r, t) in bond_utype.items()
+        }
+        symbol_matched = [x for x, (y, z) in bond_score.items() if y]
+        smbl_cnnt_matched = [x for x, y_z in bond_score.items() if all(y_z)]
+        matches = smbl_cnnt_matched if smbl_cnnt_matched else symbol_matched
+        if not matches:
+            raise ValueError(
+                f"No params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
+            )
+        log_debug(
+            f"{[[x.GetSymbol(), x.GetNumImplicitHs()] for x in bonded_atoms]} {atoms_types} "
+            f"replaced by {matches[0].id1}~{matches[0].id2}")
+        return matches
 
     def writeBonds(self):
         if not self.bonds:
