@@ -73,38 +73,6 @@ class OPLS_Parser:
     IN_CHARGES = 'In Charges'
     DO_NOT_UA = 'DON\'T USE(OPLSUA)'
 
-    # OPLSUA_MOLS = [
-    #     OPLSUA(smiles='CC(=O)O', map=(
-    #         6,
-    #         3,
-    #         4,
-    #         5,
-    #         7,
-    #     ), comment='Acetic Acid'),
-    #     OPLSUA(smiles='CC', map=(
-    #         10,
-    #         10,
-    #     ), comment='Ethane'),
-    #     OPLSUA(smiles='C', map=(10, ), comment='Methane')
-    # ]
-    # OPLSUA_FRAGS = [
-    #     OPLSUA(smiles='CC(=O)O',
-    #            map=(
-    #                None,
-    #                3,
-    #                4,
-    #                5,
-    #                7,
-    #            ),
-    #            comment='Acetic Acid'),
-    #     OPLSUA(smiles='CCC', map=(
-    #         None,
-    #         13,
-    #         None,
-    #     ), comment='Alkanes'),
-    #     OPLSUA(smiles='CCC', map=(10, None, 10), comment='Alkanes')
-    # ]
-
     # yapf: disable
     SMILES = [UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
               UA(sml='CC', mp=(82, 82,), hs=None, dsc='Ethane'),
@@ -112,7 +80,9 @@ class OPLS_Parser:
               UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
               UA(sml='CC=CC', mp=(84, 89, 89, 84, ), hs=None, dsc='2-Butene'),
               # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
-              UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid')]
+              UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid'),
+              # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
+              UA(sml='CC(=O)O', mp=(137, 133, 134, 135), hs={135: 136}, dsc='Ethanoic acid')]
     # yapf: enable
     SMILES = reversed(SMILES)
     ATOM_TOTAL = {i: i for i in range(1, 214)}
@@ -121,6 +91,8 @@ class OPLS_Parser:
     BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24})
     ANGLE_ATOM = ATOM_TOTAL.copy()
     ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24})
+    DIHE_ATOM = ATOM_TOTAL.copy()
+    DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24})
 
     DESCRIPTION_SMILES = {
         'CH4 Methane': 'C',
@@ -317,23 +289,6 @@ class OPLS_Parser:
                                          charge=float(charge),
                                          comment=comment)
             self.atoms.append(atom)
-
-    def setSmiles(self):
-        # FIXME: manually match smiles with the comments and then
-        # parse the *.lt to generate OPLSUA_MOLS
-        # mass for element, neighbor atom and bond type to find matches
-        # Chem.AddHs(mol)
-        formulas = {
-            x.description: x.formula
-            for x in self.atoms.values() if x.connectivity == 1
-        }
-        import pdb
-        pdb.set_trace()
-        for formula in formulas:
-            Chem.MolFromSmiles(self.FORMULA_SMILES[formula])
-        import pdb
-        pdb.set_trace()
-        pass
 
 
 class LammpsWriter(fileutils.LammpsInput):
@@ -572,8 +527,10 @@ class LammpsWriter(fileutils.LammpsInput):
                 xyz = conformer.GetAtomPosition(atom.GetIdx())
                 xyz = ' '.join(map(lambda x: f'{x:.3f}', xyz))
                 charge = self.ff.charges[type_id]
+                dsrptn = self.ff.atoms[type_id].description
                 self.data_fh.write(
-                    f"{atom_id} {mol_id} {type_id} {charge} {xyz}\n")
+                    f"{atom_id} {mol_id} {type_id} {charge} {xyz} # {dsrptn}\n"
+                )
         self.data_fh.write(f"\n")
 
     def setBonds(self):
@@ -650,13 +607,19 @@ class LammpsWriter(fileutils.LammpsInput):
 
     def debugPrintReplacement(self, atoms, matches):
         smbl_cnnts = [f'{x.GetSymbol()}{self.getAtomConnt(x)}' for x in atoms]
-        ids = [getattr(matches[0], x, '') for x in ['id1', 'id2', 'id3', 'id4']]
+        ids = [
+            getattr(matches[0], x, '') for x in ['id1', 'id2', 'id3', 'id4']
+        ]
         ids = [x for x in ids if x]
-        id_smbl_cnnts = [f'{self.ff.atoms[x].symbol}{self.ff.atoms[x].connectivity}' for x in ids]
+        id_smbl_cnnts = [
+            f'{self.ff.atoms[x].symbol}{self.ff.atoms[x].connectivity}'
+            for x in ids
+        ]
         log_debug(
             f"{'~'.join(smbl_cnnts)} "
             f"{'~'.join(map(str, [x.GetIntProp(self.TYPE_ID) for x in atoms]))} "
-            f"replaced by {'~'.join(map(str, id_smbl_cnnts))} {'~'.join(map(str, ids))}")
+            f"replaced by {'~'.join(map(str, id_smbl_cnnts))} {'~'.join(map(str, ids))}"
+        )
 
     def getAtomConnt(self, atom):
         implicit_h_num = atom.GetIntProp(self.IMPLICIT_H) if atom.HasProp(
@@ -700,6 +663,8 @@ class LammpsWriter(fileutils.LammpsInput):
             x for x in self.ff.angles.values() if x.id2 == type_ids[1]
         ]
         if not partial_matches:
+            import pdb
+            pdb.set_trace()
             raise ValueError(
                 f"No params for angle (middle atom type {type_ids[1]}).")
         o_symbols = set([(
@@ -745,6 +710,7 @@ class LammpsWriter(fileutils.LammpsInput):
     def getDihedralAtoms(self, atom):
         dihe_atoms = []
         atomss = self.getAngleAtoms(atom)
+        atomss += [x[::-1] for x in atomss]
         for satom, matom, eatom in atomss:
             eatomss = self.getAngleAtoms(eatom)
             matom_id = matom.GetIdx()
@@ -760,26 +726,28 @@ class LammpsWriter(fileutils.LammpsInput):
                 dihe_atoms.append([satom, matom, eatom, dihe_4th])
         return dihe_atoms
 
+    def getDihedralAtomsFromMol(self, mol):
+        atomss = [y for x in mol.GetAtoms() for y in self.getDihedralAtoms(x)]
+        # 1-2-3-4 and 4-3-2-1 are the same dihedral
+        atomss_no_flip = []
+        atom_idss = set()
+        for atoms in atomss:
+            atom_ids = tuple(x.GetIdx() for x in atoms)
+            if atom_ids in atom_idss:
+                continue
+            atom_idss.add(atom_ids)
+            atom_idss.add(atom_ids[::-1])
+            atomss_no_flip.append(atoms)
+        return atomss_no_flip
+
     def setDihedrals(self):
         dihedral_id = 0
         for mol in self.mols.values():
-            atomss = [
-                y for x in mol.GetAtoms() for y in self.getDihedralAtoms(x)
-            ]
-            # 1-2-3-4 and 4-3-2-1 are the same dihedral
-            atomss_no_flip = []
-            atom_idss = set()
-            for atoms in atomss:
-                atom_ids = tuple(x.GetIdx() for x in atoms)
-                if atom_ids in atom_idss:
-                    continue
-                atom_idss.add(atom_ids)
-                atom_idss.add(atom_ids[::-1])
-                atomss_no_flip.append(atoms)
-
+            atomss_no_flip = self.getDihedralAtomsFromMol(mol)
             for atoms in atomss_no_flip:
                 dihedral_id += 1
                 type_ids = [x.GetIntProp(self.TYPE_ID) for x in atoms]
+                type_ids = [OPLS_Parser.DIHE_ATOM[x] for x in type_ids]
                 if type_ids[1] > type_ids[2]:
                     type_ids = type_ids[::-1]
                 matches = [
@@ -788,11 +756,11 @@ class LammpsWriter(fileutils.LammpsInput):
                 ]
                 if not matches:
                     raise ValueError(
-                        f"Cannot find params for angle between atom {', '.join(map(str, type_ids))}."
+                        f"Cannot find params for dihedral between atom {'~'.join(map(str, type_ids))}."
                     )
                 dihedral = matches[0]
                 self.dihedrals[dihedral_id] = (dihedral.id, ) + tuple(
-                    [x.GetIntProp(ATOM_ID) for x in atoms])
+                    [x.GetIntProp(self.ATOM_ID) for x in atoms])
 
     def writeDihedrals(self):
         if not self.dihedrals:
@@ -817,7 +785,7 @@ class LammpsWriter(fileutils.LammpsInput):
                 if atom.GetSymbol() not in 'CN' or len(neighbors) != 3:
                     continue
                 if atom.GetSymbol() == 'N' and atom.GetHybridization(
-                ) == rdkit.Chem.rdchem.HybridizationType.SP3:
+                ) == Chem.rdchem.HybridizationType.SP3:
                     continue
                 # Sp2 carbon for planar, Sp3 with one H (CHR1R2R3) for chirality, Sp2 N in Amino Acid
                 improper_id += 1
@@ -837,14 +805,14 @@ class LammpsWriter(fileutils.LammpsInput):
                 for neighbor in neighbors:
                     if neighbor.GetSymbol(
                     ) == 'O' and neighbor.GetHybridization(
-                    ) == rdkit.Chem.rdchem.HybridizationType.SP2:
+                    ) == Chem.rdchem.HybridizationType.SP2:
                         neighbors.remove(neighbor)
                         neighbors = [neighbor] + neighbors
                 len(neighbors[0].GetNeighbors())
                 self.impropers[improper_id] = (
                     improper_type_id,
-                    atom.GetIntProp(ATOM_ID),
-                ) + tuple([x.GetIntProp(ATOM_ID) for x in neighbors])
+                    atom.GetIntProp(self.ATOM_ID),
+                ) + tuple([x.GetIntProp(self.ATOM_ID) for x in neighbors])
 
     def writeImpropers(self):
 
@@ -903,7 +871,6 @@ class LammpsWriter(fileutils.LammpsInput):
 def main(argv):
     opls_parser = OPLS_Parser()
     opls_parser.read()
-    opls_parser.setSmiles()
 
 
 if __name__ == "__main__":
