@@ -259,10 +259,9 @@ class OPLS_Parser:
         for id, line in enumerate(self.raw_content[self.TORSIONAL_MK], 1):
             line_splitted = line.split()
             ids, enes = line_splitted[1:5], line_splitted[5:]
-            ene_ang_ns = [
+            ene_ang_ns = tuple(
                 ENE_ANG_N(ene=float(x), angle=float(y), n_parm=int(z))
-                for x, y, z in zip(enes[::3], enes[1::3], enes[2::3])
-            ]
+                for x, y, z in zip(enes[::3], enes[1::3], enes[2::3]))
             self.dihedrals[id] = DIHEDRAL(id=id,
                                           id1=int(ids[0]),
                                           id2=int(ids[1]),
@@ -655,7 +654,6 @@ class LammpsWriter(fileutils.LammpsInput):
         ]
         if matches:
             return matches
-
         log_debug(
             f"No exact params for angle between atom {', '.join(map(str, type_ids))}."
         )
@@ -663,33 +661,39 @@ class LammpsWriter(fileutils.LammpsInput):
             x for x in self.ff.angles.values() if x.id2 == type_ids[1]
         ]
         if not partial_matches:
-            import pdb
-            pdb.set_trace()
             raise ValueError(
                 f"No params for angle (middle atom type {type_ids[1]}).")
-        o_symbols = set([(
-            x.GetSymbol(),
-            self.getAtomConnt(x),
-        ) for x in atoms[::2]])
-        ff_symbols = {
-            x: set([(
-                self.ff.atoms[y].symbol,
-                self.ff.atoms[y].connectivity,
-            ) for y in [x.id1, x.id3]])
-            for x in partial_matches
-        }
-        matches = [x for x, y in ff_symbols.items() if y == o_symbols]
-        if not matches:
-            o_symbols = set(x[0] for x in o_symbols)
-            matches = [
-                x for x, y in ff_symbols.items()
-                if set(z[0] for z in y) == o_symbols
-            ]
+        matches = self.getMatchesFromEnds(atoms, partial_matches)
         if not matches:
             raise ValueError(
                 f"No params for angle between atom {', '.join(map(str, type_ids))}."
             )
         self.debugPrintReplacement(atoms, matches)
+        return matches
+
+    def getMatchesFromEnds(self, atoms, partial_matches, rough=False):
+        o_symbols = set((
+            x.GetSymbol(),
+            self.getAtomConnt(x),
+        ) for x in [atoms[0], atoms[-1]])
+        ff_atom_ids = [
+            [x, x.id1, x.id4] if hasattr(x, 'id4') else [x, x.id1, x.id3]
+            for x in partial_matches
+        ]
+        ff_symbols = {
+            x[0]: set([(
+                self.ff.atoms[y].symbol,
+                self.ff.atoms[y].connectivity,
+            ) for y in x[1:]])
+            for x in ff_atom_ids
+        }
+        matches = [x for x, y in ff_symbols.items() if y == o_symbols]
+        if not matches:
+            o_symbols_partial = set(x[0] for x in o_symbols)
+            matches = [
+                x for x, y in ff_symbols.items()
+                if set(z[0] for z in y) == o_symbols_partial
+            ]
         return matches
 
     def writeAngles(self):
@@ -746,21 +750,36 @@ class LammpsWriter(fileutils.LammpsInput):
             atomss_no_flip = self.getDihedralAtomsFromMol(mol)
             for atoms in atomss_no_flip:
                 dihedral_id += 1
-                type_ids = [x.GetIntProp(self.TYPE_ID) for x in atoms]
-                type_ids = [OPLS_Parser.DIHE_ATOM[x] for x in type_ids]
-                if type_ids[1] > type_ids[2]:
-                    type_ids = type_ids[::-1]
-                matches = [
-                    x for x in self.ff.dihedrals.values()
-                    if type_ids == [x.id1, x.id2, x.id3, x.id4]
-                ]
-                if not matches:
-                    raise ValueError(
-                        f"Cannot find params for dihedral between atom {'~'.join(map(str, type_ids))}."
-                    )
+                matches = self.getMatchedDihedrals(atoms)
                 dihedral = matches[0]
                 self.dihedrals[dihedral_id] = (dihedral.id, ) + tuple(
                     [x.GetIntProp(self.ATOM_ID) for x in atoms])
+
+    def getMatchedDihedrals(self, atoms):
+        type_ids = [x.GetIntProp(self.TYPE_ID) for x in atoms]
+        type_ids = [OPLS_Parser.DIHE_ATOM[x] for x in type_ids]
+        if type_ids[1] > type_ids[2]:
+            type_ids = type_ids[::-1]
+        matches = [
+            x for x in self.ff.dihedrals.values()
+            if type_ids == [x.id1, x.id2, x.id3, x.id4]
+        ]
+        if matches:
+            return matches
+        partial_matches = [
+            x for x in self.ff.dihedrals.values()
+            if x.id2 == type_ids[1] and x.id3 == type_ids[2]
+        ]
+        if not partial_matches:
+            raise ValueError(
+                f"No params for dihedral (middle bonded atom types {type_ids[1]}~{type_ids[2]})."
+            )
+        matches = self.getMatchesFromEnds(atoms, partial_matches)
+        if not matches:
+            raise ValueError(
+                f"Cannot find params for dihedral between atom {'~'.join(map(str, type_ids))}."
+            )
+        return matches
 
     def writeDihedrals(self):
         if not self.dihedrals:
