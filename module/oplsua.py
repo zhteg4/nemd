@@ -402,6 +402,12 @@ class LammpsWriter(fileutils.LammpsInput):
     def writeLammpsData(self):
 
         with open(self.lammps_data, 'w') as self.data_fh:
+            self.setImproperSymbols()
+            self.setAtoms()
+            self.setBonds()
+            self.setAngles()
+            self.setDihedrals()
+            self.setImpropers()
             self.writeDescription()
             self.writeTopoType()
             self.writeBox()
@@ -410,13 +416,8 @@ class LammpsWriter(fileutils.LammpsInput):
             self.writeBondCoeffs()
             self.writeAngleCoeffs()
             self.writeDihedralCoeffs()
-            self.setImproperSymbols()
             self.writeImproperCoeffs()
             self.writeAtoms()
-            self.setBonds()
-            self.setAngles()
-            self.setDihedrals()
-            self.setImpropers()
             self.writeBonds()
             self.writeAngles()
             self.writeDihedrals()
@@ -427,20 +428,12 @@ class LammpsWriter(fileutils.LammpsInput):
             raise ValueError(f"Mols are not set.")
 
         self.data_fh.write(f"{self.LAMMPS_DESCRIPTION}\n\n")
-        atoms = [len(x.GetAtoms()) for x in self.mols.values()]
-        self.data_fh.write(f"{sum(atoms)} {self.ATOMS}\n")
-        bonds = [len(x.GetBonds()) for x in self.mols.values()]
-        self.data_fh.write(f"{sum(bonds)} {self.BONDS}\n")
-        neighbors = [
-            len(y.GetNeighbors()) for x in self.mols.values()
-            for y in x.GetAtoms()
-        ]
-        # FIXME: I guess improper angles may reduce this num
-        angles = [max(0, x - 1) for x in neighbors]
-        self.data_fh.write(f"{sum(angles)} {self.ANGLES}\n")
-        # FIXME: dihedral and improper are set to be zeros at this point
-        self.data_fh.write(f"0 {self.DIHEDRALS}\n")
-        self.data_fh.write(f"0 {self.IMPROPERS}\n\n")
+        atom_nums = [len(x.GetAtoms()) for x in self.mols.values()]
+        self.data_fh.write(f"{sum(atom_nums)} {self.ATOMS}\n")
+        self.data_fh.write(f"{len(self.bonds)} {self.BONDS}\n")
+        self.data_fh.write(f"{len(self.angles)} {self.ANGLES}\n")
+        self.data_fh.write(f"{len(self.dihedrals)} {self.DIHEDRALS}\n")
+        self.data_fh.write(f"{len(self.impropers)} {self.IMPROPERS}\n\n")
 
     def writeTopoType(self):
         self.data_fh.write(f"{len(self.ff.atoms)} {self.ATOM_TYPES}\n")
@@ -514,14 +507,19 @@ class LammpsWriter(fileutils.LammpsInput):
                 f"{improper.id} {improper.ene} {sign} {improper.n_parm}\n")
         self.data_fh.write("\n")
 
-    def writeAtoms(self):
-        self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
+    def setAtoms(self):
         atom_id = 0
         for mol_id, mol in self.mols.items():
-            conformer = mol.GetConformer()
             for atom in mol.GetAtoms():
                 atom_id += 1
                 atom.SetIntProp(self.ATOM_ID, atom_id)
+
+    def writeAtoms(self):
+        self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
+        for mol_id, mol in self.mols.items():
+            conformer = mol.GetConformer()
+            for atom in mol.GetAtoms():
+                atom_id = atom.GetIntProp(self.ATOM_ID)
                 type_id = atom.GetIntProp(self.TYPE_ID)
                 xyz = conformer.GetAtomPosition(atom.GetIdx())
                 xyz = ' '.join(map(lambda x: f'{x:.3f}', xyz))
