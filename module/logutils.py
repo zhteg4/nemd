@@ -1,5 +1,4 @@
 import os
-import fileutils
 import environutils
 import logging
 import pathlib

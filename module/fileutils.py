@@ -25,6 +25,15 @@ MOLT_FF_EXT = '.lt'
 RRM_EXT = '.prm'
 FF = 'ff'
 
+logger = logutils.createModuleLogger(file_path=__file__)
+
+
+def log_debug(msg):
+
+    if logger is None:
+        return
+    logger.debug(msg)
+
 
 def get_ff(fn=None, name=OPLSAA, ext=MOLT_FF_EXT):
     if not fn:

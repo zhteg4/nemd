@@ -26,11 +26,6 @@ DIHEDRAL = namedtuple('DIHEDRAL',
 
 UA = namedtuple('UA', ['sml', 'mp', 'hs', 'dsc'])
 
-# OPLSUA_MOLS = [
-#     OPLSUA(smiles='C', map=(81, ), comment='CH4 Methane'),
-#     # OPLSUA(smiles='C', map=(1,), comment='CH4 Methane'),
-# ]
-
 logger = logutils.createModuleLogger(file_path=__file__)
 
 
@@ -76,6 +71,7 @@ class OPLS_Parser:
     # yapf: disable
     SMILES = [UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
               UA(sml='CC', mp=(82, 82,), hs=None, dsc='Ethane'),
+              UA(sml='CCC', mp=(83, 86, 83,), hs=None, dsc='Propane'),
               UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
               UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
               UA(sml='CC=CC', mp=(84, 89, 89, 84, ), hs=None, dsc='2-Butene'),
@@ -360,35 +356,39 @@ class LammpsWriter(fileutils.LammpsInput):
         self.dihedrals = {}
         self.impropers = {}
         self.symbol_impropers = {}
+        self.in_fh = None
+        self.data_fh = None
         self.is_debug = environutils.is_debug()
 
     def writeLammpsIn(self):
-        with open(self.lammps_in, 'w') as fh:
-            fh.write(f"{self.UNITS} {self.units}\n")
-            fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
-            fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
-            fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
-            fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
-            fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
-            pair_style = self.LJ_CUT_COUL_LONG if self.hasCharge(
-            ) else self.LJ_CUT
-            fh.write(f"{self.PAIR_STYLE} {self.pair_style[pair_style]}\n")
-            fh.write(
-                f"{self.PAIR_MODIFY} {' '.join([(x,y) for x, y in self.pair_modify.items()][0])}\n"
-            )
-            special_bond = [
-                f"{x} {' '.join(map(str, y))}"
-                for x, y in self.special_bonds.items()
-            ][0]
-            fh.write(f"{self.SPECIAL_BONDS} {special_bond}\n")
-            if self.hasCharge():
-                kspace_style = [
-                    f"{x} {y}" for x, y in self.kspace_style.items()
-                ][0]
-                fh.write(f"{self.KSPACE_STYLE} {kspace_style}\n")
-            fh.write(f"{self.READ_DATA} {self.lammps_data}\n")
+        with open(self.lammps_in, 'w') as self.in_fh:
+            self.writeInDescriptions()
+            self.readData()
+            self.writeMinimize()
+            self.writeTimestep()
+            self.writeRun()
 
-            fh.write("minimize 1.0e-4 1.0e-6 100 1000")
+    def writeInDescriptions(self):
+        self.in_fh.write(f"{self.UNITS} {self.units}\n")
+        self.in_fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
+        self.in_fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
+        self.in_fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
+        self.in_fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
+        self.in_fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
+        pair_style = self.LJ_CUT_COUL_LONG if self.hasCharge() else self.LJ_CUT
+        self.in_fh.write(f"{self.PAIR_STYLE} {self.pair_style[pair_style]}\n")
+        self.in_fh.write(
+            f"{self.PAIR_MODIFY} {' '.join([(x, y) for x, y in self.pair_modify.items()][0])}\n"
+        )
+        special_bond = [
+            f"{x} {' '.join(map(str, y))}"
+            for x, y in self.special_bonds.items()
+        ][0]
+        self.in_fh.write(f"{self.SPECIAL_BONDS} {special_bond}\n")
+        if self.hasCharge():
+            kspace_style = [f"{x} {y}"
+                            for x, y in self.kspace_style.items()][0]
+            self.in_fh.write(f"{self.KSPACE_STYLE} {kspace_style}\n")
 
     def hasCharge(self, default=True):
         if self.mols is None:
@@ -399,6 +399,30 @@ class LammpsWriter(fileutils.LammpsInput):
         ]
         return any(charges)
 
+    def readData(self):
+        self.in_fh.write(f"{self.READ_DATA} {self.lammps_data}\n")
+
+    def writeMinimize(self, dump=True):
+        if dump:
+            self.in_fh.write("dump 1 all xyz 10 dump.xyz\n")
+            smbs = ' '.join(
+                map(str, [x.symbol for x in self.ff.atoms.values()]))
+            self.in_fh.write(f"dump_modify 1 element {smbs}\n")
+        self.in_fh.write("minimize 1.0e-4 1.0e-6 100 1000\n")
+
+    def writeTimestep(self):
+        self.in_fh.write('timestep 2\n')
+        self.in_fh.write('thermo 1000\n')
+
+    def writeRun(self):
+        self.in_fh.write("velocity all create 300 482748\n")
+        if len(self.mols) == 1:
+            # NVT on single molecule gives nan coords (guess due to translation)
+            self.in_fh.write("fix             1 all nve\n")
+        else:
+            self.in_fh.write("fix 1 all nvt temp 300 300 0.01\n")
+        self.in_fh.write("run 10000\n")
+
     def writeLammpsData(self):
 
         with open(self.lammps_data, 'w') as self.data_fh:
@@ -408,6 +432,7 @@ class LammpsWriter(fileutils.LammpsInput):
             self.setAngles()
             self.setDihedrals()
             self.setImpropers()
+            self.AnglesByImpropers()
             self.writeDescription()
             self.writeTopoType()
             self.writeBox()
@@ -698,7 +723,9 @@ class LammpsWriter(fileutils.LammpsInput):
         if not self.angles:
             return
         self.data_fh.write(f"{self.ANGLES.capitalize()}\n\n")
-        for angle_id, (type_id, id1, id2, id3) in self.angles.items():
+        angle_id = 0
+        for _, (type_id, id1, id2, id3) in self.angles.items():
+            angle_id += 1
             self.data_fh.write(f"{angle_id} {type_id} {id1} {id2} {id3}\n")
         self.data_fh.write(f"\n")
 
@@ -830,6 +857,19 @@ class LammpsWriter(fileutils.LammpsInput):
                     improper_type_id,
                     atom.GetIntProp(self.ATOM_ID),
                 ) + tuple([x.GetIntProp(self.ATOM_ID) for x in neighbors])
+
+    def AnglesByImpropers(self):
+
+        for idx, (itype, id1, id2, id3, id4) in self.impropers.items():
+            id234 = set([id2, id3, id4])
+            aidxs = [
+                aidx
+                for aidx, (atype, aid1, aid2, aid3) in self.angles.items()
+                if len(id234.intersection([aid1, aid3])) and id1 == aid2
+            ]
+            if len(aidxs) != 3:
+                continue
+            self.angles.pop(aidxs[2])
 
     def writeImpropers(self):
 
