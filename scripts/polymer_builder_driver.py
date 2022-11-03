@@ -205,8 +205,8 @@ class Polymer(object):
 
     def write(self):
         lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
-        lmw.writeLammpsIn()
         lmw.writeLammpsData()
+        lmw.writeLammpsIn()
 
 
 logger = None

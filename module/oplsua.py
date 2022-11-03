@@ -323,12 +323,19 @@ class LammpsWriter(fileutils.LammpsInput):
     LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
     LJ_CUT = 'lj/cut'
 
-    def __init__(self, ff, jobname, mols=None, lj_cut=11., coul_cut=11.):
+    def __init__(self,
+                 ff,
+                 jobname,
+                 mols=None,
+                 lj_cut=11.,
+                 coul_cut=11.,
+                 concise=True):
         self.ff = ff
         self.jobname = jobname
         self.mols = mols
         self.lj_cut = lj_cut
         self.coul_cut = coul_cut
+        self.concise = concise
         self.lammps_in = self.jobname + self.IN_EXT
         self.lammps_data = self.jobname + self.DATA_EXT
         self.units = 'real'
@@ -351,11 +358,17 @@ class LammpsWriter(fileutils.LammpsInput):
             )
         }
         self.kspace_style = {'pppm': 0.0001}
+        self.atoms = {}
         self.bonds = {}
         self.angles = {}
         self.dihedrals = {}
         self.impropers = {}
         self.symbol_impropers = {}
+        self.used_atom_types = []
+        self.used_bond_types = []
+        self.used_angle_types = []
+        self.used_dihedral_types = []
+        self.used_improper_types = []
         self.in_fh = None
         self.data_fh = None
         self.is_debug = environutils.is_debug()
@@ -405,8 +418,10 @@ class LammpsWriter(fileutils.LammpsInput):
     def writeMinimize(self, dump=True):
         if dump:
             self.in_fh.write("dump 1 all xyz 10 dump.xyz\n")
-            smbs = ' '.join(
-                map(str, [x.symbol for x in self.ff.atoms.values()]))
+            atoms = self.ff.atoms.values()
+            if self.concise:
+                atoms = [x for x in atoms if x.id in self.used_atom_types]
+            smbs = ' '.join(map(str, [x.symbol for x in atoms]))
             self.in_fh.write(f"dump_modify 1 element {smbs}\n")
         self.in_fh.write("minimize 1.0e-4 1.0e-6 100 1000\n")
 
@@ -433,6 +448,7 @@ class LammpsWriter(fileutils.LammpsInput):
             self.setDihedrals()
             self.setImpropers()
             self.AnglesByImpropers()
+            self.removeUnused()
             self.writeDescription()
             self.writeTopoType()
             self.writeBox()
@@ -448,6 +464,22 @@ class LammpsWriter(fileutils.LammpsInput):
             self.writeDihedrals()
             self.writeImpropers()
 
+    def removeUnused(self):
+        if not self.concise:
+            return
+        self.used_atom_types = [0] + sorted(
+            set(
+                y.GetIntProp(self.TYPE_ID) for x in self.mols.values()
+                for y in x.GetAtoms()))
+        self.used_bond_types = [0] + sorted(
+            set(x[0] for x in self.bonds.values()))
+        self.used_angle_types = [0] + sorted(
+            set(x[0] for x in self.angles.values()))
+        self.used_dihedral_types = [0] + sorted(
+            set(x[0] for x in self.dihedrals.values()))
+        self.used_improper_types = [0] + sorted(
+            set(x[0] for x in self.impropers.values()))
+
     def writeDescription(self):
         if self.mols is None:
             raise ValueError(f"Mols are not set.")
@@ -461,12 +493,23 @@ class LammpsWriter(fileutils.LammpsInput):
         self.data_fh.write(f"{len(self.impropers)} {self.IMPROPERS}\n\n")
 
     def writeTopoType(self):
-        self.data_fh.write(f"{len(self.ff.atoms)} {self.ATOM_TYPES}\n")
-        self.data_fh.write(f"{len(self.ff.bonds)} {self.BOND_TYPES}\n")
-        self.data_fh.write(f"{len(self.ff.angles)} {self.ANGLE_TYPES}\n")
-        self.data_fh.write(f"{len(self.ff.dihedrals)} {self.DIHEDRAL_TYPES}\n")
-        self.data_fh.write(
-            f"{len(self.ff.impropers)} {self.IMPROPER_TYPES}\n\n")
+        atom_num = len(self.used_atom_types) - 1 if self.concise else len(
+            self.ff.atoms)
+        self.data_fh.write(f"{atom_num} {self.ATOM_TYPES}\n")
+        bond_num = len(self.used_bond_types) - 1 if self.concise else len(
+            self.ff.bonds)
+        self.data_fh.write(f"{bond_num} {self.BOND_TYPES}\n")
+        angle_num = len(self.used_angle_types) - 1 if self.concise else len(
+            self.ff.angles)
+        self.data_fh.write(f"{angle_num} {self.ANGLE_TYPES}\n")
+        dihedral_num = len(
+            self.used_dihedral_types) - 1 if self.concise else len(
+                self.ff.dihedrals)
+        self.data_fh.write(f"{dihedral_num} {self.DIHEDRAL_TYPES}\n")
+        improper_num = len(
+            self.used_improper_types) - 1 if self.concise else len(
+                self.ff.impropers)
+        self.data_fh.write(f"{improper_num} {self.IMPROPER_TYPES}\n\n")
 
     def writeBox(self, min_box=None, buffer=None):
         if min_box is None:
@@ -487,31 +530,52 @@ class LammpsWriter(fileutils.LammpsInput):
     def writeMasses(self):
         self.data_fh.write(f"{self.MASSES}\n\n")
         for atom_id, atom in self.ff.atoms.items():
-            self.data_fh.write(f"{atom_id} {atom.mass} # {atom.description}\n")
+            if self.concise and atom_id not in self.used_atom_types:
+                continue
+            atm_id = self.used_atom_types.index(
+                atom_id) if self.concise else atom_id
+            dscrptn = f"{atom.description} {atom_id}" if self.concise else atom.description
+            self.data_fh.write(f"{atm_id} {atom.mass} # {dscrptn}\n")
         self.data_fh.write(f"\n")
 
     def writePairCoeffs(self):
         self.data_fh.write(f"{self.PAIR_COEFFS}\n\n")
         for atom in self.ff.atoms.values():
+            if self.concise and atom.id not in self.used_atom_types:
+                continue
             vdw = self.ff.vdws[atom.id]
-            self.data_fh.write(f"{atom.id} {atom.id} {vdw.ene} {vdw.dist}\n")
+            atom_id = self.used_atom_types.index(
+                atom.id) if self.concise else atom.id
+            self.data_fh.write(f"{atom_id} {atom_id} {vdw.ene} {vdw.dist}\n")
         self.data_fh.write("\n")
 
     def writeBondCoeffs(self):
         self.data_fh.write(f"{self.BOND_COEFFS}\n\n")
         for bond in self.ff.bonds.values():
-            self.data_fh.write(f"{bond.id}  {bond.ene} {bond.dist}\n")
+            if self.concise and bond.id not in self.used_bond_types:
+                continue
+            bond_id = self.used_bond_types.index(
+                bond.id) if self.concise else bond.id
+            self.data_fh.write(f"{bond_id}  {bond.ene} {bond.dist}\n")
         self.data_fh.write("\n")
 
     def writeAngleCoeffs(self):
         self.data_fh.write(f"{self.ANGLE_COEFFS}\n\n")
         for angle in self.ff.angles.values():
-            self.data_fh.write(f"{angle.id} {angle.ene} {angle.angle}\n")
+            if self.concise and angle.id not in self.used_angle_types:
+                continue
+            angle_id = self.used_angle_types.index(
+                angle.id) if self.concise else angle.id
+            self.data_fh.write(f"{angle_id} {angle.ene} {angle.angle}\n")
         self.data_fh.write("\n")
 
     def writeDihedralCoeffs(self):
         self.data_fh.write(f"{self.DIHEDRAL_COEFFS}\n\n")
         for dihedral in self.ff.dihedrals.values():
+            if self.concise and dihedral.id not in self.used_dihedral_types:
+                continue
+            dihedral_id = self.used_dihedral_types.index(
+                dihedral.id) if self.concise else dihedral.id
             params = [0., 0., 0., 0.]
             for ene_ang_n in dihedral.constants:
                 params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
@@ -521,15 +585,19 @@ class LammpsWriter(fileutils.LammpsInput):
                 )):
                     params[ene_ang_n.n_parm] *= -1
             self.data_fh.write(
-                f"{dihedral.id}  {' '.join(map(str, params))}\n")
+                f"{dihedral_id}  {' '.join(map(str, params))}\n")
         self.data_fh.write("\n")
 
     def writeImproperCoeffs(self):
         self.data_fh.write(f"{self.IMPROPER_COEFFS}\n\n")
         for improper in self.ff.impropers.values():
+            if self.concise and improper.id not in self.used_improper_types:
+                continue
+            improper_id = self.used_improper_types.index(
+                improper.id) if self.concise else improper.id
             sign = 1 if improper.angle == 0. else -1
             self.data_fh.write(
-                f"{improper.id} {improper.ene} {sign} {improper.n_parm}\n")
+                f"{improper_id} {improper.ene} {sign} {improper.n_parm}\n")
         self.data_fh.write("\n")
 
     def setAtoms(self):
@@ -550,6 +618,8 @@ class LammpsWriter(fileutils.LammpsInput):
                 xyz = ' '.join(map(lambda x: f'{x:.3f}', xyz))
                 charge = self.ff.charges[type_id]
                 dsrptn = self.ff.atoms[type_id].description
+                type_id = self.used_atom_types.index(
+                    type_id) if self.concise else type_id
                 self.data_fh.write(
                     f"{atom_id} {mol_id} {type_id} {charge} {xyz} # {dsrptn}\n"
                 )
@@ -654,6 +724,8 @@ class LammpsWriter(fileutils.LammpsInput):
 
         self.data_fh.write(f"{self.BONDS.capitalize()}\n\n")
         for bond_id, (bond_type, id1, id2) in self.bonds.items():
+            bond_type = self.used_bond_types.index(
+                bond_type) if self.concise else bond_type
             self.data_fh.write(f"{bond_id} {bond_type} {id1} {id2}\n")
         self.data_fh.write(f"\n")
 
@@ -726,7 +798,9 @@ class LammpsWriter(fileutils.LammpsInput):
         angle_id = 0
         for _, (type_id, id1, id2, id3) in self.angles.items():
             angle_id += 1
-            self.data_fh.write(f"{angle_id} {type_id} {id1} {id2} {id3}\n")
+            angle_type = self.used_angle_types.index(
+                type_id) if self.concise else type_id
+            self.data_fh.write(f"{angle_id} {angle_type} {id1} {id2} {id3}\n")
         self.data_fh.write(f"\n")
 
     def getAngleAtoms(self, atom):
@@ -813,6 +887,8 @@ class LammpsWriter(fileutils.LammpsInput):
         self.data_fh.write(f"{self.DIHEDRALS.capitalize()}\n\n")
         for dihedral_id, (type_id, id1, id2, id3,
                           id4) in self.dihedrals.items():
+            type_id = self.used_dihedral_types.index(
+                type_id) if self.concise else type_id
             self.data_fh.write(
                 f"{dihedral_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
@@ -879,6 +955,8 @@ class LammpsWriter(fileutils.LammpsInput):
         self.data_fh.write(f"{self.IMPROPERS.capitalize()}\n\n")
         for improper_id, (type_id, id1, id2, id3,
                           id4) in self.impropers.items():
+            type_id = self.used_improper_types.index(
+                type_id) if self.concise else type_id
             self.data_fh.write(
                 f"{improper_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
