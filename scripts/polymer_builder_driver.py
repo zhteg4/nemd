@@ -154,22 +154,38 @@ class Polymer(object):
             frag = Chem.MolFromSmiles(sml.sml)
             matches = self.polym.GetSubstructMatches(frag)
             for match in matches:
+                frag_cnnt = [
+                    x.GetNumImplicitHs() +
+                    x.GetDegree() if x.GetSymbol() != 'C' else x.GetDegree()
+                    for x in frag.GetAtoms()
+                ]
+                polm_cnnt = [
+                    self.polym.GetAtomWithIdx(x).GetDegree() for x in match
+                ]
+                match = [
+                    x if y == z else None
+                    for x, y, z in zip(match, frag_cnnt, polm_cnnt)
+                ]
                 for atom_id, type_id in zip(match, sml.mp):
-                    if not type_id:
+                    if not type_id or atom_id is None:
                         continue
                     atom = self.polym.GetAtomWithIdx(atom_id)
                     try:
                         atom.GetIntProp(self.TYPE_ID)
                     except KeyError:
                         self.setAtomIds(atom, type_id)
-                        log_debug(f"{atom_id} {type_id}")
+                        log_debug(
+                            f"{atom.GetSymbol()}{atom.GetDegree()} {atom_id} {type_id}"
+                        )
                     else:
                         continue
                     for neighbor in atom.GetNeighbors():
                         if neighbor.GetSymbol() == 'H':
                             type_id = sml.hs[type_id]
                             self.setAtomIds(neighbor, type_id)
-                            log_debug(f"{neighbor.GetIdx()} {type_id}")
+                            log_debug(
+                                f"{neighbor.GetSymbol()}{neighbor.GetDegree()} {neighbor.GetIdx()} {type_id}"
+                            )
 
     def setAtomIds(self, atom, type_id):
         atom.SetIntProp(self.TYPE_ID, type_id)

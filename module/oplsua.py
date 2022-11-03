@@ -664,13 +664,13 @@ class LammpsWriter(fileutils.LammpsInput):
         }
         # {ff bond: one share atom type}
         partial_matches = {x: y.pop() for x, y in partial_matches.items() if y}
-        bond_utype = {
-            bond: [
-                set([bond.id1, bond.id2]).difference([mtype]).pop(),
-                type_set.difference([mtype]).pop()
-            ]
-            for bond, mtype in partial_matches.items()
-        }
+        bond_utype = {}
+        for bond, mtype in partial_matches.items():
+            bond_unmatched = set([bond.id1, bond.id2]).difference([mtype])
+            bond_unmatched = bond_unmatched.pop() if bond_unmatched else mtype
+            type_unmatched = type_set.difference([mtype])
+            type_unmatched = type_unmatched.pop() if type_unmatched else mtype
+            bond_utype[bond] = [bond_unmatched, type_unmatched]
         # ff bond: [unmatched atom type in ff bond, replaced unmatched atom type in ff, unmatched atom]
         bond_utype = {
             bond: [
