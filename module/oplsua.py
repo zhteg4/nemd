@@ -89,6 +89,17 @@ class OPLS_Parser:
     ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24})
     DIHE_ATOM = ATOM_TOTAL.copy()
     DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24})
+    # To get HO-C=O, COH~OH is used, which causes CH2-COOH bond issue
+    BOND_ATOMS = {(26, 86): [16, 17]}
+    DIHE_ATOMS = {
+        (
+            26,
+            86,
+        ): (
+            1,
+            6,
+        )
+    }
 
     DESCRIPTION_SMILES = {
         'CH4 Methane': 'C',
@@ -430,12 +441,12 @@ class LammpsWriter(fileutils.LammpsInput):
         self.in_fh.write('thermo 1000\n')
 
     def writeRun(self):
-        self.in_fh.write("velocity all create 300 482748\n")
+        self.in_fh.write("velocity all create 10 482748\n")
         if len(self.mols) == 1:
             # NVT on single molecule gives nan coords (guess due to translation)
             self.in_fh.write("fix             1 all nve\n")
         else:
-            self.in_fh.write("fix 1 all nvt temp 300 300 0.01\n")
+            self.in_fh.write("fix 1 all nvt temp 10 10 0.01\n")
         self.in_fh.write("run 10000\n")
 
     def writeLammpsData(self):
@@ -513,7 +524,7 @@ class LammpsWriter(fileutils.LammpsInput):
 
     def writeBox(self, min_box=None, buffer=None):
         if min_box is None:
-            min_box = (20., 20., 20.,) # yapf: disable
+            min_box = (40., 40., 40.,) # yapf: disable
         if buffer is None:
             buffer = (2., 2., 2.,) # yapf: disable
         xyzs = np.concatenate(
@@ -647,6 +658,11 @@ class LammpsWriter(fileutils.LammpsInput):
         :return:
         """
         atoms_types = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
+        try:
+            atoms_types = OPLS_Parser.BOND_ATOMS[tuple(set(atoms_types))]
+        except KeyError:
+            # To get HO-C=O, COH~OH is used, which causes CH2-COOH bond issue
+            pass
         # Exact match between two atom type ids
         matches = [
             x for x in self.ff.bonds.values() if [x.id1, x.id2] == atoms_types
@@ -869,6 +885,12 @@ class LammpsWriter(fileutils.LammpsInput):
             x for x in self.ff.dihedrals.values()
             if x.id2 == type_ids[1] and x.id3 == type_ids[2]
         ]
+        if not partial_matches:
+            rpm_ids = OPLS_Parser.DIHE_ATOMS[tuple(type_ids[1:3])]
+            partial_matches = [
+                x for x in self.ff.dihedrals.values()
+                if set([x.id2, x.id3]) == set(rpm_ids)
+            ]
         if not partial_matches:
             raise ValueError(
                 f"No params for dihedral (middle bonded atom types {type_ids[1]}~{type_ids[2]})."
