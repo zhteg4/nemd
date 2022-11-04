@@ -299,6 +299,8 @@ class LammpsWriter(fileutils.LammpsInput):
 
     TYPE_ID = 'type_id'
     ATOM_ID = 'atom_id'
+    RES_NUM = 'res_num'
+    NEIGHBOR_CHARGE = 'neighbor_charge'
     BOND_ATM_ID = 'bond_atm_id'
     IMPLICIT_H = 'implicit_h'
 
@@ -622,12 +624,16 @@ class LammpsWriter(fileutils.LammpsInput):
                 type_id = atom.GetIntProp(self.TYPE_ID)
                 xyz = conformer.GetAtomPosition(atom.GetIdx())
                 xyz = ' '.join(map(lambda x: f'{x:.3f}', xyz))
-                charge = self.ff.charges[type_id]
+                try:
+                    ncharge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
+                except KeyError:
+                    ncharge = 0
+                charge = self.ff.charges[type_id] + ncharge
                 dsrptn = self.ff.atoms[type_id].description
                 type_id = self.used_atom_types.index(
                     type_id) if self.concise else type_id
                 self.data_fh.write(
-                    f"{atom_id} {mol_id} {type_id} {charge} {xyz} # {dsrptn}\n"
+                    f"{atom_id} {mol_id} {type_id} {charge:.4f} {xyz} # {dsrptn}\n"
                 )
         self.data_fh.write(f"\n")
 

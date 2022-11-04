@@ -14,6 +14,7 @@ import fileutils
 import nemd
 import itertools
 import plotutils
+import collections
 import environutils
 import jobutils
 import symbols
@@ -84,6 +85,8 @@ class Polymer(object):
     ATOM_ID = oplsua.LammpsWriter.ATOM_ID
     TYPE_ID = oplsua.LammpsWriter.TYPE_ID
     BOND_ATM_ID = oplsua.LammpsWriter.BOND_ATM_ID
+    RES_NUM = oplsua.LammpsWriter.RES_NUM
+    NEIGHBOR_CHARGE = oplsua.LammpsWriter.NEIGHBOR_CHARGE
     MOL_NUM = 'mol_num'
     IMPLICIT_H = oplsua.LammpsWriter.IMPLICIT_H
 
@@ -103,6 +106,7 @@ class Polymer(object):
         self.setCruMol()
         self.polymerize()
         self.assignAtomType()
+        self.balanceCharge()
         self.embedMol()
         self.setMols()
         self.write()
@@ -149,6 +153,7 @@ class Polymer(object):
         log(f"{Chem.MolToSmiles(self.polym)}")
 
     def assignAtomType(self):
+        res_num = 1
         for sml in self.ff.SMILES:
             if all(x.HasProp(self.TYPE_ID) for x in self.polym.GetAtoms()):
                 return
@@ -168,31 +173,61 @@ class Polymer(object):
                     for x, y, z in zip(match, frag_cnnt, polm_cnnt)
                 ]
                 log_debug(f"assignAtomType {sml.sml}, {match}")
-                for atom_id, type_id in zip(match, sml.mp):
-                    if not type_id or atom_id is None:
-                        continue
-                    atom = self.polym.GetAtomWithIdx(atom_id)
-                    try:
-                        atom.GetIntProp(self.TYPE_ID)
-                    except KeyError:
-                        self.setAtomIds(atom, type_id)
-                        log_debug(
-                            f"{atom.GetSymbol()}{atom.GetDegree()} {atom_id} {type_id}"
-                        )
-                    else:
-                        continue
-                    for neighbor in atom.GetNeighbors():
-                        if neighbor.GetSymbol() == 'H':
-                            type_id = sml.hs[type_id]
-                            self.setAtomIds(neighbor, type_id)
-                            log_debug(
-                                f"{neighbor.GetSymbol()}{neighbor.GetDegree()} {neighbor.GetIdx()} {type_id}"
-                            )
+                succeed = self.markAtoms(match, sml, res_num)
+                if succeed:
+                    res_num += 1
 
-    def setAtomIds(self, atom, type_id):
+    def markAtoms(self, match, sml, res_num):
+        marked = False
+        for atom_id, type_id in zip(match, sml.mp):
+            if not type_id or atom_id is None:
+                continue
+            atom = self.polym.GetAtomWithIdx(atom_id)
+            try:
+                atom.GetIntProp(self.TYPE_ID)
+            except KeyError:
+                self.setAtomIds(atom, type_id, res_num)
+                marked = True
+                log_debug(
+                    f"{atom.GetSymbol()}{atom.GetDegree()} {atom_id} {type_id}"
+                )
+            else:
+                continue
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetSymbol() == 'H':
+                    type_id = sml.hs[type_id]
+                    self.setAtomIds(neighbor, type_id, res_num)
+                    marked = True
+                    log_debug(
+                        f"{neighbor.GetSymbol()}{neighbor.GetDegree()} {neighbor.GetIdx()} {type_id}"
+                    )
+        return marked
+
+    def setAtomIds(self, atom, type_id, res_num):
         atom.SetIntProp(self.TYPE_ID, type_id)
+        atom.SetIntProp(self.RES_NUM, res_num)
         atom.SetIntProp(self.BOND_ATM_ID,
                         oplsua.OPLS_Parser.BOND_ATOM[type_id])
+
+    def balanceCharge(self):
+        res_charge = collections.defaultdict(float)
+        for atom in self.polym.GetAtoms():
+            res_num = atom.GetIntProp(self.RES_NUM)
+            type_id = atom.GetIntProp(self.TYPE_ID)
+            res_charge[res_num] += self.ff.charges[type_id]
+        for bond in self.polym.GetBonds():
+            batom, eatom = bond.GetBeginAtom(), bond.GetEndAtom()
+            bres_num = batom.GetIntProp(self.RES_NUM)
+            eres_num = eatom.GetIntProp(self.RES_NUM)
+            if bres_num == eres_num:
+                continue
+            for atom, natom in [[batom, eatom], [eatom, batom]]:
+                try:
+                    charge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
+                except KeyError:
+                    charge = 0.0
+                ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
+                atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
     def embedMol(self):
         AllChem.EmbedMolecule(self.polym)
