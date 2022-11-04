@@ -125,9 +125,8 @@ class Polymer(object):
             self.polym = self.cru_mol
             return
 
-        mols = [
-            copy.copy(self.options.cru) for x in range(self.options.cru_num)
-        ]
+        mols = [copy.copy(self.cru_mol) for x in range(self.options.cru_num)]
+
         combo = mols[0]
         for mol in mols[1:]:
             combo = Chem.CombineMols(combo, mol)
@@ -151,6 +150,8 @@ class Polymer(object):
 
     def assignAtomType(self):
         for sml in self.ff.SMILES:
+            if all(x.HasProp(self.TYPE_ID) for x in self.polym.GetAtoms()):
+                return
             frag = Chem.MolFromSmiles(sml.sml)
             matches = self.polym.GetSubstructMatches(frag)
             for match in matches:
@@ -166,6 +167,7 @@ class Polymer(object):
                     x if y == z else None
                     for x, y, z in zip(match, frag_cnnt, polm_cnnt)
                 ]
+                log_debug(f"assignAtomType {sml.sml}, {match}")
                 for atom_id, type_id in zip(match, sml.mp):
                     if not type_id or atom_id is None:
                         continue

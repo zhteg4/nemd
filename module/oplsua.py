@@ -91,16 +91,11 @@ class OPLS_Parser:
     DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24})
     # To get HO-C=O, COH~OH is used, which causes CH2-COOH bond issue
     BOND_ATOMS = {(26, 86): [16, 17]}
+    # yapf: disable
     DIHE_ATOMS = {
-        (
-            26,
-            86,
-        ): (
-            1,
-            6,
-        )
+        (26,86,): (1,6,), (26,88,): (1,6,)
     }
-
+    # yapf: enable
     DESCRIPTION_SMILES = {
         'CH4 Methane': 'C',
         'Ethane': 'CC',
@@ -950,11 +945,9 @@ class LammpsWriter(fileutils.LammpsInput):
                     ) == Chem.rdchem.HybridizationType.SP2:
                         neighbors.remove(neighbor)
                         neighbors = [neighbor] + neighbors
-                len(neighbors[0].GetNeighbors())
-                self.impropers[improper_id] = (
-                    improper_type_id,
-                    atom.GetIntProp(self.ATOM_ID),
-                ) + tuple([x.GetIntProp(self.ATOM_ID) for x in neighbors])
+                atoms = neighbors[:2] + [atom] + neighbors[2:]
+                self.impropers[improper_id] = (improper_type_id, ) + tuple(
+                    x.GetIntProp(self.ATOM_ID) for x in atoms)
 
     def AnglesByImpropers(self):
 
