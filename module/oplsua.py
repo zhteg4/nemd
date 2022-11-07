@@ -71,6 +71,7 @@ class OPLS_Parser:
     # yapf: disable
     SMILES = [UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
               UA(sml='CC', mp=(82, 82,), hs=None, dsc='Ethane'),
+              UA(sml='CO', mp=(106, 104,), hs={104:105}, dsc='Ethane'),
               UA(sml='CCC', mp=(83, 86, 83,), hs=None, dsc='Propane'),
               UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
               UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
@@ -90,7 +91,7 @@ class OPLS_Parser:
     DIHE_ATOM = ATOM_TOTAL.copy()
     DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24})
     # To get HO-C=O, COH~OH is used, which causes CH2-COOH bond issue
-    BOND_ATOMS = {(26, 86): [16, 17]}
+    BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17]}
     # yapf: disable
     DIHE_ATOMS = {
         (26,86,): (1,6,), (26,88,): (1,6,)
@@ -660,7 +661,7 @@ class LammpsWriter(fileutils.LammpsInput):
         """
         atoms_types = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
         try:
-            atoms_types = OPLS_Parser.BOND_ATOMS[tuple(set(atoms_types))]
+            atoms_types = OPLS_Parser.BOND_ATOMS[tuple(sorted(atoms_types))]
         except KeyError:
             # To get HO-C=O, COH~OH is used, which causes CH2-COOH bond issue
             pass
