@@ -559,6 +559,9 @@ class LammpsWriter(fileutils.LammpsInput):
         self.data_fh.write("\n")
 
     def writeBondCoeffs(self):
+        if len(self.used_bond_types) < 2 and self.concise:
+            return
+
         self.data_fh.write(f"{self.BOND_COEFFS}\n\n")
         for bond in self.ff.bonds.values():
             if self.concise and bond.id not in self.used_bond_types:
@@ -569,6 +572,9 @@ class LammpsWriter(fileutils.LammpsInput):
         self.data_fh.write("\n")
 
     def writeAngleCoeffs(self):
+        if len(self.used_angle_types) < 2 and self.concise:
+            return
+
         self.data_fh.write(f"{self.ANGLE_COEFFS}\n\n")
         for angle in self.ff.angles.values():
             if self.concise and angle.id not in self.used_angle_types:
@@ -579,6 +585,9 @@ class LammpsWriter(fileutils.LammpsInput):
         self.data_fh.write("\n")
 
     def writeDihedralCoeffs(self):
+        if len(self.used_dihedral_types) < 2 and self.concise:
+            return
+
         self.data_fh.write(f"{self.DIHEDRAL_COEFFS}\n\n")
         for dihedral in self.ff.dihedrals.values():
             if self.concise and dihedral.id not in self.used_dihedral_types:
@@ -598,6 +607,9 @@ class LammpsWriter(fileutils.LammpsInput):
         self.data_fh.write("\n")
 
     def writeImproperCoeffs(self):
+        if len(self.used_dihedral_types) < 2 and self.concise:
+            return
+
         self.data_fh.write(f"{self.IMPROPER_COEFFS}\n\n")
         for improper in self.ff.impropers.values():
             if self.concise and improper.id not in self.used_improper_types:

@@ -86,6 +86,8 @@ class CustomDump(object):
         with open(self.options.custom_dump, 'r') as self.dmp_fh:
             while True:
                 lines = [self.dmp_fh.readline() for _ in range(9)]
+                if not all(lines):
+                    return
                 atom_num = int(lines[3].strip('\n'))
                 box = np.array([
                     float(y) for x in range(5, 8)
