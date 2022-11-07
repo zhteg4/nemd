@@ -327,9 +327,9 @@ class LammpsWriter(fileutils.LammpsInput):
     BOX_DSP = [XLO_XHI, YLO_YHI, ZLO_ZHI]
     LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
     BUFFER = [
-        5.,
-        5.,
-        5.,
+        4.,
+        4.,
+        4.,
     ]
 
     MASSES = 'Masses'
@@ -359,12 +359,14 @@ class LammpsWriter(fileutils.LammpsInput):
                  mols=None,
                  lj_cut=11.,
                  coul_cut=11.,
+                 timestep=1,
                  concise=True):
         self.ff = ff
         self.jobname = jobname
         self.mols = mols
         self.lj_cut = lj_cut
         self.coul_cut = coul_cut
+        self.timestep = timestep
         self.concise = concise
         self.lammps_in = self.jobname + self.IN_EXT
         self.lammps_data = self.jobname + self.DATA_EXT
@@ -447,7 +449,8 @@ class LammpsWriter(fileutils.LammpsInput):
 
     def writeMinimize(self, dump=True):
         if dump:
-            self.in_fh.write("dump 1 all custom 10 dump.custom id xu yu zu\n")
+            self.in_fh.write(
+                "dump 1 all custom 1000 dump.custom id xu yu zu\n")
             self.in_fh.write("dump_modify 1 sort id\n")
             atoms = self.ff.atoms.values()
             if self.concise:
@@ -457,7 +460,7 @@ class LammpsWriter(fileutils.LammpsInput):
         self.in_fh.write("minimize 1.0e-4 1.0e-6 100 1000\n")
 
     def writeTimestep(self):
-        self.in_fh.write('timestep 1\n')
+        self.in_fh.write(f'timestep {self.timestep}\n')
         self.in_fh.write('thermo 1000\n')
 
     def writeRun(self):
@@ -465,9 +468,17 @@ class LammpsWriter(fileutils.LammpsInput):
         if len(self.mols) == 1:
             # NVT on single molecule gives nan coords (guess due to translation)
             self.in_fh.write("fix             1 all nve\n")
-        else:
-            self.in_fh.write("fix 1 all nvt temp 10 10 0.01\n")
-        self.in_fh.write("run 10000\n")
+            self.in_fh.write("run 10000\n")
+            return
+
+        self.in_fh.write(f"fix 1 all nvt temp 10 10 {self.timestep * 100}\n")
+        self.in_fh.write("run 100000\n")
+        self.in_fh.write("unfix 1\n")
+
+        self.in_fh.write(
+            f"fix 1 all npt temp 10 10 {self.timestep * 100} iso 1 1 {self.timestep * 1000}\n"
+        )
+        self.in_fh.write("run 1000000\n")
 
     def writeLammpsData(self):
 
@@ -577,7 +588,7 @@ class LammpsWriter(fileutils.LammpsInput):
             vdw = self.ff.vdws[atom.id]
             atom_id = self.used_atom_types.index(
                 atom.id) if self.concise else atom.id
-            self.data_fh.write(f"{atom_id} {atom_id} {vdw.ene} {vdw.dist}\n")
+            self.data_fh.write(f"{atom_id} {vdw.ene} {vdw.dist}\n")
         self.data_fh.write("\n")
 
     def writeBondCoeffs(self):
@@ -1104,12 +1115,14 @@ class DataFileReader(LammpsWriter):
         for id, lid in enumerate(
                 range(sidx, sidx + self.struct_dsp[self.ATOMS]), 1):
             id, mol_id, type_id, charge, x, y, z = self.lines[lid].split()[:7]
+            ele = self.lines[lid].split('#')[-1].strip().split('H')[0]
             self.atoms[int(id)] = types.SimpleNamespace(
                 id=int(id),
                 mol_id=int(id),
                 type_id=int(id),
                 charge=float(charge),
-                xyz=[float(x), float(y), float(z)])
+                xyz=[float(x), float(y), float(z)],
+                ele=ele)
 
 
 def main(argv):

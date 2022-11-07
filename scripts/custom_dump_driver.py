@@ -80,16 +80,16 @@ class CustomDump(object):
 
     def run(self):
         self.setStruct()
-        self.checkFrames()
-        # self.write()
+        #self.checkFrames()
+        self.write()
         log('Finished', timestamp=True)
 
     def setStruct(self):
         if not self.options.data_file:
             return
 
-        df_reader = oplsua.DataFileReader(self.options.data_file)
-        df_reader.run()
+        self.data_reader = oplsua.DataFileReader(self.options.data_file)
+        self.data_reader.run()
 
     def checkFrames(self, threshold=2.):
 
@@ -187,10 +187,16 @@ class CustomDump(object):
                 frm.attrs['box'] = box
                 yield frm
 
-    def write(self):
+    def write(self, wrapped=True):
         with open(self.outfile, 'w') as self.out_fh:
             for frm in self.getFrames():
                 self.out_fh.write(f'{frm.shape[0]}\n')
+                index = [self.data_reader.atoms[x].ele for x in frm.index]
+                frm.index = index
+                box = frm.attrs['box']
+                span = np.array(
+                    [box[i * 2 + 1] - box[i * 2] for i in range(3)])
+                frm = frm % span
                 frm.to_csv(self.out_fh,
                            mode='a',
                            index=True,
