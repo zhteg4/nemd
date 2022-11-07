@@ -310,18 +310,27 @@ class LammpsWriter(fileutils.LammpsInput):
     ANGLES = 'angles'
     DIHEDRALS = 'dihedrals'
     IMPROPERS = 'impropers'
+    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
 
     ATOM_TYPES = 'atom types'
     BOND_TYPES = 'bond types'
     ANGLE_TYPES = 'angle types'
     DIHEDRAL_TYPES = 'dihedral types'
     IMPROPER_TYPES = 'improper types'
+    TYPE_DSP = [
+        ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHEDRAL_TYPES, IMPROPER_TYPES
+    ]
 
     XLO_XHI = 'xlo xhi'
     YLO_YHI = 'ylo yhi'
     ZLO_ZHI = 'zlo zhi'
+    BOX_DSP = [XLO_XHI, YLO_YHI, ZLO_ZHI]
     LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
-    BUFFER = [5., 5., 5.,]
+    BUFFER = [
+        5.,
+        5.,
+        5.,
+    ]
 
     MASSES = 'Masses'
     PAIR_COEFFS = 'Pair Coeffs'
@@ -329,6 +338,17 @@ class LammpsWriter(fileutils.LammpsInput):
     ANGLE_COEFFS = 'Angle Coeffs'
     DIHEDRAL_COEFFS = 'Dihedral Coeffs'
     IMPROPER_COEFFS = 'Improper Coeffs'
+    ATOMS_CAP = ATOMS.capitalize()
+    BONDS_CAP = BONDS.capitalize()
+    ANGLES_CAP = ANGLES.capitalize()
+    DIHEDRALS_CAP = DIHEDRALS.capitalize()
+    IMPROPERS_CAP = IMPROPERS.capitalize()
+
+    MARKERS = [
+        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
+        IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
+        IMPROPERS_CAP
+    ]
 
     LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
     LJ_CUT = 'lj/cut'
@@ -427,7 +447,8 @@ class LammpsWriter(fileutils.LammpsInput):
 
     def writeMinimize(self, dump=True):
         if dump:
-            self.in_fh.write("dump 1 all xyz 10 dump.xyz\n")
+            self.in_fh.write("dump 1 all custom 10 dump.custom id xu yu zu\n")
+            self.in_fh.write("dump_modify 1 sort id\n")
             atoms = self.ff.atoms.values()
             if self.concise:
                 atoms = [x for x in atoms if x.id in self.used_atom_types]
@@ -436,7 +457,7 @@ class LammpsWriter(fileutils.LammpsInput):
         self.in_fh.write("minimize 1.0e-4 1.0e-6 100 1000\n")
 
     def writeTimestep(self):
-        self.in_fh.write('timestep 2\n')
+        self.in_fh.write('timestep 1\n')
         self.in_fh.write('thermo 1000\n')
 
     def writeRun(self):
@@ -1036,6 +1057,59 @@ class LammpsWriter(fileutils.LammpsInput):
     def getCountedSymbols(self, symbols, csmbls='CHNO'):
         return ''.join((symbols[0], ) + tuple(y + str(symbols[1:].count(y))
                                               for y in csmbls))
+
+
+class DataFileReader(LammpsWriter):
+
+    def __init__(self, data_file):
+        self.data_file = data_file
+        self.lines = None
+        self.atoms = {}
+
+    def run(self):
+        self.read()
+        self.setDescription()
+        self.setAtoms()
+
+    def read(self):
+        with open(self.data_file, 'r') as df_fh:
+            self.lines = df_fh.readlines()
+            self.mk_idxes = {
+                x: i
+                for i, l in enumerate(self.lines) for x in self.MARKERS
+                if l.startswith(x)
+            }
+
+    def setDescription(self):
+
+        dsp_eidx = min(self.mk_idxes.values())
+        self.struct_dsp = {
+            y: int(self.lines[x].split(y)[0])
+            for x in range(dsp_eidx) for y in self.STRUCT_DSP
+            if y in self.lines[x]
+        }
+        self.dype_dsp = {
+            y: int(self.lines[x].split(y)[0])
+            for x in range(dsp_eidx) for y in self.TYPE_DSP
+            if y in self.lines[x]
+        }
+        self.box_dsp = {
+            y: [float(z) for z in self.lines[x].split(y)[0].split()]
+            for x in range(dsp_eidx) for y in self.BOX_DSP
+            if y in self.lines[x]
+        }
+
+    def setAtoms(self):
+        sidx = self.mk_idxes[self.ATOMS_CAP] + 2
+        for id, lid in enumerate(
+                range(sidx, sidx + self.struct_dsp[self.ATOMS]), 1):
+            id, mol_id, type_id, charge, x, y, z = self.lines[lid].split()[:7]
+            self.atoms[int(id)] = types.SimpleNamespace(
+                id=int(id),
+                mol_id=int(id),
+                type_id=int(id),
+                charge=float(charge),
+                xyz=[float(x), float(y), float(z)])
 
 
 def main(argv):

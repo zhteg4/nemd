@@ -79,10 +79,91 @@ class CustomDump(object):
         self.outfile = self.jobname + self.XYZ_EXT
 
     def run(self):
-        self.write()
+        self.setStruct()
+        self.checkFrames()
+        # self.write()
         log('Finished', timestamp=True)
 
-    def read(self):
+    def setStruct(self):
+        if not self.options.data_file:
+            return
+
+        df_reader = oplsua.DataFileReader(self.options.data_file)
+        df_reader.run()
+
+    def checkFrames(self, threshold=2.):
+
+        for idx, frm in enumerate(self.getFrames()):
+            clashes = self.getClashes(frm, threshold=threshold)
+            if not clashes:
+                continue
+            log(f"Frame {idx} has {len(clashes)} clashes.")
+        log('All frames are checked for clashes.')
+
+    def getClashes(self, frm, threshold=2.0):
+        clashes = []
+        nids, cell, grids, indexes, span = self.getNeighborCell(frm,
+                                                                cut=10,
+                                                                resolution=2)
+        span = np.array(span)
+
+        for idx, row in frm.iterrows():
+            neighbors = self.getNeighbors(row.values, nids, cell, grids,
+                                          indexes)
+            for neighbor in neighbors:
+                nxyz = frm.loc[neighbor]
+                deta = row.values - nxyz
+                ndetal = round(deta / span)
+                dist = math.dist((
+                    0,
+                    0,
+                    0,
+                ), deta - ndetal * span)
+                if dist <= threshold:
+                    clashes.append((idx, neighbor))
+        return clashes
+
+    def getNeighbors(self, xyz, nids, cell, grids, indexes):
+
+        id = (xyz / grids).round().astype(int)
+        ids = [(id + nid) % indexes for nid in nids]
+        return [y for x in ids for y in cell[tuple(x)]]
+
+    def getNeighborCell(self, frm, cut=10, resolution=2):
+        box = frm.attrs['box']
+        span = [box[i * 2 + 1] - box[i * 2] for i in range(3)]
+        indexes = [math.ceil(x / resolution) for x in span]
+        grids = [x / i for x, i in zip(span, indexes)]
+
+        cut_mids = [math.ceil(cut / x) for x in grids]
+        grids = np.array(grids)
+        neigh_ids = [
+            ijk for ijk in itertools.product(
+                *[range(cut_mids[x]) for x in range(3)])
+            if math.dist((0, 0, 0), grids * ijk) <= cut
+        ]
+        neigh_ids.remove((
+            0,
+            0,
+            0,
+        ))
+        all_neigh_ids = set([
+            tuple(np.array(ijk) * signs)
+            for signs in itertools.product((-1, 1), (-1, 1), (-1, 1))
+            for ijk in neigh_ids
+        ])
+
+        ids = ((frm) / grids).round().astype(int)
+        atom_cell = collections.defaultdict(list)
+        for idx, row in ids.iterrows():
+            atom_cell[(
+                row.xu,
+                row.yu,
+                row.zu,
+            )].append(idx)
+        return all_neigh_ids, atom_cell, grids, indexes, span
+
+    def getFrames(self):
         with open(self.options.custom_dump, 'r') as self.dmp_fh:
             while True:
                 lines = [self.dmp_fh.readline() for _ in range(9)]
@@ -101,14 +182,14 @@ class CustomDump(object):
                                   index_col=0,
                                   names=names,
                                   engine='python')
-                if frm.shape[0] != atom_num:
+                if frm.shape[0] != atom_num or frm.isnull().values.any():
                     break
                 frm.attrs['box'] = box
                 yield frm
 
     def write(self):
         with open(self.outfile, 'w') as self.out_fh:
-            for frm in self.read():
+            for frm in self.getFrames():
                 self.out_fh.write(f'{frm.shape[0]}\n')
                 frm.to_csv(self.out_fh,
                            mode='a',
