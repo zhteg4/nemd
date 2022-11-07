@@ -321,6 +321,7 @@ class LammpsWriter(fileutils.LammpsInput):
     YLO_YHI = 'ylo yhi'
     ZLO_ZHI = 'zlo zhi'
     LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
+    BUFFER = [5., 5., 5.,]
 
     MASSES = 'Masses'
     PAIR_COEFFS = 'Pair Coeffs'
@@ -524,7 +525,7 @@ class LammpsWriter(fileutils.LammpsInput):
         if min_box is None:
             min_box = (40., 40., 40.,) # yapf: disable
         if buffer is None:
-            buffer = (2., 2., 2.,) # yapf: disable
+            buffer = self.BUFFER # yapf: disable
         xyzs = np.concatenate(
             [x.GetConformer(0).GetPositions() for x in self.mols.values()])
         box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer

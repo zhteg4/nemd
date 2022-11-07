@@ -98,7 +98,7 @@ class Polymer(object):
         self.polym = None
         self.polym_Hs = None
         self.mols = {}
-        self.buffer = [2., 2., 2.]
+        self.buffer = oplsua.LammpsWriter.BUFFER
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
 
