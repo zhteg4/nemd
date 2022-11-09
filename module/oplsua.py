@@ -1,4 +1,6 @@
+import collections
 import os
+import re
 import sys
 import types
 import symbols
@@ -676,10 +678,11 @@ class LammpsWriter(fileutils.LammpsInput):
                     ncharge = 0
                 charge = self.ff.charges[type_id] + ncharge
                 dsrptn = self.ff.atoms[type_id].description
+                symbol = self.ff.atoms[type_id].symbol
                 type_id = self.used_atom_types.index(
                     type_id) if self.concise else type_id
                 self.data_fh.write(
-                    f"{atom_id} {mol_id} {type_id} {charge:.4f} {xyz} # {dsrptn}\n"
+                    f"{atom_id} {mol_id} {type_id} {charge:.4f} {xyz} # {dsrptn} {symbol}\n"
                 )
         self.data_fh.write(f"\n")
 
@@ -1076,11 +1079,15 @@ class DataFileReader(LammpsWriter):
         self.data_file = data_file
         self.lines = None
         self.atoms = {}
+        self.bonds = {}
+        self.mols = {}
 
     def run(self):
         self.read()
         self.setDescription()
         self.setAtoms()
+        self.setBonds()
+        self.setMols()
 
     def read(self):
         with open(self.data_file, 'r') as df_fh:
@@ -1115,14 +1122,30 @@ class DataFileReader(LammpsWriter):
         for id, lid in enumerate(
                 range(sidx, sidx + self.struct_dsp[self.ATOMS]), 1):
             id, mol_id, type_id, charge, x, y, z = self.lines[lid].split()[:7]
-            ele = self.lines[lid].split('#')[-1].strip().split('H')[0]
+            ele = self.lines[lid].split('#')[-1].split()[-1]
             self.atoms[int(id)] = types.SimpleNamespace(
                 id=int(id),
-                mol_id=int(id),
+                mol_id=int(mol_id),
                 type_id=int(id),
                 charge=float(charge),
                 xyz=[float(x), float(y), float(z)],
                 ele=ele)
+
+    def setMols(self):
+        mols = collections.defaultdict(list)
+        for atom in self.atoms.values():
+            mols[atom.mol_id].append(atom.id)
+        self.mols = dict(mols)
+
+    def setBonds(self):
+        sidx = self.mk_idxes[self.BONDS_CAP] + 2
+        for id, lid in enumerate(
+                range(sidx, sidx + self.struct_dsp[self.BONDS]), 1):
+            id, type_id, id1, id2 = self.lines[lid].split()[:4]
+            self.bonds[int(id)] = types.SimpleNamespace(id=int(id),
+                                                        type_id=int(type_id),
+                                                        id1=int(id1),
+                                                        id2=int(id2))
 
 
 def main(argv):

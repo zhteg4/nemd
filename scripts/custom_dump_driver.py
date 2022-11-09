@@ -187,16 +187,23 @@ class CustomDump(object):
                 frm.attrs['box'] = box
                 yield frm
 
-    def write(self, wrapped=True):
+    def write(self, wrapped=True, bond_across_pbc=False):
         with open(self.outfile, 'w') as self.out_fh:
             for frm in self.getFrames():
+                if wrapped:
+                    box = frm.attrs['box']
+                    span = np.array(
+                        [box[i * 2 + 1] - box[i * 2] for i in range(3)])
+                    if bond_across_pbc:
+                        frm = frm % span
+                    else:
+                        for mol in self.data_reader.mols.values():
+                            center = frm.loc[mol].mean()
+                            delta = (center % span) - center
+                            frm.loc[mol] += delta
                 self.out_fh.write(f'{frm.shape[0]}\n')
                 index = [self.data_reader.atoms[x].ele for x in frm.index]
                 frm.index = index
-                box = frm.attrs['box']
-                span = np.array(
-                    [box[i * 2 + 1] - box[i * 2] for i in range(3)])
-                frm = frm % span
                 frm.to_csv(self.out_fh,
                            mode='a',
                            index=True,
