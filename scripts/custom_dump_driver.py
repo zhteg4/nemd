@@ -271,11 +271,12 @@ class CustomDump(object):
         centers = pd.concat(
             [frm.loc[x].mean() for x in self.data_reader.mols.values()],
             axis=1).transpose()
-        hspan = span / 2
-        cos_theta = centers / hspan - 1
-        sin_theta = np.sin(np.arccos(cos_theta))
+
+        theta = centers / span * 2 * np.pi
+        cos_theta = np.cos(theta)
+        sin_theta = np.sin(theta)
         theta = np.arctan2(sin_theta.mean(), cos_theta.mean())
-        mcenters = (np.cos(theta) + 1) * hspan
+        mcenters = theta * span / 2 / np.pi
         cshifts = ((mcenters - centers) / span).round()
         for id, mol in self.data_reader.mols.items():
             cshift = cshifts.loc[id - 1]
