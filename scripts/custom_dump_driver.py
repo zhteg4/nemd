@@ -183,7 +183,7 @@ class CustomDump(object):
         self.data_reader.run()
         self.data_reader.setClashExclusion()
 
-    def checkClashes(self, threshold=1.):
+    def checkClashes(self, threshold=1.5):
 
         if CLASH not in self.options.task:
             return
@@ -227,7 +227,10 @@ class CustomDump(object):
                 frm.attrs['box'] = box
                 yield frm
 
-    def writeXYZ(self, wrapped=True, bond_across_pbc=False):
+    def writeXYZ(self, wrapped=True, bond_across_pbc=False, glue=True):
+        if glue and not (wrapped and bond_across_pbc is False):
+            raise ValueError(f'Glue moves molecules together like droplets.')
+
         if XYZ not in self.options.task:
             return
 
@@ -235,7 +238,8 @@ class CustomDump(object):
             for frm in self.getFrames():
                 self.wrapCoords(frm,
                                 wrapped=wrapped,
-                                bond_across_pbc=bond_across_pbc)
+                                bond_across_pbc=bond_across_pbc,
+                                glue=glue)
                 self.out_fh.write(f'{frm.shape[0]}\n')
                 index = [self.data_reader.atoms[x].ele for x in frm.index]
                 frm.index = index
@@ -246,7 +250,7 @@ class CustomDump(object):
                            header=True)
         log(f"Coordinates are written into {self.outfile}")
 
-    def wrapCoords(self, frm, wrapped=True, bond_across_pbc=False):
+    def wrapCoords(self, frm, wrapped=True, bond_across_pbc=False, glue=True):
         if not wrapped:
             return
 
@@ -254,11 +258,28 @@ class CustomDump(object):
         span = np.array([box[i * 2 + 1] - box[i * 2] for i in range(3)])
         if bond_across_pbc:
             frm = frm % span
-        else:
-            for mol in self.data_reader.mols.values():
-                center = frm.loc[mol].mean()
-                delta = (center % span) - center
-                frm.loc[mol] += delta
+            return
+
+        for mol in self.data_reader.mols.values():
+            center = frm.loc[mol].mean()
+            delta = (center % span) - center
+            frm.loc[mol] += delta
+
+        if not glue:
+            return
+
+        centers = pd.concat(
+            [frm.loc[x].mean() for x in self.data_reader.mols.values()],
+            axis=1).transpose()
+        hspan = span / 2
+        cos_theta = centers / hspan - 1
+        sin_theta = np.sin(np.arccos(cos_theta))
+        theta = np.arctan2(sin_theta.mean(), cos_theta.mean())
+        mcenters = (np.cos(theta) + 1) * hspan
+        cshifts = ((mcenters - centers) / span).round()
+        for id, mol in self.data_reader.mols.items():
+            cshift = cshifts.loc[id - 1]
+            frm.loc[mol] += cshift * span
 
 
 logger = None
