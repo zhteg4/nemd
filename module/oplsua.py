@@ -1083,6 +1083,7 @@ class DataFileReader(LammpsWriter):
         self.angles = {}
         self.dihedrals = {}
         self.mols = {}
+        self.excluded = collections.defaultdict(set)
 
     def run(self):
         self.read()
@@ -1175,6 +1176,15 @@ class DataFileReader(LammpsWriter):
                 id2=int(id2),
                 id3=int(id3),
                 id4=int(id4))
+
+    def setClashExclusion(self, include14=True):
+        pairs = [[x.id1, x.id2] for x in self.bonds.values()]
+        pairs += [[x.id1, x.id3] for x in self.angles.values()]
+        if include14:
+            pairs += [[x.id1, x.id4] for x in self.dihedrals.values()]
+        for id1, id2 in pairs:
+            self.excluded[id1].add(id2)
+            self.excluded[id2].add(id1)
 
 
 def main(argv):
