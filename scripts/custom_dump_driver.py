@@ -69,12 +69,13 @@ def get_parser():
     jobutils.add_job_arguments(parser)
     return parser
 
+
 class DistanceCell:
 
     def __init__(self, frm=None, box=None, cut=6., resolution=2.):
         self.frm = frm
         self.box = box
-        self.cut=cut
+        self.cut = cut
         self.resolution = resolution
         self.neigh_ids = None
         self.atom_cell = None
@@ -92,9 +93,10 @@ class DistanceCell:
 
         self.box = self.frm.attrs['box']
 
-
     def setSpan(self):
-        self.span = np.array([self.box[i * 2 + 1] - self.box[i * 2] for i in range(3)])
+        self.span = np.array(
+            [self.box[i * 2 + 1] - self.box[i * 2] for i in range(3)])
+        self.hspan = self.span / 2
 
     def setgrids(self):
         self.indexes = [math.ceil(x / self.resolution) for x in self.span]
@@ -133,11 +135,12 @@ class DistanceCell:
     def getClashes(self, row, threshold=2.):
         xyz = row.values
         neighbors = self.getNeighbors(xyz)
-        delta = self.frm.loc[neighbors] - xyz
-        ndelta = (delta / self.span).round()
-        dists = np.linalg.norm(delta - ndelta * self.span, axis=1)
-        return [(row.name, x) for x, y in zip(neighbors, dists) if
-                    y <= threshold]
+        dists = np.linalg.norm(
+            (self.frm.loc[neighbors] - xyz + self.hspan) % self.span -
+            self.hspan,
+            axis=1)
+        return [(row.name, x) for x, y in zip(neighbors, dists)
+                if y <= threshold]
 
 
 def validate_options(argv):
@@ -145,7 +148,8 @@ def validate_options(argv):
     options = parser.parse_args(argv)
 
     if CLASH in options.task and not options.data_file:
-        parser.error(f'Please specify {FlAG_DATA_FILE} to run {FlAG_TASK} {CLASH}')
+        parser.error(
+            f'Please specify {FlAG_DATA_FILE} to run {FlAG_TASK} {CLASH}')
     return options
 
 
@@ -192,37 +196,6 @@ class CustomDump(object):
             clashes += dcell.getClashes(row, threshold=threshold)
         return clashes
 
-    def getNeighborCell(self, frm, cut=10, resolution=2):
-        box = frm.attrs['box']
-        span = [box[i * 2 + 1] - box[i * 2] for i in range(3)]
-        indexes = [math.ceil(x / resolution) for x in span]
-        grids = [x / i for x, i in zip(span, indexes)]
-
-        cut_mids = [math.ceil(cut / x) for x in grids]
-        grids = np.array(grids)
-        neigh_ids = [
-            ijk for ijk in itertools.product(
-                *[range(cut_mids[x]) for x in range(3)])
-            if math.dist((0, 0, 0), grids * ijk) <= cut
-        ]
-        neigh_ids.remove((0, 0, 0,)) # yapf: disable
-        all_neigh_ids = set([
-            tuple(np.array(ijk) * signs)
-            for signs in itertools.product((-1, 1), (-1, 1), (-1, 1))
-            for ijk in neigh_ids
-        ])
-        import pdb;
-        pdb.set_trace()
-        ids = ((frm) / grids).round().astype(int)
-        atom_cell = collections.defaultdict(list)
-        for idx, row in ids.iterrows():
-            atom_cell[(
-                row.xu,
-                row.yu,
-                row.zu,
-            )].append(idx)
-        return all_neigh_ids, atom_cell, grids, indexes, span
-
     def getFrames(self):
         with open(self.options.custom_dump, 'r') as self.dmp_fh:
             while True:
@@ -253,7 +226,9 @@ class CustomDump(object):
 
         with open(self.outfile, 'w') as self.out_fh:
             for frm in self.getFrames():
-                self.wrapCoords(frm, wrapped=wrapped, bond_across_pbc=bond_across_pbc)
+                self.wrapCoords(frm,
+                                wrapped=wrapped,
+                                bond_across_pbc=bond_across_pbc)
                 self.out_fh.write(f'{frm.shape[0]}\n')
                 index = [self.data_reader.atoms[x].ele for x in frm.index]
                 frm.index = index

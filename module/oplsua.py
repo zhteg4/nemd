@@ -1080,6 +1080,8 @@ class DataFileReader(LammpsWriter):
         self.lines = None
         self.atoms = {}
         self.bonds = {}
+        self.angles = {}
+        self.dihedrals = {}
         self.mols = {}
 
     def run(self):
@@ -1087,6 +1089,8 @@ class DataFileReader(LammpsWriter):
         self.setDescription()
         self.setAtoms()
         self.setBonds()
+        self.setAngles()
+        self.setDihedrals()
         self.setMols()
 
     def read(self):
@@ -1146,6 +1150,31 @@ class DataFileReader(LammpsWriter):
                                                         type_id=int(type_id),
                                                         id1=int(id1),
                                                         id2=int(id2))
+
+    def setAngles(self):
+        sidx = self.mk_idxes[self.ANGLES_CAP] + 2
+        for id, lid in enumerate(
+                range(sidx, sidx + self.struct_dsp[self.ANGLES]), 1):
+
+            id, type_id, id1, id2, id3 = self.lines[lid].split()[:5]
+            self.angles[int(id)] = types.SimpleNamespace(id=int(id),
+                                                         type_id=int(type_id),
+                                                         id1=int(id1),
+                                                         id2=int(id2),
+                                                         id3=int(id3))
+
+    def setDihedrals(self):
+        sidx = self.mk_idxes[self.DIHEDRALS_CAP] + 2
+        for id, lid in enumerate(
+                range(sidx, sidx + self.struct_dsp[self.DIHEDRALS]), 1):
+            id, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
+            self.dihedrals[int(id)] = types.SimpleNamespace(
+                id=int(id),
+                type_id=int(type_id),
+                id1=int(id1),
+                id2=int(id2),
+                id3=int(id3),
+                id4=int(id4))
 
 
 def main(argv):
