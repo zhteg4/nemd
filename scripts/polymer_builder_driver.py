@@ -153,12 +153,14 @@ class Polymer(object):
         log(f"{Chem.MolToSmiles(self.polym)}")
 
     def assignAtomType(self):
+        marked_atom_ids = []
         res_num = 1
         for sml in self.ff.SMILES:
             if all(x.HasProp(self.TYPE_ID) for x in self.polym.GetAtoms()):
+                log_debug(f"{res_num - 1} residues found.")
                 return
             frag = Chem.MolFromSmiles(sml.sml)
-            matches = self.polym.GetSubstructMatches(frag)
+            matches = self.polym.GetSubstructMatches(frag, maxMatches=1000000)
             for match in matches:
                 frag_cnnt = [
                     x.GetNumImplicitHs() +
@@ -176,9 +178,12 @@ class Polymer(object):
                 succeed = self.markAtoms(match, sml, res_num)
                 if succeed:
                     res_num += 1
+                    marked_atom_ids += succeed
+        log_debug(f"{sorted(marked_atom_ids)}, {self.polym.GetNumAtoms()}")
+        log_debug(f"{res_num - 1} residues found.")
 
     def markAtoms(self, match, sml, res_num):
-        marked = False
+        marked = []
         for atom_id, type_id in zip(match, sml.mp):
             if not type_id or atom_id is None:
                 continue
@@ -187,7 +192,7 @@ class Polymer(object):
                 atom.GetIntProp(self.TYPE_ID)
             except KeyError:
                 self.setAtomIds(atom, type_id, res_num)
-                marked = True
+                marked.append(atom_id)
                 log_debug(
                     f"{atom.GetSymbol()}{atom.GetDegree()} {atom_id} {type_id}"
                 )
@@ -197,7 +202,7 @@ class Polymer(object):
                 if neighbor.GetSymbol() == 'H':
                     type_id = sml.hs[type_id]
                     self.setAtomIds(neighbor, type_id, res_num)
-                    marked = True
+                    marked.append(neighbor.GetIdx())
                     log_debug(
                         f"{neighbor.GetSymbol()}{neighbor.GetDegree()} {neighbor.GetIdx()} {type_id}"
                     )

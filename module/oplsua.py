@@ -83,7 +83,7 @@ class OPLS_Parser:
               # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
               UA(sml='CC(=O)O', mp=(137, 133, 134, 135), hs={135: 136}, dsc='Ethanoic acid')]
     # yapf: enable
-    SMILES = reversed(SMILES)
+    SMILES = list(reversed(SMILES))
     ATOM_TOTAL = {i: i for i in range(1, 214)}
     BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
