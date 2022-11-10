@@ -477,13 +477,13 @@ class LammpsWriter(fileutils.LammpsInput):
             return
 
         self.in_fh.write(f"fix 1 all nvt temp 10 10 {self.timestep * 100}\n")
-        self.in_fh.write("run 100000\n")
+        self.in_fh.write("run 1000\n")
         self.in_fh.write("unfix 1\n")
 
         self.in_fh.write(
             f"fix 1 all npt temp 10 10 {self.timestep * 100} iso 1 1 {self.timestep * 1000}\n"
         )
-        self.in_fh.write("run 1000000\n")
+        self.in_fh.write("run 10000\n")
 
     def writeLammpsData(self):
 

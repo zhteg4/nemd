@@ -230,7 +230,7 @@ class Polymer(object):
                 atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
     def embedMol(self):
-        AllChem.EmbedMolecule(self.polym)
+        AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
 
     def setMols(self):
 
