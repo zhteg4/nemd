@@ -968,7 +968,7 @@ class LammpsWriter(fileutils.LammpsInput):
                 f"{dihedral_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
 
-    def setImpropers(self, symbols='CN'):
+    def setImpropers(self, symbols='CN', print_impropers=False):
         improper_id = 0
         for mol in self.mols.values():
             for atom in mol.GetAtoms():
@@ -987,13 +987,16 @@ class LammpsWriter(fileutils.LammpsInput):
                 neighbor_symbols = [x.GetSymbol() for x in neighbors]
                 counted = self.getCountedSymbols([atom_symbol] +
                                                  neighbor_symbols)
-                for symb, improper_ids in self.symbol_impropers.items():
-                    print(f"{symb} {self.ff.impropers[improper_ids[0]]}")
-                    impropers = [self.ff.impropers[x] for x in improper_ids]
-                    for improper in impropers:
-                        print(
-                            f"{[self.ff.atoms[x].description for x in [improper.id1, improper.id2, improper.id3, improper.id4]]}"
-                        )
+                if print_impropers:
+                    for symb, improper_ids in self.symbol_impropers.items():
+                        print(f"{symb} {self.ff.impropers[improper_ids[0]]}")
+                        impropers = [
+                            self.ff.impropers[x] for x in improper_ids
+                        ]
+                        for improper in impropers:
+                            print(
+                                f"{[self.ff.atoms[x].description for x in [improper.id1, improper.id2, improper.id3, improper.id4]]}"
+                            )
                 improper_type_id = self.symbol_impropers[counted][0]
                 neighbors = sorted(neighbors,
                                    key=lambda x: len(x.GetNeighbors()))

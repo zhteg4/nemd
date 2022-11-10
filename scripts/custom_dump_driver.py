@@ -169,10 +169,12 @@ class CustomDump(object):
         self.jobname = jobname
         self.diffusion = diffusion
         self.outfile = self.jobname + self.XYZ_EXT
+        self.data_reader = None
+        self.radii = None
 
     def run(self):
         self.setStruct()
-        self.checkClashes(radii=self.data_reader.radii)
+        self.checkClashes(radii=self.radii)
         self.writeXYZ()
         log('Finished', timestamp=True)
 
@@ -183,6 +185,7 @@ class CustomDump(object):
         self.data_reader = oplsua.DataFileReader(self.options.data_file)
         self.data_reader.run()
         self.data_reader.setClashParams(include14=False, scale=0.75)
+        self.radii = self.data_reader.radii
 
     def checkClashes(self, radii=None):
 
@@ -242,7 +245,10 @@ class CustomDump(object):
                                 bond_across_pbc=bond_across_pbc,
                                 glue=glue)
                 self.out_fh.write(f'{frm.shape[0]}\n')
-                index = [self.data_reader.atoms[x].ele for x in frm.index]
+                if self.data_reader:
+                    index = [self.data_reader.atoms[x].ele for x in frm.index]
+                else:
+                    index = ['X'] * frm.shape[0]
                 frm.index = index
                 frm.to_csv(self.out_fh,
                            mode='a',
@@ -259,6 +265,9 @@ class CustomDump(object):
         span = np.array([box[i * 2 + 1] - box[i * 2] for i in range(3)])
         if bond_across_pbc:
             frm = frm % span
+            return
+
+        if not self.data_reader:
             return
 
         for mol in self.data_reader.mols.values():
