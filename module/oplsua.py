@@ -354,6 +354,9 @@ class LammpsWriter(fileutils.LammpsInput):
 
     LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
     LJ_CUT = 'lj/cut'
+    GEOMETRIC = 'geometric'
+    ARITHMETIC = 'arithmetic'
+    SIXTHPOWER = 'sixthpower'
 
     def __init__(self,
                  ff,
@@ -383,7 +386,7 @@ class LammpsWriter(fileutils.LammpsInput):
             f"{self.LJ_CUT_COUL_LONG} {self.lj_cut} {self.coul_cut}",
             self.LJ_CUT: f"{self.LJ_CUT} {self.lj_cut}"
         }
-        self.pair_modify = {'mix': 'geometric'}
+        self.pair_modify = {'mix': self.GEOMETRIC}
         self.special_bonds = {
             'lj/coul': (
                 0.0,
@@ -1078,6 +1081,8 @@ class DataFileReader(LammpsWriter):
     def __init__(self, data_file):
         self.data_file = data_file
         self.lines = None
+        self.vdws = {}
+        self.radii = {}
         self.atoms = {}
         self.bonds = {}
         self.angles = {}
@@ -1131,7 +1136,7 @@ class DataFileReader(LammpsWriter):
             self.atoms[int(id)] = types.SimpleNamespace(
                 id=int(id),
                 mol_id=int(mol_id),
-                type_id=int(id),
+                type_id=int(type_id),
                 charge=float(charge),
                 xyz=[float(x), float(y), float(z)],
                 ele=ele)
@@ -1177,6 +1182,11 @@ class DataFileReader(LammpsWriter):
                 id3=int(id3),
                 id4=int(id4))
 
+    def setClashParams(self, include14=True, scale=1.):
+        self.setClashExclusion(include14=include14)
+        self.setPairCoeffs()
+        self.setVdwRadius(scale=scale)
+
     def setClashExclusion(self, include14=True):
         pairs = [[x.id1, x.id2] for x in self.bonds.values()]
         pairs += [[x.id1, x.id3] for x in self.angles.values()]
@@ -1185,6 +1195,34 @@ class DataFileReader(LammpsWriter):
         for id1, id2 in pairs:
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
+
+    def setPairCoeffs(self):
+        sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
+        for lid in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
+            id, ene, dist = self.lines[lid].split()
+            self.vdws[int(id)] = types.SimpleNamespace(id=int(id),
+                                                       dist=float(dist),
+                                                       ene=float(ene))
+
+    def setVdwRadius(self, mix=LammpsWriter.GEOMETRIC, scale=1.):
+        radii = collections.defaultdict(dict)
+        for id1, vdw1 in self.vdws.items():
+            for id2, vdw2 in self.vdws.items():
+                if mix == LammpsWriter.GEOMETRIC:
+                    dist = pow(vdw1.dist * vdw2.dist, 0.5)
+                elif mix == LammpsWriter.ARITHMETIC:
+                    dist = (vdw1.dist + vdw2.dist) / 2
+                elif mix == LammpsWriter.SIXTHPOWER:
+                    dist = pow((pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2,
+                               1 / 6)
+                radii[id1][id2] = dist * pow(2, 1 / 6) * scale
+
+        self.radii = collections.defaultdict(dict)
+        for atom1 in self.atoms.values():
+            for atom2 in self.atoms.values():
+                self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
+                    atom2.type_id]
+        self.radii = dict(self.radii)
 
 
 def main(argv):

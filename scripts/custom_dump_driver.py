@@ -132,7 +132,7 @@ class DistanceCell:
         ids = [tuple((id + x) % self.indexes) for x in self.neigh_ids]
         return [y for x in ids for y in self.atom_cell[x]]
 
-    def getClashes(self, row, threshold=2., excluded=None):
+    def getClashes(self, row, excluded=None, radii=None, threshold=1.):
         xyz = row.values
         neighbors = self.getNeighbors(xyz)
         if excluded:
@@ -141,11 +141,12 @@ class DistanceCell:
             (self.frm.loc[neighbors] - xyz + self.hspan) % self.span -
             self.hspan,
             axis=1)
-        clashes = [(row.name, x) for x, y in zip(neighbors, dists)
-                   if y <= threshold]
-        if clashes:
-            import pdb
-            pdb.set_trace()
+        if radii:
+            thresholds = [radii[row.name][x] for x in neighbors]
+        else:
+            thresholds = [threshold] * len(neighbors)
+        clashes = [(row.name, x)
+                   for x, y, z in zip(neighbors, dists, thresholds) if y < z]
         return clashes
 
 
@@ -171,7 +172,7 @@ class CustomDump(object):
 
     def run(self):
         self.setStruct()
-        self.checkClashes()
+        self.checkClashes(radii=self.data_reader.radii)
         self.writeXYZ()
         log('Finished', timestamp=True)
 
@@ -181,25 +182,25 @@ class CustomDump(object):
 
         self.data_reader = oplsua.DataFileReader(self.options.data_file)
         self.data_reader.run()
-        self.data_reader.setClashExclusion()
+        self.data_reader.setClashParams(include14=False, scale=0.75)
 
-    def checkClashes(self, threshold=1.5):
+    def checkClashes(self, radii=None):
 
         if CLASH not in self.options.task:
             return
 
         for idx, frm in enumerate(self.getFrames()):
-            clashes = self.getClashes(frm, threshold=threshold)
+            clashes = self.getClashes(frm, radii=radii)
             log(f"Frame {idx} has {len(clashes)} clashes.")
         log('All frames are checked for clashes.')
 
-    def getClashes(self, frm, threshold=2.0):
+    def getClashes(self, frm, radii=None):
         clashes = []
         dcell = DistanceCell(frm=frm, cut=10, resolution=2.)
         dcell.setUp()
         for _, row in frm.iterrows():
             clashes += dcell.getClashes(row,
-                                        threshold=threshold,
+                                        radii=radii,
                                         excluded=self.data_reader.excluded)
         return clashes
 
@@ -271,7 +272,7 @@ class CustomDump(object):
         centers = pd.concat(
             [frm.loc[x].mean() for x in self.data_reader.mols.values()],
             axis=1).transpose()
-
+        centers.index = self.data_reader.mols.keys()
         theta = centers / span * 2 * np.pi
         cos_theta = np.cos(theta)
         sin_theta = np.sin(theta)
@@ -279,7 +280,7 @@ class CustomDump(object):
         mcenters = theta * span / 2 / np.pi
         cshifts = ((mcenters - centers) / span).round()
         for id, mol in self.data_reader.mols.items():
-            cshift = cshifts.loc[id - 1]
+            cshift = cshifts.loc[id]
             frm.loc[mol] += cshift * span
 
 
