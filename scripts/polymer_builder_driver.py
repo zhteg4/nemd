@@ -272,6 +272,31 @@ class Polymer(object):
         for dihe in zip(bk_dihes[:-3], bk_dihes[1:-2], bk_dihes[2:-1],
                         bk_dihes[3:]):
             Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, 180)
+
+        bonded_atom_ids = [(
+            x.GetBeginAtomIdx(),
+            x.GetEndAtomIdx(),
+        ) for x in mol.GetBonds()]
+        bk_aids_set = set(bk_dihes)
+        side_atom_ids = [
+            x for x in bonded_atom_ids if len(bk_aids_set.intersection(x)) == 1
+        ]
+        side_dihes = []
+        for batom_id, eatom_id in side_atom_ids:
+            id1 = [
+                x.GetIdx()
+                for x in mol.GetAtomWithIdx(batom_id).GetNeighbors()
+                if x.GetIdx() != eatom_id
+            ][0]
+            id4 = [
+                x.GetIdx()
+                for x in mol.GetAtomWithIdx(eatom_id).GetNeighbors()
+                if x.GetIdx() != batom_id
+            ][0]
+            side_dihes.append([id1, batom_id, eatom_id, id4])
+        for dihe_atom_ids in side_dihes:
+            Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe_atom_ids, 90)
+
         cap_ht = [(
             x.GetIdx(),
             [y.GetIdx() for y in x.GetNeighbors()][0],
