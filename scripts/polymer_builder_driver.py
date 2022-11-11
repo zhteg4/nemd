@@ -2,6 +2,7 @@ import math
 import copy
 import sys
 import argparse
+import random
 import networkx as nx
 import logutils
 import functools
@@ -61,16 +62,17 @@ def get_parser():
                         metavar=FlAG_CRU.upper(),
                         type=functools.partial(parserutils.type_monomer_smiles,
                                                allow_mol=True),
+                        nargs='+',
                         help='')
     parser.add_argument(FlAG_CRU_NUM,
                         metavar=FlAG_CRU_NUM[1:].upper(),
                         type=parserutils.type_positive_int,
-                        default=1,
+                        nargs='+',
                         help='')
     parser.add_argument(FlAG_MOL_NUM,
                         metavar=FlAG_MOL_NUM[1:].upper(),
                         type=parserutils.type_positive_int,
-                        default=1,
+                        nargs='+',
                         help='')
 
     jobutils.add_job_arguments(parser)
@@ -83,6 +85,92 @@ def validate_options(argv):
     return options
 
 
+class AmorphousCell(object):
+
+    def __init__(self, options, jobname, ff=None):
+        self.options = options
+        self.jobname = jobname
+        self.outfile = self.jobname + MOLT_OUT_EXT
+        self.polymers = []
+        self.molecules = {}
+        self.mols = {}
+        self.ff = ff
+        if self.ff is None:
+            self.ff = oplsua.get_opls_parser()
+
+    def run(self):
+        self.setPolymers()
+        self.setMolecules()
+        self.write()
+
+    def setPolymers(self):
+        for cru, cru_num, in zip(self.options.cru, self.options.cru_num):
+            polym = Polymer(cru, cru_num)
+            polym.run()
+            self.polymers.append(polym)
+
+    def setMolecules(self):
+        boxes = []
+        for polymer in self.polymers:
+            polym = polymer.polym
+            conformer = polym.GetConformer(0)
+            xyzs = np.array([
+                conformer.GetAtomPosition(x.GetIdx())
+                for x in polym.GetAtoms()
+            ])
+            box = xyzs.max(axis=0) - xyzs.min(axis=0) + polymer.buffer
+            boxes.append(box)
+
+        boxes = np.array(boxes).reshape(-1, 3)
+        mbox = boxes.max(axis=0)
+        for polymer, box, mol_num in zip(self.polymers, boxes,
+                                         self.options.mol_num):
+            polymer.mol_nums_per_mbox = np.floor(mbox / box).astype(int)
+            polymer.mol_num_per_mbox = np.product(polymer.mol_nums_per_mbox)
+            polymer.mol_num = mol_num
+            polymer.num_mbox = math.ceil(polymer.mol_num /
+                                         polymer.mol_num_per_mbox)
+            percent = [
+                np.linspace(-0.5, 0.5, x, endpoint=False)
+                for x in polymer.mol_nums_per_mbox
+            ]
+            percent = [x - x.mean() for x in percent]
+            polymer.vecs = [
+                x * mbox
+                for x in itertools.product(*[[y for y in x] for x in percent])
+            ]
+
+        polymers = [x for x in self.polymers]
+        idxs = range(
+            math.ceil(math.pow(sum(x.num_mbox for x in polymers), 1. / 3)))
+        vectors = [x * mbox for x in itertools.product(idxs, idxs, idxs)]
+        mol_id = 0
+        while polymers:
+            random.shuffle(vectors)
+            vector = vectors.pop()
+            polymer = random.choice(polymers)
+            for idx, new_added in enumerate(
+                    range(min([polymer.mol_num, polymer.mol_num_per_mbox]))):
+                mol_id += 1
+                polymer.mol_num -= 1
+                mol = copy.copy(polymer.polym)
+                self.mols[mol_id] = mol
+                mol.SetIntProp('mol_num', mol_id)
+                conformer = mol.GetConformer(0)
+                for atom in mol.GetAtoms():
+                    atom_id = atom.GetIdx()
+                    xyz = list(conformer.GetAtomPosition(atom_id))
+                    xyz += (vector + polymer.vecs[idx])
+                    conformer.SetAtomPosition(atom_id, xyz)
+            if polymer.mol_num == 0:
+                polymers.remove(polymer)
+
+    def write(self):
+        lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
+        lmw.writeLammpsData()
+        lmw.writeLammpsIn()
+
+
 class Polymer(object):
     ATOM_ID = oplsua.LammpsWriter.ATOM_ID
     TYPE_ID = oplsua.LammpsWriter.TYPE_ID
@@ -92,31 +180,33 @@ class Polymer(object):
     MOL_NUM = 'mol_num'
     IMPLICIT_H = oplsua.LammpsWriter.IMPLICIT_H
 
-    def __init__(self, options, jobname, ff=None):
-        self.options = options
-        self.jobname = jobname
+    def __init__(self, cru, cru_num, ff=None):
+        self.cru = cru
+        self.cru_num = cru_num
         self.ff = ff
-        self.outfile = self.jobname + MOLT_OUT_EXT
         self.polym = None
         self.polym_Hs = None
         self.mols = {}
         self.buffer = oplsua.LammpsWriter.BUFFER
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
+        self.cru_mol = None
+        self.molecules = []
 
     def run(self):
         self.setCruMol()
+        self.markHT()
         self.polymerize()
         self.assignAtomType()
         self.balanceCharge()
         self.embedMol()
-        self.setMols()
-        self.write()
-        log('Finished', timestamp=True)
+        # self.setMols()
+        # self.write()
+        # log('Finished', timestamp=True)
 
     def setCruMol(self):
 
-        cru_mol = Chem.MolFromSmiles(self.options.cru)
+        cru_mol = Chem.MolFromSmiles(self.cru)
         for atom in cru_mol.GetAtoms():
             if atom.GetSymbol() != 'C' or atom.GetIsAromatic():
                 continue
@@ -124,22 +214,26 @@ class Polymer(object):
             atom.SetNoImplicit(True)
         self.cru_mol = Chem.AddHs(cru_mol)
 
+    def markHT(self):
+        is_mono = False
         for atom in self.cru_mol.GetAtoms():
             atom.SetIntProp('mono_atom_idx', atom.GetIdx())
             if atom.GetSymbol() != symbols.WILD_CARD:
                 continue
+            is_mono = True
             atom.SetBoolProp('CAP', True)
             for neighbor in atom.GetNeighbors():
                 neighbor.SetBoolProp('HT', True)
+        self.cru_mol.SetBoolProp('is_mono', is_mono)
 
     def polymerize(self):
 
-        if not symbols.WILD_CARD in self.options.cru:
+        if not self.cru_mol.GetBoolProp('is_mono'):
             # FIXME: We should should polymers and blends with regular molecules
             self.polym = self.cru_mol
             return
 
-        mols = [copy.copy(self.cru_mol) for x in range(self.options.cru_num)]
+        mols = [copy.copy(self.cru_mol) for x in range(self.cru_num)]
         for mono_id, mol in enumerate(mols):
             for atom in mol.GetAtoms():
                 atom.SetIntProp('mono_id', mono_id)
@@ -384,8 +478,8 @@ def main(argv):
     logger = logutils.createDriverLogger(jobname=jobname)
     options = validate_options(argv)
     logutils.logOptions(logger, options)
-    polm = Polymer(options, jobname)
-    polm.run()
+    cell = AmorphousCell(options, jobname)
+    cell.run()
 
 
 if __name__ == "__main__":
