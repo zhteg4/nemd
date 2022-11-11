@@ -2,6 +2,7 @@ import math
 import copy
 import sys
 import argparse
+import networkx as nx
 import logutils
 import functools
 import os
@@ -22,6 +23,7 @@ import numpy as np
 import oplsua
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from rdkit import Geometry
 
 FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
@@ -122,6 +124,14 @@ class Polymer(object):
             atom.SetNoImplicit(True)
         self.cru_mol = Chem.AddHs(cru_mol)
 
+        for atom in self.cru_mol.GetAtoms():
+            atom.SetIntProp('mono_atom_idx', atom.GetIdx())
+            if atom.GetSymbol() != symbols.WILD_CARD:
+                continue
+            atom.SetBoolProp('CAP', True)
+            for neighbor in atom.GetNeighbors():
+                neighbor.SetBoolProp('HT', True)
+
     def polymerize(self):
 
         if not symbols.WILD_CARD in self.options.cru:
@@ -130,7 +140,9 @@ class Polymer(object):
             return
 
         mols = [copy.copy(self.cru_mol) for x in range(self.options.cru_num)]
-
+        for mono_id, mol in enumerate(mols):
+            for atom in mol.GetAtoms():
+                atom.SetIntProp('mono_id', mono_id)
         combo = mols[0]
         for mol in mols[1:]:
             combo = Chem.CombineMols(combo, mol)
@@ -234,8 +246,78 @@ class Polymer(object):
                 ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
                 atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
-    def embedMol(self):
-        AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
+    def embedMol(self, trans=True):
+
+        if self.polym.GetNumAtoms() <= 200 and not trans:
+            AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
+            return
+
+        cru_mol = self.getCruMol()
+        xyzs, vector = self.getXYZAndVect(cru_mol)
+        conformer = self.getConformer(xyzs, vector)
+        self.polym.AddConformer(conformer)
+
+    def getCruMol(self):
+        cru_mol = copy.copy(self.cru_mol)
+        for atom in cru_mol.GetAtoms():
+            if atom.GetSymbol() != symbols.WILD_CARD:
+                continue
+            atom.SetAtomicNum(6)
+        return cru_mol
+
+    def getXYZAndVect(self, mol):
+        bk_dihes = self.getBackbone(mol)
+        AllChem.EmbedMolecule(mol)
+        conformer = mol.GetConformer(0)
+        for dihe in zip(bk_dihes[:-3], bk_dihes[1:-2], bk_dihes[2:-1],
+                        bk_dihes[3:]):
+            Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, 180)
+        cap_ht = [(
+            x.GetIdx(),
+            [y.GetIdx() for y in x.GetNeighbors()][0],
+        ) for x in mol.GetAtoms() if x.HasProp('CAP')]
+        middle_points = np.array([
+            (conformer.GetAtomPosition(x) + conformer.GetAtomPosition(y)) / 2
+            for x, y in cap_ht
+        ])
+        vector = middle_points[1, :] - middle_points[0, :]
+        xyzs = {
+            x.GetIntProp('mono_atom_idx'):
+            np.array(conformer.GetAtomPosition(x.GetIdx()))
+            for x in mol.GetAtoms() if x.HasProp('mono_atom_idx')
+        }
+        return xyzs, vector
+
+    def getBackbone(self, cru_mol):
+        cap_idxs = [x.GetIdx() for x in cru_mol.GetAtoms() if x.HasProp('CAP')]
+        graph = nx.Graph()
+        edges = [(
+            x.GetBeginAtom().GetIdx(),
+            x.GetEndAtom().GetIdx(),
+        ) for x in cru_mol.GetBonds()]
+        graph.add_edges_from(edges)
+        bk_dihes = nx.shortest_path(graph, *cap_idxs)
+        return bk_dihes
+
+    def getConformer(self, xyzs, vector):
+        mid_aid = collections.defaultdict(list)
+        for atom in self.polym.GetAtoms():
+            mid_aid[atom.GetIntProp('mono_id')].append(atom.GetIdx())
+
+        id_coords = {}
+        for mono_id, atom_id in mid_aid.items():
+            aid_oid = {
+                x: self.polym.GetAtomWithIdx(x).GetIntProp('mono_atom_idx')
+                for x in atom_id
+            }
+            vect = mono_id * vector
+            aid_xyz = {x: xyzs[y] + vect for x, y in aid_oid.items()}
+            id_coords.update(aid_xyz)
+
+        conformer = Chem.rdchem.Conformer(self.polym.GetNumAtoms())
+        for id, xyz in id_coords.items():
+            conformer.SetAtomPosition(id, xyz)
+        return conformer
 
     def setMols(self):
 
