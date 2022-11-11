@@ -246,7 +246,7 @@ class Polymer(object):
                 ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
                 atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
-    def embedMol(self, trans=True):
+    def embedMol(self, trans=False):
 
         if self.polym.GetNumAtoms() <= 200 and not trans:
             AllChem.EmbedMolecule(self.polym, useRandomCoords=True)

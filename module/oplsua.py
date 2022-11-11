@@ -78,6 +78,7 @@ class OPLS_Parser:
               UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
               UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
               UA(sml='CC=CC', mp=(84, 89, 89, 84, ), hs=None, dsc='2-Butene'),
+              UA(sml='CN(C)C=O', mp=(156, 148, 156, 153, 151,), hs=None, dsc='N,N-Dimethylformamide'),
               # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
               UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid'),
               # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
@@ -87,11 +88,11 @@ class OPLS_Parser:
     ATOM_TOTAL = {i: i for i in range(1, 214)}
     BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
-    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24})
+    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3})
     ANGLE_ATOM = ATOM_TOTAL.copy()
-    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24})
+    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72})
     DIHE_ATOM = ATOM_TOTAL.copy()
-    DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24})
+    DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72})
     # To get HO-C=O, COH~OH is used, which causes CH2-COOH bond issue
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17]}
     # yapf: disable
@@ -1013,11 +1014,11 @@ class LammpsWriter(fileutils.LammpsInput):
     def AnglesByImpropers(self):
 
         for idx, (itype, id1, id2, id3, id4) in self.impropers.items():
-            id234 = set([id2, id3, id4])
+            id124 = set([id1, id2, id4])
             aidxs = [
                 aidx
                 for aidx, (atype, aid1, aid2, aid3) in self.angles.items()
-                if len(id234.intersection([aid1, aid3])) and id1 == aid2
+                if len(id124.intersection([aid1, aid3])) and id3 == aid2
             ]
             if len(aidxs) != 3:
                 continue
