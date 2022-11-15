@@ -212,6 +212,11 @@ class Polymer(object):
                 continue
             atom.SetIntProp(self.IMPLICIT_H, atom.GetNumImplicitHs())
             atom.SetNoImplicit(True)
+
+        chiralty_info = Chem.FindMolChiralCenters(cru_mol, includeUnassigned=True)
+        for chiralty in chiralty_info:
+            cru_mol.GetAtomWithIdx(chiralty[0]).SetProp('_CIPCode', 'R')
+
         self.cru_mol = Chem.AddHs(cru_mol)
 
     def markHT(self):
@@ -340,7 +345,7 @@ class Polymer(object):
                 ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
                 atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
-    def embedMol(self, trans=False):
+    def embedMol(self, trans=True):
 
         if self.polym.GetNumAtoms() <= 200 and not trans:
             AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
@@ -350,13 +355,15 @@ class Polymer(object):
         xyzs, vector = self.getXYZAndVect(cru_mol)
         conformer = self.getConformer(xyzs, vector)
         self.polym.AddConformer(conformer)
+        # Chem.SanitizeMol(self.polym)
+        # Chem.rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(self.polym)
 
     def getCruMol(self):
         cru_mol = copy.copy(self.cru_mol)
         for atom in cru_mol.GetAtoms():
             if atom.GetSymbol() != symbols.WILD_CARD:
                 continue
-            atom.SetAtomicNum(6)
+            atom.SetAtomicNum(9)
         return cru_mol
 
     def getXYZAndVect(self, mol):
