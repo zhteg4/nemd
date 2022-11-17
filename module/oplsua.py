@@ -486,6 +486,11 @@ class LammpsWriter(fileutils.LammpsInput):
         )
         self.in_fh.write("run 10000\n")
 
+    def adjustConformer(self):
+        self.setAtoms()
+        self.setBonds()
+        self.adjustBondLength()
+
     def writeLammpsData(self):
 
         with open(self.lammps_data, 'w') as self.data_fh:
@@ -666,6 +671,20 @@ class LammpsWriter(fileutils.LammpsInput):
             for atom in mol.GetAtoms():
                 atom_id += 1
                 atom.SetIntProp(self.ATOM_ID, atom_id)
+
+    def adjustBondLength(self):
+        for mol_id, mol in self.mols.items():
+            conformer = mol.GetConformer()
+            for bond in mol.GetBonds():
+                bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
+                ids = set([x.GetIntProp(self.ATOM_ID) for x in bonded_atoms])
+                mbond_type = [
+                    x for x, y, z in self.bonds.values()
+                    if len(ids.intersection([y, z])) == 2
+                ][0]
+                dist = self.ff.bonds[mbond_type].dist
+                Chem.rdMolTransforms.SetBondLength(
+                    conformer, *[x.GetIdx() for x in bonded_atoms], dist)
 
     def writeAtoms(self):
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")

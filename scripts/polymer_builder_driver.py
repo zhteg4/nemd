@@ -236,7 +236,6 @@ class Polymer(object):
     def polymerize(self):
 
         if not self.cru_mol.GetBoolProp('is_mono'):
-            # FIXME: We should should polymers and blends with regular molecules
             self.polym = self.cru_mol
             return
 
@@ -388,9 +387,12 @@ class Polymer(object):
 
 class TransConformer(object):
 
-    def __init__(self, polym, original_cru_mol):
+    def __init__(self, polym, original_cru_mol, ff=None):
         self.polym = polym
         self.original_cru_mol = original_cru_mol
+        self.ff = ff
+        if self.ff is None:
+            self.ff = oplsua.get_opls_parser()
 
     def run(self):
         self.setCruMol()
@@ -400,6 +402,7 @@ class TransConformer(object):
         self.rotateSideGroups()
         self.setXYZAndVect()
         self.setConformer()
+        self.adjustConformer()
 
     def setCruMol(self):
         cru_mol = copy.copy(self.original_cru_mol)
@@ -527,6 +530,11 @@ class TransConformer(object):
         for id, xyz in id_coords.items():
             conformer.SetAtomPosition(id, xyz)
         self.polym.AddConformer(conformer)
+        Chem.GetSymmSSSR(self.polym)
+
+    def adjustConformer(self):
+        lmw = oplsua.LammpsWriter(self.ff, 'myjobname', mols={1: self.polym})
+        lmw.adjustConformer()
 
 
 logger = None
