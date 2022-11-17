@@ -406,10 +406,10 @@ class TransConformer(object):
 
     def setCruMol(self):
         cru_mol = copy.copy(self.original_cru_mol)
-        for atom in cru_mol.GetAtoms():
-            if atom.GetSymbol() != symbols.WILD_CARD:
-                continue
-            atom.SetAtomicNum(9)
+        atoms = [x for x in cru_mol.GetAtoms() if x.GetSymbol() == symbols.WILD_CARD]
+        neighbors = [x.GetNeighbors()[0] for x in atoms[::-1]]
+        for atom, catom in zip(atoms, neighbors):
+            atom.SetAtomicNum(catom.GetAtomicNum())
         self.cru_mol = cru_mol
 
     def cruConformer(self):
