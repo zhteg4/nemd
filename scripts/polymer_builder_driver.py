@@ -24,6 +24,7 @@ import numpy as np
 import oplsua
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from scipy.spatial.transform import Rotation
 from rdkit import Geometry
 
 FlAG_CRU = 'cru'
@@ -352,11 +353,9 @@ class Polymer(object):
             return
 
         cru_mol = self.getCruMol()
-        xyzs, vector = self.getXYZAndVect(cru_mol)
+        xyzs, vector = self.getXYZAndVector(cru_mol)
         conformer = self.getConformer(xyzs, vector)
         self.polym.AddConformer(conformer)
-        # Chem.SanitizeMol(self.polym)
-        # Chem.rdForceFieldHelpers.MMFFOptimizeMoleculeConfs(self.polym)
 
     def getCruMol(self):
         cru_mol = copy.copy(self.cru_mol)
@@ -366,14 +365,59 @@ class Polymer(object):
             atom.SetAtomicNum(9)
         return cru_mol
 
-    def getXYZAndVect(self, mol):
-        bk_dihes = self.getBackbone(mol)
+    def getXYZAndVector(self, mol):
+
         AllChem.EmbedMolecule(mol)
         conformer = mol.GetConformer(0)
+        bk_dihes_atom_ids = self.getBackbone(mol)
+        self.setTransAndRotate(conformer, bk_dihes_atom_ids)
+        self.rotateSideGroups(conformer, bk_dihes_atom_ids)
+        xyzs, vector = self.getXYZAndVect(conformer)
+        return xyzs, vector
+
+    def getBackbone(self, cru_mol):
+        cap_idxs = [x.GetIdx() for x in cru_mol.GetAtoms() if x.HasProp('CAP')]
+        graph = nx.Graph()
+        edges = [(
+            x.GetBeginAtom().GetIdx(),
+            x.GetEndAtom().GetIdx(),
+        ) for x in cru_mol.GetBonds()]
+        graph.add_edges_from(edges)
+        bk_dihes = nx.shortest_path(graph, *cap_idxs)
+        return bk_dihes
+
+    def setTransAndRotate(self, conformer, bk_dihes):
+
         for dihe in zip(bk_dihes[:-3], bk_dihes[1:-2], bk_dihes[2:-1],
                         bk_dihes[3:]):
             Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, 180)
 
+        bh_xyzs = np.array([conformer.GetAtomPosition(x) for x in dihe])
+        centroid = bh_xyzs.mean(axis=0)
+        for atom_id in range(conformer.GetNumAtoms()):
+            atom_pos = conformer.GetAtomPosition(atom_id) - centroid
+            conformer.SetAtomPosition(atom_id, atom_pos)
+
+        bvectors = (bh_xyzs[1:, :] - bh_xyzs[:-1, :])
+        nc_vector = bvectors[::2].mean(axis=0)
+        nc_vector /= np.linalg.norm(nc_vector)
+        nm_mvector = bvectors[1::2].mean(axis=0)
+        nm_mvector /= np.linalg.norm(nm_mvector)
+        avect_norm = nc_vector + nm_mvector
+        avect_norm /= np.linalg.norm(avect_norm)
+        bvect_norm = nc_vector - nm_mvector
+        bvect_norm /= np.linalg.norm(bvect_norm)
+        cvect_norm = np.cross(avect_norm, bvect_norm)
+        cvect_norm /= np.linalg.norm(cvect_norm)
+        abc_norms = np.concatenate([avect_norm.reshape(1,-1), bvect_norm.reshape(1,-1), cvect_norm.reshape(1,-1)],axis=0)
+        abc_targeted = np.eye(3)
+        rotation, rmsd = Rotation.align_vectors(abc_targeted, abc_norms)
+        for atom_id in range(conformer.GetNumAtoms()):
+            atom_pos = conformer.GetAtomPosition(atom_id)
+            conformer.SetAtomPosition(atom_id, rotation.apply(atom_pos))
+
+    def rotateSideGroups(self, conformer, bk_dihes):
+        mol = conformer.GetOwningMol()
         bonded_atom_ids = [(
             x.GetBeginAtomIdx(),
             x.GetEndAtomIdx(),
@@ -398,6 +442,8 @@ class Polymer(object):
         for dihe_atom_ids in side_dihes:
             Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe_atom_ids, 90)
 
+    def getXYZAndVect(self, conformer):
+        mol = conformer.GetOwningMol()
         cap_ht = [(
             x.GetIdx(),
             [y.GetIdx() for y in x.GetNeighbors()][0],
@@ -413,17 +459,6 @@ class Polymer(object):
             for x in mol.GetAtoms() if x.HasProp('mono_atom_idx')
         }
         return xyzs, vector
-
-    def getBackbone(self, cru_mol):
-        cap_idxs = [x.GetIdx() for x in cru_mol.GetAtoms() if x.HasProp('CAP')]
-        graph = nx.Graph()
-        edges = [(
-            x.GetBeginAtom().GetIdx(),
-            x.GetEndAtom().GetIdx(),
-        ) for x in cru_mol.GetBonds()]
-        graph.add_edges_from(edges)
-        bk_dihes = nx.shortest_path(graph, *cap_idxs)
-        return bk_dihes
 
     def getConformer(self, xyzs, vector):
         mid_aid = collections.defaultdict(list)
@@ -473,6 +508,15 @@ class Polymer(object):
         lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
         lmw.writeLammpsData()
         lmw.writeLammpsIn()
+
+
+class TransConformer(object):
+
+    def __init__(self, mol):
+        self.mol = mol
+
+
+
 
 
 logger = None
