@@ -214,7 +214,8 @@ class Polymer(object):
             atom.SetIntProp(self.IMPLICIT_H, atom.GetNumImplicitHs())
             atom.SetNoImplicit(True)
 
-        chiralty_info = Chem.FindMolChiralCenters(cru_mol, includeUnassigned=True)
+        chiralty_info = Chem.FindMolChiralCenters(cru_mol,
+                                                  includeUnassigned=True)
         for chiralty in chiralty_info:
             cru_mol.GetAtomWithIdx(chiralty[0]).SetProp('_CIPCode', 'R')
 
@@ -352,133 +353,8 @@ class Polymer(object):
             AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
             return
 
-        cru_mol = self.getCruMol()
-        xyzs, vector = self.getXYZAndVector(cru_mol)
-        conformer = self.getConformer(xyzs, vector)
-        self.polym.AddConformer(conformer)
-
-    def getCruMol(self):
-        cru_mol = copy.copy(self.cru_mol)
-        for atom in cru_mol.GetAtoms():
-            if atom.GetSymbol() != symbols.WILD_CARD:
-                continue
-            atom.SetAtomicNum(9)
-        return cru_mol
-
-    def getXYZAndVector(self, mol):
-
-        AllChem.EmbedMolecule(mol)
-        conformer = mol.GetConformer(0)
-        bk_dihes_atom_ids = self.getBackbone(mol)
-        self.setTransAndRotate(conformer, bk_dihes_atom_ids)
-        self.rotateSideGroups(conformer, bk_dihes_atom_ids)
-        xyzs, vector = self.getXYZAndVect(conformer)
-        return xyzs, vector
-
-    def getBackbone(self, cru_mol):
-        cap_idxs = [x.GetIdx() for x in cru_mol.GetAtoms() if x.HasProp('CAP')]
-        graph = nx.Graph()
-        edges = [(
-            x.GetBeginAtom().GetIdx(),
-            x.GetEndAtom().GetIdx(),
-        ) for x in cru_mol.GetBonds()]
-        graph.add_edges_from(edges)
-        bk_dihes = nx.shortest_path(graph, *cap_idxs)
-        return bk_dihes
-
-    def setTransAndRotate(self, conformer, bk_dihes):
-
-        for dihe in zip(bk_dihes[:-3], bk_dihes[1:-2], bk_dihes[2:-1],
-                        bk_dihes[3:]):
-            Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, 180)
-
-        bh_xyzs = np.array([conformer.GetAtomPosition(x) for x in dihe])
-        centroid = bh_xyzs.mean(axis=0)
-        for atom_id in range(conformer.GetNumAtoms()):
-            atom_pos = conformer.GetAtomPosition(atom_id) - centroid
-            conformer.SetAtomPosition(atom_id, atom_pos)
-
-        bvectors = (bh_xyzs[1:, :] - bh_xyzs[:-1, :])
-        nc_vector = bvectors[::2].mean(axis=0)
-        nc_vector /= np.linalg.norm(nc_vector)
-        nm_mvector = bvectors[1::2].mean(axis=0)
-        nm_mvector /= np.linalg.norm(nm_mvector)
-        avect_norm = nc_vector + nm_mvector
-        avect_norm /= np.linalg.norm(avect_norm)
-        bvect_norm = nc_vector - nm_mvector
-        bvect_norm /= np.linalg.norm(bvect_norm)
-        cvect_norm = np.cross(avect_norm, bvect_norm)
-        cvect_norm /= np.linalg.norm(cvect_norm)
-        abc_norms = np.concatenate([avect_norm.reshape(1,-1), bvect_norm.reshape(1,-1), cvect_norm.reshape(1,-1)],axis=0)
-        abc_targeted = np.eye(3)
-        rotation, rmsd = Rotation.align_vectors(abc_targeted, abc_norms)
-        for atom_id in range(conformer.GetNumAtoms()):
-            atom_pos = conformer.GetAtomPosition(atom_id)
-            conformer.SetAtomPosition(atom_id, rotation.apply(atom_pos))
-
-    def rotateSideGroups(self, conformer, bk_dihes):
-        mol = conformer.GetOwningMol()
-        bonded_atom_ids = [(
-            x.GetBeginAtomIdx(),
-            x.GetEndAtomIdx(),
-        ) for x in mol.GetBonds()]
-        bk_aids_set = set(bk_dihes)
-        side_atom_ids = [
-            x for x in bonded_atom_ids if len(bk_aids_set.intersection(x)) == 1
-        ]
-        side_dihes = []
-        for batom_id, eatom_id in side_atom_ids:
-            id1 = [
-                x.GetIdx()
-                for x in mol.GetAtomWithIdx(batom_id).GetNeighbors()
-                if x.GetIdx() != eatom_id
-            ][0]
-            id4 = [
-                x.GetIdx()
-                for x in mol.GetAtomWithIdx(eatom_id).GetNeighbors()
-                if x.GetIdx() != batom_id
-            ][0]
-            side_dihes.append([id1, batom_id, eatom_id, id4])
-        for dihe_atom_ids in side_dihes:
-            Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe_atom_ids, 90)
-
-    def getXYZAndVect(self, conformer):
-        mol = conformer.GetOwningMol()
-        cap_ht = [(
-            x.GetIdx(),
-            [y.GetIdx() for y in x.GetNeighbors()][0],
-        ) for x in mol.GetAtoms() if x.HasProp('CAP')]
-        middle_points = np.array([
-            (conformer.GetAtomPosition(x) + conformer.GetAtomPosition(y)) / 2
-            for x, y in cap_ht
-        ])
-        vector = middle_points[1, :] - middle_points[0, :]
-        xyzs = {
-            x.GetIntProp('mono_atom_idx'):
-            np.array(conformer.GetAtomPosition(x.GetIdx()))
-            for x in mol.GetAtoms() if x.HasProp('mono_atom_idx')
-        }
-        return xyzs, vector
-
-    def getConformer(self, xyzs, vector):
-        mid_aid = collections.defaultdict(list)
-        for atom in self.polym.GetAtoms():
-            mid_aid[atom.GetIntProp('mono_id')].append(atom.GetIdx())
-
-        id_coords = {}
-        for mono_id, atom_id in mid_aid.items():
-            aid_oid = {
-                x: self.polym.GetAtomWithIdx(x).GetIntProp('mono_atom_idx')
-                for x in atom_id
-            }
-            vect = mono_id * vector
-            aid_xyz = {x: xyzs[y] + vect for x, y in aid_oid.items()}
-            id_coords.update(aid_xyz)
-
-        conformer = Chem.rdchem.Conformer(self.polym.GetNumAtoms())
-        for id, xyz in id_coords.items():
-            conformer.SetAtomPosition(id, xyz)
-        return conformer
+        trans_conf = TransConformer(self.polym, self.cru_mol)
+        trans_conf.run()
 
     def setMols(self):
 
@@ -512,11 +388,145 @@ class Polymer(object):
 
 class TransConformer(object):
 
-    def __init__(self, mol):
-        self.mol = mol
+    def __init__(self, polym, original_cru_mol):
+        self.polym = polym
+        self.original_cru_mol = original_cru_mol
 
+    def run(self):
+        self.setCruMol()
+        self.cruConformer()
+        self.setBackbone()
+        self.setTransAndRotate()
+        self.rotateSideGroups()
+        self.setXYZAndVect()
+        self.setConformer()
 
+    def setCruMol(self):
+        cru_mol = copy.copy(self.original_cru_mol)
+        for atom in cru_mol.GetAtoms():
+            if atom.GetSymbol() != symbols.WILD_CARD:
+                continue
+            atom.SetAtomicNum(9)
+        self.cru_mol = cru_mol
 
+    def cruConformer(self):
+        AllChem.EmbedMolecule(self.cru_mol)
+        self.cru_conformer = self.cru_mol.GetConformer(0)
+
+    def setBackbone(self):
+        cap_idxs = [
+            x.GetIdx() for x in self.cru_mol.GetAtoms() if x.HasProp('CAP')
+        ]
+        graph = nx.Graph()
+        edges = [(
+            x.GetBeginAtom().GetIdx(),
+            x.GetEndAtom().GetIdx(),
+        ) for x in self.cru_mol.GetBonds()]
+        graph.add_edges_from(edges)
+        bk_dihes = nx.shortest_path(graph, *cap_idxs)
+        self.backbone_attom_ids = bk_dihes
+
+    def setTransAndRotate(self):
+
+        for dihe in zip(self.backbone_attom_ids[:-3],
+                        self.backbone_attom_ids[1:-2],
+                        self.backbone_attom_ids[2:-1],
+                        self.backbone_attom_ids[3:]):
+            Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer, *dihe, 180)
+
+        bh_xyzs = np.array(
+            [self.cru_conformer.GetAtomPosition(x) for x in dihe])
+        centroid = bh_xyzs.mean(axis=0)
+        for atom_id in range(self.cru_conformer.GetNumAtoms()):
+            atom_pos = self.cru_conformer.GetAtomPosition(atom_id) - centroid
+            self.cru_conformer.SetAtomPosition(atom_id, atom_pos)
+
+        bvectors = (bh_xyzs[1:, :] - bh_xyzs[:-1, :])
+        nc_vector = bvectors[::2].mean(axis=0)
+        nc_vector /= np.linalg.norm(nc_vector)
+        nm_mvector = bvectors[1::2].mean(axis=0)
+        nm_mvector /= np.linalg.norm(nm_mvector)
+        avect_norm = nc_vector + nm_mvector
+        avect_norm /= np.linalg.norm(avect_norm)
+        bvect_norm = nc_vector - nm_mvector
+        bvect_norm /= np.linalg.norm(bvect_norm)
+        cvect_norm = np.cross(avect_norm, bvect_norm)
+        cvect_norm /= np.linalg.norm(cvect_norm)
+        abc_norms = np.concatenate([
+            avect_norm.reshape(1, -1),
+            bvect_norm.reshape(1, -1),
+            cvect_norm.reshape(1, -1)
+        ],
+                                   axis=0)
+        abc_targeted = np.eye(3)
+        rotation, rmsd = Rotation.align_vectors(abc_targeted, abc_norms)
+        for atom_id in range(self.cru_conformer.GetNumAtoms()):
+            atom_pos = self.cru_conformer.GetAtomPosition(atom_id)
+            self.cru_conformer.SetAtomPosition(atom_id,
+                                               rotation.apply(atom_pos))
+
+    def rotateSideGroups(self):
+
+        bonded_atom_ids = [(
+            x.GetBeginAtomIdx(),
+            x.GetEndAtomIdx(),
+        ) for x in self.cru_mol.GetBonds()]
+        bk_aids_set = set(self.backbone_attom_ids)
+        side_atom_ids = [
+            x for x in bonded_atom_ids if len(bk_aids_set.intersection(x)) == 1
+        ]
+        side_dihes = []
+        for batom_id, eatom_id in side_atom_ids:
+            id1 = [
+                x.GetIdx()
+                for x in self.cru_mol.GetAtomWithIdx(batom_id).GetNeighbors()
+                if x.GetIdx() != eatom_id
+            ][0]
+            id4 = [
+                x.GetIdx()
+                for x in self.cru_mol.GetAtomWithIdx(eatom_id).GetNeighbors()
+                if x.GetIdx() != batom_id
+            ][0]
+            side_dihes.append([id1, batom_id, eatom_id, id4])
+        for dihe_atom_ids in side_dihes:
+            Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer,
+                                                *dihe_atom_ids, 90)
+
+    def setXYZAndVect(self):
+
+        cap_ht = [(
+            x.GetIdx(),
+            [y.GetIdx() for y in x.GetNeighbors()][0],
+        ) for x in self.cru_mol.GetAtoms() if x.HasProp('CAP')]
+        middle_points = np.array([(self.cru_conformer.GetAtomPosition(x) +
+                                   self.cru_conformer.GetAtomPosition(y)) / 2
+                                  for x, y in cap_ht])
+        self.vector = middle_points[1, :] - middle_points[0, :]
+        self.xyzs = {
+            x.GetIntProp('mono_atom_idx'):
+            np.array(self.cru_conformer.GetAtomPosition(x.GetIdx()))
+            for x in self.cru_mol.GetAtoms() if x.HasProp('mono_atom_idx')
+        }
+
+    def setConformer(self):
+        mid_aid = collections.defaultdict(list)
+        for atom in self.polym.GetAtoms():
+            mid_aid[atom.GetIntProp('mono_id')].append(atom.GetIdx())
+
+        id_coords = {}
+        for mono_id, atom_id in mid_aid.items():
+            aid_oid = {
+                x: self.polym.GetAtomWithIdx(x).GetIntProp('mono_atom_idx')
+                for x in atom_id
+            }
+            vect = mono_id * self.vector
+            aid_xyz = {x: self.xyzs[y] + vect for x, y in aid_oid.items()}
+            id_coords.update(aid_xyz)
+
+        conformer = Chem.rdchem.Conformer(self.polym.GetNumAtoms())
+        for id, xyz in id_coords.items():
+            conformer.SetAtomPosition(id, xyz)
+        self.polym.AddConformer(conformer)
 
 
 logger = None
