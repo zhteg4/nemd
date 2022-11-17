@@ -440,6 +440,7 @@ class LammpsWriter(fileutils.LammpsInput):
             kspace_style = [f"{x} {y}"
                             for x, y in self.kspace_style.items()][0]
             self.in_fh.write(f"{self.KSPACE_STYLE} {kspace_style}\n")
+        self.in_fh.write(f"log log.lammps\n")
 
     def hasCharge(self, default=True):
         if self.mols is None:
@@ -471,16 +472,19 @@ class LammpsWriter(fileutils.LammpsInput):
 
     def writeRun(self):
         self.in_fh.write("velocity all create 10 482748\n")
-        if len(self.mols) == 1:
+        if len(self.mols) == 1 and self.mols[1].GetNumAtoms() < 10:
             # NVT on single molecule gives nan coords (guess due to translation)
             self.in_fh.write("fix             1 all nve\n")
             self.in_fh.write("run 10000\n")
             return
 
-        self.in_fh.write(f"fix 1 all nvt temp 10 10 {self.timestep * 100}\n")
+        self.in_fh.write(f"fix 1 all nvt temp 300 300 {self.timestep * 100}\n")
         self.in_fh.write("run 1000\n")
-        self.in_fh.write("unfix 1\n")
 
+        if len(self.mols) == 1:
+            return
+
+        self.in_fh.write("unfix 1\n")
         self.in_fh.write(
             f"fix 1 all npt temp 10 10 {self.timestep * 100} iso 1 1 {self.timestep * 1000}\n"
         )
@@ -497,6 +501,7 @@ class LammpsWriter(fileutils.LammpsInput):
             self.setImproperSymbols()
             self.setAtoms()
             self.setBonds()
+            self.adjustBondLength()
             self.setAngles()
             self.setDihedrals()
             self.setImpropers()
@@ -573,6 +578,8 @@ class LammpsWriter(fileutils.LammpsInput):
             [x.GetConformer(0).GetPositions() for x in self.mols.values()])
         box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
+        if len(self.mols) == 1:
+            box_hf = [max(box_hf) * 1.1 for x in box_hf]
         centroid = xyzs.mean(axis=0)
         for dim in range(3):
             self.data_fh.write(

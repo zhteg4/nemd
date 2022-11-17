@@ -1,5 +1,6 @@
 import math
 import copy
+import lammps
 import sys
 import argparse
 import random
@@ -181,7 +182,7 @@ class Polymer(object):
     MOL_NUM = 'mol_num'
     IMPLICIT_H = oplsua.LammpsWriter.IMPLICIT_H
 
-    def __init__(self, cru, cru_num, ff=None):
+    def __init__(self, cru, cru_num, ff=None, srelaxation=True):
         self.cru = cru
         self.cru_num = cru_num
         self.ff = ff
@@ -387,12 +388,14 @@ class Polymer(object):
 
 class TransConformer(object):
 
-    def __init__(self, polym, original_cru_mol, ff=None):
+    def __init__(self, polym, original_cru_mol, ff=None, relaxation=True):
         self.polym = polym
         self.original_cru_mol = original_cru_mol
         self.ff = ff
+        self.relaxation = relaxation
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
+        self.relax_dir = '_relax'
 
     def run(self):
         self.setCruMol()
@@ -403,6 +406,7 @@ class TransConformer(object):
         self.setXYZAndVect()
         self.setConformer()
         self.adjustConformer()
+        self.lammpsRelaxation()
 
     def setCruMol(self):
         cru_mol = copy.copy(self.original_cru_mol)
@@ -533,8 +537,29 @@ class TransConformer(object):
         Chem.GetSymmSSSR(self.polym)
 
     def adjustConformer(self):
-        lmw = oplsua.LammpsWriter(self.ff, 'myjobname', mols={1: self.polym})
-        lmw.adjustConformer()
+        self.lmw = oplsua.LammpsWriter(self.ff, 'myjobname', mols={1: self.polym})
+        if not self.relaxation:
+            self.lmw.adjustConformer()
+            return
+        with fileutils.chdir(self.relax_dir):
+            self.lmw.writeLammpsData()
+            self.lmw.writeLammpsIn()
+
+    def lammpsRelaxation(self, min_cycle=10, max_cycle=100, threshold=.99):
+
+        with fileutils.chdir(self.relax_dir):
+            lmp = lammps.lammps(cmdargs=['-screen', 'none'])
+            lmp.file(self.lmw.lammps_in)
+            lmp.command('compute 1 all gyration')
+            data = []
+            for iclycle in range(max_cycle):
+                lmp.command('run 1000')
+                data.append(lmp.extract_compute('1', 0, 0))
+                if iclycle >= min_cycle:
+                    percentage = np.mean(data[-5:]) / np.mean(data[-10:])
+                    if percentage >= threshold:
+                        break
+            import pdb;pdb.set_trace();pass
 
 
 logger = None

@@ -41,6 +41,21 @@ def get_ff(fn=None, name=OPLSAA, ext=MOLT_FF_EXT):
     return os.path.join(environutils.get_module_path(), FF, fn)
 
 
+class chdir:
+
+    def __init__(self, dirname):
+        self.dirname = dirname
+        self.original_dir = os.getcwd()
+
+    def __enter__(self):
+        if not os.path.exists(self.dirname):
+            os.mkdir(self.dirname)
+        os.chdir(self.dirname)
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        os.chdir(self.original_dir)
+
+
 @dataclass
 class Processors:
     x: str
