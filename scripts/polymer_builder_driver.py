@@ -9,9 +9,11 @@ import logutils
 import functools
 import os
 import sys
+import pandas as pd
 
 import opls
 import units
+import traj
 import parserutils
 import fileutils
 import nemd
@@ -396,6 +398,7 @@ class TransConformer(object):
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
         self.relax_dir = '_relax'
+        self.data_file = 'data.polym'
 
     def run(self):
         self.setCruMol()
@@ -407,6 +410,7 @@ class TransConformer(object):
         self.setConformer()
         self.adjustConformer()
         self.lammpsRelaxation()
+        self.foldPolym()
 
     def setCruMol(self):
         cru_mol = copy.copy(self.original_cru_mol)
@@ -414,31 +418,36 @@ class TransConformer(object):
         neighbors = [x.GetNeighbors()[0] for x in atoms[::-1]]
         for atom, catom in zip(atoms, neighbors):
             atom.SetAtomicNum(catom.GetAtomicNum())
+            atom.SetBoolProp('CAP', True)
         self.cru_mol = cru_mol
 
     def cruConformer(self):
         AllChem.EmbedMolecule(self.cru_mol)
         self.cru_conformer = self.cru_mol.GetConformer(0)
 
-    def setBackbone(self):
+    def setBackbone(self, cru_mol=None):
+        if cru_mol is None:
+            cru_mol = self.cru_mol
         cap_idxs = [
-            x.GetIdx() for x in self.cru_mol.GetAtoms() if x.HasProp('CAP')
+            x.GetIdx() for x in cru_mol.GetAtoms() if x.HasProp('CAP')
         ]
+        if len(cap_idxs) != 2:
+            raise ValueError(f'{len(cap_idxs)} capping atoms are found.')
         graph = nx.Graph()
         edges = [(
             x.GetBeginAtom().GetIdx(),
             x.GetEndAtom().GetIdx(),
-        ) for x in self.cru_mol.GetBonds()]
+        ) for x in cru_mol.GetBonds()]
         graph.add_edges_from(edges)
         bk_dihes = nx.shortest_path(graph, *cap_idxs)
-        self.backbone_attom_ids = bk_dihes
+        self.cru_bk_atom_ids = bk_dihes
 
     def setTransAndRotate(self):
 
-        for dihe in zip(self.backbone_attom_ids[:-3],
-                        self.backbone_attom_ids[1:-2],
-                        self.backbone_attom_ids[2:-1],
-                        self.backbone_attom_ids[3:]):
+        for dihe in zip(self.cru_bk_atom_ids[:-3],
+                        self.cru_bk_atom_ids[1:-2],
+                        self.cru_bk_atom_ids[2:-1],
+                        self.cru_bk_atom_ids[3:]):
             Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer, *dihe, 180)
 
         bh_xyzs = np.array(
@@ -478,7 +487,7 @@ class TransConformer(object):
             x.GetBeginAtomIdx(),
             x.GetEndAtomIdx(),
         ) for x in self.cru_mol.GetBonds()]
-        bk_aids_set = set(self.backbone_attom_ids)
+        bk_aids_set = set(self.cru_bk_atom_ids)
         side_atom_ids = [
             x for x in bonded_atom_ids if len(bk_aids_set.intersection(x)) == 1
         ]
@@ -550,17 +559,99 @@ class TransConformer(object):
         with fileutils.chdir(self.relax_dir):
             lmp = lammps.lammps(cmdargs=['-screen', 'none'])
             lmp.file(self.lmw.lammps_in)
-            lmp.command('compute 1 all gyration')
-            data = []
-            for iclycle in range(max_cycle):
-                lmp.command('run 1000')
-                data.append(lmp.extract_compute('1', 0, 0))
-                if iclycle >= min_cycle:
-                    percentage = np.mean(data[-5:]) / np.mean(data[-10:])
-                    if percentage >= threshold:
-                        break
-            import pdb;pdb.set_trace();pass
+            lmp.command(f'write_data {self.data_file}')
+            # import pdb;pdb.set_trace()
+            # lmp.command('compute 1 all gyration')
+            # data = []
+            # for iclycle in range(max_cycle):
+            #     lmp.command('run 1000')
+            #     data.append(lmp.extract_compute('1', 0, 0))
+            #     if iclycle >= min_cycle:
+            #         percentage = np.mean(data[-5:]) / np.mean(data[-10:])
+            #         if percentage >= threshold:
+            #             break
 
+    def foldPolym(self):
+        data_file = os.path.join(self.relax_dir, self.data_file)
+        self.data_reader = oplsua.DataFileReader(data_file)
+        self.data_reader.run()
+        self.data_reader.setClashParams(include14=False, scale=0.3)
+
+        conformer = self.polym.GetConformer()
+        for atom in self.data_reader.atoms.values():
+            conformer.SetAtomPosition(atom.id - 1, np.array(atom.xyz))
+
+        self.setBackboneDihedrals()
+        self.setMovingAtoms()
+
+        box = np.array([y for x in self.data_reader.box_dsp.values() for y in x])
+        frm = pd.DataFrame(conformer.GetPositions(), index=range(1, conformer.GetNumAtoms() + 1), columns=['xu', 'yu', 'zu'])
+        frm.attrs['box'] = box
+        random.seed(2022)
+        for dihe, vals in self.bk_dihe_atom_ids.items():
+            while(len(vals)):
+                random.shuffle(vals)
+                val = vals.pop()
+                Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, val)
+                frm.loc[:] = conformer.GetPositions()
+                dcell = traj.DistanceCell(frm=frm, cut=10, resolution=2.)
+                dcell.setUp()
+                clashes = []
+                import pdb;pdb.set_trace()
+                moving_atom_ids = self.moving_atom_ids[dihe]
+                stationary_atom_ids = 
+                for _, row in frm.iterrows():
+                    clashes += dcell.getClashes(row,
+                                                radii=self.data_reader.radii,
+                                                excluded=self.data_reader.excluded)
+                print(len(clashes))
+                if not clashes:
+                    break
+
+    def setBackboneDihedrals(self):
+        cru_bk_atom_ids = set(self.cru_bk_atom_ids)
+        self.backbone_atoms = [x for x in self.polym.GetAtoms() if
+         int(x.GetProp('mono_atom_idx')) in cru_bk_atom_ids]
+        assert all([x.GetIdx() in [z.GetIdx() for z in y.GetNeighbors()] for x,y in zip(self.backbone_atoms[1:], self.backbone_atoms[:-1])])
+        assert all([x.GetIdx() in [z.GetIdx() for z in y.GetNeighbors()] for x,y in zip(self.backbone_atoms[:-1], self.backbone_atoms[1:])])
+        self.bk_dihe_atom_ids = zip(self.backbone_atoms[:-3], self.backbone_atoms[1:-2], self.backbone_atoms[2:-1], self.backbone_atoms[3:])
+        self.bk_dihe_atom_ids = {tuple(y.GetIdx() for y in x): list(np.linspace(0,360, 36, endpoint=False)) for x in self.bk_dihe_atom_ids}
+
+    def setMovingAtoms(self):
+        self.moving_atom_ids = {}
+        conformer = self.polym.GetConformer()
+        for dihe_atom_ids in self.bk_dihe_atom_ids.keys():
+            orgin_xyz = conformer.GetPositions()
+            orgin_val = Chem.rdMolTransforms.GetDihedralDeg(conformer, *dihe_atom_ids)
+            Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe_atom_ids, orgin_val + 1)
+            xyz = conformer.GetPositions()
+            changed = (orgin_xyz == xyz)
+            self.moving_atom_ids[dihe_atom_ids] = [i + 1 for i, x in enumerate(changed) if not all(x)]
+
+    def write(self):
+
+        with Chem.SDWriter('polym.sdf') as polym_fh:
+            polym_fh.SetProps(["mono_atom_idxs"])
+            mono_atom_idxs = [x.GetIntProp('mono_atom_idx') for x in self.polym.GetAtoms()]
+            self.polym.SetProp('mono_atom_idxs', ' '.join(map(str, mono_atom_idxs)))
+            polym_fh.write(self.polym)
+
+        with Chem.SDWriter('original_cru_mol.sdf') as cru_fh:
+            cru_fh.write(self.original_cru_mol)
+
+    @staticmethod
+    def read(filename):
+        suppl = Chem.SDMolSupplier(filename, sanitize=False, removeHs=False)
+        mol = next(suppl)
+        # mol = Chem.AddHs(mol)
+        Chem.GetSymmSSSR(mol)
+        try:
+            mono_atom_idxs = mol.GetProp('mono_atom_idxs').split()
+        except KeyError:
+            return mol
+        for atom, mono_atom_idx in zip(mol.GetAtoms(), mono_atom_idxs):
+            atom.SetProp('mono_atom_idx', mono_atom_idx)
+        return mol
 
 logger = None
 

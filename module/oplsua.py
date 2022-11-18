@@ -417,7 +417,7 @@ class LammpsWriter(fileutils.LammpsInput):
             self.readData()
             self.writeMinimize()
             self.writeTimestep()
-            self.writeRun()
+            # self.writeRun()
 
     def writeInDescriptions(self):
         self.in_fh.write(f"{self.UNITS} {self.units}\n")
@@ -579,7 +579,7 @@ class LammpsWriter(fileutils.LammpsInput):
         box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
         if len(self.mols) == 1:
-            box_hf = [max(box_hf) * 1.1 for x in box_hf]
+            box_hf = [max(box_hf) * 1.2 for x in box_hf]
         centroid = xyzs.mean(axis=0)
         for dim in range(3):
             self.data_fh.write(
