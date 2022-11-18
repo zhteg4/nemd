@@ -414,7 +414,9 @@ class TransConformer(object):
 
     def setCruMol(self):
         cru_mol = copy.copy(self.original_cru_mol)
-        atoms = [x for x in cru_mol.GetAtoms() if x.GetSymbol() == symbols.WILD_CARD]
+        atoms = [
+            x for x in cru_mol.GetAtoms() if x.GetSymbol() == symbols.WILD_CARD
+        ]
         neighbors = [x.GetNeighbors()[0] for x in atoms[::-1]]
         for atom, catom in zip(atoms, neighbors):
             atom.SetAtomicNum(catom.GetAtomicNum())
@@ -428,9 +430,7 @@ class TransConformer(object):
     def setBackbone(self, cru_mol=None):
         if cru_mol is None:
             cru_mol = self.cru_mol
-        cap_idxs = [
-            x.GetIdx() for x in cru_mol.GetAtoms() if x.HasProp('CAP')
-        ]
+        cap_idxs = [x.GetIdx() for x in cru_mol.GetAtoms() if x.HasProp('CAP')]
         if len(cap_idxs) != 2:
             raise ValueError(f'{len(cap_idxs)} capping atoms are found.')
         graph = nx.Graph()
@@ -444,10 +444,8 @@ class TransConformer(object):
 
     def setTransAndRotate(self):
 
-        for dihe in zip(self.cru_bk_atom_ids[:-3],
-                        self.cru_bk_atom_ids[1:-2],
-                        self.cru_bk_atom_ids[2:-1],
-                        self.cru_bk_atom_ids[3:]):
+        for dihe in zip(self.cru_bk_atom_ids[:-3], self.cru_bk_atom_ids[1:-2],
+                        self.cru_bk_atom_ids[2:-1], self.cru_bk_atom_ids[3:]):
             Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer, *dihe, 180)
 
         bh_xyzs = np.array(
@@ -546,7 +544,9 @@ class TransConformer(object):
         Chem.GetSymmSSSR(self.polym)
 
     def adjustConformer(self):
-        self.lmw = oplsua.LammpsWriter(self.ff, 'myjobname', mols={1: self.polym})
+        self.lmw = oplsua.LammpsWriter(self.ff,
+                                       'myjobname',
+                                       mols={1: self.polym})
         if not self.relaxation:
             self.lmw.adjustConformer()
             return
@@ -575,65 +575,114 @@ class TransConformer(object):
         data_file = os.path.join(self.relax_dir, self.data_file)
         self.data_reader = oplsua.DataFileReader(data_file)
         self.data_reader.run()
-        self.data_reader.setClashParams(include14=False, scale=0.3)
+        self.data_reader.setClashParams(include14=True, scale=0.6)
 
         conformer = self.polym.GetConformer()
         for atom in self.data_reader.atoms.values():
             conformer.SetAtomPosition(atom.id - 1, np.array(atom.xyz))
 
         self.setBackboneDihedrals()
-        self.setMovingAtoms()
+        self.setFragAtoms()
 
-        box = np.array([y for x in self.data_reader.box_dsp.values() for y in x])
-        frm = pd.DataFrame(conformer.GetPositions(), index=range(1, conformer.GetNumAtoms() + 1), columns=['xu', 'yu', 'zu'])
+        box = np.array(
+            [y for x in self.data_reader.box_dsp.values() for y in x])
+        frm = pd.DataFrame(conformer.GetPositions(),
+                           index=range(1,
+                                       conformer.GetNumAtoms() + 1),
+                           columns=['xu', 'yu', 'zu'])
         frm.attrs['box'] = box
         random.seed(2022)
+
         for dihe, vals in self.bk_dihe_atom_ids.items():
-            while(len(vals)):
+            while (len(vals)):
                 random.shuffle(vals)
                 val = vals.pop()
-                Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, val)
+                Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, 180)
                 frm.loc[:] = conformer.GetPositions()
                 dcell = traj.DistanceCell(frm=frm, cut=10, resolution=2.)
                 dcell.setUp()
                 clashes = []
-                import pdb;pdb.set_trace()
-                moving_atom_ids = self.moving_atom_ids[dihe]
-                stationary_atom_ids = 
+                # frag_atom_ids = self.frag_atom_ids[dihe]
+                # frag_rows = [frm.iloc[x] for x in frag_atom_ids]
                 for _, row in frm.iterrows():
-                    clashes += dcell.getClashes(row,
-                                                radii=self.data_reader.radii,
-                                                excluded=self.data_reader.excluded)
-                print(len(clashes))
+                    clashes += dcell.getClashes(
+                        row,
+                        radii=self.data_reader.radii,
+                        excluded=self.data_reader.excluded)
+                print(
+                    clashes
+                )  #, Chem.rdMolTransforms.GetBondLength(conformer, 50, 54), self.data_reader.radii[51][55])
+                if clashes:
+                    import pdb
+                    pdb.set_trace()
+                break
                 if not clashes:
                     break
 
     def setBackboneDihedrals(self):
         cru_bk_atom_ids = set(self.cru_bk_atom_ids)
-        self.backbone_atoms = [x for x in self.polym.GetAtoms() if
-         int(x.GetProp('mono_atom_idx')) in cru_bk_atom_ids]
-        assert all([x.GetIdx() in [z.GetIdx() for z in y.GetNeighbors()] for x,y in zip(self.backbone_atoms[1:], self.backbone_atoms[:-1])])
-        assert all([x.GetIdx() in [z.GetIdx() for z in y.GetNeighbors()] for x,y in zip(self.backbone_atoms[:-1], self.backbone_atoms[1:])])
-        self.bk_dihe_atom_ids = zip(self.backbone_atoms[:-3], self.backbone_atoms[1:-2], self.backbone_atoms[2:-1], self.backbone_atoms[3:])
-        self.bk_dihe_atom_ids = {tuple(y.GetIdx() for y in x): list(np.linspace(0,360, 36, endpoint=False)) for x in self.bk_dihe_atom_ids}
+        self.backbone_atoms = [
+            x for x in self.polym.GetAtoms()
+            if int(x.GetProp('mono_atom_idx')) in cru_bk_atom_ids
+        ]
+        assert all([
+            x.GetIdx() in [z.GetIdx() for z in y.GetNeighbors()]
+            for x, y in zip(self.backbone_atoms[1:], self.backbone_atoms[:-1])
+        ])
+        assert all([
+            x.GetIdx() in [z.GetIdx() for z in y.GetNeighbors()]
+            for x, y in zip(self.backbone_atoms[:-1], self.backbone_atoms[1:])
+        ])
+        self.bk_dihe_atom_ids = zip(self.backbone_atoms[:-3],
+                                    self.backbone_atoms[1:-2],
+                                    self.backbone_atoms[2:-1],
+                                    self.backbone_atoms[3:])
+        self.bk_dihe_atom_ids = {
+            tuple(y.GetIdx()
+                  for y in x): list(np.linspace(0, 360, 36, endpoint=False))
+            for x in self.bk_dihe_atom_ids
+        }
 
-    def setMovingAtoms(self):
-        self.moving_atom_ids = {}
+    def setFragAtoms(self):
+        self.all_frag_atom_ids = {}
         conformer = self.polym.GetConformer()
         for dihe_atom_ids in self.bk_dihe_atom_ids.keys():
             orgin_xyz = conformer.GetPositions()
-            orgin_val = Chem.rdMolTransforms.GetDihedralDeg(conformer, *dihe_atom_ids)
-            Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe_atom_ids, orgin_val + 1)
+            orgin_val = Chem.rdMolTransforms.GetDihedralDeg(
+                conformer, *dihe_atom_ids)
+            Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe_atom_ids,
+                                                orgin_val + 5)
             xyz = conformer.GetPositions()
-            changed = (orgin_xyz == xyz)
-            self.moving_atom_ids[dihe_atom_ids] = [i + 1 for i, x in enumerate(changed) if not all(x)]
+            changed = np.isclose(orgin_xyz, xyz)
+            self.all_frag_atom_ids[dihe_atom_ids] = [
+                i for i, x in enumerate(changed) if not all(x)
+            ]
+            Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe_atom_ids,
+                                                orgin_val)
+
+        moved = set()
+        self.frag_atom_ids = {}
+        for dihe in reversed(self.bk_dihe_atom_ids.keys()):
+            all_frag_atom_ids = self.all_frag_atom_ids[dihe]
+            self.frag_atom_ids[dihe] = set(all_frag_atom_ids).difference(moved)
+            moved = moved.union(self.frag_atom_ids[dihe])
+        self.frag_atom_ids = {
+            x: list(self.frag_atom_ids[x])
+            for x in self.bk_dihe_atom_ids.keys()
+        }
+
+        self.existing_atom_ids = set(x for x in range(conformer.GetNumAtoms()))
+        self.existing_atom_ids = list(self.existing_atom_ids.difference(moved))
 
     def write(self):
 
         with Chem.SDWriter('polym.sdf') as polym_fh:
             polym_fh.SetProps(["mono_atom_idxs"])
-            mono_atom_idxs = [x.GetIntProp('mono_atom_idx') for x in self.polym.GetAtoms()]
-            self.polym.SetProp('mono_atom_idxs', ' '.join(map(str, mono_atom_idxs)))
+            mono_atom_idxs = [
+                x.GetIntProp('mono_atom_idx') for x in self.polym.GetAtoms()
+            ]
+            self.polym.SetProp('mono_atom_idxs',
+                               ' '.join(map(str, mono_atom_idxs)))
             polym_fh.write(self.polym)
 
         with Chem.SDWriter('original_cru_mol.sdf') as cru_fh:
@@ -652,6 +701,7 @@ class TransConformer(object):
         for atom, mono_atom_idx in zip(mol.GetAtoms(), mono_atom_idxs):
             atom.SetProp('mono_atom_idx', mono_atom_idx)
         return mol
+
 
 logger = None
 

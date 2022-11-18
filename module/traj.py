@@ -79,6 +79,9 @@ class DistanceCell:
             thresholds = [radii[row.name][x] for x in neighbors]
         else:
             thresholds = [threshold] * len(neighbors)
-        clashes = [(row.name, x)
+        clashes = [(row.name, x, y, z)
                    for x, y, z in zip(neighbors, dists, thresholds) if y < z]
+        if clashes:
+            import pdb
+            pdb.set_trace()
         return clashes

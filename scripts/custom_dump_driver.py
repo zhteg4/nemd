@@ -122,7 +122,8 @@ class CustomDump(object):
         clashes = []
         dcell = traj.DistanceCell(frm=frm, cut=10, resolution=2.)
         dcell.setUp()
-        import pdb;pdb.set_trace()
+        import pdb
+        pdb.set_trace()
         for _, row in frm.iterrows():
             clashes += dcell.getClashes(row,
                                         radii=radii,

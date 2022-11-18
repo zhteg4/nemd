@@ -1108,8 +1108,9 @@ class LammpsWriter(fileutils.LammpsInput):
 
 class DataFileReader(LammpsWriter):
 
-    def __init__(self, data_file):
+    def __init__(self, data_file, min_dist=1.09 * 2):
         self.data_file = data_file
+        self.min_dist = min_dist
         self.lines = None
         self.vdws = {}
         self.radii = {}
@@ -1117,6 +1118,7 @@ class DataFileReader(LammpsWriter):
         self.bonds = {}
         self.angles = {}
         self.dihedrals = {}
+        self.impropers = {}
         self.mols = {}
         self.excluded = collections.defaultdict(set)
 
@@ -1127,6 +1129,7 @@ class DataFileReader(LammpsWriter):
         self.setBonds()
         self.setAngles()
         self.setDihedrals()
+        self.setImpropers()
         self.setMols()
 
     def read(self):
@@ -1212,6 +1215,19 @@ class DataFileReader(LammpsWriter):
                 id3=int(id3),
                 id4=int(id4))
 
+    def setImpropers(self):
+        sidx = self.mk_idxes[self.IMPROPERS_CAP] + 2
+        for id, lid in enumerate(
+                range(sidx, sidx + self.struct_dsp[self.IMPROPERS]), 1):
+            id, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
+            self.impropers[int(id)] = types.SimpleNamespace(
+                id=int(id),
+                type_id=int(type_id),
+                id1=int(id1),
+                id2=int(id2),
+                id3=int(id3),
+                id4=int(id4))
+
     def setClashParams(self, include14=True, scale=1.):
         self.setClashExclusion(include14=include14)
         self.setPairCoeffs()
@@ -1220,6 +1236,10 @@ class DataFileReader(LammpsWriter):
     def setClashExclusion(self, include14=True):
         pairs = [[x.id1, x.id2] for x in self.bonds.values()]
         pairs += [[x.id1, x.id3] for x in self.angles.values()]
+        pairs += [
+            y for x in self.impropers.values()
+            for y in itertools.combinations([x.id1, x.id2, x.id3, x.id4], 2)
+        ]
         if include14:
             pairs += [[x.id1, x.id4] for x in self.dihedrals.values()]
         for id1, id2 in pairs:
@@ -1239,7 +1259,9 @@ class DataFileReader(LammpsWriter):
         for id1, vdw1 in self.vdws.items():
             for id2, vdw2 in self.vdws.items():
                 if mix == LammpsWriter.GEOMETRIC:
-                    dist = pow(vdw1.dist * vdw2.dist, 0.5)
+                    dist1 = vdw1.dist if vdw1.dist > self.min_dist else self.min_dist
+                    dist2 = vdw2.dist if vdw2.dist > self.min_dist else self.min_dist
+                    dist = pow(dist1 * dist2, 0.5)
                 elif mix == LammpsWriter.ARITHMETIC:
                     dist = (vdw1.dist + vdw2.dist) / 2
                 elif mix == LammpsWriter.SIXTHPOWER:
