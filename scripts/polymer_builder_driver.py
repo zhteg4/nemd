@@ -114,6 +114,11 @@ class AmorphousCell(object):
             self.polymers.append(polym)
 
     def setMolecules(self):
+        self.setBoxes()
+        self.setPolymVectors()
+        self.placeMols()
+
+    def setBoxes(self):
         boxes = []
         for polymer in self.polymers:
             polym = polymer.polym
@@ -125,9 +130,11 @@ class AmorphousCell(object):
             box = xyzs.max(axis=0) - xyzs.min(axis=0) + polymer.buffer
             boxes.append(box)
 
-        boxes = np.array(boxes).reshape(-1, 3)
-        mbox = boxes.max(axis=0)
-        for polymer, box, mol_num in zip(self.polymers, boxes,
+        self.boxes = np.array(boxes).reshape(-1, 3)
+
+    def setPolymVectors(self):
+        mbox = self.boxes.max(axis=0)
+        for polymer, box, mol_num in zip(self.polymers, self.boxes,
                                          self.options.mol_num):
             polymer.mol_nums_per_mbox = np.floor(mbox / box).astype(int)
             polymer.mol_num_per_mbox = np.product(polymer.mol_nums_per_mbox)
@@ -144,9 +151,11 @@ class AmorphousCell(object):
                 for x in itertools.product(*[[y for y in x] for x in percent])
             ]
 
+    def placeMols(self):
         polymers = [x for x in self.polymers]
         idxs = range(
             math.ceil(math.pow(sum(x.num_mbox for x in polymers), 1. / 3)))
+        mbox = self.boxes.max(axis=0)
         vectors = [x * mbox for x in itertools.product(idxs, idxs, idxs)]
         mol_id = 0
         while polymers:
@@ -171,7 +180,7 @@ class AmorphousCell(object):
 
     def write(self):
         lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
-        lmw.writeLammpsData()
+        lmw.writeLammpsData(adjust_bond_legnth=False)
         lmw.writeLammpsIn()
 
 
@@ -597,27 +606,26 @@ class TransConformer(object):
             while (len(vals)):
                 random.shuffle(vals)
                 val = vals.pop()
-                Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, 180)
+                Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, val)
                 frm.loc[:] = conformer.GetPositions()
                 dcell = traj.DistanceCell(frm=frm, cut=10, resolution=2.)
                 dcell.setUp()
                 clashes = []
                 # frag_atom_ids = self.frag_atom_ids[dihe]
                 # frag_rows = [frm.iloc[x] for x in frag_atom_ids]
+                # import pdb;pdb.set_trace()
                 for _, row in frm.iterrows():
                     clashes += dcell.getClashes(
                         row,
+                        # included= [x for x in frag_atom_ids]
                         radii=self.data_reader.radii,
                         excluded=self.data_reader.excluded)
-                print(
-                    clashes
-                )  #, Chem.rdMolTransforms.GetBondLength(conformer, 50, 54), self.data_reader.radii[51][55])
-                if clashes:
-                    import pdb
-                    pdb.set_trace()
-                break
                 if not clashes:
                     break
+        #         if clashes and not vals:
+        #             import pdb;pdb.set_trace()
+        # import pdb;
+        # pdb.set_trace()
 
     def setBackboneDihedrals(self):
         cru_bk_atom_ids = set(self.cru_bk_atom_ids)

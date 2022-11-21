@@ -43,7 +43,7 @@ class DistanceCell:
                 *[range(max_ids[x]) for x in range(3)])
             if math.dist((0, 0, 0), self.grids * ijk) <= self.cut
         ]
-        neigh_ids.remove((0, 0, 0,)) # yapf: disable
+        # neigh_ids.remove((0, 0, 0,))
         self.neigh_ids = set([
             tuple(np.array(ijk) * signs)
             for signs in itertools.product((-1, 1), (-1, 1), (-1, 1))
@@ -51,7 +51,7 @@ class DistanceCell:
         ])
 
     def setAtomCell(self, ):
-        ids = ((self.frm) / self.grids).round().astype(int)
+        ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
         self.atom_cell = collections.defaultdict(list)
         for idx, row in ids.iterrows():
             self.atom_cell[(
@@ -66,9 +66,15 @@ class DistanceCell:
         ids = [tuple((id + x) % self.indexes) for x in self.neigh_ids]
         return [y for x in ids for y in self.atom_cell[x]]
 
-    def getClashes(self, row, excluded=None, radii=None, threshold=1.):
+    def getClashes(self, row, included=None, excluded=None, radii=None, threshold=1.):
         xyz = row.values
         neighbors = self.getNeighbors(xyz)
+        try:
+            neighbors.remove(row.name)
+        except ValueError:
+            pass
+        if included:
+            neighbors = [x for x in neighbors if x in included]
         if excluded:
             neighbors = [x for x in neighbors if x not in excluded[row.name]]
         dists = np.linalg.norm(
@@ -81,7 +87,4 @@ class DistanceCell:
             thresholds = [threshold] * len(neighbors)
         clashes = [(row.name, x, y, z)
                    for x, y, z in zip(neighbors, dists, thresholds) if y < z]
-        if clashes:
-            import pdb
-            pdb.set_trace()
         return clashes

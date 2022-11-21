@@ -495,13 +495,13 @@ class LammpsWriter(fileutils.LammpsInput):
         self.setBonds()
         self.adjustBondLength()
 
-    def writeLammpsData(self):
+    def writeLammpsData(self, adjust_bond_legnth=True):
 
         with open(self.lammps_data, 'w') as self.data_fh:
             self.setImproperSymbols()
             self.setAtoms()
             self.setBonds()
-            self.adjustBondLength()
+            self.adjustBondLength(adjust_bond_legnth)
             self.setAngles()
             self.setDihedrals()
             self.setImpropers()
@@ -679,7 +679,10 @@ class LammpsWriter(fileutils.LammpsInput):
                 atom_id += 1
                 atom.SetIntProp(self.ATOM_ID, atom_id)
 
-    def adjustBondLength(self):
+    def adjustBondLength(self, adjust_bond_legnth=True):
+        if not adjust_bond_legnth:
+            return
+
         for mol_id, mol in self.mols.items():
             conformer = mol.GetConformer()
             for bond in mol.GetBonds():
