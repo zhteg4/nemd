@@ -1,6 +1,7 @@
 import math
 import copy
 import lammps
+import structutils
 import sys
 import argparse
 import random
@@ -408,6 +409,7 @@ class TransConformer(object):
             self.ff = oplsua.get_opls_parser()
         self.relax_dir = '_relax'
         self.data_file = 'data.polym'
+        self.conformer = None
 
     def run(self):
         self.setCruMol()
@@ -442,12 +444,7 @@ class TransConformer(object):
         cap_idxs = [x.GetIdx() for x in cru_mol.GetAtoms() if x.HasProp('CAP')]
         if len(cap_idxs) != 2:
             raise ValueError(f'{len(cap_idxs)} capping atoms are found.')
-        graph = nx.Graph()
-        edges = [(
-            x.GetBeginAtom().GetIdx(),
-            x.GetEndAtom().GetIdx(),
-        ) for x in cru_mol.GetBonds()]
-        graph.add_edges_from(edges)
+        graph = structutils.getGraph(cru_mol)
         bk_dihes = nx.shortest_path(graph, *cap_idxs)
         self.cru_bk_atom_ids = bk_dihes
 
@@ -581,51 +578,85 @@ class TransConformer(object):
             #             break
 
     def foldPolym(self):
-        data_file = os.path.join(self.relax_dir, self.data_file)
-        self.data_reader = oplsua.DataFileReader(data_file)
-        self.data_reader.run()
-        self.data_reader.setClashParams(include14=True, scale=0.6)
 
-        conformer = self.polym.GetConformer()
-        for atom in self.data_reader.atoms.values():
-            conformer.SetAtomPosition(atom.id - 1, np.array(atom.xyz))
-
-        self.setBackboneDihedrals()
-        self.setFragAtoms()
-
-        box = np.array(
-            [y for x in self.data_reader.box_dsp.values() for y in x])
-        frm = pd.DataFrame(conformer.GetPositions(),
-                           index=range(1,
-                                       conformer.GetNumAtoms() + 1),
-                           columns=['xu', 'yu', 'zu'])
-        frm.attrs['box'] = box
+        self.setPolymConformer()
+        frm = self.getFrm()
         random.seed(2022)
 
         for dihe, vals in self.bk_dihe_atom_ids.items():
             while (len(vals)):
                 random.shuffle(vals)
                 val = vals.pop()
-                Chem.rdMolTransforms.SetDihedralDeg(conformer, *dihe, val)
-                frm.loc[:] = conformer.GetPositions()
+                Chem.rdMolTransforms.SetDihedralDeg(self.conformer, *dihe, val)
+                frm.loc[:] = self.conformer.GetPositions()
                 dcell = traj.DistanceCell(frm=frm, cut=10, resolution=2.)
                 dcell.setUp()
                 clashes = []
-                # frag_atom_ids = self.frag_atom_ids[dihe]
-                # frag_rows = [frm.iloc[x] for x in frag_atom_ids]
-                # import pdb;pdb.set_trace()
-                for _, row in frm.iterrows():
+                frag_atom_ids = self.frag_atom_ids[dihe]
+                frag_rows = [frm.iloc[x] for x in frag_atom_ids]
+                for row in frag_rows:
                     clashes += dcell.getClashes(
                         row,
-                        # included= [x for x in frag_atom_ids]
+                        included=[x + 1 for x in self.existing_atom_ids],
                         radii=self.data_reader.radii,
                         excluded=self.data_reader.excluded)
                 if not clashes:
+                    self.existing_atom_ids += frag_atom_ids
                     break
         #         if clashes and not vals:
         #             import pdb;pdb.set_trace()
-        # import pdb;
-        # pdb.set_trace()
+        import pdb
+        pdb.set_trace()
+
+    def setPolymConformer(self):
+        data_file = os.path.join(self.relax_dir, self.data_file)
+        self.data_reader = oplsua.DataFileReader(data_file)
+        self.data_reader.run()
+        self.data_reader.setClashParams(include14=True, scale=0.6)
+
+        self.conformer = self.polym.GetConformer()
+        for atom in self.data_reader.atoms.values():
+            self.conformer.SetAtomPosition(atom.id - 1, np.array(atom.xyz))
+
+        # self.setBackboneDihedrals()
+        self.setMoleculeGraph()
+        self.findLongPath()
+        self.setDihedrals()
+        self.setFragAtoms()
+
+    def getFrm(self):
+        box = np.array(
+            [y for x in self.data_reader.box_dsp.values() for y in x])
+        frm = pd.DataFrame(self.conformer.GetPositions(),
+                           index=range(1,
+                                       self.conformer.GetNumAtoms() + 1),
+                           columns=['xu', 'yu', 'zu'])
+        frm.attrs['box'] = box
+        return frm
+
+    def setMoleculeGraph(self):
+        self.graph = structutils.getGraph(self.polym)
+
+    def findLongPath(self, source=None):
+        shortest_path = nx.shortest_path(self.graph, source=source)
+        path_length, path = 0, None
+        for a_source_node, target_path in shortest_path.items():
+            for a_target_node, a_path in target_path.items():
+                if path_length >= len(a_path):
+                    continue
+                source_node = a_source_node
+                target_node = a_target_node
+                path = a_path
+                path_length = len(a_path)
+        return source_node, target_node, path
+
+    def setDihedrals(self):
+        src, trgt, path = self.findLongPath()
+        dihes = zip(path[:-3], path[1:-2], path[2:-1], path[3:])
+        self.bk_dihe_atom_ids = {
+            tuple(x): list(np.linspace(0, 360, 36, endpoint=False))
+            for x in dihes
+        }
 
     def setBackboneDihedrals(self):
         cru_bk_atom_ids = set(self.cru_bk_atom_ids)
@@ -652,6 +683,8 @@ class TransConformer(object):
         }
 
     def setFragAtoms(self):
+        import pdb
+        pdb.set_trace()
         self.all_frag_atom_ids = {}
         conformer = self.polym.GetConformer()
         for dihe_atom_ids in self.bk_dihe_atom_ids.keys():

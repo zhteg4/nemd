@@ -66,7 +66,12 @@ class DistanceCell:
         ids = [tuple((id + x) % self.indexes) for x in self.neigh_ids]
         return [y for x in ids for y in self.atom_cell[x]]
 
-    def getClashes(self, row, included=None, excluded=None, radii=None, threshold=1.):
+    def getClashes(self,
+                   row,
+                   included=None,
+                   excluded=None,
+                   radii=None,
+                   threshold=1.):
         xyz = row.values
         neighbors = self.getNeighbors(xyz)
         try:
