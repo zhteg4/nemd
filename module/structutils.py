@@ -3,6 +3,7 @@ import networkx as nx
 EDGES = 'edges'
 WEIGHT = 'weight'
 
+
 def getGraph(mol):
     graph = nx.Graph()
     edges = [(
@@ -23,7 +24,10 @@ def getGraph(mol):
 def findLongPath(graph=None, mol=None, source=None, target=None, weight=None):
     if graph is None:
         graph = getGraph(mol)
-    shortest_path = nx.shortest_path(graph, source=source,target=target, weight=weight)
+    shortest_path = nx.shortest_path(graph,
+                                     source=source,
+                                     target=target,
+                                     weight=weight)
     if target is not None:
         shortest_path = {target: shortest_path}
     if source is not None:
