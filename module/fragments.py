@@ -1,10 +1,20 @@
 import traj
+import logutils
 import oplsua
 import random
 import numpy as np
 import pandas as pd
 from rdkit import Chem
 import structutils
+
+logger = logutils.createModuleLogger(file_path=__file__)
+
+
+def log_debug(msg):
+
+    if logger is None:
+        return
+    logger.debug(msg)
 
 
 class Fragment:
@@ -24,8 +34,8 @@ class Fragment:
         self.resetVals()
 
     def resetVals(self):
+        self.fval, self.val = True, None
         self.vals = list(np.linspace(0, 360, 36, endpoint=False))
-        self.fval = True
 
     def getNewDihes(self):
         source = self.dihe[1] if self.dihe else None
@@ -93,7 +103,7 @@ class Fragment:
     def getNxtFrags(self):
         all_nfrags = []
         nfrags = [self]
-        while(nfrags):
+        while (nfrags):
             nfrags = [y for x in nfrags for y in x.nfrags if not y.fval]
             all_nfrags += nfrags
         return all_nfrags
@@ -102,6 +112,7 @@ class Fragment:
         return self.fmol.hasClashes(self.atom_ids)
 
     def setConformer(self):
+        self.fmol.setDcell()
         while (self.vals):
             self.setDihedralDeg()
             if not self.hasClashes():
@@ -120,7 +131,8 @@ class FragMol:
         self.data_file = data_file
         self.conf = self.mol.GetConformer(0)
         self.graph = structutils.getGraph(mol)
-        self.rotatable_bonds = self.mol.GetSubstructMatches(self.PATT)
+        self.rotatable_bonds = self.mol.GetSubstructMatches(self.PATT,
+                                                            maxMatches=1000000)
         self.init_frag = None
         self.extg_aids = None
 
@@ -203,13 +215,9 @@ class FragMol:
 
     def hasClashes(self, atom_ids):
         self.frm.loc[:] = self.conf.GetPositions()
-        dcell = traj.DistanceCell(frm=self.frm,
-                                  cut=self.cell_cut,
-                                  resolution=self.cell_rez)
-        dcell.setUp()
         frag_rows = [self.frm.iloc[x] for x in atom_ids]
         for row in frag_rows:
-            clashes = dcell.getClashes(
+            clashes = self.dcell.getClashes(
                 row,
                 included=[x + 1 for x in self.extg_aids],
                 radii=self.data_reader.radii,
@@ -217,6 +225,13 @@ class FragMol:
             if clashes:
                 return True
         return False
+
+    def setDcell(self):
+        self.frm.loc[:] = self.conf.GetPositions()
+        self.dcell = traj.DistanceCell(frm=self.frm,
+                                       cut=self.cell_cut,
+                                       resolution=self.cell_rez)
+        self.dcell.setUp()
 
     def setConformer(self, seed=2022):
         random.seed(seed)
@@ -230,11 +245,13 @@ class FragMol:
                 continue
             frag = frag.getPreAvailFrag()
             nxt_frags = frag.getNxtFrags()
+            nxt_frags += [y for x in nxt_frags for y in x.nfrags]
             [x.resetVals() for x in nxt_frags]
             frags = [frag] + [x for x in frags if x not in nxt_frags]
-            ratom_ids = [y for x in nxt_frags for y in x.atom_ids]
+            ratom_ids = frag.atom_ids[:]
+            ratom_ids += [y for x in nxt_frags for y in x.atom_ids]
             self.extg_aids = self.extg_aids.difference(ratom_ids)
-            print(f"{len(self.extg_aids)}, {len(frag.vals)}: {frag}")
+            log_debug(f"{len(self.extg_aids)}, {len(frag.vals)}: {frag}")
 
     def run(self):
         self.addNxtFrags()

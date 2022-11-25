@@ -53,7 +53,8 @@ class DistanceCell:
 
     def setAtomCell(self, ):
         ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
-        self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1), dtype=np.bool)
+        self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
+                                  dtype=np.bool)
         for row in ids.itertuples():
             self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
 
@@ -75,10 +76,12 @@ class DistanceCell:
             neighbors.remove(row.name)
         except ValueError:
             pass
+        neighbors = set(neighbors)
         if included:
-            neighbors = [x for x in neighbors if x in included]
+            neighbors = neighbors.intersection(included)
         if excluded:
-            neighbors = [x for x in neighbors if x not in excluded[row.name]]
+            neighbors = neighbors.difference(excluded[row.name])
+        neighbors = list(neighbors)
         dists = np.linalg.norm(
             (self.frm.loc[neighbors] - xyz + self.hspan) % self.span -
             self.hspan,
