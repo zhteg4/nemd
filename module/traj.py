@@ -1,7 +1,8 @@
 import numpy as np
 import math
 import itertools
-import collections
+from bitsets import bitset
+from bitarray import bitarray
 
 
 class DistanceCell:
@@ -52,19 +53,15 @@ class DistanceCell:
 
     def setAtomCell(self, ):
         ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
-        self.atom_cell = collections.defaultdict(list)
-        for idx, row in ids.iterrows():
-            self.atom_cell[(
-                row.xu,
-                row.yu,
-                row.zu,
-            )].append(idx)
+        self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1), dtype=np.bool)
+        for row in ids.itertuples():
+            self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
 
     def getNeighbors(self, xyz):
 
         id = (xyz / self.grids).round().astype(int)
         ids = [tuple((id + x) % self.indexes) for x in self.neigh_ids]
-        return [y for x in ids for y in self.atom_cell[x]]
+        return [y for x in ids for y in self.atom_cell[x].nonzero()[0]]
 
     def getClashes(self,
                    row,

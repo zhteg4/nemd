@@ -1,5 +1,3 @@
-import os
-import copy
 import traj
 import oplsua
 import random
@@ -22,10 +20,12 @@ class Fragment:
         self.nfrags = []
         self.vals = []
         self.val = None
+        self.fval = True
         self.resetVals()
 
     def resetVals(self):
-        self.vals = list(np.linspace(0, 360, 24, endpoint=False))
+        self.vals = list(np.linspace(0, 360, 36, endpoint=False))
+        self.fval = True
 
     def getNewDihes(self):
         source = self.dihe[1] if self.dihe else None
@@ -72,6 +72,7 @@ class Fragment:
     def popVal(self):
         val = random.choice(self.vals)
         self.vals.remove(val)
+        self.fval = False
         return val
 
     def setDihedralDeg(self, val=None):
@@ -85,26 +86,27 @@ class Fragment:
         frag, rfrags = self, []
         while (frag.pfrag and not frag.vals):
             frag = frag.pfrag
-            [x.resetVals() for x in frag.nfrags]
-            rfrags += frag.nfrags
         if frag.pfrag is None and not frag.vals:
             raise ValueError('Conformer search failed.')
-        return frag, [y for x in rfrags for y in x.atom_ids]
+        return frag
 
-    # def markEdges(self, wt=0.0001):
-    #     marked = []
-    #     atom_ids_set = set(self.atom_ids)
-    #     for node in self.atom_ids:
-    #         edges = self.graph.nodes[node][structutils.EDGES]
-    #         edges = [x for x in edges if [y for y in x if y != node][0] in atom_ids_set]
-    #         marked += edges
-    #         for edge in edges:
-    #             self.graph.edges[edge][structutils.WEIGHT] = wt
-    #     return marked
-    #
-    # def clearEdges(self, edges):
-    #     for edge in edges:
-    #         self.graph.edges[edge].pop(structutils.WEIGHT)
+    def getNxtFrags(self):
+        all_nfrags = []
+        nfrags = [self]
+        while(nfrags):
+            nfrags = [y for x in nfrags for y in x.nfrags if not y.fval]
+            all_nfrags += nfrags
+        return all_nfrags
+
+    def hasClashes(self):
+        return self.fmol.hasClashes(self.atom_ids)
+
+    def setConformer(self):
+        while (self.vals):
+            self.setDihedralDeg()
+            if not self.hasClashes():
+                return True
+        return False
 
 
 class FragMol:
@@ -199,13 +201,13 @@ class FragMol:
                                 columns=['xu', 'yu', 'zu'])
         self.frm.attrs['box'] = box
 
-    def hasClashes(self, frag):
+    def hasClashes(self, atom_ids):
         self.frm.loc[:] = self.conf.GetPositions()
         dcell = traj.DistanceCell(frm=self.frm,
                                   cut=self.cell_cut,
                                   resolution=self.cell_rez)
         dcell.setUp()
-        frag_rows = [self.frm.iloc[x] for x in frag.atom_ids]
+        frag_rows = [self.frm.iloc[x] for x in atom_ids]
         for row in frag_rows:
             clashes = dcell.getClashes(
                 row,
@@ -213,29 +215,26 @@ class FragMol:
                 radii=self.data_reader.radii,
                 excluded=self.data_reader.excluded)
             if clashes:
-                return bool(clashes)
+                return True
         return False
 
-    def setConformer(self, seed=None):
+    def setConformer(self, seed=2022):
         random.seed(seed)
         frags = [self.init_frag]
         while (frags):
             frag = frags.pop(0)
-            print(len(self.extg_aids))
-            while (frag.vals):
-                frag.setDihedralDeg()
-                has_clashes = self.hasClashes(frag)
-                if not has_clashes:
-                    self.extg_aids = self.extg_aids.union(frag.atom_ids)
-                    frags += frag.nfrags
-                    break
-                if not frag.vals:
-                    frag, ratom_ids = frag.getPreAvailFrag()
-                    for ratom_id in ratom_ids:
-                        try:
-                            self.extg_aids.remove(ratom_id)
-                        except KeyError:
-                            pass
+            success = frag.setConformer()
+            if success:
+                self.extg_aids = self.extg_aids.union(frag.atom_ids)
+                frags += frag.nfrags
+                continue
+            frag = frag.getPreAvailFrag()
+            nxt_frags = frag.getNxtFrags()
+            [x.resetVals() for x in nxt_frags]
+            frags = [frag] + [x for x in frags if x not in nxt_frags]
+            ratom_ids = [y for x in nxt_frags for y in x.atom_ids]
+            self.extg_aids = self.extg_aids.difference(ratom_ids)
+            print(f"{len(self.extg_aids)}, {len(frag.vals)}: {frag}")
 
     def run(self):
         self.addNxtFrags()
