@@ -5,14 +5,20 @@ if [ -z "$1" ]; then
     exit
 fi
 
-SCRIPT_ABS_PATH="$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
+SCRIPT_DIR="$(dirname "$1")"
+if [ -d $SCRIPT_DIR ]; then
+    SCRIPT_ABS_PATH="$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
+fi
+
 if [ -f $SCRIPT_ABS_PATH ]; then
     SCRIPT_PATH=$SCRIPT_ABS_PATH
 fi
 
-args=("$@")
-SCRIPT_BASENAME=`basename ${args[0]}`
-SCRIPT_PATH=$NEMD_SCRIPTS/$SCRIPT_BASENAME
+if [ -z "$SCRIPT_PATH" ]; then
+    args=("$@")
+    SCRIPT_BASENAME=`basename ${args[0]}`
+    SCRIPT_PATH=$NEMD_SCRIPTS/$SCRIPT_BASENAME
+fi
 
 if [ ! -f $SCRIPT_PATH ]; then
     echo "Neither $SCRIPT_PATH or $SCRIPT_ABS_PATH exist."
