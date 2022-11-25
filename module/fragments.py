@@ -2,6 +2,7 @@ import traj
 import logutils
 import oplsua
 import random
+import itertools
 import numpy as np
 import pandas as pd
 from rdkit import Chem
@@ -151,9 +152,37 @@ class FragMol:
         return not in_ring and single
 
     def findLongPath(self, source=None, target=None):
-        return structutils.findLongPath(self.graph,
-                                        source=source,
-                                        target=target)
+
+        if any([
+                source is not None, target is not None,
+                not self.mol.GetBoolProp('is_mono')
+        ]):
+            return structutils.findLongPath(self.graph,
+                                            source=source,
+                                            target=target)
+        ht_atoms = {
+            x.GetProp('mono_id'): []
+            for x in self.mol.GetAtoms() if x.HasProp('POLYM_HT')
+        }
+        for atom in self.mol.GetAtoms():
+            try:
+                ht_atoms[atom.GetProp('mono_id')].append(atom.GetIdx())
+            except KeyError:
+                pass
+        st_atoms = list(ht_atoms.values())
+        sources = st_atoms[0]
+        targets = [y for x in st_atoms[1:] for y in x]
+        source, target, path, path_len = None, None, None, -1
+        for a_source, a_target in itertools.product(sources, targets):
+            _, _, a_path = structutils.findLongPath(self.graph,
+                                                    source=a_source,
+                                                    target=a_target)
+            if len(a_path) < path_len:
+                continue
+            path_len = len(a_path)
+            source, target, path = a_source, a_target, a_path
+
+        return source, target, path
 
     def addNxtFrags(self):
         self.init_frag = Fragment([], self)

@@ -265,6 +265,9 @@ class Polymer(object):
         ]
         ht_atoms = [x.GetNeighbors()[0] for x in capping_atoms]
         ht_atom_idxs = [x.GetIdx() for x in ht_atoms]
+        for polym_ht_atom_id in [ht_atom_idxs[0], ht_atom_idxs[-1]]:
+            combo.GetAtomWithIdx(polym_ht_atom_id).SetBoolProp(
+                'POLYM_HT', True)
         edcombo = Chem.EditableMol(combo)
         for t_atom_idx, h_atom_idx in zip(
                 ht_atom_idxs[1:-1:2],
