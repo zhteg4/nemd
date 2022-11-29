@@ -5,17 +5,20 @@ import copy
 import oplsua
 import lammps
 import random
+import symbols
+import jobutils
 import logutils
 import functools
+import constants
 import fragments
 import structutils
 import parserutils
 import fileutils
 import itertools
+import prop_names
 import collections
 import environutils
-import jobutils
-import symbols
+import conformerutils
 import numpy as np
 import networkx as nx
 from rdkit import Chem
@@ -186,7 +189,8 @@ class AmorphousCell(object):
         Duplicate molecules and set coordinates.
         """
         idxs = range(
-            math.ceil(math.pow(sum(x.num_mbox for x in self.polymers), 1. / 3)))
+            math.ceil(math.pow(sum(x.num_mbox for x in self.polymers),
+                               1. / 3)))
         vectors = [x * self.mbox for x in itertools.product(idxs, idxs, idxs)]
         mol_id, polymers = 0, self.polymers[:]
         while polymers:
@@ -200,9 +204,7 @@ class AmorphousCell(object):
                 mol_id, mol = mol_id + 1, copy.copy(polymer.polym)
                 self.mols[mol_id] = mol
                 mol.SetIntProp(Polymer.MOL_NUM, mol_id)
-                mtrx = np.identity(4)
-                mtrx[:-1, 3] = polymer.vecs[idx] + vector
-                Chem.rdMolTransforms.TransformConformer(mol.GetConformer(0), mtrx)
+                conformerutils.translation(mol.GetConformer(0), polymer.vecs[idx] + vector)
 
     def write(self):
         """
@@ -226,8 +228,20 @@ class Polymer(object):
     NEIGHBOR_CHARGE = oplsua.LammpsWriter.NEIGHBOR_CHARGE
     MOL_NUM = 'mol_num'
     IMPLICIT_H = oplsua.LammpsWriter.IMPLICIT_H
+    MONO_ATOM_IDX = 'mono_atom_idx'
+    CAP = 'cap'
+    HT = 'ht'
+    POLYM_HT = prop_names.POLYM_HT
+    IS_MONO = prop_names.IS_MONO
+    MONO_ID = prop_names.MONO_ID
+    LARGE_NUM = constants.LARGE_NUM
 
     def __init__(self, cru, cru_num, ff=None):
+        """
+        :param cru str: the smiles string for monomer
+        :param cru_num int: the number of monomers per polymer
+        :param ff str: the file path for the force field
+        """
         self.cru = cru
         self.cru_num = cru_num
         self.ff = ff
@@ -241,22 +255,27 @@ class Polymer(object):
             self.ff = oplsua.get_opls_parser()
 
     def run(self):
+        """
+        Main method to build one polymer.
+        """
         self.setCruMol()
-        self.markHT()
+        self.markMonomer()
         self.polymerize()
         self.assignAtomType()
         self.balanceCharge()
         self.embedMol()
 
     def setCruMol(self):
-
+        """
+        Set monomer mol based on the input smiles.
+        """
         cru_mol = Chem.MolFromSmiles(self.cru)
         for atom in cru_mol.GetAtoms():
-            if atom.GetSymbol() != 'C' or atom.GetIsAromatic():
+            if atom.GetSymbol() != symbols.CARBON or atom.GetIsAromatic():
                 continue
             atom.SetIntProp(self.IMPLICIT_H, atom.GetNumImplicitHs())
             atom.SetNoImplicit(True)
-
+        # FIXME: support monomers of different chiralties
         chiralty_info = Chem.FindMolChiralCenters(cru_mol,
                                                   includeUnassigned=True)
         for chiralty in chiralty_info:
@@ -264,39 +283,55 @@ class Polymer(object):
 
         self.cru_mol = Chem.AddHs(cru_mol)
 
-    def markHT(self):
-        is_mono = False
-        for atom in self.cru_mol.GetAtoms():
-            atom.SetIntProp('mono_atom_idx', atom.GetIdx())
-            if atom.GetSymbol() != symbols.WILD_CARD:
-                continue
-            is_mono = True
-            atom.SetBoolProp('CAP', True)
-            for neighbor in atom.GetNeighbors():
-                neighbor.SetBoolProp('HT', True)
-        self.cru_mol.SetBoolProp('is_mono', is_mono)
+    def markMonomer(self):
+        """
+        Marker monomer original atom indexes, head/tail and capping atoms.
+        """
+
+        capping = [
+            x for x in self.cru_mol.GetAtoms()
+            if x.GetSymbol() == symbols.WILD_CARD
+        ]
+        is_mono = True if capping else False
+        self.cru_mol.SetBoolProp(self.IS_MONO, is_mono)
+        [x.SetBoolProp(self.CAP, True) for x in capping]
+        [
+            y.SetBoolProp(self.HT, True) for x in capping
+            for y in x.GetNeighbors()
+        ]
+        [
+            x.SetIntProp(self.MONO_ATOM_IDX, x.GetIdx())
+            for x in self.cru_mol.GetAtoms()
+        ]
 
     def polymerize(self):
+        """
+        Polymerize from the monomer mol.
+        """
 
-        if not self.cru_mol.GetBoolProp('is_mono'):
+        if not self.cru_mol.GetBoolProp(self.IS_MONO):
             self.polym = self.cru_mol
             return
-
-        mols = [copy.copy(self.cru_mol) for x in range(self.cru_num)]
-        for mono_id, mol in enumerate(mols):
+        # Duplicate and index monomers
+        mols = []
+        for mono_id in range(1, self.cru_num + 1):
+            mol = copy.copy(self.cru_mol)
+            mols.append(mol)
             for atom in mol.GetAtoms():
-                atom.SetIntProp('mono_id', mono_id)
+                atom.SetIntProp(self.MONO_ID, mono_id)
+        # Combine monomers into one molecule
         combo = mols[0]
         for mol in mols[1:]:
             combo = Chem.CombineMols(combo, mol)
+        # Search head/tail atoms
         capping_atoms = [
             x for x in combo.GetAtoms() if x.GetSymbol() == symbols.WILD_CARD
         ]
         ht_atoms = [x.GetNeighbors()[0] for x in capping_atoms]
         ht_atom_idxs = [x.GetIdx() for x in ht_atoms]
-        for polym_ht_atom_id in [ht_atom_idxs[0], ht_atom_idxs[-1]]:
-            combo.GetAtomWithIdx(polym_ht_atom_id).SetBoolProp(
-                'POLYM_HT', True)
+        for polym_ht in [ht_atom_idxs[0], ht_atom_idxs[-1]]:
+            combo.GetAtomWithIdx(polym_ht).SetBoolProp(self.POLYM_HT, True)
+        # Create bonds between monomers
         edcombo = Chem.EditableMol(combo)
         for t_atom_idx, h_atom_idx in zip(
                 ht_atom_idxs[1:-1:2],
@@ -306,6 +341,7 @@ class Polymer(object):
                             h_atom_idx,
                             order=Chem.rdchem.BondType.SINGLE)
         polym = edcombo.GetMol()
+        # Delete capping atoms
         orgin_atom_num = None
         while (orgin_atom_num != polym.GetNumAtoms()):
             orgin_atom_num = polym.GetNumAtoms()
@@ -315,13 +351,16 @@ class Polymer(object):
         log(f"{Chem.MolToSmiles(self.polym)}")
 
     def assignAtomType(self):
+        """
+        Assign atom types for force field assignment.
+        """
         marked_smiles = {}
         marked_atom_ids = []
         res_num = 1
         for sml in self.ff.SMILES:
             frag = Chem.MolFromSmiles(sml.sml)
-            matches = self.polym.GetSubstructMatches(frag, maxMatches=1000000)
-            matches = [self.filterMatches(x, frag) for x in matches]
+            matches = self.polym.GetSubstructMatches(frag, maxMatches=self.LARGE_NUM)
+            matches = [self.filterMatch(x, frag) for x in matches]
             res_num, matom_ids = self.markMatches(matches, sml, res_num)
             if not matom_ids:
                 continue
@@ -336,10 +375,17 @@ class Polymer(object):
         log_debug(f"{res_num - 1} residues found.")
         [log_debug(f'{x}: {y}') for x, y in marked_smiles.items()]
 
-    def filterMatches(self, match, frag):
+    def filterMatch(self, match, frag):
+        """
+        Filter substruct matches based on connectivity.
+
+        :param match tuples: atom ids of one match
+        :param frag: the fragment of one force field templated smiles
+        :return: tuples: atom ids of one match with correct connectivity
+        """
         frag_cnnt = [
             x.GetNumImplicitHs() +
-            x.GetDegree() if x.GetSymbol() != 'C' else x.GetDegree()
+            x.GetDegree() if x.GetSymbol() != symbols.CARBON else x.GetDegree()
             for x in frag.GetAtoms()
         ]
         polm_cnnt = [self.polym.GetAtomWithIdx(x).GetDegree() for x in match]
@@ -350,6 +396,14 @@ class Polymer(object):
         return match
 
     def markMatches(self, matches, sml, res_num):
+        """
+        Mark the matched atoms.
+
+        :param matches list of tuple: each tuple has one pattern match
+        :param sml namedtuple: 'UA' namedtuple for smiles
+        :param res_num int: the residue number
+        :return int, list: incremented residue number, list of marked atom list
+        """
         marked_atom_ids = []
         for match in matches:
             log_debug(f"assignAtomType {sml.sml}, {match}")
@@ -360,6 +414,15 @@ class Polymer(object):
         return res_num, marked_atom_ids
 
     def markAtoms(self, match, sml, res_num):
+        """
+        Marker atoms with type id, res_num, and bonded_atom id for vdw/charge
+            table lookup, charge balance, and bond searching.
+
+        :param match tuple: atom ids of one match
+        :param sml namedtuple: 'UA' namedtuple for smiles
+        :param res_num int: the residue number
+        :return list: list of marked atom ids
+        """
         marked = []
         for atom_id, type_id in zip(match, sml.mp):
             if not type_id or atom_id is None:
@@ -368,7 +431,7 @@ class Polymer(object):
             try:
                 atom.GetIntProp(self.TYPE_ID)
             except KeyError:
-                self.setAtomIds(atom, type_id, res_num)
+                self.markAtom(atom, type_id, res_num)
                 marked.append(atom_id)
                 log_debug(
                     f"{atom.GetSymbol()}{atom.GetDegree()} {atom_id} {type_id}"
@@ -376,27 +439,38 @@ class Polymer(object):
             else:
                 continue
             for neighbor in atom.GetNeighbors():
-                if neighbor.GetSymbol() == 'H':
+                if neighbor.GetSymbol() == symbols.HYDROGEN:
                     type_id = sml.hs[type_id]
-                    self.setAtomIds(neighbor, type_id, res_num)
+                    self.markAtom(neighbor, type_id, res_num)
                     marked.append(neighbor.GetIdx())
                     log_debug(
                         f"{neighbor.GetSymbol()}{neighbor.GetDegree()} {neighbor.GetIdx()} {type_id}"
                     )
         return marked
 
-    def setAtomIds(self, atom, type_id, res_num):
+    def markAtom(self, atom, type_id, res_num):
+        """
+        Set atom id, res_num, and bonded_atom id.
+        :param atom 'rdkit.Chem.rdchem.Atom': the atom to mark
+        :param type_id int: atom type id
+        :param res_num int: residue number
+        """
+
         atom.SetIntProp(self.TYPE_ID, type_id)
         atom.SetIntProp(self.RES_NUM, res_num)
         atom.SetIntProp(self.BOND_ATM_ID,
                         oplsua.OPLS_Parser.BOND_ATOM[type_id])
 
     def balanceCharge(self):
+        """
+        Balance the charge when residues are not neutral.
+        """
         res_charge = collections.defaultdict(float)
         for atom in self.polym.GetAtoms():
             res_num = atom.GetIntProp(self.RES_NUM)
             type_id = atom.GetIntProp(self.TYPE_ID)
             res_charge[res_num] += self.ff.charges[type_id]
+
         for bond in self.polym.GetBonds():
             batom, eatom = bond.GetBeginAtom(), bond.GetEndAtom()
             bres_num = batom.GetIntProp(self.RES_NUM)
@@ -405,30 +479,50 @@ class Polymer(object):
                 continue
             for atom, natom in [[batom, eatom], [eatom, batom]]:
                 try:
+                    # When the atom has multiple residue neighbors
                     charge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
                 except KeyError:
                     charge = 0.0
                 ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
                 atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
-    def embedMol(self, trans=True):
+    def embedMol(self, trans=False):
+        """
+        Embed the molecule with coordinates.
 
+        :param trans bool: If True, all_trans conformer without entanglements is built.
+        """
         if self.polym.GetNumAtoms() <= 200 and not trans:
             AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
             return
 
-        trans_conf = TransConformer(self.polym, self.cru_mol)
+        trans_conf = Conformer(self.polym, self.cru_mol)
         trans_conf.run()
 
     def write(self):
+        """
+        Write lammps data file.
+        """
         lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
         lmw.writeLammpsData()
         lmw.writeLammpsIn()
 
 
-class TransConformer(object):
+class Conformer(object):
+    """
+    Conformer coordinate assignment.
+    """
+
+    CAP = Polymer.CAP
 
     def __init__(self, polym, original_cru_mol, ff=None, relaxation=True):
+        """
+
+        :param polym:
+        :param original_cru_mol:
+        :param ff:
+        :param relaxation:
+        """
         self.polym = polym
         self.original_cru_mol = original_cru_mol
         self.ff = ff
@@ -440,9 +534,12 @@ class TransConformer(object):
         self.conformer = None
 
     def run(self):
+        """
+        Main method set the conformer.
+        """
         self.setCruMol()
-        self.cruConformer()
-        self.setBackbone()
+        self.setCruConformer()
+        self.setCruBackbone()
         self.setTransAndRotate()
         self.rotateSideGroups()
         self.setXYZAndVect()
@@ -452,6 +549,9 @@ class TransConformer(object):
         self.foldPolym()
 
     def setCruMol(self):
+        """
+        Set monomer mol with elements tuned.
+        """
         cru_mol = copy.copy(self.original_cru_mol)
         atoms = [
             x for x in cru_mol.GetAtoms() if x.GetSymbol() == symbols.WILD_CARD
@@ -459,24 +559,30 @@ class TransConformer(object):
         neighbors = [x.GetNeighbors()[0] for x in atoms[::-1]]
         for atom, catom in zip(atoms, neighbors):
             atom.SetAtomicNum(catom.GetAtomicNum())
-            atom.SetBoolProp('CAP', True)
+            atom.SetBoolProp(self.CAP, True)
         self.cru_mol = cru_mol
 
-    def cruConformer(self):
+    def setCruConformer(self):
+        """
+        Set the cru conformer.
+        """
         AllChem.EmbedMolecule(self.cru_mol)
         self.cru_conformer = self.cru_mol.GetConformer(0)
 
-    def setBackbone(self, cru_mol=None):
-        if cru_mol is None:
-            cru_mol = self.cru_mol
-        cap_idxs = [x.GetIdx() for x in cru_mol.GetAtoms() if x.HasProp('CAP')]
+    def setCruBackbone(self):
+        """
+        Set the cru backbone atom ids.
+        """
+        cap_idxs = [x.GetIdx() for x in self.cru_mol.GetAtoms() if x.HasProp(self.CAP)]
         if len(cap_idxs) != 2:
             raise ValueError(f'{len(cap_idxs)} capping atoms are found.')
-        graph = structutils.getGraph(cru_mol)
-        bk_dihes = nx.shortest_path(graph, *cap_idxs)
-        self.cru_bk_atom_ids = bk_dihes
+        graph = structutils.getGraph(self.cru_mol)
+        self.cru_bk_atom_ids = nx.shortest_path(graph, *cap_idxs)
 
     def setTransAndRotate(self):
+        """
+        Set trans conformer with side group rotated.
+        """
 
         for dihe in zip(self.cru_bk_atom_ids[:-3], self.cru_bk_atom_ids[1:-2],
                         self.cru_bk_atom_ids[2:-1], self.cru_bk_atom_ids[3:]):
@@ -545,10 +651,11 @@ class TransConformer(object):
         cap_ht = [(
             x.GetIdx(),
             [y.GetIdx() for y in x.GetNeighbors()][0],
-        ) for x in self.cru_mol.GetAtoms() if x.HasProp('CAP')]
+        ) for x in self.cru_mol.GetAtoms() if x.HasProp(self.CAP)]
         middle_points = np.array([(self.cru_conformer.GetAtomPosition(x) +
                                    self.cru_conformer.GetAtomPosition(y)) / 2
                                   for x, y in cap_ht])
+
         self.vector = middle_points[1, :] - middle_points[0, :]
         self.xyzs = {
             x.GetIntProp('mono_atom_idx'):

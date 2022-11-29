@@ -3,6 +3,7 @@ import logutils
 import oplsua
 import random
 import itertools
+import prop_names
 import numpy as np
 import pandas as pd
 from rdkit import Chem
@@ -126,6 +127,9 @@ class FragMol:
     # https://ctr.fandom.com/wiki/Break_rotatable_bonds_and_report_the_fragments
     PATT = Chem.MolFromSmarts(
         '[!$([NH]!@C(=O))&!D1&!$(*#*)]-&!@[!$([NH]!@C(=O))&!D1&!$(*#*)]')
+    IS_MONO = prop_names.IS_MONO
+    MONO_ID = prop_names.MONO_ID
+    POLYM_HT = prop_names.POLYM_HT
 
     def __init__(self, mol, data_file=None):
         self.mol = mol
@@ -155,20 +159,21 @@ class FragMol:
 
         if any([
                 source is not None, target is not None,
-                not self.mol.GetBoolProp('is_mono')
+                not self.mol.GetBoolProp(self.IS_MONO)
         ]):
             return structutils.findLongPath(self.graph,
                                             source=source,
                                             target=target)
         ht_atoms = {
-            x.GetProp('mono_id'): []
-            for x in self.mol.GetAtoms() if x.HasProp('POLYM_HT')
+            x.GetProp(self.MONO_ID): []
+            for x in self.mol.GetAtoms() if x.HasProp(self.POLYM_HT)
         }
         for atom in self.mol.GetAtoms():
             try:
-                ht_atoms[atom.GetProp('mono_id')].append(atom.GetIdx())
+                ht_atoms[atom.GetProp(self.MONO_ID)].append(atom.GetIdx())
             except KeyError:
                 pass
+
         st_atoms = list(ht_atoms.values())
         sources = st_atoms[0]
         targets = [y for x in st_atoms[1:] for y in x]

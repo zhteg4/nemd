@@ -1,29 +1,13 @@
-import math
-import copy
-import sys
-import argparse
-import logutils
-import functools
 import os
 import sys
-
 import traj
-import opls
-import units
-import pandas as pd
+import oplsua
+import logutils
 import parserutils
-import fileutils
-import nemd
-import itertools
-import plotutils
-import collections
 import environutils
 import jobutils
-import symbols
 import numpy as np
-import oplsua
-from rdkit import Chem
-from rdkit.Chem import AllChem
+import pandas as pd
 
 FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
