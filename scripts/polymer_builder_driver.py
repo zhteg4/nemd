@@ -277,39 +277,58 @@ class Polymer(object):
                             h_atom_idx,
                             order=Chem.rdchem.BondType.SINGLE)
         polym = edcombo.GetMol()
-        self.polym = Chem.DeleteSubstructs(
-            polym, Chem.MolFromSmiles(symbols.WILD_CARD))
+        orgin_atom_num = None
+        while (orgin_atom_num != polym.GetNumAtoms()):
+            orgin_atom_num = polym.GetNumAtoms()
+            polym = Chem.DeleteSubstructs(
+                polym, Chem.MolFromSmiles(symbols.WILD_CARD))
+        self.polym = polym
         log(f"{Chem.MolToSmiles(self.polym)}")
 
     def assignAtomType(self):
+        marked_smiles = {}
         marked_atom_ids = []
         res_num = 1
         for sml in self.ff.SMILES:
-            if all(x.HasProp(self.TYPE_ID) for x in self.polym.GetAtoms()):
-                log_debug(f"{res_num - 1} residues found.")
-                return
             frag = Chem.MolFromSmiles(sml.sml)
             matches = self.polym.GetSubstructMatches(frag, maxMatches=1000000)
-            for match in matches:
-                frag_cnnt = [
-                    x.GetNumImplicitHs() +
-                    x.GetDegree() if x.GetSymbol() != 'C' else x.GetDegree()
-                    for x in frag.GetAtoms()
-                ]
-                polm_cnnt = [
-                    self.polym.GetAtomWithIdx(x).GetDegree() for x in match
-                ]
-                match = [
-                    x if y == z else None
-                    for x, y, z in zip(match, frag_cnnt, polm_cnnt)
-                ]
-                log_debug(f"assignAtomType {sml.sml}, {match}")
-                succeed = self.markAtoms(match, sml, res_num)
-                if succeed:
-                    res_num += 1
-                    marked_atom_ids += succeed
-        log_debug(f"{sorted(marked_atom_ids)}, {self.polym.GetNumAtoms()}")
+            matches = [self.filterMatches(x, frag) for x in matches]
+            res_num, matom_ids = self.markMatches(matches, sml, res_num)
+            if not matom_ids:
+                continue
+            cnt = collections.Counter([len(x) for x in matom_ids])
+            cnt_exp = str(len(matom_ids)) + ' matches ' + ','.join(
+                [f'{x}*{y}' for x, y in cnt.items()])
+            marked_smiles[sml.sml] = cnt_exp
+            marked_atom_ids += [y for x in matom_ids for y in x]
+            if all(x.HasProp(self.TYPE_ID) for x in self.polym.GetAtoms()):
+                break
+        log_debug(f"{len(marked_atom_ids)}, {self.polym.GetNumAtoms()}")
         log_debug(f"{res_num - 1} residues found.")
+        [log_debug(f'{x}: {y}') for x, y in marked_smiles.items()]
+
+    def filterMatches(self, match, frag):
+        frag_cnnt = [
+            x.GetNumImplicitHs() +
+            x.GetDegree() if x.GetSymbol() != 'C' else x.GetDegree()
+            for x in frag.GetAtoms()
+        ]
+        polm_cnnt = [self.polym.GetAtomWithIdx(x).GetDegree() for x in match]
+        match = [
+            x if y == z else None
+            for x, y, z in zip(match, frag_cnnt, polm_cnnt)
+        ]
+        return match
+
+    def markMatches(self, matches, sml, res_num):
+        marked_atom_ids = []
+        for match in matches:
+            log_debug(f"assignAtomType {sml.sml}, {match}")
+            marked = self.markAtoms(match, sml, res_num)
+            if marked:
+                res_num += 1
+                marked_atom_ids.append(marked)
+        return res_num, marked_atom_ids
 
     def markAtoms(self, match, sml, res_num):
         marked = []
