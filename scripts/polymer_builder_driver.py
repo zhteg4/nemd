@@ -1,36 +1,26 @@
-import math
-import copy
-import lammps
-import structutils
-import sys
-import argparse
-import random
-import networkx as nx
-import logutils
-import functools
 import os
 import sys
-import pandas as pd
-
+import math
+import copy
+import oplsua
+import lammps
+import random
+import logutils
+import functools
 import fragments
-import opls
-import units
-import traj
+import structutils
 import parserutils
 import fileutils
-import nemd
 import itertools
-import plotutils
 import collections
 import environutils
 import jobutils
 import symbols
 import numpy as np
-import oplsua
+import networkx as nx
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from scipy.spatial.transform import Rotation
-from rdkit import Geometry
 
 FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
@@ -40,28 +30,46 @@ MOLT_OUT_EXT = fileutils.MOLT_FF_EXT
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 
-LEN_CH = 1.0930  # length of the C-H bond
-# ~= 109.5 degrees = tetrahedronal angle (C-C-C angle)
-TETRAHEDRONAL_ANGLE = 2 * math.atan(math.sqrt(2))
-
 
 def log_debug(msg):
+    """
+    Print this message into the log file in debug mode.
+    :param msg str: the msg to print
+    """
     if logger:
         logger.debug(msg)
 
 
 def log(msg, timestamp=False):
+    """
+    Print this message into log file in regular mode.
+
+    :param msg: the msg to print
+    :param timestamp bool: print time after the msg
+    :return:
+    """
     if not logger:
         return
     logutils.log(logger, msg, timestamp=timestamp)
 
 
 def log_error(msg):
+    """
+    Print this message and exit the program.
+
+    :param msg str: the msg to print
+    """
     log(msg + '\nAborting...', timestamp=True)
     sys.exit(1)
 
 
 def get_parser():
+    """
+    The user-friendly command-line parser.
+
+    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
+        out of sys.argv.
+    """
     parser = parserutils.get_parser(
         description='Generate the moltemplate input *.lt')
     parser.add_argument(FlAG_CRU,
@@ -86,14 +94,29 @@ def get_parser():
 
 
 def validate_options(argv):
+    """
+    Parse and validate the command args
+
+    :param argv list: list of command input.
+    :return: 'argparse.ArgumentParser':  Parsed command-line options out of sys.argv
+    """
     parser = get_parser()
     options = parser.parse_args(argv)
     return options
 
 
 class AmorphousCell(object):
+    """
+    Build amorphous cell from molecules. (polymers may be built from monomers first)
+    """
 
     def __init__(self, options, jobname, ff=None):
+        """
+        :param options 'argparse.ArgumentParser':  Parsed command-line options
+        :param jobname str: the jobname based on which out filenames are figured
+            out
+        :param ff str: the force field filepath
+        """
         self.options = options
         self.jobname = jobname
         self.outfile = self.jobname + MOLT_OUT_EXT
@@ -105,88 +128,97 @@ class AmorphousCell(object):
             self.ff = oplsua.get_opls_parser()
 
     def run(self):
+        """
+        Main method to build the cell.
+        """
         self.setPolymers()
-        self.setMolecules()
+        self.setGriddedCell()
         self.write()
 
     def setPolymers(self):
+        """
+        Build polymer from monomers if provided.
+        """
         for cru, cru_num, in zip(self.options.cru, self.options.cru_num):
             polym = Polymer(cru, cru_num)
             polym.run()
             self.polymers.append(polym)
 
-    def setMolecules(self):
+    def setGriddedCell(self):
+        """
+        Set gridded amorphous cell.
+        """
         self.setBoxes()
         self.setPolymVectors()
         self.placeMols()
 
     def setBoxes(self):
-        boxes = []
-        for polymer in self.polymers:
-            polym = polymer.polym
-            conformer = polym.GetConformer(0)
-            xyzs = np.array([
-                conformer.GetAtomPosition(x.GetIdx())
-                for x in polym.GetAtoms()
-            ])
-            box = xyzs.max(axis=0) - xyzs.min(axis=0) + polymer.buffer
-            boxes.append(box)
+        """
+        Set the minimum box for each molecule.
+        """
 
-        self.boxes = np.array(boxes).reshape(-1, 3)
+        for polymer in self.polymers:
+            xyzs = polymer.polym.GetConformer(0).GetPositions()
+            polymer.box = xyzs.max(axis=0) - xyzs.min(axis=0) + polymer.buffer
+        self.mbox = np.array([x.box for x in self.polymers]).max(axis=0)
 
     def setPolymVectors(self):
-        mbox = self.boxes.max(axis=0)
-        for polymer, box, mol_num in zip(self.polymers, self.boxes,
-                                         self.options.mol_num):
-            polymer.mol_nums_per_mbox = np.floor(mbox / box).astype(int)
-            polymer.mol_num_per_mbox = np.product(polymer.mol_nums_per_mbox)
-            polymer.mol_num = mol_num
-            polymer.num_mbox = math.ceil(polymer.mol_num /
-                                         polymer.mol_num_per_mbox)
+        """
+        Set polymer translational vectors based on medium box size.
+        """
+        for polym, mol_num in zip(self.polymers, self.options.mol_num):
+            polym.mol_num = mol_num
+            mol_nums_per_mbox = np.floor(self.mbox / polym.box).astype(int)
+            polym.mol_num_per_mbox = np.product(mol_nums_per_mbox)
+            polym.num_mbox = math.ceil(polym.mol_num / polym.mol_num_per_mbox)
             percent = [
                 np.linspace(-0.5, 0.5, x, endpoint=False)
-                for x in polymer.mol_nums_per_mbox
+                for x in mol_nums_per_mbox
             ]
             percent = [x - x.mean() for x in percent]
-            polymer.vecs = [
-                x * mbox
+            polym.vecs = [
+                x * self.mbox
                 for x in itertools.product(*[[y for y in x] for x in percent])
             ]
 
     def placeMols(self):
-        polymers = [x for x in self.polymers]
+        """
+        Duplicate molecules and set coordinates.
+        """
         idxs = range(
-            math.ceil(math.pow(sum(x.num_mbox for x in polymers), 1. / 3)))
-        mbox = self.boxes.max(axis=0)
-        vectors = [x * mbox for x in itertools.product(idxs, idxs, idxs)]
-        mol_id = 0
+            math.ceil(math.pow(sum(x.num_mbox for x in self.polymers), 1. / 3)))
+        vectors = [x * self.mbox for x in itertools.product(idxs, idxs, idxs)]
+        mol_id, polymers = 0, self.polymers[:]
         while polymers:
             random.shuffle(vectors)
             vector = vectors.pop()
             polymer = random.choice(polymers)
-            for idx, new_added in enumerate(
-                    range(min([polymer.mol_num, polymer.mol_num_per_mbox]))):
-                mol_id += 1
+            for idx in range(min([polymer.mol_num, polymer.mol_num_per_mbox])):
                 polymer.mol_num -= 1
-                mol = copy.copy(polymer.polym)
+                if polymer.mol_num == 0:
+                    polymers.remove(polymer)
+                mol_id, mol = mol_id + 1, copy.copy(polymer.polym)
                 self.mols[mol_id] = mol
-                mol.SetIntProp('mol_num', mol_id)
-                conformer = mol.GetConformer(0)
-                for atom in mol.GetAtoms():
-                    atom_id = atom.GetIdx()
-                    xyz = list(conformer.GetAtomPosition(atom_id))
-                    xyz += (vector + polymer.vecs[idx])
-                    conformer.SetAtomPosition(atom_id, xyz)
-            if polymer.mol_num == 0:
-                polymers.remove(polymer)
+                mol.SetIntProp(Polymer.MOL_NUM, mol_id)
+                mtrx = np.identity(4)
+                mtrx[:-1, 3] = polymer.vecs[idx] + vector
+                Chem.rdMolTransforms.TransformConformer(mol.GetConformer(0), mtrx)
 
     def write(self):
+        """
+        Write amorphous cell as lammps data file.
+        :return:
+        """
         lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
         lmw.writeLammpsData(adjust_bond_legnth=False)
         lmw.writeLammpsIn()
 
 
 class Polymer(object):
+    """
+    Class to build a polymer from monomers.
+    """
+
     ATOM_ID = oplsua.LammpsWriter.ATOM_ID
     TYPE_ID = oplsua.LammpsWriter.TYPE_ID
     BOND_ATM_ID = oplsua.LammpsWriter.BOND_ATM_ID
@@ -195,18 +227,18 @@ class Polymer(object):
     MOL_NUM = 'mol_num'
     IMPLICIT_H = oplsua.LammpsWriter.IMPLICIT_H
 
-    def __init__(self, cru, cru_num, ff=None, srelaxation=True):
+    def __init__(self, cru, cru_num, ff=None):
         self.cru = cru
         self.cru_num = cru_num
         self.ff = ff
         self.polym = None
         self.polym_Hs = None
-        self.mols = {}
+        self.box = None
+        self.cru_mol = None
+        self.molecules = []
         self.buffer = oplsua.LammpsWriter.BUFFER
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
-        self.cru_mol = None
-        self.molecules = []
 
     def run(self):
         self.setCruMol()
@@ -215,9 +247,6 @@ class Polymer(object):
         self.assignAtomType()
         self.balanceCharge()
         self.embedMol()
-        # self.setMols()
-        # self.write()
-        # log('Finished', timestamp=True)
 
     def setCruMol(self):
 
@@ -390,30 +419,6 @@ class Polymer(object):
 
         trans_conf = TransConformer(self.polym, self.cru_mol)
         trans_conf.run()
-
-    def setMols(self):
-
-        conformer = self.polym.GetConformer(0)
-        xyzs = np.array([
-            conformer.GetAtomPosition(x.GetIdx())
-            for x in self.polym.GetAtoms()
-        ])
-        mol_bndr = xyzs.max(axis=0) - xyzs.min(axis=0)
-        mol_vec = mol_bndr + self.buffer
-        idxs = range(math.ceil(math.pow(self.options.mol_num, 1. / 3)))
-        idxs_3d = itertools.product(idxs, idxs, idxs)
-        for mol_id, idxs in enumerate(idxs_3d, 1):
-            if mol_id > self.options.mol_num:
-                return
-            polym = copy.copy(self.polym)
-            self.mols[mol_id] = polym
-            polym.SetIntProp(self.MOL_NUM, mol_id)
-            polym_conformer = polym.GetConformer(0)
-            for atom in polym.GetAtoms():
-                atom_id = atom.GetIdx()
-                xyz = list(conformer.GetAtomPosition(atom_id))
-                xyz += mol_vec * idxs
-                polym_conformer.SetAtomPosition(atom_id, xyz)
 
     def write(self):
         lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
