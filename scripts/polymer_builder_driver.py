@@ -23,7 +23,6 @@ import numpy as np
 import networkx as nx
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from scipy.spatial.transform import Rotation
 
 FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
@@ -204,7 +203,8 @@ class AmorphousCell(object):
                 mol_id, mol = mol_id + 1, copy.copy(polymer.polym)
                 self.mols[mol_id] = mol
                 mol.SetIntProp(Polymer.MOL_NUM, mol_id)
-                conformerutils.translation(mol.GetConformer(0), polymer.vecs[idx] + vector)
+                conformerutils.translation(mol.GetConformer(0),
+                                           polymer.vecs[idx] + vector)
 
     def write(self):
         """
@@ -359,7 +359,8 @@ class Polymer(object):
         res_num = 1
         for sml in self.ff.SMILES:
             frag = Chem.MolFromSmiles(sml.sml)
-            matches = self.polym.GetSubstructMatches(frag, maxMatches=self.LARGE_NUM)
+            matches = self.polym.GetSubstructMatches(frag,
+                                                     maxMatches=self.LARGE_NUM)
             matches = [self.filterMatch(x, frag) for x in matches]
             res_num, matom_ids = self.markMatches(matches, sml, res_num)
             if not matom_ids:
@@ -384,8 +385,8 @@ class Polymer(object):
         :return: tuples: atom ids of one match with correct connectivity
         """
         frag_cnnt = [
-            x.GetNumImplicitHs() +
-            x.GetDegree() if x.GetSymbol() != symbols.CARBON else x.GetDegree()
+            x.GetNumImplicitHs() + x.GetDegree()
+            if x.GetSymbol() != symbols.CARBON else x.GetDegree()
             for x in frag.GetAtoms()
         ]
         polm_cnnt = [self.polym.GetAtomWithIdx(x).GetDegree() for x in match]
@@ -486,7 +487,7 @@ class Polymer(object):
                 ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
                 atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
-    def embedMol(self, trans=False):
+    def embedMol(self, trans=True):
         """
         Embed the molecule with coordinates.
 
@@ -496,7 +497,7 @@ class Polymer(object):
             AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
             return
 
-        trans_conf = Conformer(self.polym, self.cru_mol)
+        trans_conf = Conformer(self.polym, self.cru_mol, trans=trans)
         trans_conf.run()
 
     def write(self):
@@ -514,38 +515,55 @@ class Conformer(object):
     """
 
     CAP = Polymer.CAP
+    MONO_ATOM_IDX = Polymer.MONO_ATOM_IDX
+    MONO_ID = Polymer.MONO_ID
+    OUT_EXTN = '.sdf'
 
-    def __init__(self, polym, original_cru_mol, ff=None, relaxation=True):
+    def __init__(self,
+                 polym,
+                 original_cru_mol,
+                 ff=None,
+                 trans=False,
+                 jobname=None,
+                 minimization=True):
         """
-
-        :param polym:
-        :param original_cru_mol:
-        :param ff:
-        :param relaxation:
+        :param polym 'rdkit.Chem.rdchem.Mol': the polymer to set conformer
+        :param original_cru_mol 'rdkit.Chem.rdchem.Mol': the monomer mol
+            constructing the polymer
+        :param ff 'OPLS_Parser': force field information.
+        :param trans bool: Whether all-tran conformation is requested.
+        :param jobname str: The jobname
+        :param minimization bool: Whether LAMMPS minimization is performed.
         """
         self.polym = polym
         self.original_cru_mol = original_cru_mol
         self.ff = ff
-        self.relaxation = relaxation
+        self.trans = trans
+        self.jobname = jobname
+        self.minimization = minimization
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
+        if self.jobname is None:
+            self.jobname = 'conf_search'
         self.relax_dir = '_relax'
         self.data_file = 'data.polym'
         self.conformer = None
+        self.lmw = None
 
     def run(self):
         """
         Main method set the conformer.
         """
+
         self.setCruMol()
         self.setCruConformer()
         self.setCruBackbone()
-        self.setTransAndRotate()
+        self.transAndRotate()
         self.rotateSideGroups()
         self.setXYZAndVect()
         self.setConformer()
         self.adjustConformer()
-        self.lammpsRelaxation()
+        self.minimize()
         self.foldPolym()
 
     def setCruMol(self):
@@ -573,135 +591,159 @@ class Conformer(object):
         """
         Set the cru backbone atom ids.
         """
-        cap_idxs = [x.GetIdx() for x in self.cru_mol.GetAtoms() if x.HasProp(self.CAP)]
+        cap_idxs = [
+            x.GetIdx() for x in self.cru_mol.GetAtoms() if x.HasProp(self.CAP)
+        ]
         if len(cap_idxs) != 2:
             raise ValueError(f'{len(cap_idxs)} capping atoms are found.')
         graph = structutils.getGraph(self.cru_mol)
         self.cru_bk_atom_ids = nx.shortest_path(graph, *cap_idxs)
 
-    def setTransAndRotate(self):
+    def transAndRotate(self):
         """
-        Set trans conformer with side group rotated.
+        Set trans-conformer with translation and rotation.
         """
 
         for dihe in zip(self.cru_bk_atom_ids[:-3], self.cru_bk_atom_ids[1:-2],
                         self.cru_bk_atom_ids[2:-1], self.cru_bk_atom_ids[3:]):
             Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer, *dihe, 180)
 
-        bh_xyzs = np.array(
-            [self.cru_conformer.GetAtomPosition(x) for x in dihe])
-        centroid = bh_xyzs.mean(axis=0)
-        for atom_id in range(self.cru_conformer.GetNumAtoms()):
-            atom_pos = self.cru_conformer.GetAtomPosition(atom_id) - centroid
-            self.cru_conformer.SetAtomPosition(atom_id, atom_pos)
+        cntrd = conformerutils.centroid(self.cru_conformer,
+                                        atom_ids=self.cru_bk_atom_ids)
 
-        bvectors = (bh_xyzs[1:, :] - bh_xyzs[:-1, :])
-        nc_vector = bvectors[::2].mean(axis=0)
-        nc_vector /= np.linalg.norm(nc_vector)
-        nm_mvector = bvectors[1::2].mean(axis=0)
-        nm_mvector /= np.linalg.norm(nm_mvector)
-        avect_norm = nc_vector + nm_mvector
-        avect_norm /= np.linalg.norm(avect_norm)
-        bvect_norm = nc_vector - nm_mvector
-        bvect_norm /= np.linalg.norm(bvect_norm)
-        cvect_norm = np.cross(avect_norm, bvect_norm)
-        cvect_norm /= np.linalg.norm(cvect_norm)
-        abc_norms = np.concatenate([
-            avect_norm.reshape(1, -1),
-            bvect_norm.reshape(1, -1),
-            cvect_norm.reshape(1, -1)
-        ],
-                                   axis=0)
+        conformerutils.translation(self.cru_conformer, -np.array(cntrd))
+        abc_norms = self.getABCVectors()
         abc_targeted = np.eye(3)
-        rotation, rmsd = Rotation.align_vectors(abc_targeted, abc_norms)
-        for atom_id in range(self.cru_conformer.GetNumAtoms()):
-            atom_pos = self.cru_conformer.GetAtomPosition(atom_id)
-            self.cru_conformer.SetAtomPosition(atom_id,
-                                               rotation.apply(atom_pos))
+        conformerutils.rotate(self.cru_conformer, abc_norms, abc_targeted)
+
+    def getABCVectors(self):
+        """
+        Get the a, b, c vectors of the molecule.
+
+        :return 3x3 'numpy.ndarray': a vector is parallel with the backbone,
+            b and c vectors are perpendicular with the backbone.
+        """
+
+        def get_norm(vect):
+            """
+            Get the normalized vector.
+
+            :param vect 'numpy.ndarray': input vector
+            :return 'numpy.ndarray': normalized vector
+            """
+            vect /= np.linalg.norm(vect)
+            return vect
+
+        bh_xyzs = np.array([
+            self.cru_conformer.GetAtomPosition(x) for x in self.cru_bk_atom_ids
+        ])
+        bvectors = (bh_xyzs[1:, :] - bh_xyzs[:-1, :])
+        nc_vector = get_norm(bvectors[::2].mean(axis=0))
+        nm_mvector = get_norm(bvectors[1::2].mean(axis=0))
+        avect = get_norm(nc_vector + nm_mvector).reshape(1, -1)
+        bvect = get_norm(nc_vector - nm_mvector).reshape(1, -1)
+        cvect = get_norm(np.cross(avect, bvect)).reshape(1, -1)
+        abc_norms = np.concatenate([avect, bvect, cvect], axis=0)
+        return abc_norms
 
     def rotateSideGroups(self):
+        """
+        Rotate the bond between the backbone and side group.
+        """
 
-        bonded_atom_ids = [(
-            x.GetBeginAtomIdx(),
-            x.GetEndAtomIdx(),
-        ) for x in self.cru_mol.GetBonds()]
-        bk_aids_set = set(self.cru_bk_atom_ids)
-        side_atom_ids = [
-            x for x in bonded_atom_ids if len(bk_aids_set.intersection(x)) == 1
+        def get_other_atom(aid1, aid2):
+            """
+            Get one atom id that is bonded to aid1 beyond aid2.
+
+            :param aid1 int: The neighbors of this atom is searched.
+            :param aid2 int: This is excluded from the neighbor search
+            :return one atom id that is bonded to aid1 beyond aid2:
+            """
+            aids = self.cru_mol.GetAtomWithIdx(aid1).GetNeighbors()
+            aids = [x.GetIdx() for x in aids]
+            aids.remove(aid2)
+            return aids[0]
+
+        # Search for atom pairs connecting the backbone and the side group
+        bonds = self.cru_mol.GetBonds()
+        bonded_aids = [(x.GetBeginAtomIdx(), x.GetEndAtomIdx()) for x in bonds]
+        bk_ids = set(self.cru_bk_atom_ids)
+        side_aids = [
+            x for x in bonded_aids if len(bk_ids.intersection(x)) == 1
         ]
+        side_aids = [x if x[0] in bk_ids else reversed(x) for x in side_aids]
+        # Get the dihedral atom ids that move the side group
         side_dihes = []
-        for batom_id, eatom_id in side_atom_ids:
-            id1 = [
-                x.GetIdx()
-                for x in self.cru_mol.GetAtomWithIdx(batom_id).GetNeighbors()
-                if x.GetIdx() != eatom_id
-            ][0]
-            id4 = [
-                x.GetIdx()
-                for x in self.cru_mol.GetAtomWithIdx(eatom_id).GetNeighbors()
-                if x.GetIdx() != batom_id
-            ][0]
-            side_dihes.append([id1, batom_id, eatom_id, id4])
-        for dihe_atom_ids in side_dihes:
-            Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer,
-                                                *dihe_atom_ids, 90)
+        for id2, id3 in side_aids:
+            id1 = get_other_atom(id2, id3)
+            id4 = get_other_atom(id3, id2)
+            side_dihes.append([id1, id2, id3, id4])
+        for dihe in side_dihes:
+            Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer, *dihe, 90)
 
     def setXYZAndVect(self):
+        """
+        Set the XYZ of the non-capping atoms and translational vector, preparing
+        for the monomer coordinate shifting.
+        """
 
-        cap_ht = [(
-            x.GetIdx(),
-            [y.GetIdx() for y in x.GetNeighbors()][0],
-        ) for x in self.cru_mol.GetAtoms() if x.HasProp(self.CAP)]
-        middle_points = np.array([(self.cru_conformer.GetAtomPosition(x) +
-                                   self.cru_conformer.GetAtomPosition(y)) / 2
-                                  for x, y in cap_ht])
+        cap_ht = [x for x in self.cru_mol.GetAtoms() if x.HasProp(self.CAP)]
+        cap_ht = [(x.GetIdx(), x.GetNeighbors()[0].GetIdx()) for x in cap_ht]
+        middle_points = np.array([
+            np.mean([self.cru_conformer.GetAtomPosition(y) for y in x], axis=0)
+            for x in cap_ht
+        ])
 
         self.vector = middle_points[1, :] - middle_points[0, :]
         self.xyzs = {
-            x.GetIntProp('mono_atom_idx'):
+            x.GetIntProp(self.MONO_ATOM_IDX):
             np.array(self.cru_conformer.GetAtomPosition(x.GetIdx()))
-            for x in self.cru_mol.GetAtoms() if x.HasProp('mono_atom_idx')
+            for x in self.cru_mol.GetAtoms() if x.HasProp(self.MONO_ATOM_IDX)
         }
 
     def setConformer(self):
-        mid_aid = collections.defaultdict(list)
+        """
+        Build and set the conformer.
+        """
+        mono_id_atoms = collections.defaultdict(list)
         for atom in self.polym.GetAtoms():
-            mid_aid[atom.GetIntProp('mono_id')].append(atom.GetIdx())
-
-        id_coords = {}
-        for mono_id, atom_id in mid_aid.items():
-            aid_oid = {
-                x: self.polym.GetAtomWithIdx(x).GetIntProp('mono_atom_idx')
-                for x in atom_id
-            }
-            vect = mono_id * self.vector
-            aid_xyz = {x: self.xyzs[y] + vect for x, y in aid_oid.items()}
-            id_coords.update(aid_xyz)
+            mono_id_atoms[atom.GetIntProp(self.MONO_ID)].append(atom)
 
         conformer = Chem.rdchem.Conformer(self.polym.GetNumAtoms())
-        for id, xyz in id_coords.items():
-            conformer.SetAtomPosition(id, xyz)
+        for mono_id, atoms in mono_id_atoms.items():
+            vect = mono_id * self.vector
+            for atom in atoms:
+                mono_atom_id = atom.GetIntProp(self.MONO_ATOM_IDX)
+                xyz = self.xyzs[mono_atom_id] + vect
+                conformer.SetAtomPosition(atom.GetIdx(), xyz)
         self.polym.AddConformer(conformer)
         Chem.GetSymmSSSR(self.polym)
 
     def adjustConformer(self):
-        self.lmw = oplsua.LammpsWriter(self.ff,
-                                       'myjobname',
-                                       mols={1: self.polym})
-        if not self.relaxation:
-            self.lmw.adjustConformer()
+        """
+        Adjust the conformer coordinates based on the force field.
+        """
+        mols = {1: self.polym}
+        self.lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=mols)
+        if self.minimization:
             return
+        self.lmw.adjustConformer()
+
+    def minimize(self):
+        """
+        Run force field minimizer.
+        """
+        if not self.minimization:
+            return
+
         with fileutils.chdir(self.relax_dir):
             self.lmw.writeLammpsData()
             self.lmw.writeLammpsIn()
-
-    def lammpsRelaxation(self, min_cycle=10, max_cycle=100, threshold=.99):
-
-        with fileutils.chdir(self.relax_dir):
             lmp = lammps.lammps(cmdargs=['-screen', 'none'])
             lmp.file(self.lmw.lammps_in)
             lmp.command(f'write_data {self.data_file}')
-            # import pdb;pdb.set_trace()
+            # Don't delete: The following is one example for interactive lammps
+            # min_cycle=10, max_cycle=100, threshold=.99
             # lmp.command('compute 1 all gyration')
             # data = []
             # for iclycle in range(max_cycle):
@@ -713,37 +755,54 @@ class Conformer(object):
             #             break
 
     def foldPolym(self):
+        """
+        Fold polymer chain with clash check.
+        """
+        if self.trans or not self.minimize:
+            return
 
         data_file = os.path.join(self.relax_dir, self.data_file)
         fmol = fragments.FragMol(self.polym, data_file=data_file)
         fmol.run()
 
-    def write(self):
+    @classmethod
+    def write(cls, mol, filename):
+        """
+        Write the polymer and monomer into sdf files.
 
-        with Chem.SDWriter('polym.sdf') as polym_fh:
-            polym_fh.SetProps(["mono_atom_idxs"])
-            mono_atom_idxs = [
-                x.GetIntProp('mono_atom_idx') for x in self.polym.GetAtoms()
-            ]
-            self.polym.SetProp('mono_atom_idxs',
-                               ' '.join(map(str, mono_atom_idxs)))
-            polym_fh.write(self.polym)
+        :param mol 'rdkit.Chem.rdchem.Mol': The molecule to write out
+        :param filename str: The file path to write into
+        """
 
-        with Chem.SDWriter('original_cru_mol.sdf') as cru_fh:
-            cru_fh.write(self.original_cru_mol)
+        with Chem.SDWriter(filename) as fh:
+            try:
+                mono_atom_idxs = [
+                    x.GetIntProp(cls.MONO_ATOM_IDX) for x in mol.GetAtoms()
+                ]
+            except KeyError:
+                fh.write(mol)
+                return
+            mol.SetProps([cls.MONO_ATOM_IDX])
+            mol.SetProp(cls.MONO_ATOM_IDX, ' '.join(map(str, mono_atom_idxs)))
+            fh.write(mol)
 
-    @staticmethod
-    def read(filename):
+    @classmethod
+    def read(cls, filename):
+        """
+        Read molecule from file path.
+
+        :param filename str: the file path to read molecule from.
+        :return 'rdkit.Chem.rdchem.Mol': The molecule with properties.
+        """
         suppl = Chem.SDMolSupplier(filename, sanitize=False, removeHs=False)
         mol = next(suppl)
-        # mol = Chem.AddHs(mol)
         Chem.GetSymmSSSR(mol)
         try:
-            mono_atom_idxs = mol.GetProp('mono_atom_idxs').split()
+            mono_atom_idxs = mol.GetProp(cls.MONO_ATOM_IDX).split()
         except KeyError:
             return mol
         for atom, mono_atom_idx in zip(mol.GetAtoms(), mono_atom_idxs):
-            atom.SetProp('mono_atom_idx', mono_atom_idx)
+            atom.SetProp(cls.MONO_ATOM_IDX, mono_atom_idx)
         return mol
 
 

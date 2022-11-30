@@ -1219,7 +1219,10 @@ class DataFileReader(LammpsWriter):
                 id4=int(id4))
 
     def setImpropers(self):
-        sidx = self.mk_idxes[self.IMPROPERS_CAP] + 2
+        try:
+            sidx = self.mk_idxes[self.IMPROPERS_CAP] + 2
+        except KeyError:
+            return
         for id, lid in enumerate(
                 range(sidx, sidx + self.struct_dsp[self.IMPROPERS]), 1):
             id, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
