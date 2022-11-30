@@ -212,7 +212,7 @@ class FragMol:
         return all_frags
 
     def getNumFrags(self):
-        pass
+        return len(self.fragments())
 
     def setInitAtomIds(self):
         frags = self.fragments()
@@ -268,6 +268,7 @@ class FragMol:
         self.dcell.setUp()
 
     def setConformer(self, seed=2022):
+        log_debug(f"{self.getNumFrags()} fragments found.")
         random.seed(seed)
         frags = [self.init_frag]
         while (frags):

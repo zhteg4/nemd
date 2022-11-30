@@ -208,12 +208,14 @@ class AmorphousCell(object):
 
     def write(self):
         """
-        Write amorphous cell as lammps data file.
+        Write amorphous cell into data file.
         :return:
         """
         lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
         lmw.writeLammpsData(adjust_bond_legnth=False)
         lmw.writeLammpsIn()
+        log(f'Data file written into {lmw.lammps_data}.')
+        log(f'In script written into {lmw.lammps_in}.')
 
 
 class Polymer(object):
@@ -348,7 +350,7 @@ class Polymer(object):
             polym = Chem.DeleteSubstructs(
                 polym, Chem.MolFromSmiles(symbols.WILD_CARD))
         self.polym = polym
-        log(f"{Chem.MolToSmiles(self.polym)}")
+        log(f"Polymer SMILES: {Chem.MolToSmiles(self.polym)}")
 
     def assignAtomType(self):
         """
@@ -487,11 +489,12 @@ class Polymer(object):
                 ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
                 atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
-    def embedMol(self, trans=True):
+    def embedMol(self, trans=False):
         """
         Embed the molecule with coordinates.
 
-        :param trans bool: If True, all_trans conformer without entanglements is built.
+        :param trans bool: If True, all_trans conformer without entanglements is
+            built.
         """
         if self.polym.GetNumAtoms() <= 200 and not trans:
             AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
@@ -758,12 +761,14 @@ class Conformer(object):
         """
         Fold polymer chain with clash check.
         """
-        if self.trans or not self.minimize:
+
+        if self.trans or not self.minimization:
             return
 
         data_file = os.path.join(self.relax_dir, self.data_file)
         fmol = fragments.FragMol(self.polym, data_file=data_file)
         fmol.run()
+        log('An entangled conformer set.')
 
     @classmethod
     def write(cls, mol, filename):
@@ -818,6 +823,7 @@ def main(argv):
     logutils.logOptions(logger, options)
     cell = AmorphousCell(options, jobname)
     cell.run()
+    log('Finished.', timestamp=True)
 
 
 if __name__ == "__main__":
