@@ -1,13 +1,13 @@
 import traj
-import logutils
 import oplsua
 import random
+import logutils
 import itertools
 import prop_names
+import structutils
 import numpy as np
 import pandas as pd
 from rdkit import Chem
-import structutils
 
 logger = logutils.createModuleLogger(file_path=__file__)
 
@@ -141,6 +141,11 @@ class FragMol:
         self.init_frag = None
         self.extg_aids = None
 
+    def isRotatable(self, bond):
+        in_ring = self.mol.GetBondBetweenAtoms(*bond).IsInRing()
+        single = tuple(sorted(bond)) in self.rotatable_bonds
+        return not in_ring and single
+
     def getSwingAtoms(self, *dihe):
         oxyz = self.conf.GetPositions()
         oval = Chem.rdMolTransforms.GetDihedralDeg(self.conf, *dihe)
@@ -149,11 +154,6 @@ class FragMol:
         changed = np.isclose(oxyz, xyz)
         Chem.rdMolTransforms.SetDihedralDeg(self.conf, *dihe, oval)
         return [i for i, x in enumerate(changed) if not all(x)]
-
-    def isRotatable(self, bond):
-        in_ring = self.mol.GetBondBetweenAtoms(*bond).IsInRing()
-        single = tuple(sorted(bond)) in self.rotatable_bonds
-        return not in_ring and single
 
     def findLongPath(self, source=None, target=None):
 

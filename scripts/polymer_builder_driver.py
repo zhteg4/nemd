@@ -746,6 +746,7 @@ class Conformer(object):
             lmp = lammps.lammps(cmdargs=['-screen', 'none'])
             lmp.file(self.lmw.lammps_in)
             lmp.command(f'write_data {self.data_file}')
+            lmp.close()
             # Don't delete: The following is one example for interactive lammps
             # min_cycle=10, max_cycle=100, threshold=.99
             # lmp.command('compute 1 all gyration')
