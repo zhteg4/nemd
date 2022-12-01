@@ -736,6 +736,7 @@ class Conformer(object):
         """
         Run force field minimizer.
         """
+
         if not self.minimization:
             return
 

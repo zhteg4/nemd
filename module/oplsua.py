@@ -464,7 +464,7 @@ class LammpsWriter(fileutils.LammpsInput):
                 atoms = [x for x in atoms if x.id in self.used_atom_types]
             smbs = ' '.join(map(str, [x.symbol for x in atoms]))
             self.in_fh.write(f"dump_modify 1 element {smbs}\n")
-        self.in_fh.write("minimize 1.0e-4 1.0e-6 100 1000\n")
+        self.in_fh.write("minimize 1.0e-4 1.0e-6 1000 100000\n")
 
     def writeTimestep(self):
         self.in_fh.write(f'timestep {self.timestep}\n')
@@ -579,7 +579,7 @@ class LammpsWriter(fileutils.LammpsInput):
         box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
         if len(self.mols) == 1:
-            box_hf = [max(box_hf) * 1.2 for x in box_hf]
+            box_hf = [x * 1.2 for x in box_hf]
         centroid = xyzs.mean(axis=0)
         for dim in range(3):
             self.data_fh.write(
