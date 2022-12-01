@@ -5,12 +5,12 @@ import pytest
 from testutils import SINGLE_NEMD, CRYSTAL_NEMD
 
 
-
 class TestTempReader(object):
 
     @pytest.fixture
     def temp_reader(self):
-        temp_file = testutils.test_file(os.path.join(SINGLE_NEMD, 'temp.profile'))
+        temp_file = testutils.test_file(
+            os.path.join(SINGLE_NEMD, 'temp.profile'))
         temp_reader = fileutils.TempReader(temp_file)
         return temp_reader
 
@@ -37,7 +37,8 @@ class TestLammpsInput(object):
 
     @pytest.fixture
     def lammps_input_reader(self):
-        input_file = testutils.test_file(os.path.join(SINGLE_NEMD, 'in.nemd_cff91'))
+        input_file = testutils.test_file(
+            os.path.join(SINGLE_NEMD, 'in.nemd_cff91'))
         lammps_in = fileutils.LammpsInput(input_file)
         return lammps_in
 
@@ -53,7 +54,8 @@ class TestLammpsLogReader(object):
 
     @pytest.fixture
     def lammps_log_reader(self):
-        log_file = testutils.test_file(os.path.join(CRYSTAL_NEMD, 'log.lammps'))
+        log_file = testutils.test_file(os.path.join(CRYSTAL_NEMD,
+                                                    'log.lammps'))
         lammps_log = fileutils.LammpsLogReader(log_file)
         return lammps_log
 

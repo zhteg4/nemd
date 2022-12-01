@@ -21,7 +21,7 @@ def getGraph(mol):
     return graph
 
 
-def findLongPath(graph=None, mol=None, source=None, target=None, weight=None):
+def findPath(graph=None, mol=None, source=None, target=None, weight=None):
     if graph is None:
         graph = getGraph(mol)
     shortest_path = nx.shortest_path(graph,

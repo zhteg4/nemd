@@ -44,8 +44,8 @@ class Fragment:
         targets = self.atom_ids if self.atom_ids else [None]
         src, trgt, path, path_len = None, None, None, -1
         for target in targets:
-            asrc, atrgt, apath = self.fmol.findLongPath(source=source,
-                                                        target=target)
+            asrc, atrgt, apath = self.fmol.findPath(source=source,
+                                                    target=target)
             if path_len >= len(apath):
                 continue
             src, trgt, path, path_len = asrc, atrgt, apath, len(apath)
@@ -59,6 +59,8 @@ class Fragment:
         if self.dihe:
             nfrags = [self] + nfrags
         else:
+            if not dihes:
+                return []
             self.dihe = dihes[0]
             self.setUp()
             nfrags[0] = self
@@ -123,6 +125,9 @@ class Fragment:
 
 
 class FragMol:
+    """
+    Fragment molecule class to hold fragment information.
+    """
 
     # https://ctr.fandom.com/wiki/Break_rotatable_bonds_and_report_the_fragments
     PATT = Chem.MolFromSmarts(
@@ -132,6 +137,11 @@ class FragMol:
     POLYM_HT = prop_names.POLYM_HT
 
     def __init__(self, mol, data_file=None):
+        """
+        :param mol 'rdkit.Chem.rdchem.Mol': the molecule to fragmentize
+        :param data_file str: filename path to get force field information
+        """
+
         self.mol = mol
         self.data_file = data_file
         self.conf = self.mol.GetConformer(0)
@@ -140,13 +150,28 @@ class FragMol:
                                                             maxMatches=1000000)
         self.init_frag = None
         self.extg_aids = None
+        self.frm = None
 
     def isRotatable(self, bond):
+        """
+        Whether the bond between the two atoms is rotatable.
+
+        :param bond list or tuple of two ints: the atom ids of two bonded atoms
+        :return bool: Whether the bond is rotatable.
+        """
+
         in_ring = self.mol.GetBondBetweenAtoms(*bond).IsInRing()
         single = tuple(sorted(bond)) in self.rotatable_bonds
         return not in_ring and single
 
     def getSwingAtoms(self, *dihe):
+        """
+        Get the swing atoms when the dihedral angle changes.
+
+        :param dihe list of four ints: the atom ids that form a dihedral angle
+        :return list of ints: the swing atom ids when the dihedral angle changes.
+        """
+
         oxyz = self.conf.GetPositions()
         oval = Chem.rdMolTransforms.GetDihedralDeg(self.conf, *dihe)
         Chem.rdMolTransforms.SetDihedralDeg(self.conf, *dihe, oval + 5)
@@ -155,33 +180,43 @@ class FragMol:
         Chem.rdMolTransforms.SetDihedralDeg(self.conf, *dihe, oval)
         return [i for i, x in enumerate(changed) if not all(x)]
 
-    def findLongPath(self, source=None, target=None):
+    def findPath(self, source=None, target=None):
+        """
+        Find the shortest path between source and target. If source and target
+        are not provided, shortest paths between all pairs are computed and the
+        long path is returned.
 
-        if any([
-                source is not None, target is not None,
-                not self.mol.GetBoolProp(self.IS_MONO)
-        ]):
-            return structutils.findLongPath(self.graph,
-                                            source=source,
-                                            target=target)
-        ht_atoms = {
+        NOTE: if source and target are not provided and the molecule is built
+        from momomers, the atom pairs from selected from the first and last monomers
+
+        :param source int: the atom id that serves as the source.
+        :param target int: the atom id that serves as the target.
+        :return list of ints: the atom ids that form the shortest path.
+        """
+
+        if source or target or not self.mol.HasProp(
+                self.IS_MONO) or not self.mol.GetBoolProp(self.IS_MONO):
+            return structutils.findPath(self.graph,
+                                        source=source,
+                                        target=target)
+        ht_mono_ids = {
             x.GetProp(self.MONO_ID): []
             for x in self.mol.GetAtoms() if x.HasProp(self.POLYM_HT)
         }
         for atom in self.mol.GetAtoms():
             try:
-                ht_atoms[atom.GetProp(self.MONO_ID)].append(atom.GetIdx())
+                ht_mono_ids[atom.GetProp(self.MONO_ID)].append(atom.GetIdx())
             except KeyError:
                 pass
 
-        st_atoms = list(ht_atoms.values())
+        st_atoms = list(ht_mono_ids.values())
         sources = st_atoms[0]
         targets = [y for x in st_atoms[1:] for y in x]
         source, target, path, path_len = None, None, None, -1
         for a_source, a_target in itertools.product(sources, targets):
-            _, _, a_path = structutils.findLongPath(self.graph,
-                                                    source=a_source,
-                                                    target=a_target)
+            _, _, a_path = structutils.findPath(self.graph,
+                                                source=a_source,
+                                                target=a_target)
             if len(a_path) < path_len:
                 continue
             path_len = len(a_path)
@@ -190,21 +225,37 @@ class FragMol:
         return source, target, path
 
     def addNxtFrags(self):
+        """
+        Starting from the initial fragment, keep fragmentizing the current
+        fragment and adding the newly generated ones to be fragmentized until
+        no fragments can be further fragmentized.
+        """
         self.init_frag = Fragment([], self)
         to_be_fragmentized = self.init_frag.setFrags()
         while (to_be_fragmentized):
             frag = to_be_fragmentized.pop(0)
             nfrags = frag.setFrags()
             to_be_fragmentized += nfrags
+        if not self.init_frag.dihe:
+            self.init_frag = None
 
     def setPreFrags(self):
+        """
+        Set previous fragment.
+        """
         all_frags = self.fragments()
         for frag in all_frags:
             for nfrag in frag.nfrags:
                 nfrag.pfrag = frag
 
     def fragments(self):
+        """
+        Return all fragments.
+        :return list: each of the item is one fragment.
+        """
         all_frags = []
+        if self.init_frag is None:
+            return all_frags
         nfrags = [self.init_frag]
         while (nfrags):
             all_frags += nfrags
@@ -212,9 +263,16 @@ class FragMol:
         return all_frags
 
     def getNumFrags(self):
+        """
+        Return the number of the total fragments
+        :return int: number of the total fragments.
+        """
         return len(self.fragments())
 
     def setInitAtomIds(self):
+        """
+        Set initial atom ids that don't belong to any fragments.
+        """
         frags = self.fragments()
         atom_ids = [y for x in frags for y in x.atom_ids]
         atom_ids_set = set(atom_ids)
@@ -224,30 +282,57 @@ class FragMol:
         ])
 
     def readData(self):
+        """
+        Read data  file and set clash parameters.
+        """
         self.data_reader = oplsua.DataFileReader(self.data_file)
         self.data_reader.run()
         self.data_reader.setClashParams(include14=True, scale=0.6)
 
-    def setClashParams(self):
+    def setDCellParams(self):
+        """
+        Set distance cell parameters.
+        """
         self.max_clash_dist = max(
             [y for x in self.data_reader.radii.values() for y in x.values()])
         self.cell_rez = self.max_clash_dist
         self.cell_cut = self.max_clash_dist * 2
 
     def setCoords(self):
+        """
+        Set conformer coordinates from data file.
+        """
         for atom in self.data_reader.atoms.values():
             self.conf.SetAtomPosition(atom.id - 1, np.array(atom.xyz))
 
     def setFrm(self):
+        """
+        Set traj frame.
+        """
         box = np.array(
             [y for x in self.data_reader.box_dsp.values() for y in x])
-        self.frm = pd.DataFrame(self.conf.GetPositions(),
-                                index=range(1,
-                                            self.conf.GetNumAtoms() + 1),
-                                columns=['xu', 'yu', 'zu'])
-        self.frm.attrs['box'] = box
+        xyz = self.conf.GetPositions()
+        self.frm = traj.Frame(xyz=xyz, box=box)
+
+    def setDcell(self):
+        """
+        Set distance cell.
+        :return:
+        """
+        self.frm.loc[:] = self.conf.GetPositions()
+        self.dcell = traj.DistanceCell(frm=self.frm,
+                                       cut=self.cell_cut,
+                                       resolution=self.cell_rez)
+        self.dcell.setUp()
 
     def hasClashes(self, atom_ids):
+        """
+        Whether the input atoms have clashes with the existing atoms.
+
+        :param atom_ids list of ints: list of atom ids
+        :return bool: clashes exist or not.
+        """
+
         self.frm.loc[:] = self.conf.GetPositions()
         frag_rows = [self.frm.iloc[x] for x in atom_ids]
         for row in frag_rows:
@@ -260,14 +345,11 @@ class FragMol:
                 return True
         return False
 
-    def setDcell(self):
-        self.frm.loc[:] = self.conf.GetPositions()
-        self.dcell = traj.DistanceCell(frm=self.frm,
-                                       cut=self.cell_cut,
-                                       resolution=self.cell_rez)
-        self.dcell.setUp()
-
     def setConformer(self, seed=2022):
+        """
+        Set conformer coordinates without clashes.
+        :param seed int: seed to set random state.
+        """
         log_debug(f"{self.getNumFrags()} fragments found.")
         random.seed(seed)
         frags = [self.init_frag]
@@ -293,7 +375,7 @@ class FragMol:
         self.setPreFrags()
         self.setInitAtomIds()
         self.readData()
-        self.setClashParams()
+        self.setDCellParams()
         self.setCoords()
         self.setFrm()
         self.setConformer(2022)

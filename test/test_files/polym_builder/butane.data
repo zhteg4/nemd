@@ -1,0 +1,66 @@
+LAMMPS Description
+
+4 atoms
+3 bonds
+2 angles
+1 dihedrals
+0 impropers
+
+2 atom types
+2 bond types
+1 angle types
+1 dihedral types
+0 improper types
+
+-26.12 21.88 xlo xhi
+-24.58 23.42 ylo yhi
+-22.73 25.27 zlo zhi
+
+Masses
+
+1 15.035 # CH3 n-Butane 83
+2 14.027 # CH2 n-Butane 86
+
+Pair Coeffs
+
+1 0.175 3.905
+2 0.118 3.905
+
+Bond Coeffs
+
+1  260.0 1.526
+2  260.0 1.526
+
+Angle Coeffs
+
+1 63.0 112.4
+
+Dihedral Coeffs
+
+1  0.0 0.0 4.0 0.0
+
+Improper Coeffs
+
+
+Atoms
+
+1 1 1 0.0000 -2.308 0.627 0.341 # CH3 n-Butane C
+2 1 2 0.0000 -3.093 -0.498 0.989 # CH2 n-Butane C
+3 1 2 0.0000 -2.071 -1.538 1.431 # CH2 n-Butane C
+4 1 1 0.0000 -1.020 -0.915 2.313 # CH3 n-Butane C
+
+Bonds
+
+1 1 1 2
+2 2 2 3
+3 1 4 3
+
+Angles
+
+1 1 1 2 3
+2 1 4 3 2
+
+Dihedrals
+
+1 1 1 2 3 4
+

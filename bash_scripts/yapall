@@ -1,1 +1,1 @@
-python3 -m yapf -i $NEMD_SRC/module/*.py $NEMD_SRC/scripts/*.py
+python3 -m yapf -i $NEMD_SRC/module/*.py $NEMD_SRC/scripts/*.py $NEMD_SRC/test/module/*.py $NEMD_SRC/test/*.py

@@ -1235,7 +1235,7 @@ class DataFileReader(LammpsWriter):
                 id4=int(id4))
 
     def setClashParams(self, include14=True, scale=1.):
-        self.setClashExclusion(include14=include14)
+        self.setClashExclusion(include14=not include14)
         self.setPairCoeffs()
         self.setVdwRadius(scale=scale)
 

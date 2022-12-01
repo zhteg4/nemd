@@ -1,11 +1,26 @@
 import numpy as np
 import math
 import itertools
-from bitsets import bitset
-from bitarray import bitarray
+import pandas as pd
+
+
+class Frame(pd.DataFrame):
+    BOX = 'box'
+    XU = 'xu'
+    YU = 'yu'
+    ZU = 'zu'
+    UXYZ = [XU, YU, ZU]
+
+    def __init__(self, xyz=None, box=None):
+        index = None
+        if xyz is not None:
+            index = range(1, xyz.shape[0] + 1)
+        super().__init__(data=xyz, index=index, columns=self.UXYZ)
+        self.attrs[self.BOX] = box
 
 
 class DistanceCell:
+    BOX = Frame.BOX
 
     def __init__(self, frm=None, box=None, cut=6., resolution=2.):
         self.frm = frm
@@ -26,7 +41,7 @@ class DistanceCell:
         if self.box is not None:
             return
 
-        self.box = self.frm.attrs['box']
+        self.box = self.frm.attrs[self.BOX]
 
     def setSpan(self):
         self.span = np.array(
@@ -54,7 +69,7 @@ class DistanceCell:
     def setAtomCell(self, ):
         ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
         self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
-                                  dtype=np.bool)
+                                  dtype=bool)
         for row in ids.itertuples():
             self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
 
@@ -70,6 +85,7 @@ class DistanceCell:
                    excluded=None,
                    radii=None,
                    threshold=1.):
+
         xyz = row.values
         neighbors = self.getNeighbors(xyz)
         try:
