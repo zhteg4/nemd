@@ -1,6 +1,4 @@
 import collections
-import os
-import re
 import sys
 import types
 import symbols
@@ -1111,6 +1109,8 @@ class LammpsWriter(fileutils.LammpsInput):
 
 class DataFileReader(LammpsWriter):
 
+    SCALE = 0.6
+
     def __init__(self, data_file, min_dist=1.09 * 2):
         self.data_file = data_file
         self.min_dist = min_dist
@@ -1234,7 +1234,7 @@ class DataFileReader(LammpsWriter):
                 id3=int(id3),
                 id4=int(id4))
 
-    def setClashParams(self, include14=True, scale=1.):
+    def setClashParams(self, include14=True, scale=SCALE):
         self.setClashExclusion(include14=not include14)
         self.setPairCoeffs()
         self.setVdwRadius(scale=scale)

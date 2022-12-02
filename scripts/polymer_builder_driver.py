@@ -36,7 +36,8 @@ JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 def log_debug(msg):
     """
     Print this message into the log file in debug mode.
-    :param msg str: the msg to print
+
+    :param msg str: the msg to be printed
     """
     if logger:
         logger.debug(msg)
@@ -48,7 +49,6 @@ def log(msg, timestamp=False):
 
     :param msg: the msg to print
     :param timestamp bool: print time after the msg
-    :return:
     """
     if not logger:
         return
@@ -59,7 +59,7 @@ def log_error(msg):
     """
     Print this message and exit the program.
 
-    :param msg str: the msg to print
+    :param msg str: the msg to be printed
     """
     log(msg + '\nAborting...', timestamp=True)
     sys.exit(1)
@@ -73,23 +73,25 @@ def get_parser():
         out of sys.argv.
     """
     parser = parserutils.get_parser(
-        description='Generate the moltemplate input *.lt')
-    parser.add_argument(FlAG_CRU,
-                        metavar=FlAG_CRU.upper(),
-                        type=functools.partial(parserutils.type_monomer_smiles,
-                                               allow_mol=True),
-                        nargs='+',
-                        help='')
-    parser.add_argument(FlAG_CRU_NUM,
-                        metavar=FlAG_CRU_NUM[1:].upper(),
-                        type=parserutils.type_positive_int,
-                        nargs='+',
-                        help='')
+        description='Build amorphous cell from molecules and monomers.')
+    parser.add_argument(
+        FlAG_CRU,
+        metavar=FlAG_CRU.upper(),
+        type=functools.partial(parserutils.type_monomer_smiles,
+                               allow_mol=True),
+        nargs='+',
+        help='SMILES of the constitutional repeat unit (monomer)')
+    parser.add_argument(
+        FlAG_CRU_NUM,
+        metavar=FlAG_CRU_NUM[1:].upper(),
+        type=parserutils.type_positive_int,
+        nargs='+',
+        help='Number of constitutional repeat unit per polymer')
     parser.add_argument(FlAG_MOL_NUM,
                         metavar=FlAG_MOL_NUM[1:].upper(),
                         type=parserutils.type_positive_int,
                         nargs='+',
-                        help='')
+                        help='Number of molecules in the amorphous cell')
 
     jobutils.add_job_arguments(parser)
     return parser

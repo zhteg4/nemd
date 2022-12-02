@@ -357,7 +357,7 @@ class FragMol:
         """
         self.data_reader = oplsua.DataFileReader(self.data_file)
         self.data_reader.run()
-        self.data_reader.setClashParams(include14=True, scale=0.6)
+        self.data_reader.setClashParams()
 
     def setDCellParams(self):
         """
@@ -430,6 +430,7 @@ class FragMol:
                 self.extg_aids = self.extg_aids.union(frag.atom_ids)
                 frags += frag.nfrags
                 continue
+
             # 1）Find the previous fragment with available dihedral candidates.
             frag = frag.getPreAvailFrag()
             # 2）Find the next fragments who have been placed into the cell.

@@ -3,9 +3,9 @@ import sys
 import traj
 import oplsua
 import logutils
+import jobutils
 import parserutils
 import environutils
-import jobutils
 import numpy as np
 import pandas as pd
 
@@ -19,43 +19,72 @@ JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 
 
 def log_debug(msg):
+    """
+    Print this message into the log file in debug mode.
+
+    :param msg str: the msg to be printed
+    """
     if logger:
         logger.debug(msg)
 
 
 def log(msg, timestamp=False):
+    """
+    Print this message into log file in regular mode.
+
+    :param msg: the msg to print
+    :param timestamp bool: print time after the msg
+    """
     if not logger:
         return
     logutils.log(logger, msg, timestamp=timestamp)
 
 
 def log_error(msg):
+    """
+    Print this message and exit the program.
+
+    :param msg str: the msg to be printed
+    """
     log(msg + '\nAborting...', timestamp=True)
     sys.exit(1)
 
 
 def get_parser():
+    """
+    The user-friendly command-line parser.
+
+    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
+        out of sys.argv.
+    """
     parser = parserutils.get_parser(
-        description='Generate the moltemplate input *.lt')
+        description='Perform tasks on customer dump')
     parser.add_argument(FlAG_CUSTOM_DUMP,
                         metavar=FlAG_CUSTOM_DUMP.upper(),
                         type=parserutils.type_file,
-                        help='')
+                        help='Custom dump file to analyze')
     parser.add_argument(FlAG_DATA_FILE,
                         metavar=FlAG_DATA_FILE.upper(),
                         type=parserutils.type_file,
-                        help='')
+                        help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
                         choices=[XYZ, CLASH],
                         default=[XYZ],
                         nargs='+',
-                        help='')
+                        help=f'{XYZ} writes out .xyz for VMD visualization;'
+                        f'{CLASH} check clashes for each frame.')
 
     jobutils.add_job_arguments(parser)
     return parser
 
 
 def validate_options(argv):
+    """
+    Parse and validate the command args
+
+    :param argv list: list of command input.
+    :return: 'argparse.ArgumentParser':  Parsed command-line options out of sys.argv
+    """
     parser = get_parser()
     options = parser.parse_args(argv)
 
@@ -70,6 +99,11 @@ class CustomDump(object):
     XYZ_EXT = '.xyz'
 
     def __init__(self, options, jobname, diffusion=False):
+        """
+        :param options 'argparse.ArgumentParser': Parsed command-line options
+        :param jobname str: jobname of this task
+        :param diffusion bool: particles passing PBCs continue traveling
+        """
         self.options = options
         self.jobname = jobname
         self.diffusion = diffusion
@@ -78,65 +112,56 @@ class CustomDump(object):
         self.radii = None
 
     def run(self):
+        """
+        Main method to run the tasks.
+        """
         self.setStruct()
-        self.checkClashes(radii=self.radii)
+        self.checkClashes()
         self.writeXYZ()
         log('Finished', timestamp=True)
 
     def setStruct(self):
+        """
+        Load data file and set clash parameters.
+        """
         if not self.options.data_file:
             return
 
         self.data_reader = oplsua.DataFileReader(self.options.data_file)
         self.data_reader.run()
-        self.data_reader.setClashParams(include14=False, scale=0.75)
-        self.radii = self.data_reader.radii
+        self.data_reader.setClashParams()
 
-    def checkClashes(self, radii=None):
-
+    def checkClashes(self):
+        """
+        Check clashes for reach frames.
+        """
         if CLASH not in self.options.task:
             return
 
-        for idx, frm in enumerate(self.getFrames()):
-            clashes = self.getClashes(frm, radii=radii)
+        for idx, frm in enumerate(traj.Frame.read(self.options.custom_dump)):
+            clashes = self.getClashes(frm)
+            if clashes:
+                import pdb;pdb.set_trace()
+            print(clashes)
             log(f"Frame {idx} has {len(clashes)} clashes.")
         log('All frames are checked for clashes.')
 
-    def getClashes(self, frm, radii=None):
+    def getClashes(self, frm):
+        """
+        Get the clashes between atom pair for this frame.
+
+        :param frm 'traj.Frame':
+        :return list of tuples: each tuple has two atom ids, the distance, and
+            clash threshold
+        """
         clashes = []
-        dcell = traj.DistanceCell(frm=frm, cut=10, resolution=2.)
+        dcell = traj.DistanceCell(frm=frm)
         dcell.setUp()
-        import pdb
-        pdb.set_trace()
         for _, row in frm.iterrows():
             clashes += dcell.getClashes(row,
-                                        radii=radii,
+                                        radii=self.data_reader.radii,
                                         excluded=self.data_reader.excluded)
         return clashes
-
-    def getFrames(self):
-        with open(self.options.custom_dump, 'r') as self.dmp_fh:
-            while True:
-                lines = [self.dmp_fh.readline() for _ in range(9)]
-                if not all(lines):
-                    return
-                atom_num = int(lines[3].strip('\n'))
-                box = np.array([
-                    float(y) for x in range(5, 8)
-                    for y in lines[x].strip('\n').split()
-                ])
-                names = lines[-1].strip('\n').split()[-4:]
-                frm = pd.read_csv(self.dmp_fh,
-                                  nrows=atom_num,
-                                  header=None,
-                                  delimiter='\s',
-                                  index_col=0,
-                                  names=names,
-                                  engine='python')
-                if frm.shape[0] != atom_num or frm.isnull().values.any():
-                    break
-                frm.attrs['box'] = box
-                yield frm
 
     def writeXYZ(self, wrapped=True, bond_across_pbc=False, glue=True):
         if glue and not (wrapped and bond_across_pbc is False):
@@ -146,7 +171,7 @@ class CustomDump(object):
             return
 
         with open(self.outfile, 'w') as self.out_fh:
-            for frm in self.getFrames():
+            for frm in traj.Frame.read(self.options.custom_dump):
                 self.wrapCoords(frm,
                                 wrapped=wrapped,
                                 bond_across_pbc=bond_across_pbc,
