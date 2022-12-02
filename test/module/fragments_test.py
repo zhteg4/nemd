@@ -184,3 +184,94 @@ class TestFragMol:
         assert fmol.hasClashes([3])
         fmol.setConformer()
         assert not fmol.hasClashes([3])
+
+
+class TestFragment:
+
+    @pytest.fixture
+    def frag(self, smiles_str, data_file):
+        mol = getMol(smiles_str)
+        fmol = fragments.FragMol(mol, data_file)
+        frag = fragments.Fragment([], fmol)
+        return frag
+
+    @pytest.mark.parametrize(('smiles_str', 'data_file'), [(BUTANE, None)])
+    def testResetVals(self, frag):
+        frag.resetVals()
+        assert not frag.val
+        assert frag.fval
+
+    @pytest.mark.parametrize(('smiles_str', 'data_file', 'num'),
+                             [(BUTANE, None, 1), (BUTENE, None, 0),
+                              (CCCOOH, None, 2), (BENZENE, None, 0),
+                              (CC3COOH, None, 8)])
+    def testSetFrags(self, frag, num):
+        assert num == len(frag.setFrags())
+
+    @pytest.mark.parametrize(('smiles_str', 'data_file', 'num'),
+                             [(BUTANE, None, 1), (BUTENE, None, 0),
+                              (CCCOOH, None, 2), (BENZENE, None, 0),
+                              (CC3COOH, None, 8)])
+    def testGetNewDihes(self, frag, num):
+        assert num == len(frag.getNewDihes())
+
+    @pytest.mark.parametrize(('smiles_str', 'data_file'), [(BUTANE, None),
+                                                           (CCCOOH, None)])
+    def testSetDihedralDeg(self, frag):
+        frag.setFrags()
+        frag.setDihedralDeg(123)
+        assert np.isclose(123, frag.getDihedralDeg())
+        assert frag.fval
+        frag.setDihedralDeg()
+        assert not np.isclose(123, frag.getDihedralDeg())
+        assert not frag.fval
+
+    @pytest.mark.parametrize(('smiles_str', 'data_file'), [(BUTANE, None),
+                                                           (BUTENE, None),
+                                                           (CCCOOH, None),
+                                                           (BENZENE, None)])
+    def testPopVal(self, frag):
+        num_vals = len(frag.vals)
+        frag.val = frag.popVal()
+        assert frag.val is not None
+        assert num_vals != len(frag.vals)
+        assert not frag.fval
+
+    @pytest.mark.parametrize(('smiles_str', 'data_file'), [(CC3COOH, None)])
+    def testGetPreAvailFrag(self, frag):
+        fmol = frag.fmol
+        fmol.addNxtFrags()
+        fmol.setPreFrags()
+        # frag with no previous
+        assert fmol.init_frag.getPreAvailFrag() is None
+        # frag without dihedral vals return one available previous
+        second_frag = fmol.init_frag.nfrags[0]
+        second_frag.vals = []
+        assert 0 == second_frag.getPreAvailFrag().dihe[0]
+        # No available previous
+        fmol.init_frag.vals = []
+        assert second_frag.getPreAvailFrag() is None
+
+    @pytest.mark.parametrize(('smiles_str', 'data_file'), [(CC3COOH, None)])
+    def testGetNxtFrags(self, frag):
+        fmol = frag.fmol
+        fmol.addNxtFrags()
+        fmol.setPreFrags()
+        second_frag = fmol.init_frag.nfrags[0]
+        second_frag.vals = []
+        frag = second_frag.getPreAvailFrag()
+        assert 0 == frag.dihe[0]
+        frag.getNxtFrags()
+        assert not frag.getNxtFrags()
+        frag.nfrags[0].fval = False
+        assert 1 == len(frag.getNxtFrags())
+
+    @pytest.mark.parametrize(('smiles_str', 'data_file'),
+                             [(BUTANE, BUTANE_DATA)])
+    def testGetNxtFrags(self, frag):
+        fmol = frag.fmol
+        fmol.run()
+        frag = fmol.init_frag
+        oval = frag.getDihedralDeg()
+        frag.setConformer()
+        assert oval != frag.getDihedralDeg()

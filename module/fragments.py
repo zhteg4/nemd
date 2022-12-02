@@ -6,7 +6,6 @@ import itertools
 import prop_names
 import structutils
 import numpy as np
-import pandas as pd
 from rdkit import Chem
 
 logger = logutils.createModuleLogger(file_path=__file__)
@@ -25,6 +24,11 @@ class Fragment:
         return f"{self.dihe}: {self.atom_ids}"
 
     def __init__(self, dihe, fmol):
+        """
+        :param dihe list of dihedral atom ids: the dihedral that changes the
+            atom position in this fragment.
+        :param fmol 'fragments.FragMol': the FragMol that this fragment belongs to
+        """
         self.dihe = dihe
         self.fmol = fmol
         self.atom_ids = []
@@ -36,75 +40,133 @@ class Fragment:
         self.resetVals()
 
     def resetVals(self):
+        """
+        Reset the dihedral angle values and state.
+        """
         self.fval, self.val = True, None
         self.vals = list(np.linspace(0, 360, 36, endpoint=False))
 
-    def getNewDihes(self):
-        source = self.dihe[1] if self.dihe else None
-        targets = self.atom_ids if self.atom_ids else [None]
-        src, trgt, path, path_len = None, None, None, -1
-        for target in targets:
-            asrc, atrgt, apath = self.fmol.findPath(source=source,
-                                                    target=target)
-            if path_len >= len(apath):
-                continue
-            src, trgt, path, path_len = asrc, atrgt, apath, len(apath)
-        dihes = list(zip(path[:-3], path[1:-2], path[2:-1], path[3:]))
-        dihes = [x for x in dihes if self.fmol.isRotatable(x[1:-1])]
-        return dihes
-
     def setFrags(self):
+        """
+        Set fragments by searching for rotatable bond path and adding them as
+        next fragments.
+
+        :return list of 'Fragment': newly added fragments with the first being itself
+            (the atom ids of the current fragments changed)
+        """
         dihes = self.getNewDihes()
+        if not dihes:
+            return []
         nfrags = [Fragment(x, self.fmol) for x in dihes]
         if self.dihe:
             nfrags = [self] + nfrags
         else:
-            if not dihes:
-                return []
+            # Manually set self.dihe for the initial fragment
             self.dihe = dihes[0]
             self.setUp()
             nfrags[0] = self
         [x.setUp() for x in nfrags[1:]]
         for frag, nfrag in zip(nfrags[:-1], nfrags[1:]):
             frag.addFrag(nfrag)
-        return nfrags if dihes else []
+        return nfrags
+
+    def getNewDihes(self):
+        """
+        Get a list of dihedral angles that travel along the fragment rotatable
+        bond to one fragment atom ids so that the path has the most rotatable
+        bonds.
+
+        NOTE: If the current dihedral angle of this fragment is not set, the
+        dihedral angle list travel along the path with the most rotatable bonds.
+
+        :return list of list: each sublist has four atom ids.
+        """
+        if self.dihe:
+            pairs = zip([self.dihe[1]] * len(self.atom_ids), self.atom_ids)
+        else:
+            pairs = self.fmol.findPolymPair()
+
+        dihes, num = [], 0
+        for source, target in pairs:
+            _, _, path = self.fmol.findPath(source=source, target=target)
+            a_dihes = zip(path[:-3], path[1:-2], path[2:-1], path[3:])
+            a_dihes = [x for x in a_dihes if self.fmol.isRotatable(x[1:-1])]
+            if len(a_dihes) < num:
+                continue
+            num = len(a_dihes)
+            dihes = a_dihes
+        return dihes
+
+    def setUp(self):
+        """
+        Set up the fragment.
+        """
+        self.atom_ids = self.fmol.getSwingAtoms(*self.dihe)
 
     def addFrag(self, nfrag):
+        """
+        Add the next fragment to the current one's new fragments.
+
+        :param nfrag 'Fragment': the next fragment to be added.
+        """
         self.atom_ids = sorted(set(self.atom_ids).difference(nfrag.atom_ids))
         self.nfrags.append(nfrag)
 
-    def setUp(self):
-        self.setSwingAtoms()
-        self.setFragAtoms()
-
-    def setSwingAtoms(self):
-        self.swing_atom_ids = self.fmol.getSwingAtoms(*self.dihe)
-
-    def setFragAtoms(self):
-        self.atom_ids = self.swing_atom_ids[:]
-
-    def popVal(self):
-        val = random.choice(self.vals)
-        self.vals.remove(val)
-        self.fval = False
-        return val
-
     def setDihedralDeg(self, val=None):
+        """
+        Set the dihedral angle of the current fragment. If val is not provided,
+        randomly choose one from the candidates.
+
+        :param val float: the dihedral angle value to be set.
+        """
         if val is None:
             val = self.popVal()
         self.val = val
         Chem.rdMolTransforms.SetDihedralDeg(self.fmol.conf, *self.dihe,
                                             self.val)
 
+    def getDihedralDeg(self):
+        """
+        Measure and return the dihedral angle value
+
+        :return float: the dihedral angle degree
+        """
+
+        return Chem.rdMolTransforms.GetDihedralDeg(self.fmol.conf, *self.dihe)
+
+    def popVal(self):
+        """
+        Randomly pop one val from dihedral value candidates.
+
+        :return float: the picked dihedral value
+        """
+        val = random.choice(self.vals)
+        self.vals.remove(val)
+        self.fval = False
+        return val
+
     def getPreAvailFrag(self):
-        frag, rfrags = self, []
+        """
+        Get the first previous fragment that has available dihedral candidates.
+
+        :return 'Fragment': The previous fragment found.
+        """
+        frag = self.pfrag
+        if frag is None:
+            return None
         while (frag.pfrag and not frag.vals):
             frag = frag.pfrag
         if frag.pfrag is None and not frag.vals:
-            raise ValueError('Conformer search failed.')
+            # FIXME: Failed conformer search should try to reduce clash criteria
+            return None
         return frag
 
     def getNxtFrags(self):
+        """
+        Get the next fragments that don't have full dihedral value candidates.
+
+        :return list: list of next fragments
+        """
         all_nfrags = []
         nfrags = [self]
         while (nfrags):
@@ -113,9 +175,21 @@ class Fragment:
         return all_nfrags
 
     def hasClashes(self):
+        """
+        Whether the atoms in current fragment has clashes with other atoms in
+        the molecue that are set as existing atoms
+
+        :return bool: clash exists or not.
+        """
         return self.fmol.hasClashes(self.atom_ids)
 
     def setConformer(self):
+        """
+        Try out dihedral angle values to avoid clashes.
+
+        :return bool: True on the first no-clash conformer with respect to the
+            current dihedral angle and atom ids.
+        """
         self.fmol.setDcell()
         while (self.vals):
             self.setDihedralDeg()
@@ -186,19 +260,24 @@ class FragMol:
         are not provided, shortest paths between all pairs are computed and the
         long path is returned.
 
-        NOTE: if source and target are not provided and the molecule is built
-        from momomers, the atom pairs from selected from the first and last monomers
-
         :param source int: the atom id that serves as the source.
         :param target int: the atom id that serves as the target.
         :return list of ints: the atom ids that form the shortest path.
         """
 
-        if source or target or not self.mol.HasProp(
-                self.IS_MONO) or not self.mol.GetBoolProp(self.IS_MONO):
-            return structutils.findPath(self.graph,
-                                        source=source,
-                                        target=target)
+        return structutils.findPath(self.graph, source=source, target=target)
+
+    def findPolymPair(self):
+        """
+        If the molecule is built from momomers, the atom pairs from
+        selected from the first and last monomers.
+
+        :return list or iterator of int tuple: each tuple is an atom id pair
+        """
+        if not self.mol.HasProp(self.IS_MONO) or not self.mol.GetBoolProp(
+                self.IS_MONO):
+            return [(None, None)]
+
         ht_mono_ids = {
             x.GetProp(self.MONO_ID): []
             for x in self.mol.GetAtoms() if x.HasProp(self.POLYM_HT)
@@ -212,17 +291,8 @@ class FragMol:
         st_atoms = list(ht_mono_ids.values())
         sources = st_atoms[0]
         targets = [y for x in st_atoms[1:] for y in x]
-        source, target, path, path_len = None, None, None, -1
-        for a_source, a_target in itertools.product(sources, targets):
-            _, _, a_path = structutils.findPath(self.graph,
-                                                source=a_source,
-                                                target=a_target)
-            if len(a_path) < path_len:
-                continue
-            path_len = len(a_path)
-            source, target, path = a_source, a_target, a_path
 
-        return source, target, path
+        return itertools.product(sources, targets)
 
     def addNxtFrags(self):
         """
@@ -360,17 +430,23 @@ class FragMol:
                 self.extg_aids = self.extg_aids.union(frag.atom_ids)
                 frags += frag.nfrags
                 continue
+            # 1）Find the previous fragment with available dihedral candidates.
             frag = frag.getPreAvailFrag()
+            # 2）Find the next fragments who have been placed into the cell.
             nxt_frags = frag.getNxtFrags()
-            nxt_frags += [y for x in nxt_frags for y in x.nfrags]
             [x.resetVals() for x in nxt_frags]
-            frags = [frag] + [x for x in frags if x not in nxt_frags]
-            ratom_ids = frag.atom_ids[:]
-            ratom_ids += [y for x in nxt_frags for y in x.atom_ids]
+            ratom_ids = [y for x in [frag] + nxt_frags for y in x.atom_ids]
             self.extg_aids = self.extg_aids.difference(ratom_ids)
+            # 3）Fragment after the next fragments were added to the growing
+            # frags before this backmove step.
+            nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
+            frags = [frag] + list(set(frags).difference(nnxt_frags))
             log_debug(f"{len(self.extg_aids)}, {len(frag.vals)}: {frag}")
 
     def run(self):
+        """
+        Main method for fragmentation and conformer search.
+        """
         self.addNxtFrags()
         self.setPreFrags()
         self.setInitAtomIds()
