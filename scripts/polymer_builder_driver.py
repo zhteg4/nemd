@@ -36,7 +36,6 @@ JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 def log_debug(msg):
     """
     Print this message into the log file in debug mode.
-
     :param msg str: the msg to be printed
     """
     if logger:
@@ -48,7 +47,7 @@ def log(msg, timestamp=False):
     Print this message into log file in regular mode.
 
     :param msg: the msg to print
-    :param timestamp bool: print time after the msg
+    :param timestamp bool: the msg to be printed
     """
     if not logger:
         return

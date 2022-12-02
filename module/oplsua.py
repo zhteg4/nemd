@@ -415,7 +415,7 @@ class LammpsWriter(fileutils.LammpsInput):
             self.readData()
             self.writeMinimize()
             self.writeTimestep()
-            # self.writeRun()
+            self.writeRun()
 
     def writeInDescriptions(self):
         self.in_fh.write(f"{self.UNITS} {self.units}\n")

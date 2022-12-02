@@ -2,8 +2,8 @@ import os
 import sys
 import traj
 import oplsua
-import logutils
 import jobutils
+import logutils
 import parserutils
 import environutils
 import numpy as np
@@ -139,9 +139,7 @@ class CustomDump(object):
             return
 
         for idx, frm in enumerate(traj.Frame.read(self.options.custom_dump)):
-            clashes = self.getClashes(frm)
-            if clashes:
-                import pdb;pdb.set_trace()
+            clashes = self.getClashes(frm, )
             print(clashes)
             log(f"Frame {idx} has {len(clashes)} clashes.")
         log('All frames are checked for clashes.')

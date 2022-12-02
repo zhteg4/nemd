@@ -430,7 +430,6 @@ class FragMol:
                 self.extg_aids = self.extg_aids.union(frag.atom_ids)
                 frags += frag.nfrags
                 continue
-
             # 1）Find the previous fragment with available dihedral candidates.
             frag = frag.getPreAvailFrag()
             # 2）Find the next fragments who have been placed into the cell.

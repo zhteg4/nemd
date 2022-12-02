@@ -26,7 +26,7 @@ class Frame(pd.DataFrame):
             name = xyz.values.index.name
         except AttributeError:
             name = None
-        if name is not None and xyz is not None:
+        if name is None and xyz is not None:
             index = range(1, xyz.shape[0] + 1)
         else:
             index = None
@@ -112,18 +112,13 @@ class DistanceCell:
         self.grids = np.array([x / i for x, i in zip(self.span, self.indexes)])
 
     def setNeighborIds(self):
-        """
-        Set neighbor cell ids. All cells with the distance smaller than
-        the cut threshold are considered as each other's neighbor.
-        """
         max_ids = [math.ceil(self.cut / x) for x in self.grids]
-        ijks = itertools.product(*[range(max_ids[x]) for x in range(3)])
-        ijks = {x: [y - 1 if y else y for y in x] for x in ijks}
         neigh_ids = [
-            x for x,y in ijks.items()
-            if np.linalg.norm(self.grids * y) <= self.cut
+            ijk for ijk in itertools.product(
+                *[range(max_ids[x]) for x in range(3)])
+            if math.dist((0, 0, 0), self.grids * ijk) <= self.cut
         ]
-        # Don't remove the (0, 0, 0,) as multiple atom may be in one cell
+        # neigh_ids.remove((0, 0, 0,))
         self.neigh_ids = set([
             tuple(np.array(ijk) * signs)
             for signs in itertools.product((-1, 1), (-1, 1), (-1, 1))
