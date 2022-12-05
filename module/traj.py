@@ -182,6 +182,7 @@ class DistanceCell:
         """
         Get the neighbor atom ids from the neighbor cells (including the current
         cell itself)
+
         :param xyz 1x3 array of floats: xyz of one atom coordinates
         :return list int: the atom ids of the neighbor atoms
         """
@@ -197,6 +198,8 @@ class DistanceCell:
                    radii=None,
                    threshold=1.):
         """
+        Get the clashes between xyz and atoms in the frame.
+
         :param row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
         :param included list of int: the atom ids included for the clash check
         :param excluded list of int: the atom ids excluded for the clash check

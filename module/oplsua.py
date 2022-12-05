@@ -462,10 +462,12 @@ class LammpsWriter(fileutils.LammpsInput):
                 atoms = [x for x in atoms if x.id in self.used_atom_types]
             smbs = ' '.join(map(str, [x.symbol for x in atoms]))
             self.in_fh.write(f"dump_modify 1 element {smbs}\n")
+        self.in_fh.write("min_style fire\n")
         self.in_fh.write("minimize 1.0e-6 1.0e-8 1000 100000\n")
 
     def writeTimestep(self):
         self.in_fh.write(f'timestep {self.timestep}\n')
+        self.in_fh.write('thermo_modify flush yes\n')
         self.in_fh.write('thermo 1000\n')
 
     def writeRun(self):
@@ -473,11 +475,11 @@ class LammpsWriter(fileutils.LammpsInput):
         if len(self.mols) == 1 and self.mols[1].GetNumAtoms() < 10:
             # NVT on single molecule gives nan coords (guess due to translation)
             self.in_fh.write("fix             1 all nve\n")
-            self.in_fh.write("run 10000\n")
+            self.in_fh.write("run 2000\n")
             return
 
         self.in_fh.write(f"fix 1 all nvt temp 10 10 {self.timestep * 100}\n")
-        self.in_fh.write("run 10000\n")
+        self.in_fh.write("run 2000\n")
 
         if len(self.mols) == 1:
             return
@@ -1265,15 +1267,16 @@ class DataFileReader(LammpsWriter):
         for id1, vdw1 in self.vdws.items():
             for id2, vdw2 in self.vdws.items():
                 if mix == LammpsWriter.GEOMETRIC:
-                    dist1 = vdw1.dist if vdw1.dist > self.min_dist else self.min_dist
-                    dist2 = vdw2.dist if vdw2.dist > self.min_dist else self.min_dist
-                    dist = pow(dist1 * dist2, 0.5)
+                    dist = pow(vdw1.dist * vdw2.dist, 0.5)
                 elif mix == LammpsWriter.ARITHMETIC:
                     dist = (vdw1.dist + vdw2.dist) / 2
                 elif mix == LammpsWriter.SIXTHPOWER:
                     dist = pow((pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2,
                                1 / 6)
-                radii[id1][id2] = dist * pow(2, 1 / 6) * scale
+                dist *= pow(2, 1 / 6) * scale
+                if dist < self.min_dist:
+                    dist = self.min_dist
+                radii[id1][id2] = dist
 
         self.radii = collections.defaultdict(dict)
         for atom1 in self.atoms.values():

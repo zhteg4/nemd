@@ -4,7 +4,6 @@ import pytest
 import testutils
 import numpy as np
 
-
 TRAJS = 'trajs'
 BASE_DIR = testutils.test_file(TRAJS)
 CC3COOH = os.path.join(BASE_DIR, 'CC3COOH.custom')

@@ -95,6 +95,9 @@ def validate_options(argv):
 
 
 class CustomDump(object):
+    """
+    Analyze a dump custom file.
+    """
 
     XYZ_EXT = '.xyz'
 
@@ -147,7 +150,7 @@ class CustomDump(object):
         """
         Get the clashes between atom pair for this frame.
 
-        :param frm 'traj.Frame':
+        :param frm 'traj.Frame': traj frame to analyze clashes
         :return list of tuples: each tuple has two atom ids, the distance, and
             clash threshold
         """
@@ -161,6 +164,13 @@ class CustomDump(object):
         return clashes
 
     def writeXYZ(self, wrapped=True, bond_across_pbc=False, glue=True):
+        """
+        Write the coordinates of the trajectory into XYZ format.
+
+        :param wrapped bool: coordinates are within the PBC box.
+        :param bond_across_pbc bool:
+        :param glue bool:
+        """
         if glue and not (wrapped and bond_across_pbc is False):
             raise ValueError(f'Glue moves molecules together like droplets.')
 
