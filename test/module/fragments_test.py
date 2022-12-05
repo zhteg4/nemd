@@ -125,8 +125,8 @@ class TestFragMol:
     def testSetDCellParams(self, fmol):
         fmol.readData()
         fmol.setDCellParams()
-        np.testing.assert_allclose(2.629928579188861, fmol.cell_rez)
-        np.testing.assert_allclose(5.259857158377722, fmol.cell_cut)
+        np.testing.assert_allclose(2.980585723080709, fmol.cell_rez)
+        np.testing.assert_allclose(5.961171446161418, fmol.cell_cut)
 
     @pytest.mark.parametrize(('smiles_str', 'data_file'),
                              [(BUTANE, BUTANE_DATA)])
@@ -165,9 +165,9 @@ class TestFragMol:
         fmol.setCoords()
         fmol.setFrm()
         fmol.setDcell()
-        assert not fmol.hasClashes([3])
-        fmol.data_reader.radii[4][1] = 3
         assert fmol.hasClashes([3])
+        fmol.data_reader.radii[4][1] = 2
+        assert not fmol.hasClashes([3])
 
     @pytest.mark.parametrize(('smiles_str', 'data_file'),
                              [(BUTANE, BUTANE_DATA)])

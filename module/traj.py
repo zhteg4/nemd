@@ -1,7 +1,7 @@
-import numpy as np
 import math
 import oplsua
 import itertools
+import numpy as np
 import pandas as pd
 
 
@@ -84,6 +84,7 @@ class DistanceCell:
         self.frm = frm
         self.cut = cut
         self.resolution = resolution
+        self.span = None
         self.neigh_ids = None
         self.atom_cell = None
 
@@ -112,20 +113,27 @@ class DistanceCell:
         self.grids = np.array([x / i for x, i in zip(self.span, self.indexes)])
 
     def setNeighborIds(self):
-        max_ids = [math.ceil(self.cut / x) for x in self.grids]
-        neigh_ids = [
-            ijk for ijk in itertools.product(
-                *[range(max_ids[x]) for x in range(3)])
-            if math.dist((0, 0, 0), self.grids * ijk) <= self.cut
-        ]
-        # neigh_ids.remove((0, 0, 0,))
-        self.neigh_ids = set([
-            tuple(np.array(ijk) * signs)
-            for signs in itertools.product((-1, 1), (-1, 1), (-1, 1))
-            for ijk in neigh_ids
-        ])
+        """
+        Cells with separation distances less than the cutoff are set as neighbors.
+        """
 
-    def setAtomCell(self, ):
+        def separation_dist(ijk):
+            separation_ids = [y - 1 if y else y for y in ijk]
+            return np.linalg.norm(self.grids * separation_ids)
+
+        max_ids = [math.ceil(self.cut / x) + 1 for x in self.grids]
+        ijks = itertools.product(*[range(max_ids[x]) for x in range(3)])
+        # Adjacent Cells are zero distance separated.
+        neigh_ids = [x for x in ijks if separation_dist(x) < self.cut]
+        # Keep itself (0,0,0) cell as multiple atoms may be in one cell.
+        signs = itertools.product((-1, 1), (-1, 1), (-1, 1))
+        signs = [np.array(x) for x in signs]
+        self.neigh_ids = set([tuple(y * x) for x in signs for y in neigh_ids])
+
+    def setAtomCell(self):
+        """
+        Put atom ids into the corresponding cells.
+        """
         ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
         self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
                                   dtype=bool)
@@ -133,6 +141,12 @@ class DistanceCell:
             self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
 
     def getNeighbors(self, xyz):
+        """
+        Get the neighbor atom ids from the neighbor cells (including the current
+        cell itself)
+        :param xyz 1x3 array of floats: xyz of one atom coordinates
+        :return list int: the atom ids of the neighbor atoms
+        """
 
         id = (xyz / self.grids).round().astype(int)
         ids = [tuple((id + x) % self.indexes) for x in self.neigh_ids]
@@ -144,6 +158,15 @@ class DistanceCell:
                    excluded=None,
                    radii=None,
                    threshold=1.):
+        """
+
+        :param row:
+        :param included:
+        :param excluded:
+        :param radii:
+        :param threshold:
+        :return:
+        """
 
         xyz = row.values
         neighbors = self.getNeighbors(xyz)

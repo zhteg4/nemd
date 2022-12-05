@@ -1,10 +1,10 @@
-import collections
 import sys
 import types
 import symbols
 import itertools
 import logutils
 import fileutils
+import collections
 import environutils
 import numpy as np
 from rdkit import Chem
@@ -462,7 +462,7 @@ class LammpsWriter(fileutils.LammpsInput):
                 atoms = [x for x in atoms if x.id in self.used_atom_types]
             smbs = ' '.join(map(str, [x.symbol for x in atoms]))
             self.in_fh.write(f"dump_modify 1 element {smbs}\n")
-        self.in_fh.write("minimize 1.0e-4 1.0e-6 1000 100000\n")
+        self.in_fh.write("minimize 1.0e-6 1.0e-8 1000 100000\n")
 
     def writeTimestep(self):
         self.in_fh.write(f'timestep {self.timestep}\n')
@@ -476,8 +476,8 @@ class LammpsWriter(fileutils.LammpsInput):
             self.in_fh.write("run 10000\n")
             return
 
-        self.in_fh.write(f"fix 1 all nvt temp 300 300 {self.timestep * 100}\n")
-        self.in_fh.write("run 1000\n")
+        self.in_fh.write(f"fix 1 all nvt temp 10 10 {self.timestep * 100}\n")
+        self.in_fh.write("run 10000\n")
 
         if len(self.mols) == 1:
             return
@@ -1109,7 +1109,7 @@ class LammpsWriter(fileutils.LammpsInput):
 
 class DataFileReader(LammpsWriter):
 
-    SCALE = 0.6
+    SCALE = 0.55
 
     def __init__(self, data_file, min_dist=1.09 * 2):
         self.data_file = data_file
