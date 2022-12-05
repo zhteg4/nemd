@@ -1,13 +1,9 @@
 import os
 import traj
 import pytest
-import fragments
 import testutils
 import numpy as np
-from rdkit import Chem
-from rdkit import RDLogger
-from rdkit.Chem import AllChem
-from contextlib import contextmanager
+
 
 TRAJS = 'trajs'
 BASE_DIR = testutils.test_file(TRAJS)
@@ -45,7 +41,7 @@ class TestDistanceCell:
     @pytest.fixture
     def dcell(self, filename):
         frm = next(traj.Frame.read(filename))
-        return traj.DistanceCell(frm)
+        return traj.DistanceCell(frm, cut=3., resolution=1.)
 
     @pytest.mark.parametrize(('filename'), [(CC3COOH)])
     def testSetSpan(self, dcell):
@@ -56,7 +52,7 @@ class TestDistanceCell:
     def testSetgrids(self, dcell):
         dcell.setSpan()
         dcell.setgrids()
-        assert (dcell.grids == 2).all()
+        assert (dcell.grids == 1).all()
 
     @pytest.mark.parametrize(('filename'), [(CC3COOH)])
     def testSetNeighborIds(self, dcell):
@@ -64,3 +60,34 @@ class TestDistanceCell:
         dcell.setgrids()
         dcell.setNeighborIds()
         assert 311 == len(dcell.neigh_ids)
+
+    @pytest.mark.parametrize(('filename'), [(CC3COOH)])
+    def testSetAtomCell(self, dcell):
+        dcell.setSpan()
+        dcell.setgrids()
+        dcell.setNeighborIds()
+        dcell.setAtomCell()
+        assert (48, 48, 48, 19) == dcell.atom_cell.shape
+
+    @pytest.mark.parametrize(('filename'), [(CC3COOH)])
+    def testGetNeighbors(self, dcell):
+        dcell.cut = 3
+        dcell.resolution = 1
+        dcell.setSpan()
+        dcell.setgrids()
+        dcell.setNeighborIds()
+        dcell.setAtomCell()
+        xyzs = [dcell.frm.getXYZ(x) for x in dcell.getNeighbors((0, 0, 0))]
+        dists = [np.linalg.norm(x) for x in xyzs]
+        assert 16 == len(dists)
+
+    @pytest.mark.parametrize(('filename'), [(CC3COOH)])
+    def testGetNeighbors(self, dcell):
+        dcell.cut = 3
+        dcell.resolution = 1
+        dcell.setSpan()
+        dcell.setgrids()
+        dcell.setNeighborIds()
+        dcell.setAtomCell()
+        row = dcell.frm.getXYZ(1)
+        assert not dcell.getClashes(row)

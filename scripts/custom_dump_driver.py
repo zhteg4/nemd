@@ -140,8 +140,6 @@ class CustomDump(object):
 
         for idx, frm in enumerate(traj.Frame.read(self.options.custom_dump)):
             clashes = self.getClashes(frm)
-            if clashes:
-                print(min([x[2] / x[3] for x in clashes]))
             log(f"Frame {idx} has {len(clashes)} clashes.")
         log('All frames are checked for clashes.')
 

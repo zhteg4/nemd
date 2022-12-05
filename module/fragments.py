@@ -365,8 +365,8 @@ class FragMol:
         """
         self.max_clash_dist = max(
             [y for x in self.data_reader.radii.values() for y in x.values()])
-        self.cell_rez = self.max_clash_dist
-        self.cell_cut = self.max_clash_dist * 2
+        self.cell_rez = self.max_clash_dist * traj.DistanceCell.SCALE
+        self.cell_cut = self.max_clash_dist
 
     def setCoords(self):
         """

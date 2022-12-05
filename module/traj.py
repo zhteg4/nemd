@@ -11,6 +11,7 @@ class Frame(pd.DataFrame):
     """
 
     BOX = 'box'
+    SPAN = 'span'
     XU = 'xu'
     YU = 'yu'
     ZU = 'zu'
@@ -31,7 +32,7 @@ class Frame(pd.DataFrame):
         else:
             index = None
         super().__init__(data=xyz, index=index, columns=self.UXYZ)
-        self.attrs[self.BOX] = box
+        self.setBox(box)
 
     @classmethod
     def read(cls, filename):
@@ -64,6 +65,43 @@ class Frame(pd.DataFrame):
                     for y in lines[x].strip('\n').split()
                 ])
                 yield cls(frm, box=box)
+
+    def getXYZ(self, atom_id):
+        """
+        Get the XYZ of the atom id.
+
+        :param atom_id int: atom id
+        :return row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
+        """
+        return self.loc[atom_id]
+
+    def setBox(self, box):
+        """
+        Set the box span from box limits.
+
+        :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
+        """
+        self.attrs[self.BOX] = box
+        self.attrs[self.SPAN] = {x: np.inf for x in self.UXYZ}
+        if box is None:
+            return
+        for idx, col in enumerate(self.UXYZ):
+            self.attrs[self.SPAN][col] = box[idx * 2 + 1] - box[idx * 2]
+
+    def getDists(self, ids, xyz):
+        """
+        Get the distance between the xyz and the of the xyzs associated with the
+        input atom ids.
+
+        :param atom_id int: atom ids
+        :param xyz (3,) 'pandas.core.series.Series': xyz coordinates and atom id
+        :return list of floats: distances
+        """
+        dists = self.getXYZ(ids) - xyz
+        for col in self.UXYZ:
+            dists[col] = dists[col].apply(
+                lambda x: math.remainder(x, self.attrs[self.SPAN][col]))
+        return np.linalg.norm(dists, axis=1)
 
 
 class DistanceCell:
@@ -159,13 +197,12 @@ class DistanceCell:
                    radii=None,
                    threshold=1.):
         """
-
-        :param row:
-        :param included:
-        :param excluded:
-        :param radii:
-        :param threshold:
-        :return:
+        :param row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
+        :param included list of int: the atom ids included for the clash check
+        :param excluded list of int: the atom ids excluded for the clash check
+        :param radii dict: the values are the radii smaller than which are clashes
+        :param threshold clash radii: clash criteria when radii not defined
+        :return list of tuple: clashed atom ids, distance, and threshold
         """
 
         xyz = row.values
@@ -180,10 +217,7 @@ class DistanceCell:
         if excluded:
             neighbors = neighbors.difference(excluded[row.name])
         neighbors = list(neighbors)
-        dists = np.linalg.norm(
-            (self.frm.loc[neighbors] - xyz + self.hspan) % self.span -
-            self.hspan,
-            axis=1)
+        dists = self.frm.getDists(neighbors, xyz)
         if radii:
             thresholds = [radii[row.name][x] for x in neighbors]
         else:

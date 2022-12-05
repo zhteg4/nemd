@@ -1109,7 +1109,7 @@ class LammpsWriter(fileutils.LammpsInput):
 
 class DataFileReader(LammpsWriter):
 
-    SCALE = 0.55
+    SCALE = 0.6
 
     def __init__(self, data_file, min_dist=1.09 * 2):
         self.data_file = data_file
