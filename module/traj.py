@@ -1,5 +1,6 @@
 import math
 import oplsua
+import symbols
 import itertools
 import numpy as np
 import pandas as pd
@@ -102,6 +103,70 @@ class Frame(pd.DataFrame):
             dists[col] = dists[col].apply(
                 lambda x: math.remainder(x, self.attrs[self.SPAN][col]))
         return np.linalg.norm(dists, axis=1)
+
+    def wrapCoords(self, broken_bonds, dreader=None):
+        """
+        Wrap coordinates into the PBC box. If broken_bonds is False and mols is
+        provided, the geometric center of each molecule is wrapped into the box
+
+        :param broken_bonds bool: If True, bonds may be broken by PBC boundaries
+        :param dreader 'oplsua.DataFileReader': to get molecule ids and
+            associated atoms are available
+        """
+        if dreader is None:
+            return
+
+        span = np.array([x for x in self.attrs[self.SPAN].values()])
+        if broken_bonds:
+            self = self % span
+
+        if broken_bonds or dreader.mols is None:
+            return
+
+        for mol in dreader.mols.values():
+            center = self.loc[mol].mean()
+            delta = (center % span) - center
+            self.loc[mol] += delta
+
+    def glue(self, dreader=None):
+        """
+        Circular mean to compact the molecules.
+
+        :param dreader 'oplsua.DataFileReader': to get molecule ids and
+            associated atoms are available
+        """
+        if dreader is None:
+            return
+
+        span = np.array([x for x in self.attrs[self.SPAN].values()])
+        centers = pd.concat(
+            [self.loc[x].mean() for x in dreader.mols.values()],
+            axis=1).transpose()
+        centers.index = dreader.mols.keys()
+        theta = centers / span * 2 * np.pi
+        cos_theta = np.cos(theta)
+        sin_theta = np.sin(theta)
+        theta = np.arctan2(sin_theta.mean(), cos_theta.mean())
+        mcenters = theta * span / 2 / np.pi
+        cshifts = ((mcenters - centers) / span).round()
+        for id, mol in dreader.mols.items():
+            cshift = cshifts.loc[id]
+            self.loc[mol] += cshift * span
+
+    def write(self, fh, dreader=None):
+        """
+        Write XYZ to a file.
+
+        :param fh class '_io.TextIOWrapper': file handdle to write out xyz.
+        """
+
+        fh.write(f'{self.shape[0]}\n')
+        if dreader is None:
+            index = [symbols.UNKNOWN] * self.shape[0]
+        else:
+            index = [dreader.atoms[x].ele for x in self.index]
+        self.index = index
+        self.to_csv(fh, mode='a', index=True, sep=' ', header=True)
 
 
 class DistanceCell:

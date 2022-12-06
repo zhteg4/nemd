@@ -129,9 +129,10 @@ class CustomDump(object):
         """
         if not self.options.data_file:
             return
-
         self.data_reader = oplsua.DataFileReader(self.options.data_file)
         self.data_reader.run()
+        if CLASH not in self.options.task:
+            return
         self.data_reader.setClashParams()
 
     def checkClashes(self):
@@ -163,73 +164,28 @@ class CustomDump(object):
                                         excluded=self.data_reader.excluded)
         return clashes
 
-    def writeXYZ(self, wrapped=True, bond_across_pbc=False, glue=True):
+    def writeXYZ(self, wrapped=True, broken_bonds=False, glue=True):
         """
         Write the coordinates of the trajectory into XYZ format.
 
-        :param wrapped bool: coordinates are within the PBC box.
-        :param bond_across_pbc bool:
-        :param glue bool:
+        :param wrapped bool: coordinates are wrapped into the PBC box.
+        :param bond_across_pbc bool: allow bonds passing PBC boundaries.
+        :param glue bool: circular mean to compact the molecules.
         """
-        if glue and not (wrapped and bond_across_pbc is False):
-            raise ValueError(f'Glue moves molecules together like droplets.')
-
         if XYZ not in self.options.task:
             return
 
+        if glue and not (wrapped and broken_bonds is False):
+            raise ValueError(f'Glue moves molecules together like droplets.')
+
         with open(self.outfile, 'w') as self.out_fh:
             for frm in traj.Frame.read(self.options.custom_dump):
-                self.wrapCoords(frm,
-                                wrapped=wrapped,
-                                bond_across_pbc=bond_across_pbc,
-                                glue=glue)
-                self.out_fh.write(f'{frm.shape[0]}\n')
-                if self.data_reader:
-                    index = [self.data_reader.atoms[x].ele for x in frm.index]
-                else:
-                    index = ['X'] * frm.shape[0]
-                frm.index = index
-                frm.to_csv(self.out_fh,
-                           mode='a',
-                           index=True,
-                           sep=' ',
-                           header=True)
+                if wrapped:
+                    frm.wrapCoords(broken_bonds, dreader=self.data_reader)
+                if glue:
+                    frm.glue(dreader=self.data_reader)
+                frm.write(self.out_fh, dreader=self.data_reader)
         log(f"Coordinates are written into {self.outfile}")
-
-    def wrapCoords(self, frm, wrapped=True, bond_across_pbc=False, glue=True):
-        if not wrapped:
-            return
-
-        box = frm.attrs['box']
-        span = np.array([box[i * 2 + 1] - box[i * 2] for i in range(3)])
-        if bond_across_pbc:
-            frm = frm % span
-            return
-
-        if not self.data_reader:
-            return
-
-        for mol in self.data_reader.mols.values():
-            center = frm.loc[mol].mean()
-            delta = (center % span) - center
-            frm.loc[mol] += delta
-
-        if not glue:
-            return
-
-        centers = pd.concat(
-            [frm.loc[x].mean() for x in self.data_reader.mols.values()],
-            axis=1).transpose()
-        centers.index = self.data_reader.mols.keys()
-        theta = centers / span * 2 * np.pi
-        cos_theta = np.cos(theta)
-        sin_theta = np.sin(theta)
-        theta = np.arctan2(sin_theta.mean(), cos_theta.mean())
-        mcenters = theta * span / 2 / np.pi
-        cshifts = ((mcenters - centers) / span).round()
-        for id, mol in self.data_reader.mols.items():
-            cshift = cshifts.loc[id]
-            frm.loc[mol] += cshift * span
 
 
 logger = None

@@ -1,5 +1,6 @@
 WILD_CARD = '*'
 CARBON = 'C'
+UNKNOWN = 'X'
 HYDROGEN = 'H'
 POUND = '#'
 RETURN = '\n'
