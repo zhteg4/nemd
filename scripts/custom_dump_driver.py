@@ -6,8 +6,7 @@ import jobutils
 import logutils
 import parserutils
 import environutils
-import numpy as np
-import pandas as pd
+
 
 FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
@@ -164,19 +163,21 @@ class CustomDump(object):
                                         excluded=self.data_reader.excluded)
         return clashes
 
-    def writeXYZ(self, wrapped=True, broken_bonds=False, glue=True):
+    def writeXYZ(self, wrapped=True, broken_bonds=False, glue=False):
         """
         Write the coordinates of the trajectory into XYZ format.
 
         :param wrapped bool: coordinates are wrapped into the PBC box.
         :param bond_across_pbc bool: allow bonds passing PBC boundaries.
         :param glue bool: circular mean to compact the molecules.
+
+        NOTE: wrapped=False & glue=False is good for diffusion virtualization
+        wrapped True & broken_bonds=False is good for box fully filled with molecules
+        broken_bonds=False & glue=True is good for molecules droplets in vacuum
+        Not all combination make physical senses.
         """
         if XYZ not in self.options.task:
             return
-
-        if glue and not (wrapped and broken_bonds is False):
-            raise ValueError(f'Glue moves molecules together like droplets.')
 
         with open(self.outfile, 'w') as self.out_fh:
             for frm in traj.Frame.read(self.options.custom_dump):

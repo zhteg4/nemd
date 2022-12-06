@@ -107,30 +107,34 @@ class Frame(pd.DataFrame):
     def wrapCoords(self, broken_bonds, dreader=None):
         """
         Wrap coordinates into the PBC box. If broken_bonds is False and mols is
-        provided, the geometric center of each molecule is wrapped into the box
+        provided, the geometric center of each molecule is wrapped into the box.
 
         :param broken_bonds bool: If True, bonds may be broken by PBC boundaries
         :param dreader 'oplsua.DataFileReader': to get molecule ids and
-            associated atoms are available
+            associated atoms
         """
         if dreader is None:
             return
 
         span = np.array([x for x in self.attrs[self.SPAN].values()])
         if broken_bonds:
-            self = self % span
-
-        if broken_bonds or dreader.mols is None:
+            self.loc[:] = self.loc[:] % span
+            # The wrapped xyz shouldn't support molecule center operation
             return
 
+        if dreader.mols is None:
+            return
+
+        # The unwrapped xyz can directly perform molecule center operation
         for mol in dreader.mols.values():
-            center = self.loc[mol].mean()
+            center = self.loc[mol].mean(axis=0)
             delta = (center % span) - center
             self.loc[mol] += delta
 
     def glue(self, dreader=None):
         """
-        Circular mean to compact the molecules.
+        Circular mean to compact the molecules. Good for molecules droplets in
+        vacuum. (extension needed for droplets or clustering in solution)
 
         :param dreader 'oplsua.DataFileReader': to get molecule ids and
             associated atoms are available
@@ -140,7 +144,7 @@ class Frame(pd.DataFrame):
 
         span = np.array([x for x in self.attrs[self.SPAN].values()])
         centers = pd.concat(
-            [self.loc[x].mean() for x in dreader.mols.values()],
+            [self.loc[x].mean(axis=0) for x in dreader.mols.values()],
             axis=1).transpose()
         centers.index = dreader.mols.keys()
         theta = centers / span * 2 * np.pi
@@ -148,10 +152,10 @@ class Frame(pd.DataFrame):
         sin_theta = np.sin(theta)
         theta = np.arctan2(sin_theta.mean(), cos_theta.mean())
         mcenters = theta * span / 2 / np.pi
-        cshifts = ((mcenters - centers) / span).round()
+        cshifts = ((mcenters - centers) / span).round() * span
         for id, mol in dreader.mols.items():
             cshift = cshifts.loc[id]
-            self.loc[mol] += cshift * span
+            self.loc[mol] += cshift
 
     def write(self, fh, dreader=None):
         """
