@@ -1,0 +1,2 @@
+python3 -m cProfile -o nemd.profile ../nemd/scripts/custom_dump_driver.py -data_file polymer_builder.data dump.custom -task xyz
+snakeviz nemd.profile
