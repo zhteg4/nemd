@@ -4,7 +4,6 @@ import math
 import copy
 import oplsua
 import lammps
-import random
 import symbols
 import jobutils
 import logutils
@@ -27,6 +26,7 @@ from rdkit.Chem import AllChem
 FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
 FlAG_MOL_NUM = '-mol_num'
+FlAG_SEED = '-seed'
 
 MOLT_OUT_EXT = fileutils.MOLT_FF_EXT
 
@@ -91,7 +91,10 @@ def get_parser():
                         type=parserutils.type_positive_int,
                         nargs='+',
                         help='Number of molecules in the amorphous cell')
-
+    parser.add_argument(FlAG_SEED,
+                        metavar=FlAG_SEED[1:].upper(),
+                        type=parserutils.type_random_seed,
+                        help='Set random state using this seed.')
     jobutils.add_job_arguments(parser)
     return parser
 
@@ -194,9 +197,9 @@ class AmorphousCell(object):
         vectors = [x * self.mbox for x in itertools.product(idxs, idxs, idxs)]
         mol_id, polymers = 0, self.polymers[:]
         while polymers:
-            random.shuffle(vectors)
+            np.random.shuffle(vectors)
             vector = vectors.pop()
-            polymer = random.choice(polymers)
+            polymer = np.random.choice(polymers)
             for idx in range(min([polymer.mol_num, polymer.mol_num_per_mbox])):
                 polymer.mol_num -= 1
                 if polymer.mol_num == 0:

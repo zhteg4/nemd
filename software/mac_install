@@ -23,6 +23,9 @@ pip3 install matplotlib
 pip3 install yapf
 pip3 install PyQt5
 
+# Mac File Comparison Tools and Diff Tools
+brew install meld
+
 # ssh is looking for xauth in /usr/X11R6/bin and on macOS with XQuartz it is in /opt/X11/bin
 # Edit ~/.ssh/config, add XAuthLocation /opt/X11/bin/xauth to the host config.
 

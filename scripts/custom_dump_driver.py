@@ -7,7 +7,6 @@ import logutils
 import parserutils
 import environutils
 
-
 FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
 FlAG_TASK = '-task'

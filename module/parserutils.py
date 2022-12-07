@@ -1,6 +1,7 @@
 import os
 import symbols
 import argparse
+import numpy as np
 from rdkit import Chem
 
 
@@ -24,23 +25,39 @@ def type_file(arg):
     raise argparse.ArgumentTypeError(f'{arg} not found.')
 
 
-def type_positive_float(arg):
+def type_float(arg):
     try:
         value = float(arg)
     except ValueError:
         raise argparse.ArgumentTypeError(
             f'{arg} cannot be converted to float.')
+    return value
+
+
+def type_positive_float(arg):
+    value = type_float(arg)
     if value <= 0:
         raise argparse.ArgumentTypeError(f'{value} is not a possitive float.')
     return value
 
 
-def type_positive_int(arg):
+def type_random_seed(arg):
+    value = type_int(arg)
+    np.random.seed(value)
+    return value
+
+
+def type_int(arg):
     try:
         value = int(arg)
     except ValueError:
         raise argparse.ArgumentTypeError(
             f'{arg} cannot be converted to integer.')
+    return value
+
+
+def type_positive_int(arg):
+    value = type_int(arg)
     if value < 1:
         raise argparse.ArgumentTypeError(
             f'{value} is not a possitive integer.')
