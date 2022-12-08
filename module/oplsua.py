@@ -1,6 +1,7 @@
 import sys
 import types
 import symbols
+import chemparse
 import itertools
 import logutils
 import fileutils
@@ -30,19 +31,29 @@ logger = logutils.createModuleLogger(file_path=__file__)
 
 
 def log_debug(msg):
-
+    """
+    Print this message into the log file in debug mode.
+    :param msg str: the msg to be printed
+    """
     if logger is None:
         return
     logger.debug(msg)
 
 
 def get_opls_parser():
+    """
+    Read and parser opls force field file.
+    :return 'OPLS_Parser': the parser with force field information
+    """
     opls_parser = OPLS_Parser()
     opls_parser.read()
     return opls_parser
 
 
 class OPLS_Parser:
+    """
+    Parse force field file and map SMILES strings.
+    """
 
     FILE_PATH = fileutils.get_ff(name=fileutils.OPLSUA, ext=fileutils.RRM_EXT)
 
@@ -136,12 +147,8 @@ class OPLS_Parser:
         'Ethyl Sulfide': '*SCC'
     }
 
-    def __init__(self, all_atom=False):
-        self.all_atom = all_atom
-        self.lines = None
-        self.markers = None
+    def __init__(self):
         self.raw_content = {}
-        self.content = {}
         self.atoms = {}
         self.vdws = {}
         self.bonds = {}
@@ -150,10 +157,11 @@ class OPLS_Parser:
         self.impropers = {}
         self.dihedrals = {}
         self.charges = {}
-        self.mol_smiles = {}
-        self.frag_smiles = {}
 
     def read(self):
+        """
+        Main method to read and parse the force field file.
+        """
         self.setRawContent()
         self.setAtomType()
         self.setVdW()
@@ -162,65 +170,70 @@ class OPLS_Parser:
         self.setUreyBradley()
         self.setImproper()
         self.setDihedral()
-        self.setUACharge()
+        self.setCharge()
 
     def setRawContent(self):
-        fp = open(self.FILE_PATH, 'r')
-        lines = fp.readlines()
-        lines = [x.strip(' \n') for x in lines]
+        """
+        Read and set raw content.
+        """
 
-        marker_lidx = {}
-        for idx, line in enumerate(lines):
-            for mark in self.MARKERS:
-                if mark in line:
-                    marker_lidx[mark] = idx
-
+        with open(self.FILE_PATH, 'r') as fp:
+            lns = [x.strip(' \n') for x in fp.readlines()]
+        mls = {m: i for i, l in enumerate(lns) for m in self.MARKERS if m in l}
         for bmarker, emarker in zip(self.MARKERS[:-1], self.MARKERS[1:]):
-            content_lines = lines[marker_lidx[bmarker]:marker_lidx[emarker]]
+            content_lines = lns[mls[bmarker]:mls[emarker]]
             self.raw_content[bmarker] = [
                 x for x in content_lines
                 if x and not x.startswith(symbols.POUND)
             ]
 
     def setAtomType(self):
+        """
+        Set atom types based on the 'Atom Type Definitions' block.
+        """
         for line in self.raw_content[self.ATOM_MK]:
-            bcomment, comment, acomment = line.split('"')
+            # 'atom       1    C     "C Peptide Amide"         6    12.011    3'
+            bcomment, comment, acomment = line.split(symbols.DOUBLE_QUOTATION)
             _, id, formula = bcomment.split()
-            atomic_number, mass, connectivity = acomment.split()
-            h_count = 0
-            symbol = formula.split('H')[0]
-            if symbol:
-                try:
-                    h_count = int(formula.split('H')[-1])
-                except ValueError:
-                    # C as formula
-                    h_count = int('H' in formula)
-            else:
-                # CH3 -> C; H -> H
-                symbol = formula
+            atomic_number, mass, cnnct = acomment.split()  # CH3, CH, C, H
+            prsd = chemparse.parse_formula(formula)
+            h_count = prsd.pop(symbols.HYDROGEN, 0)
+            symbol = [x for x in prsd.keys()][0] if prsd else symbols.HYDROGEN
             self.atoms[int(id)] = ATOM_TYPE(id=int(id),
                                             formula=formula,
                                             symbol=symbol,
                                             description=comment,
                                             atomic_number=int(atomic_number),
                                             mass=float(mass),
-                                            connectivity=int(connectivity) +
-                                            h_count)
+                                            connectivity=int(cnnct) + h_count)
 
     def setVdW(self):
+        """
+        Set vdw parameters based on 'Van der Waals Parameters' block.
+        """
         for line in self.raw_content[self.VAN_MK]:
+            # 'vdw         213               2.5560     0.4330'
             _, id, dist, ene = line.split()
             self.vdws[int(id)] = VDW(id=int(id),
                                      dist=float(dist),
                                      ene=float(ene))
 
-    def setUACharge(self):
+    def setCharge(self):
+        """
+        Set charges based on 'Atomic Partial Charge Parameters' block.
+        """
         for line in self.raw_content[self.ATOMIC_MK]:
+            # 'charge      213               0.0000'
             _, type_id, charge = line.split()
             self.charges[int(type_id)] = float(charge)
 
     def setBond(self):
+        """
+        Set bond parameters based on 'Bond Stretching Parameters' block.
+        :return: 
+        """
         for id, line in enumerate(self.raw_content[self.BOND_MK], 1):
+            # 'bond        104  107          386.00     1.4250'
             _, id1, id2, ene, dist = line.split()
             self.bonds[id] = BOND(id=id,
                                   id1=int(id1),
@@ -229,7 +242,11 @@ class OPLS_Parser:
                                   dist=float(dist))
 
     def setAngle(self):
+        """
+        Set angle parameters based on 'Angle Bending Parameters' block.
+        """
         for id, line in enumerate(self.raw_content[self.ANGLE_MK], 1):
+            # 'angle        83  107  104      80.00     109.50'
             _, id1, id2, id3, ene, angle = line.split()
             self.angles[id] = ANGLE(id=id,
                                     id1=int(id1),
@@ -239,6 +256,11 @@ class OPLS_Parser:
                                     angle=float(angle))
 
     def setUreyBradley(self):
+        """
+        Set parameters based on 'Urey-Bradley Parameters' block.
+
+        NOTE: current this is not supported.
+        """
         for id, line in enumerate(self.raw_content[self.UREY_MK], 1):
             _, id1, id2, id3, ene, dist = line.split()
             self.urey_bradleys[id] = UREY_BRADLEY(id1=int(id1),
@@ -248,6 +270,9 @@ class OPLS_Parser:
                                                   dist=float(dist))
 
     def setImproper(self):
+        """
+        Set improper parameters based on 'Improper Torsional Parameters' block.
+        """
         for id, line in enumerate(self.raw_content[self.IMPROPER_MK], 1):
             _, id1, id2, id3, id4, ene, angle, n_parm = line.split()
             self.impropers[id] = IMPROPER(id=id,
@@ -260,6 +285,9 @@ class OPLS_Parser:
                                           n_parm=int(n_parm))
 
     def setDihedral(self):
+        """
+        Set dihedral parameters based on 'Torsional Parameters' block.
+        """
         for id, line in enumerate(self.raw_content[self.TORSIONAL_MK], 1):
             line_splitted = line.split()
             ids, enes = line_splitted[1:5], line_splitted[5:]
@@ -272,26 +300,6 @@ class OPLS_Parser:
                                           id3=int(ids[2]),
                                           id4=int(ids[3]),
                                           constants=ene_ang_ns)
-
-    def setCharge(self):
-        sidx = self.markers[self.IN_CHARGES]
-        indexes = sorted(self.markers.values())
-        eidx = indexes[indexes.index(sidx) + 1]
-        lines = [
-            x.strip().strip('set type') for x in self.lines[sidx + 1:eidx]
-        ]
-        lines = [
-            x.strip(self.DO_NOT_UA).split(':')[1] for x in lines
-            if self.all_atom ^ x.endswith(self.DO_NOT_UA)
-        ]
-        self.atoms = []
-        for line in lines:
-            idx_c, comment = line.split(symbols.POUND)
-            index, charge = idx_c.split(self.CHARGE)
-            atom = types.SimpleNamespace(index=int(index),
-                                         charge=float(charge),
-                                         comment=comment)
-            self.atoms.append(atom)
 
 
 class LammpsWriter(fileutils.LammpsInput):
