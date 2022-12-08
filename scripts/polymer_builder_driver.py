@@ -215,7 +215,7 @@ class AmorphousCell(object):
         Write amorphous cell into data file.
         :return:
         """
-        lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
+        lmw = oplsua.LammpsWriter(self.mols, self.ff, self.jobname)
         lmw.writeLammpsData(adjust_bond_legnth=False)
         lmw.writeLammpsIn()
         log(f'Data file written into {lmw.lammps_data}.')

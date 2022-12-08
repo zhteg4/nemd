@@ -105,9 +105,7 @@ class OPLS_Parser:
     # To get HO-C=O, COH~OH is used, which causes CH2-COOH bond issue
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17]}
     # yapf: disable
-    DIHE_ATOMS = {
-        (26,86,): (1,6,), (26,88,): (1,6,)
-    }
+    DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,)}
     # yapf: enable
     DESCRIPTION_SMILES = {
         'CH4 Methane': 'C',
@@ -262,6 +260,8 @@ class OPLS_Parser:
         NOTE: current this is not supported.
         """
         for id, line in enumerate(self.raw_content[self.UREY_MK], 1):
+            # ureybrad     78   77   78      38.25     1.5139
+            # ureybrad     80   79   80      39.90     1.6330
             _, id1, id2, id3, ene, dist = line.split()
             self.urey_bradleys[id] = UREY_BRADLEY(id1=int(id1),
                                                   id2=int(id2),
@@ -274,6 +274,7 @@ class OPLS_Parser:
         Set improper parameters based on 'Improper Torsional Parameters' block.
         """
         for id, line in enumerate(self.raw_content[self.IMPROPER_MK], 1):
+            # imptors       5    3    1    2           10.500  180.0  2
             _, id1, id2, id3, id4, ene, angle, n_parm = line.split()
             self.impropers[id] = IMPROPER(id=id,
                                           id1=int(id1),
@@ -289,6 +290,7 @@ class OPLS_Parser:
         Set dihedral parameters based on 'Torsional Parameters' block.
         """
         for id, line in enumerate(self.raw_content[self.TORSIONAL_MK], 1):
+            # torsion       2    1    3    4            0.650    0.0  1      2.500  180.0  2
             line_splitted = line.split()
             ids, enes = line_splitted[1:5], line_splitted[5:]
             ene_ang_ns = tuple(
@@ -302,8 +304,186 @@ class OPLS_Parser:
                                           constants=ene_ang_ns)
 
 
-class LammpsWriter(fileutils.LammpsInput):
+class LammpsIn(fileutils.LammpsInput):
+    """
+    Class to write out LAMMPS in script.
+    """
+
     IN_EXT = '.in'
+
+    LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
+    LJ_CUT = 'lj/cut'
+    GEOMETRIC = 'geometric'
+    ARITHMETIC = 'arithmetic'
+    SIXTHPOWER = 'sixthpower'
+
+    MIX = 'mix'
+    PPPM = 'pppm'
+    REAL = 'real'
+    FULL = 'full'
+    OPLS = 'opls'
+    CVFF = 'cvff'
+    FIRE = 'fire'
+    MIN_STYLE = 'min_style'
+    HARMONIC = 'harmonic'
+    LJ_COUL = 'lj/coul'
+
+    def __init__(self,
+                 jobname,
+                 lj_cut=11.,
+                 coul_cut=11.,
+                 timestep=1,
+                 concise=True):
+        """
+        :param jobname str: jobname based on which out filenames are defined
+        :param lj_cut float: cut off distance for Lennard-Jones potential
+        :param coul_cut float: cut off distance for Coulombic pairwise interaction
+        :param timestep float: timestep size for subsequent molecular dynamics simulations
+        """
+        self.jobname = jobname
+        self.lj_cut = lj_cut
+        self.coul_cut = coul_cut
+        self.timestep = timestep
+        self.concise = concise
+        self.lammps_in = self.jobname + self.IN_EXT
+        self.units = self.REAL
+        self.atom_style = self.FULL
+        self.bond_style = self.HARMONIC
+        self.angle_style = self.HARMONIC
+        self.dihedral_style = self.OPLS
+        self.improper_style = self.CVFF
+        self.pair_style = {
+            self.LJ_CUT_COUL_LONG:
+            f"{self.LJ_CUT_COUL_LONG} {self.lj_cut} {self.coul_cut}",
+            self.LJ_CUT: f"{self.LJ_CUT} {self.lj_cut}"
+        }
+        self.in_fh = None
+        self.is_debug = environutils.is_debug()
+
+    def writeLammpsIn(self):
+        """
+        Write out LAMMPS in script.
+        """
+        with open(self.lammps_in, 'w') as self.in_fh:
+            self.writeDescriptions()
+            self.readData()
+            self.writeMinimize()
+            self.writeTimestep()
+            self.writeRun()
+
+    def writeDescriptions(self):
+        """
+        Write in script description section.
+        """
+        self.in_fh.write(f"{self.UNITS} {self.units}\n")
+        self.in_fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
+        self.in_fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
+        self.in_fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
+        self.in_fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
+        self.in_fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
+        pair_style = self.LJ_CUT_COUL_LONG if self.hasCharge() else self.LJ_CUT
+        self.in_fh.write(f"{self.PAIR_STYLE} {self.pair_style[pair_style]}\n")
+        self.in_fh.write(f"{self.PAIR_MODIFY} {self.MIX} {self.GEOMETRIC}\n")
+        self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5 \n")
+        if self.hasCharge():
+            self.in_fh.write(f"{self.KSPACE_STYLE} 0.0001\n")
+        self.in_fh.write(f"log log.{self.jobname}\n")
+
+    def hasCharge(self):
+        """
+        Whether any atom has charge.
+        """
+        charges = [
+            self.ff.charges[y.GetIntProp(self.TYPE_ID)]
+            for x in self.mols.values() for y in x.GetAtoms()
+        ]
+        return any(charges)
+
+    def readData(self):
+        """
+        Write data file related information.
+        """
+        self.in_fh.write(f"{self.READ_DATA} {self.lammps_data}\n")
+
+    def writeMinimize(self, min_style=FIRE, dump=True):
+        """
+        Write commands related to minimization.
+
+        :param min_style str: cg, fire, spin, etc.
+        :param dump bool: Whether dump out trajectory.
+        """
+        if dump:
+            self.in_fh.write(
+                "dump 1 all custom 1000 dump.custom id xu yu zu\n")
+            self.in_fh.write("dump_modify 1 sort id\n")
+            atoms = self.ff.atoms.values()
+            if self.concise:
+                atoms = [x for x in atoms if x.id in self.used_atom_types]
+            smbs = ' '.join(map(str, [x.symbol for x in atoms]))
+            self.in_fh.write(f"dump_modify 1 element {smbs}\n")
+        self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
+        self.in_fh.write("minimize 1.0e-6 1.0e-8 1000 100000\n")
+
+    def writeTimestep(self):
+        """
+        Write commands related to timestep.
+        """
+        self.in_fh.write(f'timestep {self.timestep}\n')
+        self.in_fh.write('thermo_modify flush yes\n')
+        self.in_fh.write('thermo 1000\n')
+
+    def writeRun(self,
+                 start_temp=10.,
+                 target_temp=None,
+                 tdamp=100,
+                 pdamp=1000):
+        """
+        Write command to further equilibrate the system.
+        """
+
+        self.in_fh.write(f"velocity all create {start_temp} 482748\n")
+        if len(self.mols) == 1 and self.mols[1].GetNumAtoms() < 10:
+            # NVT on single molecule gives nan coords (guess due to translation)
+            self.in_fh.write("fix 1 all nve\n")
+            self.in_fh.write("run 2000\n")
+            return
+
+        self.in_fh.write(
+            f"fix 1 all nvt temp {start_temp} {start_temp} {self.timestep * tdamp}\n"
+        )
+        self.in_fh.write("run 2000\n")
+
+        if len(self.mols) == 1:
+            return
+
+        # Run relaxation on systems of multiple molecules
+        self.in_fh.write("unfix 1\n")
+        self.in_fh.write(
+            f"fix 1 all npt temp {start_temp} {start_temp} {self.timestep * tdamp} iso 1 1 {self.timestep * pdamp}\n"
+        )
+        self.in_fh.write("run 10000\n")
+
+        if target_temp is None:
+            return
+
+        self.in_fh.write("unfix 1\n")
+        self.in_fh.write(
+            f"fix 1 all npt temp {start_temp} {target_temp} {self.timestep * tdamp} iso 1 1 {self.timestep * pdamp}\n"
+        )
+        self.in_fh.write("run 100000\n")
+
+        self.in_fh.write("unfix 1\n")
+        self.in_fh.write(
+            f"fix 1 all npt temp {target_temp} {target_temp} {self.timestep * tdamp} iso 1 1 {self.timestep * pdamp}\n"
+        )
+        self.in_fh.write("run 100000\n")
+
+
+class LammpsWriter(LammpsIn):
+    """
+    Class to write out LAMMPS data file.
+    """
+
     DATA_EXT = '.data'
     LAMMPS_DESCRIPTION = 'LAMMPS Description'
 
@@ -335,11 +515,7 @@ class LammpsWriter(fileutils.LammpsInput):
     ZLO_ZHI = 'zlo zhi'
     BOX_DSP = [XLO_XHI, YLO_YHI, ZLO_ZHI]
     LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
-    BUFFER = [
-        4.,
-        4.,
-        4.,
-    ]
+    BUFFER = [4., 4., 4.] # yapf: disable
 
     MASSES = 'Masses'
     PAIR_COEFFS = 'Pair Coeffs'
@@ -359,49 +535,24 @@ class LammpsWriter(fileutils.LammpsInput):
         IMPROPERS_CAP
     ]
 
-    LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
-    LJ_CUT = 'lj/cut'
-    GEOMETRIC = 'geometric'
-    ARITHMETIC = 'arithmetic'
-    SIXTHPOWER = 'sixthpower'
-
-    def __init__(self,
-                 ff,
-                 jobname,
-                 mols=None,
-                 lj_cut=11.,
-                 coul_cut=11.,
-                 timestep=1,
-                 concise=True):
+    def __init__(self, mols, ff, jobname, concise=True, *arg, **kwarg):
+        """
+        :param ff 'oplsua.OPLS_Parser':
+        :param jobname str: jobname based on which out filenames are defined
+        :param mols dict: keys are the molecule ids, and values are 'rdkit.Chem.rdchem.Mol'
+        :param lj_cut float: cut off distance for Lennard-Jones potential
+        :param coul_cut float: cut off distance for Coulombic pairwise interaction
+        :param timestep float: timestep size for subsequent molecular dynamics simulations
+        :param concise bool: If False, all the atoms in the force field file shows
+            up in the force field section of the data file. If True, only the present
+            ones are writen into the data file.
+        """
+        super().__init__(jobname, *arg, **kwarg)
         self.ff = ff
-        self.jobname = jobname
         self.mols = mols
-        self.lj_cut = lj_cut
-        self.coul_cut = coul_cut
-        self.timestep = timestep
+        self.jobname = jobname
         self.concise = concise
-        self.lammps_in = self.jobname + self.IN_EXT
         self.lammps_data = self.jobname + self.DATA_EXT
-        self.units = 'real'
-        self.atom_style = 'full'
-        self.bond_style = 'harmonic'
-        self.angle_style = 'harmonic'
-        self.dihedral_style = 'opls'
-        self.improper_style = 'cvff'
-        self.pair_style = {
-            self.LJ_CUT_COUL_LONG:
-            f"{self.LJ_CUT_COUL_LONG} {self.lj_cut} {self.coul_cut}",
-            self.LJ_CUT: f"{self.LJ_CUT} {self.lj_cut}"
-        }
-        self.pair_modify = {'mix': self.GEOMETRIC}
-        self.special_bonds = {
-            'lj/coul': (
-                0.0,
-                0.0,
-                0.5,
-            )
-        }
-        self.kspace_style = {'pppm': 0.0001}
         self.atoms = {}
         self.bonds = {}
         self.angles = {}
@@ -413,90 +564,7 @@ class LammpsWriter(fileutils.LammpsInput):
         self.used_angle_types = []
         self.used_dihedral_types = []
         self.used_improper_types = []
-        self.in_fh = None
         self.data_fh = None
-        self.is_debug = environutils.is_debug()
-
-    def writeLammpsIn(self):
-        with open(self.lammps_in, 'w') as self.in_fh:
-            self.writeInDescriptions()
-            self.readData()
-            self.writeMinimize()
-            self.writeTimestep()
-            self.writeRun()
-
-    def writeInDescriptions(self):
-        self.in_fh.write(f"{self.UNITS} {self.units}\n")
-        self.in_fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
-        self.in_fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
-        self.in_fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
-        self.in_fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
-        self.in_fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
-        pair_style = self.LJ_CUT_COUL_LONG if self.hasCharge() else self.LJ_CUT
-        self.in_fh.write(f"{self.PAIR_STYLE} {self.pair_style[pair_style]}\n")
-        self.in_fh.write(
-            f"{self.PAIR_MODIFY} {' '.join([(x, y) for x, y in self.pair_modify.items()][0])}\n"
-        )
-        special_bond = [
-            f"{x} {' '.join(map(str, y))}"
-            for x, y in self.special_bonds.items()
-        ][0]
-        self.in_fh.write(f"{self.SPECIAL_BONDS} {special_bond}\n")
-        if self.hasCharge():
-            kspace_style = [f"{x} {y}"
-                            for x, y in self.kspace_style.items()][0]
-            self.in_fh.write(f"{self.KSPACE_STYLE} {kspace_style}\n")
-        self.in_fh.write(f"log log.lammps\n")
-
-    def hasCharge(self, default=True):
-        if self.mols is None:
-            return default
-        charges = [
-            self.ff.charges[y.GetIntProp(self.TYPE_ID)]
-            for x in self.mols.values() for y in x.GetAtoms()
-        ]
-        return any(charges)
-
-    def readData(self):
-        self.in_fh.write(f"{self.READ_DATA} {self.lammps_data}\n")
-
-    def writeMinimize(self, dump=True):
-        if dump:
-            self.in_fh.write(
-                "dump 1 all custom 1000 dump.custom id xu yu zu\n")
-            self.in_fh.write("dump_modify 1 sort id\n")
-            atoms = self.ff.atoms.values()
-            if self.concise:
-                atoms = [x for x in atoms if x.id in self.used_atom_types]
-            smbs = ' '.join(map(str, [x.symbol for x in atoms]))
-            self.in_fh.write(f"dump_modify 1 element {smbs}\n")
-        self.in_fh.write("min_style fire\n")
-        self.in_fh.write("minimize 1.0e-6 1.0e-8 1000 100000\n")
-
-    def writeTimestep(self):
-        self.in_fh.write(f'timestep {self.timestep}\n')
-        self.in_fh.write('thermo_modify flush yes\n')
-        self.in_fh.write('thermo 1000\n')
-
-    def writeRun(self):
-        self.in_fh.write("velocity all create 10 482748\n")
-        if len(self.mols) == 1 and self.mols[1].GetNumAtoms() < 10:
-            # NVT on single molecule gives nan coords (guess due to translation)
-            self.in_fh.write("fix             1 all nve\n")
-            self.in_fh.write("run 2000\n")
-            return
-
-        self.in_fh.write(f"fix 1 all nvt temp 10 10 {self.timestep * 100}\n")
-        self.in_fh.write("run 2000\n")
-
-        if len(self.mols) == 1:
-            return
-
-        self.in_fh.write("unfix 1\n")
-        self.in_fh.write(
-            f"fix 1 all npt temp 10 10 {self.timestep * 100} iso 1 1 {self.timestep * 1000}\n"
-        )
-        self.in_fh.write("run 10000\n")
 
     def adjustConformer(self):
         self.setAtoms()

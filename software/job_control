@@ -1,0 +1,5 @@
+https://hpc.nih.gov/docs/job_dependencies.html
+sbatch - Slurm Workload Manager
+Building pipelines using slurm dependencies
+Job Dependencies
+https://hpc.nih.gov/docs/userguide.html#depend
