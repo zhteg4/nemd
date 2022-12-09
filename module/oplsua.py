@@ -145,6 +145,9 @@ class OPLS_Parser:
         'Ethyl Sulfide': '*SCC'
     }
 
+    BOND_ATM_ID = 'bond_atm_id'
+    IMPLICIT_H = 'implicit_h'
+
     def __init__(self):
         self.raw_content = {}
         self.atoms = {}
@@ -302,6 +305,75 @@ class OPLS_Parser:
                                           id3=int(ids[2]),
                                           id4=int(ids[3]),
                                           constants=ene_ang_ns)
+
+    def getMatchedBonds(self, bonded_atoms):
+        """
+        Get force field matched bonds. The searching and approximation follows:
+        1) Forced mapping via BOND_ATOMS to connect force field fragments.
+        2) Exact match for current atom types.
+        3) Matching of one atom with the other's symbol and connectivity matched
+        4) Matching of one atom with only the other's symbol matched
+
+        :raise ValueError: If the above failed
+
+        :param bonded_atoms: list of two bonded atoms sorted by BOND_ATM_ID
+        :return list of 'oplsua.BOND': bond information
+        """
+
+        atom_types = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
+        try:
+            atom_types = OPLS_Parser.BOND_ATOMS[tuple(sorted(atom_types))]
+        except KeyError:
+            # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
+            pass
+        # Exact match between two atom type ids
+        matches = [
+            x for x in self.bonds.values() if [x.id1, x.id2] == atom_types
+        ]
+        if matches:
+            return matches
+
+        log_debug(
+            f"No exact params for bond between atom type {atom_types[0]} and {atom_types[1]}."
+        )
+        bond_score, type_set = {}, set(atom_types)
+        for bond in self.bonds.values():
+            matched = type_set.intersection([bond.id1, bond.id2])
+            if len(matched) != 1:
+                continue
+            # Compare the unmatched and sore them
+            atom_id = set([bond.id1, bond.id2]).difference(matched).pop()
+            atom = [
+                x for x in bonded_atoms
+                if x.GetIntProp(self.BOND_ATM_ID) not in [bond.id1, bond.id2]
+            ][0]
+            ssymbol = self.atoms[atom_id].symbol == atom.GetSymbol()
+            scnnt = self.atoms[atom_id].connectivity == self.getAtomConnt(atom)
+            bond_score[bond] = [ssymbol, scnnt]
+
+        matches = [x for x, y_z in bond_score.items() if all(y_z)]
+        if not matches:
+            matches = [x for x, (y, z) in bond_score.items() if y]
+        if not matches:
+            raise ValueError(
+                f"No params for bond between atom type {atom_types[0]} and {atom_types[1]}."
+            )
+        # self.debugPrintReplacement(bonded_atoms, matches)
+        return matches
+
+    @classmethod
+    def getAtomConnt(cls, atom):
+        """
+        Get the atomic connectivity information.
+
+        :param atom 'rdkit.Chem.rdchem.Atom': the connectivity of this atom
+        :return int: the number of bonds connected to this atom including the
+            implicit hydrogen.
+        """
+
+        implicit_h_num = atom.GetIntProp(cls.IMPLICIT_H) if atom.HasProp(
+            cls.IMPLICIT_H) else 0
+        return atom.GetDegree() + implicit_h_num
 
 
 class LammpsIn(fileutils.LammpsInput):
@@ -496,8 +568,8 @@ class LammpsWriter(LammpsIn):
     ATOM_ID = 'atom_id'
     RES_NUM = 'res_num'
     NEIGHBOR_CHARGE = 'neighbor_charge'
-    BOND_ATM_ID = 'bond_atm_id'
-    IMPLICIT_H = 'implicit_h'
+    BOND_ATM_ID = OPLS_Parser.BOND_ATM_ID
+    IMPLICIT_H = OPLS_Parser.IMPLICIT_H
 
     ATOMS = 'atoms'
     BONDS = 'bonds'
@@ -623,76 +695,13 @@ class LammpsWriter(LammpsIn):
             # BOND_ATM_ID defines bonding parameters marked during atom typing
             bonded_atoms = sorted(bonded_atoms,
                                   key=lambda x: x.GetIntProp(self.BOND_ATM_ID))
-            matches = self.getMatchedBonds(bonded_atoms)
+            matches = self.ff.getMatchedBonds(bonded_atoms)
             bond = matches[0]
             self.bonds[bond_id] = (
                 bond.id,
                 bonded_atoms[0].GetIntProp(self.ATOM_ID),
                 bonded_atoms[1].GetIntProp(self.ATOM_ID),
             )
-
-    def getMatchedBonds(self, bonded_atoms):
-        """
-        Get force field matched bonds.
-
-        :param bonded_atoms: list of two bonded atoms sorted by BOND_ATM_ID
-        :return list of 'oplsua.BOND': bond information
-        """
-        atoms_types = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
-        try:
-            atoms_types = OPLS_Parser.BOND_ATOMS[tuple(sorted(atoms_types))]
-        except KeyError:
-            # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
-            pass
-        # Exact match between two atom type ids
-        matches = [
-            x for x in self.ff.bonds.values() if [x.id1, x.id2] == atoms_types
-        ]
-        if matches:
-            return matches
-
-        log_debug(
-            f"No exact params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
-        )
-        type_set = set(atoms_types)
-        partial_matches = {
-            x: type_set.intersection([x.id1, x.id2])
-            for x in self.ff.bonds.values()
-        }
-        # {ff bond: one share atom type}
-        partial_matches = {x: y.pop() for x, y in partial_matches.items() if y}
-        bond_utype = {}
-        for bond, mtype in partial_matches.items():
-            bond_unmatched = set([bond.id1, bond.id2]).difference([mtype])
-            bond_unmatched = bond_unmatched.pop() if bond_unmatched else mtype
-            type_unmatched = type_set.difference([mtype])
-            type_unmatched = type_unmatched.pop() if type_unmatched else mtype
-            bond_utype[bond] = [bond_unmatched, type_unmatched]
-        # ff bond: [unmatched atom type in ff bond, replaced unmatched atom type in ff, unmatched atom]
-        bond_utype = {
-            bond: [
-                utype, rtype,
-                [
-                    x for x in bonded_atoms
-                    if x.GetIntProp(self.BOND_ATM_ID) == rtype
-                ][0]
-            ]
-            for bond, (utype, rtype) in bond_utype.items()
-        }
-        bond_score = {}
-        for bond, (uatm, _, atm) in bond_utype.items():
-            ssymbol = self.ff.atoms[uatm].symbol == atm.GetSymbol()
-            scnnt = self.ff.atoms[uatm].connectivity == self.getAtomConnt(atm)
-            bond_score[bond] = [ssymbol, scnnt]
-        symbol_matched = [x for x, (y, z) in bond_score.items() if y]
-        smbl_cnnt_matched = [x for x, y_z in bond_score.items() if all(y_z)]
-        matches = smbl_cnnt_matched if smbl_cnnt_matched else symbol_matched
-        if not matches:
-            raise ValueError(
-                f"No params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
-            )
-        self.debugPrintReplacement(bonded_atoms, matches)
-        return matches
 
     def adjustCoords(self):
         """

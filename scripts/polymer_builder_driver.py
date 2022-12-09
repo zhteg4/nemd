@@ -336,7 +336,10 @@ class Polymer(object):
         ht_atoms = [x.GetNeighbors()[0] for x in capping_atoms]
         ht_atom_idxs = [x.GetIdx() for x in ht_atoms]
         for polym_ht in [ht_atom_idxs[0], ht_atom_idxs[-1]]:
-            combo.GetAtomWithIdx(polym_ht).SetBoolProp(self.POLYM_HT, True)
+            atom = combo.GetAtomWithIdx(polym_ht)
+            atom.SetBoolProp(self.POLYM_HT, True)
+            atom.SetIntProp(self.IMPLICIT_H,
+                            atom.GetIntProp(self.IMPLICIT_H) + 1)
         # Create bonds between monomers
         edcombo = Chem.EditableMol(combo)
         for t_atom_idx, h_atom_idx in zip(
