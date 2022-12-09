@@ -102,7 +102,7 @@ class OPLS_Parser:
     ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72})
     DIHE_ATOM = ATOM_TOTAL.copy()
     DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72})
-    # To get HO-C=O, COH~OH is used, which causes CH2-COOH bond issue
+    # C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17]}
     # yapf: disable
     DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,)}
@@ -439,6 +439,11 @@ class LammpsIn(fileutils.LammpsInput):
                  pdamp=1000):
         """
         Write command to further equilibrate the system.
+
+        :param start_temp float: the starting temperature for relaxation
+        :param target_temp float: the target temperature at the end of the relaxation
+        :param tdamp float: damping factor to control temperature
+        :param pdamp float: damping factor to control pressure
         """
 
         self.in_fh.write(f"velocity all create {start_temp} 482748\n")
@@ -459,8 +464,8 @@ class LammpsIn(fileutils.LammpsInput):
         # Run relaxation on systems of multiple molecules
         self.in_fh.write("unfix 1\n")
         self.in_fh.write(
-            f"fix 1 all npt temp {start_temp} {start_temp} {self.timestep * tdamp} iso 1 1 {self.timestep * pdamp}\n"
-        )
+            f"fix 1 all npt temp {start_temp} {start_temp} {self.timestep * tdamp} "
+            f"iso 1 1 {self.timestep * pdamp}\n")
         self.in_fh.write("run 10000\n")
 
         if target_temp is None:
@@ -468,14 +473,14 @@ class LammpsIn(fileutils.LammpsInput):
 
         self.in_fh.write("unfix 1\n")
         self.in_fh.write(
-            f"fix 1 all npt temp {start_temp} {target_temp} {self.timestep * tdamp} iso 1 1 {self.timestep * pdamp}\n"
-        )
+            f"fix 1 all npt temp {start_temp} {target_temp} {self.timestep * tdamp} "
+            f"iso 1 1 {self.timestep * pdamp}\n")
         self.in_fh.write("run 100000\n")
 
         self.in_fh.write("unfix 1\n")
         self.in_fh.write(
-            f"fix 1 all npt temp {target_temp} {target_temp} {self.timestep * tdamp} iso 1 1 {self.timestep * pdamp}\n"
-        )
+            f"fix 1 all npt temp {target_temp} {target_temp} {self.timestep * tdamp} "
+            f"iso 1 1 {self.timestep * pdamp}\n")
         self.in_fh.write("run 100000\n")
 
 
@@ -566,18 +571,20 @@ class LammpsWriter(LammpsIn):
         self.used_improper_types = []
         self.data_fh = None
 
-    def adjustConformer(self):
-        self.setAtoms()
-        self.setBonds()
-        self.adjustBondLength()
+    def writeData(self, adjust_coords=True):
+        """
+        Write out LAMMPS data file.
 
-    def writeLammpsData(self, adjust_bond_legnth=True):
+        :param adjust_coords bool: whether adjust coordinates of the molecules.
+            This only good for a small piece as clashes between non-bonded atoms
+            may be introduced.
+        """
 
         with open(self.lammps_data, 'w') as self.data_fh:
             self.setImproperSymbols()
             self.setAtoms()
             self.setBonds()
-            self.adjustBondLength(adjust_bond_legnth)
+            self.adjustBondLength(adjust_coords)
             self.setAngles()
             self.setDihedrals()
             self.setImpropers()
@@ -598,9 +605,110 @@ class LammpsWriter(LammpsIn):
             self.writeDihedrals()
             self.writeImpropers()
 
+    def setAtoms(self):
+        """
+        Set atom property.
+        """
+        atoms = [atom for mol in self.mols.values() for atom in mol.GetAtoms()]
+        for atom_id, atom in enumerate(atoms, start=1):
+            atom.SetIntProp(self.ATOM_ID, atom_id)
+
+    def setBonds(self):
+        """
+        Set bonding information.
+        """
+        bonds = [bond for mol in self.mols.values() for bond in mol.GetBonds()]
+        for bond_id, bond in enumerate(bonds, start=1):
+            bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
+            # BOND_ATM_ID defines bonding parameters marked during atom typing
+            bonded_atoms = sorted(bonded_atoms,
+                                  key=lambda x: x.GetIntProp(self.BOND_ATM_ID))
+            matches = self.getMatchedBonds(bonded_atoms)
+            bond = matches[0]
+            self.bonds[bond_id] = (
+                bond.id,
+                bonded_atoms[0].GetIntProp(self.ATOM_ID),
+                bonded_atoms[1].GetIntProp(self.ATOM_ID),
+            )
+
+    def getMatchedBonds(self, bonded_atoms):
+        """
+        Get force field matched bonds.
+
+        :param bonded_atoms: list of two bonded atoms sorted by BOND_ATM_ID
+        :return list of 'oplsua.BOND': bond information
+        """
+        atoms_types = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
+        try:
+            atoms_types = OPLS_Parser.BOND_ATOMS[tuple(sorted(atoms_types))]
+        except KeyError:
+            # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
+            pass
+        # Exact match between two atom type ids
+        matches = [
+            x for x in self.ff.bonds.values() if [x.id1, x.id2] == atoms_types
+        ]
+        if matches:
+            return matches
+
+        log_debug(
+            f"No exact params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
+        )
+        type_set = set(atoms_types)
+        partial_matches = {
+            x: type_set.intersection([x.id1, x.id2])
+            for x in self.ff.bonds.values()
+        }
+        # {ff bond: one share atom type}
+        partial_matches = {x: y.pop() for x, y in partial_matches.items() if y}
+        bond_utype = {}
+        for bond, mtype in partial_matches.items():
+            bond_unmatched = set([bond.id1, bond.id2]).difference([mtype])
+            bond_unmatched = bond_unmatched.pop() if bond_unmatched else mtype
+            type_unmatched = type_set.difference([mtype])
+            type_unmatched = type_unmatched.pop() if type_unmatched else mtype
+            bond_utype[bond] = [bond_unmatched, type_unmatched]
+        # ff bond: [unmatched atom type in ff bond, replaced unmatched atom type in ff, unmatched atom]
+        bond_utype = {
+            bond: [
+                utype, rtype,
+                [
+                    x for x in bonded_atoms
+                    if x.GetIntProp(self.BOND_ATM_ID) == rtype
+                ][0]
+            ]
+            for bond, (utype, rtype) in bond_utype.items()
+        }
+        bond_score = {}
+        for bond, (uatm, _, atm) in bond_utype.items():
+            ssymbol = self.ff.atoms[uatm].symbol == atm.GetSymbol()
+            scnnt = self.ff.atoms[uatm].connectivity == self.getAtomConnt(atm)
+            bond_score[bond] = [ssymbol, scnnt]
+        symbol_matched = [x for x, (y, z) in bond_score.items() if y]
+        smbl_cnnt_matched = [x for x, y_z in bond_score.items() if all(y_z)]
+        matches = smbl_cnnt_matched if smbl_cnnt_matched else symbol_matched
+        if not matches:
+            raise ValueError(
+                f"No params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
+            )
+        self.debugPrintReplacement(bonded_atoms, matches)
+        return matches
+
+    def adjustCoords(self):
+        """
+        Adjust the coordinates based bond length etc.
+        """
+        self.setAtoms()
+        self.setBonds()
+        self.adjustBondLength()
+
     def removeUnused(self):
+        """
+        Remove used force field information so that the data file is minimal.
+        """
         if not self.concise:
             return
+
         self.used_atom_types = [0] + sorted(
             set(
                 y.GetIntProp(self.TYPE_ID) for x in self.mols.values()
@@ -748,13 +856,6 @@ class LammpsWriter(LammpsIn):
                 f"{improper_id} {improper.ene} {sign} {improper.n_parm}\n")
         self.data_fh.write("\n")
 
-    def setAtoms(self):
-        atom_id = 0
-        for mol_id, mol in self.mols.items():
-            for atom in mol.GetAtoms():
-                atom_id += 1
-                atom.SetIntProp(self.ATOM_ID, atom_id)
-
     def adjustBondLength(self, adjust_bond_legnth=True):
         if not adjust_bond_legnth:
             return
@@ -794,83 +895,6 @@ class LammpsWriter(LammpsIn):
                     f"{atom_id} {mol_id} {type_id} {charge:.4f} {xyz} # {dsrptn} {symbol}\n"
                 )
         self.data_fh.write(f"\n")
-
-    def setBonds(self):
-        bond_id = 0
-        for mol in self.mols.values():
-            for bond in mol.GetBonds():
-                bond_id += 1
-                bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
-                bonded_atoms = sorted(
-                    bonded_atoms, key=lambda x: x.GetIntProp(self.BOND_ATM_ID))
-                matches = self.getMatchedBonds(bonded_atoms)
-                bond = matches[0]
-                self.bonds[bond_id] = (
-                    bond.id,
-                    bonded_atoms[0].GetIntProp(self.ATOM_ID),
-                    bonded_atoms[1].GetIntProp(self.ATOM_ID),
-                )
-
-    def getMatchedBonds(self, bonded_atoms):
-        """
-        :param bonded_atoms: list of two bonded atoms sorted by BOND_ATM_ID
-        :return:
-        """
-        atoms_types = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
-        try:
-            atoms_types = OPLS_Parser.BOND_ATOMS[tuple(sorted(atoms_types))]
-        except KeyError:
-            # To get HO-C=O, COH~OH is used, which causes CH2-COOH bond issue
-            pass
-        # Exact match between two atom type ids
-        matches = [
-            x for x in self.ff.bonds.values() if [x.id1, x.id2] == atoms_types
-        ]
-        if matches:
-            return matches
-
-        log_debug(
-            f"No exact params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
-        )
-        type_set = set(atoms_types)
-        partial_matches = {
-            x: type_set.intersection([x.id1, x.id2])
-            for x in self.ff.bonds.values()
-        }
-        # {ff bond: one share atom type}
-        partial_matches = {x: y.pop() for x, y in partial_matches.items() if y}
-        bond_utype = {}
-        for bond, mtype in partial_matches.items():
-            bond_unmatched = set([bond.id1, bond.id2]).difference([mtype])
-            bond_unmatched = bond_unmatched.pop() if bond_unmatched else mtype
-            type_unmatched = type_set.difference([mtype])
-            type_unmatched = type_unmatched.pop() if type_unmatched else mtype
-            bond_utype[bond] = [bond_unmatched, type_unmatched]
-        # ff bond: [unmatched atom type in ff bond, replaced unmatched atom type in ff, unmatched atom]
-        bond_utype = {
-            bond: [
-                utype, rtype,
-                [
-                    x for x in bonded_atoms
-                    if x.GetIntProp(self.BOND_ATM_ID) == rtype
-                ][0]
-            ]
-            for bond, (utype, rtype) in bond_utype.items()
-        }
-        bond_score = {}
-        for bond, (uatm, _, atm) in bond_utype.items():
-            ssymbol = self.ff.atoms[uatm].symbol == atm.GetSymbol()
-            scnnt = self.ff.atoms[uatm].connectivity == self.getAtomConnt(atm)
-            bond_score[bond] = [ssymbol, scnnt]
-        symbol_matched = [x for x, (y, z) in bond_score.items() if y]
-        smbl_cnnt_matched = [x for x, y_z in bond_score.items() if all(y_z)]
-        matches = smbl_cnnt_matched if smbl_cnnt_matched else symbol_matched
-        if not matches:
-            raise ValueError(
-                f"No params for bond between atom type {atoms_types[0]} and {atoms_types[1]}."
-            )
-        self.debugPrintReplacement(bonded_atoms, matches)
-        return matches
 
     def debugPrintReplacement(self, atoms, matches):
         smbl_cnnts = [f'{x.GetSymbol()}{self.getAtomConnt(x)}' for x in atoms]
@@ -1241,35 +1265,11 @@ class DataFileReader(LammpsWriter):
             if y in self.lines[x]
         }
 
-    def setAtoms(self):
-        sidx = self.mk_idxes[self.ATOMS_CAP] + 2
-        for id, lid in enumerate(
-                range(sidx, sidx + self.struct_dsp[self.ATOMS]), 1):
-            id, mol_id, type_id, charge, x, y, z = self.lines[lid].split()[:7]
-            ele = self.lines[lid].split('#')[-1].split()[-1]
-            self.atoms[int(id)] = types.SimpleNamespace(
-                id=int(id),
-                mol_id=int(mol_id),
-                type_id=int(type_id),
-                charge=float(charge),
-                xyz=[float(x), float(y), float(z)],
-                ele=ele)
-
     def setMols(self):
         mols = collections.defaultdict(list)
         for atom in self.atoms.values():
             mols[atom.mol_id].append(atom.id)
         self.mols = dict(mols)
-
-    def setBonds(self):
-        sidx = self.mk_idxes[self.BONDS_CAP] + 2
-        for id, lid in enumerate(
-                range(sidx, sidx + self.struct_dsp[self.BONDS]), 1):
-            id, type_id, id1, id2 = self.lines[lid].split()[:4]
-            self.bonds[int(id)] = types.SimpleNamespace(id=int(id),
-                                                        type_id=int(type_id),
-                                                        id1=int(id1),
-                                                        id2=int(id2))
 
     def setAngles(self):
         sidx = self.mk_idxes[self.ANGLES_CAP] + 2

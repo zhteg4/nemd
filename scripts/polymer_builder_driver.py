@@ -216,7 +216,7 @@ class AmorphousCell(object):
         :return:
         """
         lmw = oplsua.LammpsWriter(self.mols, self.ff, self.jobname)
-        lmw.writeLammpsData(adjust_bond_legnth=False)
+        lmw.writeData(adjust_coords=False)
         lmw.writeLammpsIn()
         log(f'Data file written into {lmw.lammps_data}.')
         log(f'In script written into {lmw.lammps_in}.')
@@ -463,8 +463,10 @@ class Polymer(object):
         :param res_num int: residue number
         """
 
+        # TYPE_ID defines vdw and charge
         atom.SetIntProp(self.TYPE_ID, type_id)
         atom.SetIntProp(self.RES_NUM, res_num)
+        # BOND_ATM_ID defines bonding parameters
         atom.SetIntProp(self.BOND_ATM_ID,
                         oplsua.OPLS_Parser.BOND_ATOM[type_id])
 
@@ -512,7 +514,7 @@ class Polymer(object):
         Write lammps data file.
         """
         lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
-        lmw.writeLammpsData()
+        lmw.writeData()
         lmw.writeLammpsIn()
 
 
@@ -734,7 +736,7 @@ class Conformer(object):
         self.lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=mols)
         if self.minimization:
             return
-        self.lmw.adjustConformer()
+        self.lmw.adjustCoords()
 
     def minimize(self):
         """
@@ -745,7 +747,7 @@ class Conformer(object):
             return
 
         with fileutils.chdir(self.relax_dir):
-            self.lmw.writeLammpsData()
+            self.lmw.writeData()
             self.lmw.writeLammpsIn()
             lmp = lammps.lammps(cmdargs=['-screen', 'none'])
             lmp.file(self.lmw.lammps_in)
