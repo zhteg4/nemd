@@ -5,11 +5,18 @@ import chemparse
 import itertools
 import logutils
 import fileutils
+import constants
 import collections
 import environutils
 import numpy as np
 from rdkit import Chem
 from collections import namedtuple
+
+BOND_ATM_ID = 'bond_atm_id'
+RES_NUM = 'res_num'
+IMPLICIT_H = 'implicit_h'
+TYPE_ID = 'type_id'
+LARGE_NUM = constants.LARGE_NUM
 
 ATOM_TYPE = namedtuple('ATOM_TYPE', [
     'id', 'formula', 'symbol', 'description', 'atomic_number', 'mass',
@@ -50,34 +57,16 @@ def get_opls_parser():
     return opls_parser
 
 
-class OPLS_Parser:
+class OPLS_Typer:
     """
-    Parse force field file and map SMILES strings.
+    Type the atoms and map SMILES fragments.
     """
 
-    FILE_PATH = fileutils.get_ff(name=fileutils.OPLSUA, ext=fileutils.RRM_EXT)
-
-    DEFINITION_MK = 'Force Field Definition'
-    LITERATURE_MK = 'Literature References'
-    ATOM_MK = 'Atom Type Definitions'
-    VAN_MK = 'Van der Waals Parameters'
-    BOND_MK = 'Bond Stretching Parameters'
-    ANGLE_MK = 'Angle Bending Parameters'
-    UREY_MK = 'Urey-Bradley Parameters'
-    IMPROPER_MK = 'Improper Torsional Parameters'
-    TORSIONAL_MK = 'Torsional Parameters'
-    ATOMIC_MK = 'Atomic Partial Charge Parameters'
-    BIOPOLYMER_MK = 'Biopolymer Atom Type Conversions'
-
-    MARKERS = [
-        DEFINITION_MK, LITERATURE_MK, ATOM_MK, VAN_MK, BOND_MK, ANGLE_MK,
-        UREY_MK, IMPROPER_MK, TORSIONAL_MK, ATOMIC_MK, BIOPOLYMER_MK
-    ]
-
-    WRITE_ONCE = 'write_once'
-    CHARGE = 'charge'
-    IN_CHARGES = 'In Charges'
-    DO_NOT_UA = 'DON\'T USE(OPLSUA)'
+    TYPE_ID = TYPE_ID
+    RES_NUM = RES_NUM
+    BOND_ATM_ID = BOND_ATM_ID
+    IMPLICIT_H = IMPLICIT_H
+    LARGE_NUM = constants.LARGE_NUM
 
     # yapf: disable
     SMILES = [UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
@@ -145,8 +134,146 @@ class OPLS_Parser:
         'Ethyl Sulfide': '*SCC'
     }
 
-    BOND_ATM_ID = 'bond_atm_id'
-    IMPLICIT_H = 'implicit_h'
+    def __init__(self, mol):
+        self.mol = mol
+
+    def run(self):
+        """
+        Assign atom types for force field assignment.
+        """
+        marked_smiles = {}
+        marked_atom_ids = []
+        res_num = 1
+        for sml in self.SMILES:
+            frag = Chem.MolFromSmiles(sml.sml)
+            matches = self.mol.GetSubstructMatches(frag,
+                                                     maxMatches=self.LARGE_NUM)
+            matches = [self.filterMatch(x, frag) for x in matches]
+            res_num, matom_ids = self.markMatches(matches, sml, res_num)
+            if not matom_ids:
+                continue
+            cnt = collections.Counter([len(x) for x in matom_ids])
+            cnt_exp = str(len(matom_ids)) + ' matches ' + ','.join(
+                [f'{x}*{y}' for x, y in cnt.items()])
+            marked_smiles[sml.sml] = cnt_exp
+            marked_atom_ids += [y for x in matom_ids for y in x]
+            if all(x.HasProp(self.TYPE_ID) for x in self.mol.GetAtoms()):
+                break
+        log_debug(f"{len(marked_atom_ids)}, {self.mol.GetNumAtoms()}")
+        log_debug(f"{res_num - 1} residues found.")
+        [log_debug(f'{x}: {y}') for x, y in marked_smiles.items()]
+
+    def filterMatch(self, match, frag):
+        """
+        Filter substruct matches based on connectivity.
+
+        :param match tuples: atom ids of one match
+        :param frag: the fragment of one force field templated smiles
+        :return: tuples: atom ids of one match with correct connectivity
+        """
+        frag_cnnt = [
+            x.GetNumImplicitHs() + x.GetDegree()
+            if x.GetSymbol() != symbols.CARBON else x.GetDegree()
+            for x in frag.GetAtoms()
+        ]
+        polm_cnnt = [self.mol.GetAtomWithIdx(x).GetDegree() for x in match]
+        match = [
+            x if y == z else None
+            for x, y, z in zip(match, frag_cnnt, polm_cnnt)
+        ]
+        return match
+
+    def markMatches(self, matches, sml, res_num):
+        """
+        Mark the matched atoms.
+
+        :param matches list of tuple: each tuple has one pattern match
+        :param sml namedtuple: 'UA' namedtuple for smiles
+        :param res_num int: the residue number
+        :return int, list: incremented residue number, list of marked atom list
+        """
+        marked_atom_ids = []
+        for match in matches:
+            log_debug(f"assignAtomType {sml.sml}, {match}")
+            marked = self.markAtoms(match, sml, res_num)
+            if marked:
+                res_num += 1
+                marked_atom_ids.append(marked)
+        return res_num, marked_atom_ids
+
+    def markAtoms(self, match, sml, res_num):
+        """
+        Marker atoms with type id, res_num, and bonded_atom id for vdw/charge
+            table lookup, charge balance, and bond searching.
+
+        :param match tuple: atom ids of one match
+        :param sml namedtuple: 'UA' namedtuple for smiles
+        :param res_num int: the residue number
+        :return list: list of marked atom ids
+        """
+        marked = []
+        for atom_id, type_id in zip(match, sml.mp):
+            if not type_id or atom_id is None:
+                continue
+            atom = self.mol.GetAtomWithIdx(atom_id)
+            try:
+                atom.GetIntProp(self.TYPE_ID)
+            except KeyError:
+                self.markAtom(atom, type_id, res_num)
+                marked.append(atom_id)
+                log_debug(
+                    f"{atom.GetSymbol()}{atom.GetDegree()} {atom_id} {type_id}"
+                )
+            else:
+                continue
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetSymbol() == symbols.HYDROGEN:
+                    type_id = sml.hs[type_id]
+                    self.markAtom(neighbor, type_id, res_num)
+                    marked.append(neighbor.GetIdx())
+                    log_debug(
+                        f"{neighbor.GetSymbol()}{neighbor.GetDegree()} {neighbor.GetIdx()} {type_id}"
+                    )
+        return marked
+
+    def markAtom(self, atom, type_id, res_num):
+        """
+        Set atom id, res_num, and bonded_atom id.
+        :param atom 'rdkit.Chem.rdchem.Atom': the atom to mark
+        :param type_id int: atom type id
+        :param res_num int: residue number
+        """
+
+        # TYPE_ID defines vdw and charge
+        atom.SetIntProp(self.TYPE_ID, type_id)
+        atom.SetIntProp(self.RES_NUM, res_num)
+        # BOND_ATM_ID defines bonding parameters
+        atom.SetIntProp(self.BOND_ATM_ID, self.BOND_ATOM[type_id])
+
+
+class OPLS_Parser(OPLS_Typer):
+    """
+    Parse force field file and map atomic details.
+    """
+
+    FILE_PATH = fileutils.get_ff(name=fileutils.OPLSUA, ext=fileutils.RRM_EXT)
+
+    DEFINITION_MK = 'Force Field Definition'
+    LITERATURE_MK = 'Literature References'
+    ATOM_MK = 'Atom Type Definitions'
+    VAN_MK = 'Van der Waals Parameters'
+    BOND_MK = 'Bond Stretching Parameters'
+    ANGLE_MK = 'Angle Bending Parameters'
+    UREY_MK = 'Urey-Bradley Parameters'
+    IMPROPER_MK = 'Improper Torsional Parameters'
+    TORSIONAL_MK = 'Torsional Parameters'
+    ATOMIC_MK = 'Atomic Partial Charge Parameters'
+    BIOPOLYMER_MK = 'Biopolymer Atom Type Conversions'
+
+    MARKERS = [
+        DEFINITION_MK, LITERATURE_MK, ATOM_MK, VAN_MK, BOND_MK, ANGLE_MK,
+        UREY_MK, IMPROPER_MK, TORSIONAL_MK, ATOMIC_MK, BIOPOLYMER_MK
+    ]
 
     def __init__(self):
         self.raw_content = {}
@@ -309,6 +436,7 @@ class OPLS_Parser:
     def getMatchedBonds(self, bonded_atoms):
         """
         Get force field matched bonds. The searching and approximation follows:
+
         1) Forced mapping via BOND_ATOMS to connect force field fragments.
         2) Exact match for current atom types.
         3) Matching of one atom with the other's symbol and connectivity matched
@@ -358,7 +486,7 @@ class OPLS_Parser:
             raise ValueError(
                 f"No params for bond between atom type {atom_types[0]} and {atom_types[1]}."
             )
-        # self.debugPrintReplacement(bonded_atoms, matches)
+        self.debugPrintReplacement(bonded_atoms, matches)
         return matches
 
     @classmethod
@@ -375,6 +503,98 @@ class OPLS_Parser:
             cls.IMPLICIT_H) else 0
         return atom.GetDegree() + implicit_h_num
 
+    def getAngleAtoms(self, atom):
+        """
+        Get all three angle atoms from the input middle atom. The first atom has
+        a TYPE_ID smaller than the third.
+
+        :param atom 'rdkit.Chem.rdchem.Atom': the middle atom
+        :return list of list: each sublist contains three atoms.
+        """
+        neighbors = atom.GetNeighbors()
+        if len(neighbors) < 2:
+            return []
+        neighbors = sorted(neighbors, key=lambda x: x.GetIntProp(self.TYPE_ID))
+        return [[x, atom, y] for x, y in itertools.combinations(neighbors, 2)]
+
+    def getMatchedAngles(self, atoms):
+        """
+
+        :param atoms:
+        :return:
+        """
+
+
+        end_ids = [self.ANGLE_ATOM[x.GetIntProp(self.TYPE_ID)] for x in atoms[::2]]
+        if end_ids[0] > end_ids[1]:
+            atoms = list(reversed(atoms))
+        type_ids = [x.GetIntProp(self.TYPE_ID) for x in atoms]
+        type_ids = [OPLS_Parser.ANGLE_ATOM[x] for x in type_ids]
+        matches = [
+            x for x in self.angles.values()
+            if type_ids == [x.id1, x.id2, x.id3]
+        ]
+
+        if matches:
+            return matches
+        log_debug(
+            f"No exact params for angle between atom {', '.join(map(str, type_ids))}."
+        )
+        partial_matches = [
+            x for x in self.angles.values() if x.id2 == type_ids[1]
+        ]
+        if not partial_matches:
+            import pdb;pdb.set_trace()
+            raise ValueError(
+                f"No params for angle (middle atom type {type_ids[1]}).")
+        matches = self.getMatchesFromEnds(atoms, partial_matches)
+        if not matches:
+            raise ValueError(
+                f"No params for angle between atom {', '.join(map(str, type_ids))}."
+            )
+        self.debugPrintReplacement(atoms, matches)
+        return matches
+
+    def debugPrintReplacement(self, atoms, matches):
+        smbl_cnnts = [f'{x.GetSymbol()}{self.getAtomConnt(x)}' for x in atoms]
+        ids = [
+            getattr(matches[0], x, '') for x in ['id1', 'id2', 'id3', 'id4']
+        ]
+        ids = [x for x in ids if x]
+        id_smbl_cnnts = [
+            f'{self.atoms[x].symbol}{self.atoms[x].connectivity}'
+            for x in ids
+        ]
+        log_debug(
+            f"{'~'.join(smbl_cnnts)} "
+            f"{'~'.join(map(str, [x.GetIntProp(self.TYPE_ID) for x in atoms]))} "
+            f"replaced by {'~'.join(map(str, id_smbl_cnnts))} {'~'.join(map(str, ids))}"
+        )
+
+    def getMatchesFromEnds(self, atoms, partial_matches, rough=False):
+        o_symbols = set((
+            x.GetSymbol(),
+            self.getAtomConnt(x),
+        ) for x in [atoms[0], atoms[-1]])
+        ff_atom_ids = [
+            [x, x.id1, x.id4] if hasattr(x, 'id4') else [x, x.id1, x.id3]
+            for x in partial_matches
+        ]
+        ff_symbols = {
+            x[0]: set([(
+                self.atoms[y].symbol,
+                self.atoms[y].connectivity,
+            ) for y in x[1:]])
+            for x in ff_atom_ids
+        }
+        matches = [x for x, y in ff_symbols.items() if y == o_symbols]
+        if not matches:
+            o_symbols_partial = set(x[0] for x in o_symbols)
+            matches = [
+                x for x, y in ff_symbols.items()
+                if set(z[0] for z in y) == o_symbols_partial
+            ]
+        return matches
 
 class LammpsIn(fileutils.LammpsInput):
     """
@@ -564,9 +784,9 @@ class LammpsWriter(LammpsIn):
     DATA_EXT = '.data'
     LAMMPS_DESCRIPTION = 'LAMMPS Description'
 
-    TYPE_ID = 'type_id'
+    TYPE_ID = OPLS_Parser.TYPE_ID
     ATOM_ID = 'atom_id'
-    RES_NUM = 'res_num'
+    RES_NUM = RES_NUM
     NEIGHBOR_CHARGE = 'neighbor_charge'
     BOND_ATM_ID = OPLS_Parser.BOND_ATM_ID
     IMPLICIT_H = OPLS_Parser.IMPLICIT_H
@@ -653,12 +873,13 @@ class LammpsWriter(LammpsIn):
         """
 
         with open(self.lammps_data, 'w') as self.data_fh:
-            self.setImproperSymbols()
             self.setAtoms()
+            self.balanceCharge()
             self.setBonds()
             self.adjustBondLength(adjust_coords)
             self.setAngles()
             self.setDihedrals()
+            self.setImproperSymbols()
             self.setImpropers()
             self.AnglesByImpropers()
             self.removeUnused()
@@ -681,9 +902,46 @@ class LammpsWriter(LammpsIn):
         """
         Set atom property.
         """
-        atoms = [atom for mol in self.mols.values() for atom in mol.GetAtoms()]
-        for atom_id, atom in enumerate(atoms, start=1):
+
+        for atom_id, atom in enumerate(self.atom, start=1):
             atom.SetIntProp(self.ATOM_ID, atom_id)
+
+    @property
+    def atom(self):
+        """
+        Handy way to get all atoms.
+
+        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
+        """
+
+        return (atom for mol in self.mols.values() for atom in mol.GetAtoms())
+
+    def balanceCharge(self):
+        """
+        Balance the charge when residues are not neutral.
+        """
+
+        for mol in self.mols.values():
+            res_charge = collections.defaultdict(float)
+            for atom in mol.GetAtoms():
+                res_num = atom.GetIntProp(self.RES_NUM)
+                type_id = atom.GetIntProp(self.TYPE_ID)
+                res_charge[res_num] += self.ff.charges[type_id]
+
+            for bond in mol.GetBonds():
+                batom, eatom = bond.GetBeginAtom(), bond.GetEndAtom()
+                bres_num = batom.GetIntProp(self.RES_NUM)
+                eres_num = eatom.GetIntProp(self.RES_NUM)
+                if bres_num == eres_num:
+                    continue
+                for atom, natom in [[batom, eatom], [eatom, batom]]:
+                    try:
+                        # When the atom has multiple residue neighbors
+                        charge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
+                    except KeyError:
+                        charge = 0.0
+                    ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
+                    atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
     def setBonds(self):
         """
@@ -703,6 +961,28 @@ class LammpsWriter(LammpsIn):
                 bonded_atoms[1].GetIntProp(self.ATOM_ID),
             )
 
+    def adjustBondLength(self, adjust_bond_legnth=True):
+        """
+        Adjust bond length according to the force field parameters.
+
+        :param adjust_bond_legnth bool: adjust bond length if True.
+        """
+        if not adjust_bond_legnth:
+            return
+
+        for mol_id, mol in self.mols.items():
+            conformer = mol.GetConformer()
+            for bond in mol.GetBonds():
+                bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
+                ids = set([x.GetIntProp(self.ATOM_ID) for x in bonded_atoms])
+                mbond_type = [
+                    x for x, y, z in self.bonds.values()
+                    if len(ids.intersection([y, z])) == 2
+                ][0]
+                dist = self.ff.bonds[mbond_type].dist
+                Chem.rdMolTransforms.SetBondLength(
+                    conformer, *[x.GetIdx() for x in bonded_atoms], dist)
+
     def adjustCoords(self):
         """
         Adjust the coordinates based bond length etc.
@@ -710,6 +990,17 @@ class LammpsWriter(LammpsIn):
         self.setAtoms()
         self.setBonds()
         self.adjustBondLength()
+
+    def setAngles(self):
+        """
+        Set angle force field matches.
+        """
+
+        all_angle_atoms = (y for x in self.atom for y in self.ff.getAngleAtoms(x))
+        for angle_id, angle_atoms in enumerate(all_angle_atoms, start=1):
+            angle = self.ff.getMatchedAngles(angle_atoms)[0]
+            atom_ids = tuple(x.GetIntProp(self.ATOM_ID) for x in angle_atoms)
+            self.angles[angle_id] = (angle.id, ) + atom_ids
 
     def removeUnused(self):
         """
@@ -865,23 +1156,6 @@ class LammpsWriter(LammpsIn):
                 f"{improper_id} {improper.ene} {sign} {improper.n_parm}\n")
         self.data_fh.write("\n")
 
-    def adjustBondLength(self, adjust_bond_legnth=True):
-        if not adjust_bond_legnth:
-            return
-
-        for mol_id, mol in self.mols.items():
-            conformer = mol.GetConformer()
-            for bond in mol.GetBonds():
-                bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
-                ids = set([x.GetIntProp(self.ATOM_ID) for x in bonded_atoms])
-                mbond_type = [
-                    x for x, y, z in self.bonds.values()
-                    if len(ids.intersection([y, z])) == 2
-                ][0]
-                dist = self.ff.bonds[mbond_type].dist
-                Chem.rdMolTransforms.SetBondLength(
-                    conformer, *[x.GetIdx() for x in bonded_atoms], dist)
-
     def writeAtoms(self):
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
         for mol_id, mol in self.mols.items():
@@ -937,43 +1211,6 @@ class LammpsWriter(LammpsIn):
             self.data_fh.write(f"{bond_id} {bond_type} {id1} {id2}\n")
         self.data_fh.write(f"\n")
 
-    def setAngles(self):
-        angle_id = 0
-        for mol in self.mols.values():
-            for atom in mol.GetAtoms():
-                for atoms in self.getAngleAtoms(atom):
-                    angle_id += 1
-                    matches = self.getMatchedAngles(atoms)
-                    angle = matches[0]
-                    self.angles[angle_id] = (angle.id, ) + tuple(
-                        x.GetIntProp(self.ATOM_ID) for x in atoms)
-
-    def getMatchedAngles(self, atoms):
-        type_ids = [x.GetIntProp(self.TYPE_ID) for x in atoms]
-        type_ids = [OPLS_Parser.ANGLE_ATOM[x] for x in type_ids]
-        matches = [
-            x for x in self.ff.angles.values()
-            if type_ids == [x.id1, x.id2, x.id3]
-        ]
-        if matches:
-            return matches
-        log_debug(
-            f"No exact params for angle between atom {', '.join(map(str, type_ids))}."
-        )
-        partial_matches = [
-            x for x in self.ff.angles.values() if x.id2 == type_ids[1]
-        ]
-        if not partial_matches:
-            raise ValueError(
-                f"No params for angle (middle atom type {type_ids[1]}).")
-        matches = self.getMatchesFromEnds(atoms, partial_matches)
-        if not matches:
-            raise ValueError(
-                f"No params for angle between atom {', '.join(map(str, type_ids))}."
-            )
-        self.debugPrintReplacement(atoms, matches)
-        return matches
-
     def getMatchesFromEnds(self, atoms, partial_matches, rough=False):
         o_symbols = set((
             x.GetSymbol(),
@@ -1011,19 +1248,12 @@ class LammpsWriter(LammpsIn):
             self.data_fh.write(f"{angle_id} {angle_type} {id1} {id2} {id3}\n")
         self.data_fh.write(f"\n")
 
-    def getAngleAtoms(self, atom):
-        neighbors = atom.GetNeighbors()
-        if len(neighbors) < 2:
-            return []
-        neighbors = sorted(neighbors, key=lambda x: x.GetIntProp(self.TYPE_ID))
-        return [[x, atom, y] for x, y in itertools.combinations(neighbors, 2)]
-
     def getDihedralAtoms(self, atom):
         dihe_atoms = []
-        atomss = self.getAngleAtoms(atom)
+        atomss = self.ff.getAngleAtoms(atom)
         atomss += [x[::-1] for x in atomss]
         for satom, matom, eatom in atomss:
-            eatomss = self.getAngleAtoms(eatom)
+            eatomss = self.ff.getAngleAtoms(eatom)
             matom_id = matom.GetIdx()
             eatom_id = eatom.GetIdx()
             for eatoms in eatomss:
@@ -1121,11 +1351,11 @@ class LammpsWriter(LammpsIn):
                 if atom.GetSymbol() == 'N' and atom.GetHybridization(
                 ) == Chem.rdchem.HybridizationType.SP3:
                     continue
-                # Sp2 carbon for planar, Sp3 with one H (CHR1R2R3) for chirality, Sp2 N in Amino Acid
+                # Sp2 carbon for planar, Sp3 with one H (CHR1R2R3) for chirality,
+                # Sp2 N in Amino Acid
                 improper_id += 1
                 neighbor_symbols = [x.GetSymbol() for x in neighbors]
-                counted = self.getCountedSymbols([atom_symbol] +
-                                                 neighbor_symbols)
+                counted = self.countSymbols([atom_symbol] + neighbor_symbols)
                 if print_impropers:
                     for symb, improper_ids in self.symbol_impropers.items():
                         print(f"{symb} {self.ff.impropers[improper_ids[0]]}")
@@ -1177,13 +1407,19 @@ class LammpsWriter(LammpsIn):
         self.data_fh.write(f"\n")
 
     def setImproperSymbols(self):
-
+        """
+        Check and assert the current improper force field. These checks may be
+        only good for this specific force field for even this specific file.
+        """
+        msg = "Impropers from the same symbols are of the same constants."
+        # {1: 'CNCO', 2: 'CNCO', 3: 'CNCO' ...
         symbolss = {
             z: ''.join([
                 self.ff.atoms[y].symbol for y in [x.id1, x.id2, x.id3, x.id4]
             ])
             for z, x in self.ff.impropers.items()
         }
+        # {'CNCO': (10.5, 180.0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9), ...
         symbol_impropers = {}
         for id, symbols in symbolss.items():
             improper = self.ff.impropers[id]
@@ -1199,21 +1435,29 @@ class LammpsWriter(LammpsIn):
                 improper.n_parm,
             )
             symbol_impropers[symbols] += (improper.id, )
-        log_debug(f"Impropers from the same symbols share the same constants.")
-        orig_types = len(symbol_impropers)
-        neighbors = [[x[2], x[0], x[1], x[3]] for x in symbol_impropers.keys()]
-        # The csmbls in getCountedSymbols is from the following collections
-        csmbls = sorted(set([y for x in neighbors[1:] for y in x]))
-        counted = [(x[0], ) + tuple(y + str(x[1:].count(y)) for y in csmbls)
-                   for x in neighbors]
-        assert orig_types == len(counted)
-        log_debug(f"Impropers neighbor counts based on symbols are unique.")
-        for id, (symbols, constants) in enumerate(symbol_impropers.items()):
-            counted_symbols = ''.join(counted[id])
-            log_debug(f"{counted_symbols} ({symbols}) : {constants}")
-            self.symbol_impropers[counted_symbols] = constants[3:]
+        log_debug(msg)
 
-    def getCountedSymbols(self, symbols, csmbls='CHNO'):
+        msg = "Improper neighbor counts based on symbols are unique."
+        neighbors = [[x[2], x[0], x[1], x[3]] for x in symbol_impropers.keys()]
+        # The csmbls in getCountedSymbols is obtained from the following
+        csmbls = sorted(set([y for x in neighbors[1:] for y in x]))  # CHNO
+        counted = [self.countSymbols(x, csmbls=csmbls) for x in neighbors]
+        assert len(symbol_impropers) == len(set(counted))
+        log_debug(msg)
+
+        self.symbol_impropers = {
+            x: y[3:]
+            for x, y in zip(counted, symbol_impropers.values())
+        }
+
+    @staticmethod
+    def countSymbols(symbols, csmbls='CHNO'):
+        """
+
+        :param symbols:
+        :param csmbls:
+        :return:
+        """
         return ''.join((symbols[0], ) + tuple(y + str(symbols[1:].count(y))
                                               for y in csmbls))
 

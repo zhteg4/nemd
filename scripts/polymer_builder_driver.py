@@ -230,7 +230,7 @@ class Polymer(object):
     ATOM_ID = oplsua.LammpsWriter.ATOM_ID
     TYPE_ID = oplsua.LammpsWriter.TYPE_ID
     BOND_ATM_ID = oplsua.LammpsWriter.BOND_ATM_ID
-    RES_NUM = oplsua.LammpsWriter.RES_NUM
+    RES_NUM = oplsua.RES_NUM
     NEIGHBOR_CHARGE = oplsua.LammpsWriter.NEIGHBOR_CHARGE
     MOL_NUM = 'mol_num'
     IMPLICIT_H = oplsua.LammpsWriter.IMPLICIT_H
@@ -240,7 +240,6 @@ class Polymer(object):
     POLYM_HT = prop_names.POLYM_HT
     IS_MONO = prop_names.IS_MONO
     MONO_ID = prop_names.MONO_ID
-    LARGE_NUM = constants.LARGE_NUM
 
     def __init__(self, cru, cru_num, ff=None):
         """
@@ -268,7 +267,6 @@ class Polymer(object):
         self.markMonomer()
         self.polymerize()
         self.assignAtomType()
-        self.balanceCharge()
         self.embedMol()
 
     def setCruMol(self):
@@ -361,142 +359,10 @@ class Polymer(object):
 
     def assignAtomType(self):
         """
-        Assign atom types for force field assignment.
+        Assign atom types to the structure.
         """
-        marked_smiles = {}
-        marked_atom_ids = []
-        res_num = 1
-        for sml in self.ff.SMILES:
-            frag = Chem.MolFromSmiles(sml.sml)
-            matches = self.polym.GetSubstructMatches(frag,
-                                                     maxMatches=self.LARGE_NUM)
-            matches = [self.filterMatch(x, frag) for x in matches]
-            res_num, matom_ids = self.markMatches(matches, sml, res_num)
-            if not matom_ids:
-                continue
-            cnt = collections.Counter([len(x) for x in matom_ids])
-            cnt_exp = str(len(matom_ids)) + ' matches ' + ','.join(
-                [f'{x}*{y}' for x, y in cnt.items()])
-            marked_smiles[sml.sml] = cnt_exp
-            marked_atom_ids += [y for x in matom_ids for y in x]
-            if all(x.HasProp(self.TYPE_ID) for x in self.polym.GetAtoms()):
-                break
-        log_debug(f"{len(marked_atom_ids)}, {self.polym.GetNumAtoms()}")
-        log_debug(f"{res_num - 1} residues found.")
-        [log_debug(f'{x}: {y}') for x, y in marked_smiles.items()]
-
-    def filterMatch(self, match, frag):
-        """
-        Filter substruct matches based on connectivity.
-
-        :param match tuples: atom ids of one match
-        :param frag: the fragment of one force field templated smiles
-        :return: tuples: atom ids of one match with correct connectivity
-        """
-        frag_cnnt = [
-            x.GetNumImplicitHs() + x.GetDegree()
-            if x.GetSymbol() != symbols.CARBON else x.GetDegree()
-            for x in frag.GetAtoms()
-        ]
-        polm_cnnt = [self.polym.GetAtomWithIdx(x).GetDegree() for x in match]
-        match = [
-            x if y == z else None
-            for x, y, z in zip(match, frag_cnnt, polm_cnnt)
-        ]
-        return match
-
-    def markMatches(self, matches, sml, res_num):
-        """
-        Mark the matched atoms.
-
-        :param matches list of tuple: each tuple has one pattern match
-        :param sml namedtuple: 'UA' namedtuple for smiles
-        :param res_num int: the residue number
-        :return int, list: incremented residue number, list of marked atom list
-        """
-        marked_atom_ids = []
-        for match in matches:
-            log_debug(f"assignAtomType {sml.sml}, {match}")
-            marked = self.markAtoms(match, sml, res_num)
-            if marked:
-                res_num += 1
-                marked_atom_ids.append(marked)
-        return res_num, marked_atom_ids
-
-    def markAtoms(self, match, sml, res_num):
-        """
-        Marker atoms with type id, res_num, and bonded_atom id for vdw/charge
-            table lookup, charge balance, and bond searching.
-
-        :param match tuple: atom ids of one match
-        :param sml namedtuple: 'UA' namedtuple for smiles
-        :param res_num int: the residue number
-        :return list: list of marked atom ids
-        """
-        marked = []
-        for atom_id, type_id in zip(match, sml.mp):
-            if not type_id or atom_id is None:
-                continue
-            atom = self.polym.GetAtomWithIdx(atom_id)
-            try:
-                atom.GetIntProp(self.TYPE_ID)
-            except KeyError:
-                self.markAtom(atom, type_id, res_num)
-                marked.append(atom_id)
-                log_debug(
-                    f"{atom.GetSymbol()}{atom.GetDegree()} {atom_id} {type_id}"
-                )
-            else:
-                continue
-            for neighbor in atom.GetNeighbors():
-                if neighbor.GetSymbol() == symbols.HYDROGEN:
-                    type_id = sml.hs[type_id]
-                    self.markAtom(neighbor, type_id, res_num)
-                    marked.append(neighbor.GetIdx())
-                    log_debug(
-                        f"{neighbor.GetSymbol()}{neighbor.GetDegree()} {neighbor.GetIdx()} {type_id}"
-                    )
-        return marked
-
-    def markAtom(self, atom, type_id, res_num):
-        """
-        Set atom id, res_num, and bonded_atom id.
-        :param atom 'rdkit.Chem.rdchem.Atom': the atom to mark
-        :param type_id int: atom type id
-        :param res_num int: residue number
-        """
-
-        # TYPE_ID defines vdw and charge
-        atom.SetIntProp(self.TYPE_ID, type_id)
-        atom.SetIntProp(self.RES_NUM, res_num)
-        # BOND_ATM_ID defines bonding parameters
-        atom.SetIntProp(self.BOND_ATM_ID,
-                        oplsua.OPLS_Parser.BOND_ATOM[type_id])
-
-    def balanceCharge(self):
-        """
-        Balance the charge when residues are not neutral.
-        """
-        res_charge = collections.defaultdict(float)
-        for atom in self.polym.GetAtoms():
-            res_num = atom.GetIntProp(self.RES_NUM)
-            type_id = atom.GetIntProp(self.TYPE_ID)
-            res_charge[res_num] += self.ff.charges[type_id]
-
-        for bond in self.polym.GetBonds():
-            batom, eatom = bond.GetBeginAtom(), bond.GetEndAtom()
-            bres_num = batom.GetIntProp(self.RES_NUM)
-            eres_num = eatom.GetIntProp(self.RES_NUM)
-            if bres_num == eres_num:
-                continue
-            for atom, natom in [[batom, eatom], [eatom, batom]]:
-                try:
-                    # When the atom has multiple residue neighbors
-                    charge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
-                except KeyError:
-                    charge = 0.0
-                ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
-                atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
+        ff_typer = oplsua.OPLS_Typer(self.polym)
+        ff_typer.run()
 
     def embedMol(self, trans=False):
         """
