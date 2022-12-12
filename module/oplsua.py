@@ -621,6 +621,48 @@ class OPLS_Parser:
             ]
         return matches
 
+    def getMatchedDihedrals(self, atoms):
+        """
+        Get the matched dihedral force field types.
+
+        1) Exact match of all four atom types
+        2) Exact match of torsion bond if found else forced match of the torsion
+        3) End atom matching based on symbol and connectivity
+
+        :param atoms list of three 'rdkit.Chem.rdchem.Atom': atom for a dihedral
+        :return list of 'oplsua.DIHEDRAL': the matched parameters.
+        """
+
+        tids = [x.GetIntProp(self.DIHE_ATM_ID) for x in atoms]
+        if tids[1] > tids[2]:
+            # Flip the direction due to middle torsion atom id order
+            tids = tids[::-1]
+        matches = [
+            x for x in self.dihedrals.values()
+            if tids == [x.id1, x.id2, x.id3, x.id4]
+        ]
+        if matches:
+            return matches
+
+        partial_matches = [
+            x for x in self.dihedrals.values()
+            if x.id2 == tids[1] and x.id3 == tids[2]
+        ]
+        if not partial_matches:
+            rpm_ids = OPLS_Typer.DIHE_ATOMS[tuple(tids[1:3])]
+            partial_matches = [
+                x for x in self.dihedrals.values()
+                if set([x.id2, x.id3]) == set(rpm_ids)
+            ]
+        if not partial_matches:
+            err = f"No params for dihedral (middle bonded atom types {tids[1]}~{tids[2]})."
+            raise ValueError(err)
+        matches = self.getMatchesFromEnds(atoms, partial_matches)
+        if not matches:
+            err = f"Cannot find params for dihedral between atom {'~'.join(map(str, tids))}."
+            raise ValueError(err)
+        return matches
+
 
 class LammpsIn(fileutils.LammpsInput):
     """
@@ -940,7 +982,17 @@ class LammpsWriter(LammpsIn):
         :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
         """
 
-        return (atom for mol in self.mols.values() for atom in mol.GetAtoms())
+        return (atom for mol in self.molecule for atom in mol.GetAtoms())
+
+    @property
+    def molecule(self):
+        """
+        Handy way to get all atoms.
+
+        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
+        """
+
+        return (mol for mol in self.mols.values())
 
     def balanceCharge(self):
         """
@@ -1022,12 +1074,75 @@ class LammpsWriter(LammpsIn):
         Set angle force field matches.
         """
 
-        all_angle_atoms = (y for x in self.atom
-                           for y in self.ff.getAngleAtoms(x))
-        for angle_id, angle_atoms in enumerate(all_angle_atoms, start=1):
-            angle = self.ff.getMatchedAngles(angle_atoms)[0]
-            atom_ids = tuple(x.GetIntProp(self.ATOM_ID) for x in angle_atoms)
+        angle_atoms = (y for x in self.atom for y in self.ff.getAngleAtoms(x))
+        for angle_id, atoms in enumerate(angle_atoms, start=1):
+            angle = self.ff.getMatchedAngles(atoms)[0]
+            atom_ids = tuple(x.GetIntProp(self.ATOM_ID) for x in atoms)
             self.angles[angle_id] = (angle.id, ) + atom_ids
+
+    def setDihedrals(self):
+        """
+        Set the dihedral angles of the molecules.
+        """
+
+        dihe_atoms = self.getDiheAtoms()
+        for dihedral_id, atoms in enumerate(dihe_atoms, start=1):
+            dihedral = self.ff.getMatchedDihedrals(atoms)[0]
+            atom_ids = tuple([x.GetIntProp(self.ATOM_ID) for x in atoms])
+            self.dihedrals[dihedral_id] = (dihedral.id, ) + atom_ids
+
+    def getDiheAtoms(self):
+        """
+        Get the dihedral atoms of all molecules.
+
+        :return list of list: each sublist has four atoms forming a dihedral angle.
+        """
+        return [y for x in self.molecule for y in self.getDihAtomsFromMol(x)]
+
+    def getDihAtomsFromMol(self, mol):
+        """
+        Get the dihedral atoms of this molecule.
+
+        NOTE: Flipping the order the four dihedral atoms yields the same dihedral,
+        and only one of them is returned.
+
+        :param 'rdkit.Chem.rdchem.Mol': the molecule to get dihedral atoms.
+        :return list of list: each sublist has four atom ids forming a dihedral angle.
+        """
+        atomss = [y for x in mol.GetAtoms() for y in self.getDihedralAtoms(x)]
+        # 1-2-3-4 and 4-3-2-1 are the same dihedral
+        atomss_no_flip = []
+        atom_idss = set()
+        for atoms in atomss:
+            atom_ids = tuple(x.GetIdx() for x in atoms)
+            if atom_ids in atom_idss:
+                continue
+            atom_idss.add(atom_ids)
+            atom_idss.add(atom_ids[::-1])
+            atomss_no_flip.append(atoms)
+        return atomss_no_flip
+
+    def getDihedralAtoms(self, atom):
+        """
+        Get the dihedral atoms whose torsion bonded atoms contain this atom.
+
+        :param atom 'rdkit.Chem.rdchem.Atom': the middle atom of the dihedral
+        :return list of list: each sublist has four atom ids forming a dihedral
+            angle.
+        """
+        dihe_atoms = []
+        atomss = self.ff.getAngleAtoms(atom)
+        atomss += [x[::-1] for x in atomss]
+        for satom, matom, eatom in atomss:
+            presented = set([matom.GetIdx(), eatom.GetIdx()])
+            dihe_4ths = [
+                y for x in self.ff.getAngleAtoms(eatom) for y in x
+                if y.GetIdx() not in presented
+            ]
+            for dihe_4th in dihe_4ths:
+                dihe_atoms.append([satom, matom, eatom, dihe_4th])
+
+        return dihe_atoms
 
     def removeUnused(self):
         """
@@ -1237,31 +1352,6 @@ class LammpsWriter(LammpsIn):
             self.data_fh.write(f"{bond_id} {bond_type} {id1} {id2}\n")
         self.data_fh.write(f"\n")
 
-    def getMatchesFromEnds(self, atoms, partial_matches, rough=False):
-        o_symbols = set((
-            x.GetSymbol(),
-            self.getAtomConnt(x),
-        ) for x in [atoms[0], atoms[-1]])
-        ff_atom_ids = [
-            [x, x.id1, x.id4] if hasattr(x, 'id4') else [x, x.id1, x.id3]
-            for x in partial_matches
-        ]
-        ff_symbols = {
-            x[0]: set([(
-                self.ff.atoms[y].symbol,
-                self.ff.atoms[y].conn,
-            ) for y in x[1:]])
-            for x in ff_atom_ids
-        }
-        matches = [x for x, y in ff_symbols.items() if y == o_symbols]
-        if not matches:
-            o_symbols_partial = set(x[0] for x in o_symbols)
-            matches = [
-                x for x, y in ff_symbols.items()
-                if set(z[0] for z in y) == o_symbols_partial
-            ]
-        return matches
-
     def writeAngles(self):
         if not self.angles:
             return
@@ -1273,82 +1363,6 @@ class LammpsWriter(LammpsIn):
                 type_id) if self.concise else type_id
             self.data_fh.write(f"{angle_id} {angle_type} {id1} {id2} {id3}\n")
         self.data_fh.write(f"\n")
-
-    def getDihedralAtoms(self, atom):
-        dihe_atoms = []
-        atomss = self.ff.getAngleAtoms(atom)
-        atomss += [x[::-1] for x in atomss]
-        for satom, matom, eatom in atomss:
-            eatomss = self.ff.getAngleAtoms(eatom)
-            matom_id = matom.GetIdx()
-            eatom_id = eatom.GetIdx()
-            for eatoms in eatomss:
-                eatom_ids = [x.GetIdx() for x in eatoms]
-                eatom_ids.remove(eatom_id)
-                try:
-                    eatom_ids.remove(matom_id)
-                except ValueError:
-                    continue
-                dihe_4th = [x for x in eatoms if x.GetIdx() == eatom_ids[0]][0]
-                dihe_atoms.append([satom, matom, eatom, dihe_4th])
-        return dihe_atoms
-
-    def getDihedralAtomsFromMol(self, mol):
-        atomss = [y for x in mol.GetAtoms() for y in self.getDihedralAtoms(x)]
-        # 1-2-3-4 and 4-3-2-1 are the same dihedral
-        atomss_no_flip = []
-        atom_idss = set()
-        for atoms in atomss:
-            atom_ids = tuple(x.GetIdx() for x in atoms)
-            if atom_ids in atom_idss:
-                continue
-            atom_idss.add(atom_ids)
-            atom_idss.add(atom_ids[::-1])
-            atomss_no_flip.append(atoms)
-        return atomss_no_flip
-
-    def setDihedrals(self):
-        dihedral_id = 0
-        for mol in self.mols.values():
-            atomss_no_flip = self.getDihedralAtomsFromMol(mol)
-            for atoms in atomss_no_flip:
-                dihedral_id += 1
-                matches = self.getMatchedDihedrals(atoms)
-                dihedral = matches[0]
-                self.dihedrals[dihedral_id] = (dihedral.id, ) + tuple(
-                    [x.GetIntProp(self.ATOM_ID) for x in atoms])
-
-    def getMatchedDihedrals(self, atoms):
-        type_ids = [x.GetIntProp(self.TYPE_ID) for x in atoms]
-        type_ids = [OPLS_Typer.DIHE_ATOM[x] for x in type_ids]
-        if type_ids[1] > type_ids[2]:
-            type_ids = type_ids[::-1]
-        matches = [
-            x for x in self.ff.dihedrals.values()
-            if type_ids == [x.id1, x.id2, x.id3, x.id4]
-        ]
-        if matches:
-            return matches
-        partial_matches = [
-            x for x in self.ff.dihedrals.values()
-            if x.id2 == type_ids[1] and x.id3 == type_ids[2]
-        ]
-        if not partial_matches:
-            rpm_ids = OPLS_Typer.DIHE_ATOMS[tuple(type_ids[1:3])]
-            partial_matches = [
-                x for x in self.ff.dihedrals.values()
-                if set([x.id2, x.id3]) == set(rpm_ids)
-            ]
-        if not partial_matches:
-            raise ValueError(
-                f"No params for dihedral (middle bonded atom types {type_ids[1]}~{type_ids[2]})."
-            )
-        matches = self.getMatchesFromEnds(atoms, partial_matches)
-        if not matches:
-            raise ValueError(
-                f"Cannot find params for dihedral between atom {'~'.join(map(str, type_ids))}."
-            )
-        return matches
 
     def writeDihedrals(self):
         if not self.dihedrals:
