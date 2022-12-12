@@ -212,8 +212,7 @@ class AmorphousCell(object):
 
     def write(self):
         """
-        Write amorphous cell into data file.
-        :return:
+        Write amorphous cell into data file
         """
         lmw = oplsua.LammpsWriter(self.mols, self.ff, self.jobname)
         lmw.writeData(adjust_coords=False)
@@ -228,12 +227,12 @@ class Polymer(object):
     """
 
     ATOM_ID = oplsua.LammpsWriter.ATOM_ID
-    TYPE_ID = oplsua.LammpsWriter.TYPE_ID
-    BOND_ATM_ID = oplsua.LammpsWriter.BOND_ATM_ID
+    TYPE_ID = oplsua.TYPE_ID
+    BOND_ATM_ID = oplsua.BOND_ATM_ID
     RES_NUM = oplsua.RES_NUM
     NEIGHBOR_CHARGE = oplsua.LammpsWriter.NEIGHBOR_CHARGE
+    IMPLICIT_H = oplsua.IMPLICIT_H
     MOL_NUM = 'mol_num'
-    IMPLICIT_H = oplsua.LammpsWriter.IMPLICIT_H
     MONO_ATOM_IDX = 'mono_atom_idx'
     CAP = 'cap'
     HT = 'ht'
