@@ -3,3 +3,11 @@ sbatch - Slurm Workload Manager
 Building pipelines using slurm dependencies
 Job Dependencies
 https://hpc.nih.gov/docs/userguide.html#depend
+
+pip3 install kubernetes
+brew install kubectl
+https://github.com/kubernetes-client/python
+https://kubernetes.io/blog/2022/12/09/kubernetes-v1-26-release/
+https://github.com/kubernetes/cli-runtime
+https://github.com/kubernetes/sample-cli-plugin
+
