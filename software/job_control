@@ -15,7 +15,11 @@ https://github.com/kubernetes/sample-cli-plugin
 brew install hyperkit
 brew install minikube
 
-# run the amd64 binary on an M1 system; running the darwin/arm64 binary instead; https://github.com/kubernetes/minikube/releases/download/v1.28.0/minikube-darwin-arm64
-minikube start
 https://www.youtube.com/watch?v=X48VuDVv0do
 
+# Macbook M2 install
+# https://eric-price.net/posts/2022-06-15-install-minikube-m1-mac/
+https://github.com/kubernetes/minikube/releases/download/v1.28.0/minikube-darwin-arm64
+#curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-darwin-arm64
+sudo install minikube-darwin-arm64 /usr/local/bin/minikube
+minikube start --driver=docker
