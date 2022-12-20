@@ -11,3 +11,11 @@ https://kubernetes.io/blog/2022/12/09/kubernetes-v1-26-release/
 https://github.com/kubernetes/cli-runtime
 https://github.com/kubernetes/sample-cli-plugin
 
+# install kubernetes for local
+brew install hyperkit
+brew install minikube
+
+# run the amd64 binary on an M1 system; running the darwin/arm64 binary instead; https://github.com/kubernetes/minikube/releases/download/v1.28.0/minikube-darwin-arm64
+minikube start
+https://www.youtube.com/watch?v=X48VuDVv0do
+
