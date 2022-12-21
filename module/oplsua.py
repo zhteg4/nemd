@@ -746,7 +746,7 @@ class LammpsIn(fileutils.LammpsInput):
         self.in_fh.write(f"{self.PAIR_MODIFY} {self.MIX} {self.GEOMETRIC}\n")
         self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5 \n")
         if self.hasCharge():
-            self.in_fh.write(f"{self.KSPACE_STYLE} 0.0001\n")
+            self.in_fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
         self.in_fh.write(f"log log.{self.jobname}\n")
 
     def hasCharge(self):
@@ -782,7 +782,7 @@ class LammpsIn(fileutils.LammpsInput):
             smbs = ' '.join(map(str, [x.symbol for x in atoms]))
             self.in_fh.write(f"dump_modify 1 element {smbs}\n")
         self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
-        self.in_fh.write("minimize 1.0e-6 1.0e-8 1000 100000\n")
+        self.in_fh.write("minimize 1.0e-6 1.0e-8 10000 100000\n")
 
     def writeTimestep(self):
         """
@@ -900,14 +900,13 @@ class LammpsWriter(LammpsIn):
         IMPROPERS_CAP
     ]
 
+    IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
+
     def __init__(self, mols, ff, jobname, concise=True, *arg, **kwarg):
         """
+        :param mols dict: keys are the molecule ids, and values are 'rdkit.Chem.rdchem.Mol'
         :param ff 'oplsua.OPLS_Parser':
         :param jobname str: jobname based on which out filenames are defined
-        :param mols dict: keys are the molecule ids, and values are 'rdkit.Chem.rdchem.Mol'
-        :param lj_cut float: cut off distance for Lennard-Jones potential
-        :param coul_cut float: cut off distance for Coulombic pairwise interaction
-        :param timestep float: timestep size for subsequent molecular dynamics simulations
         :param concise bool: If False, all the atoms in the force field file shows
             up in the force field section of the data file. If True, only the present
             ones are writen into the data file.
@@ -1144,6 +1143,175 @@ class LammpsWriter(LammpsIn):
 
         return dihe_atoms
 
+    def setImproperSymbols(self):
+        """
+        Check and assert the current improper force field. These checks may be
+        only good for this specific force field for even this specific file.
+        """
+        msg = "Impropers from the same symbols are of the same constants."
+        # {1: 'CNCO', 2: 'CNCO', 3: 'CNCO' ...
+        symbolss = {
+            z: ''.join([
+                self.ff.atoms[y].symbol for y in [x.id1, x.id2, x.id3, x.id4]
+            ])
+            for z, x in self.ff.impropers.items()
+        }
+        # {'CNCO': (10.5, 180.0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9), ...
+        symbol_impropers = {}
+        for id, symbols in symbolss.items():
+            improper = self.ff.impropers[id]
+            if symbols not in symbol_impropers:
+                symbol_impropers[symbols] = (
+                    improper.ene,
+                    improper.angle,
+                    improper.n_parm,
+                )
+            assert symbol_impropers[symbols][:3] == (
+                improper.ene,
+                improper.angle,
+                improper.n_parm,
+            )
+            symbol_impropers[symbols] += (improper.id, )
+        log_debug(msg)
+
+        msg = "Improper neighbor counts based on symbols are unique."
+        # The third one is the center ('Improper Torsional Parameters' in prm)
+        neighbors = [[x[2], x[0], x[1], x[3]] for x in symbol_impropers.keys()]
+        # The csmbls in getCountedSymbols is obtained from the following
+        csmbls = sorted(set([y for x in neighbors[1:] for y in x]))  # CHNO
+        counted = [self.countSymbols(x, csmbls=csmbls) for x in neighbors]
+        assert len(symbol_impropers) == len(set(counted))
+        log_debug(msg)
+
+        self.symbol_impropers = {
+            x: y[3:]
+            for x, y in zip(counted, symbol_impropers.values())
+        }
+
+    @staticmethod
+    def countSymbols(symbols, csmbls='CHNO'):
+        """
+        Count improper cluster symbols: the first is the center atoms and the
+        rest connects with the center.
+
+        :param symbols list: the element symbols forming the improper cluster
+            with first being the center
+        :param csmbls str: all possible cluster symbols
+        """
+        # e.g., ['C1', 'H0', 'N1', 'O1']
+        counted = [y + str(symbols[1:].count(y)) for y in csmbls]
+        # e.g., 'CC1H0N1O1'
+        return ''.join([symbols[0]] + counted)
+
+    def setImpropers(self, csymbols=IMPROPER_CENTER_SYMBOLS):
+        """
+        Set improper angles based on center atoms and neighbor symbols.
+
+        :param csymbols str: each Char is one possible center element
+
+        In short:
+        1) sp2 sites and united atom CH groups (sp3 carbons) needs improper
+         (though I saw a reference using improper for sp3 N)
+        2) No rules for a center atom. (Charmm asks order for symmetricity)
+        3) Number of internal geometry variables (3N_atom – 6) deletes one angle
+
+        The details are the following:
+
+        When the Weiner et al. (1984,1986) force field was developed, improper
+        torsions were designated for specific sp2 sites, as well as for united
+        atom CH groups - sp3 carbons with one implicit hydrogen.
+        Ref: http://ambermd.org/Questions/improp.html
+
+        There are no rules for a center atom. You simply define two planes, each
+        defined by three atoms. The angle is given by the angle between these
+        two planes. (from hess)
+        ref: https://gromacs.bioexcel.eu/t/the-atom-order-i-j-k-l-in-defining-an
+        -improper-dihedral-in-gromacs-using-the-opls-aa-force-field/3658
+
+        The CHARMM convention in the definition of improper torsion angles is to
+        list the central atom in the first position, while no rule exists for how
+        to order the other three atoms.
+        ref: Symmetrization of the AMBER and CHARMM Force Fields, J. Comput. Chem.
+
+        Two conditions are satisfied:
+            1) the number of internal geometry variables is Nv= 3N_atom – 6
+            2) each variable can be perturbed independently of the other variables
+        For the case of ammonia, 3 bond lengths N-H1, N-H2, N-H3, the two bond
+        angles θ1 = H1-N-H2 and θ2 = H1-N-H3, and the ω = H2-H1-N-H3
+        ref: Atomic Forces for Geometry-Dependent Point Multipole and Gaussian
+        Multipole Models
+        """
+        improper_id = 0
+        for atom in self.atom:
+            atom_symbol, neighbors = atom.GetSymbol(), atom.GetNeighbors()
+            if atom_symbol not in csymbols or len(neighbors) != 3:
+                continue
+            if atom.GetSymbol() == symbols.NITROGEN and atom.GetHybridization(
+            ) == Chem.rdchem.HybridizationType.SP3:
+                continue
+            # Sp2 carbon for planar, Sp3 with one H (CHR1R2R3) for chirality,
+            # Sp2 N in Amino Acid
+            improper_id += 1
+            neighbor_symbols = [x.GetSymbol() for x in neighbors]
+            counted = self.countSymbols([atom_symbol] + neighbor_symbols)
+            improper_type_id = self.symbol_impropers[counted][0]
+            # FIXME: see docstring for current investigation. (NO ACTIONS TAKEN)
+            #  1) LAMMPS recommends the first to be the center, while the prm
+            #  and literature order the third as the center.
+            #  2) In addition, since improper has one non-connected edge,
+            #  are the two non-edge atom selections important?
+            #  3) Moreover, do we have to delete over constrained angle? If so,
+            #  how about the one facing the non-connected edge?
+            # Current implementation:
+            # first plane: center + the two most heavy atom
+            # second plane: the three non-center atoms
+            # benefit: 1) O-C-O / O.O.R imposes symmetricity (RCOO)
+            # 2) R-N-C / O.O.H exposes hydrogen out of plane vibration (RCNH)
+            neighbors = sorted(neighbors,
+                               key=lambda x: x.GetMass(),
+                               reverse=True)
+            atoms = [atom] + neighbors
+            self.impropers[improper_id] = (improper_type_id, ) + tuple(
+                x.GetIntProp(self.ATOM_ID) for x in atoms)
+
+    def printImpropers(self):
+        """
+        Print all the possible improper angles in the force field file.
+        """
+        for symb, improper_ids in self.symbol_impropers.items():
+            print(f"{symb} {self.ff.impropers[improper_ids[0]]}")
+            impropers = [self.ff.impropers[x] for x in improper_ids]
+            for improper in impropers:
+                ids = [improper.id1, improper.id2, improper.id3, improper.id4]
+                print(f"{[self.ff.atoms[x].description for x in ids]}")
+
+    def AnglesByImpropers(self):
+        """
+        One improper adds one restraint and thus one angle is removed.
+
+        e.g. NH3 if all three H-N-H angles are defined, you cannot control out
+        of plane mode.
+
+        Two conditions are satisfied:
+            1) the number of internal geometry variables is Nv= 3N_atom – 6
+            2) each variable can be perturbed independently of the other variables
+        For the case of ammonia, 3 bond lengths N-H1, N-H2, N-H3, the two bond
+        angles θ1 = H1-N-H2 and θ2 = H1-N-H3, and the ω = H2-H1-N-H3
+        ref: Atomic Forces for Geometry-Dependent Point Multipole and Gaussian
+        Multipole Models
+        """
+
+        for idx, (itype, id1, id2, id3, id4) in self.impropers.items():
+            id234 = set([id2, id3, id4])
+            aidxs = [
+                aidx
+                for aidx, (atype, aid1, aid2, aid3) in self.angles.items()
+                if len(id234.intersection([aid1, aid3])) and id1 == aid2
+            ]
+            if len(aidxs) != 3:
+                continue
+            self.angles.pop(aidxs[2])
+
     def removeUnused(self):
         """
         Remove used force field information so that the data file is minimal.
@@ -1165,6 +1333,10 @@ class LammpsWriter(LammpsIn):
             set(x[0] for x in self.impropers.values()))
 
     def writeDescription(self):
+        """
+        Write the lammps description section, including the number of atom, bond,
+        angle etc.
+        """
         if self.mols is None:
             raise ValueError(f"Mols are not set.")
 
@@ -1177,6 +1349,10 @@ class LammpsWriter(LammpsIn):
         self.data_fh.write(f"{len(self.impropers)} {self.IMPROPERS}\n\n")
 
     def writeTopoType(self):
+        """
+
+        :return:
+        """
         atom_num = len(self.used_atom_types) - 1 if self.concise else len(
             self.ff.atoms)
         self.data_fh.write(f"{atom_num} {self.ATOM_TYPES}\n")
@@ -1220,7 +1396,7 @@ class LammpsWriter(LammpsIn):
                 continue
             atm_id = self.used_atom_types.index(
                 atom_id) if self.concise else atom_id
-            dscrptn = f"{atom.description} {atom_id}" if self.concise else atom.description
+            dscrptn = f"{atom.description} {atom.symbol} {atom_id}" if self.concise else atom.description
             self.data_fh.write(f"{atm_id} {atom.mass} # {dscrptn}\n")
         self.data_fh.write(f"\n")
 
@@ -1377,61 +1553,6 @@ class LammpsWriter(LammpsIn):
                 f"{dihedral_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
 
-    def setImpropers(self, symbols='CN', print_impropers=False):
-        improper_id = 0
-        for mol in self.mols.values():
-            for atom in mol.GetAtoms():
-                atom_symbol = atom.GetSymbol()
-                if atom_symbol not in symbols:
-                    continue
-                neighbors = atom.GetNeighbors()
-                # FIXME: H-N should be counted as one neighbor
-                if atom.GetSymbol() not in 'CN' or len(neighbors) != 3:
-                    continue
-                if atom.GetSymbol() == 'N' and atom.GetHybridization(
-                ) == Chem.rdchem.HybridizationType.SP3:
-                    continue
-                # Sp2 carbon for planar, Sp3 with one H (CHR1R2R3) for chirality,
-                # Sp2 N in Amino Acid
-                improper_id += 1
-                neighbor_symbols = [x.GetSymbol() for x in neighbors]
-                counted = self.countSymbols([atom_symbol] + neighbor_symbols)
-                if print_impropers:
-                    for symb, improper_ids in self.symbol_impropers.items():
-                        print(f"{symb} {self.ff.impropers[improper_ids[0]]}")
-                        impropers = [
-                            self.ff.impropers[x] for x in improper_ids
-                        ]
-                        for improper in impropers:
-                            print(
-                                f"{[self.ff.atoms[x].description for x in [improper.id1, improper.id2, improper.id3, improper.id4]]}"
-                            )
-                improper_type_id = self.symbol_impropers[counted][0]
-                neighbors = sorted(neighbors,
-                                   key=lambda x: len(x.GetNeighbors()))
-                for neighbor in neighbors:
-                    if neighbor.GetSymbol(
-                    ) == 'O' and neighbor.GetHybridization(
-                    ) == Chem.rdchem.HybridizationType.SP2:
-                        neighbors.remove(neighbor)
-                        neighbors = [neighbor] + neighbors
-                atoms = neighbors[:2] + [atom] + neighbors[2:]
-                self.impropers[improper_id] = (improper_type_id, ) + tuple(
-                    x.GetIntProp(self.ATOM_ID) for x in atoms)
-
-    def AnglesByImpropers(self):
-
-        for idx, (itype, id1, id2, id3, id4) in self.impropers.items():
-            id124 = set([id1, id2, id4])
-            aidxs = [
-                aidx
-                for aidx, (atype, aid1, aid2, aid3) in self.angles.items()
-                if len(id124.intersection([aid1, aid3])) and id3 == aid2
-            ]
-            if len(aidxs) != 3:
-                continue
-            self.angles.pop(aidxs[2])
-
     def writeImpropers(self):
 
         if not self.impropers:
@@ -1446,61 +1567,6 @@ class LammpsWriter(LammpsIn):
                 f"{improper_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
 
-    def setImproperSymbols(self):
-        """
-        Check and assert the current improper force field. These checks may be
-        only good for this specific force field for even this specific file.
-        """
-        msg = "Impropers from the same symbols are of the same constants."
-        # {1: 'CNCO', 2: 'CNCO', 3: 'CNCO' ...
-        symbolss = {
-            z: ''.join([
-                self.ff.atoms[y].symbol for y in [x.id1, x.id2, x.id3, x.id4]
-            ])
-            for z, x in self.ff.impropers.items()
-        }
-        # {'CNCO': (10.5, 180.0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9), ...
-        symbol_impropers = {}
-        for id, symbols in symbolss.items():
-            improper = self.ff.impropers[id]
-            if symbols not in symbol_impropers:
-                symbol_impropers[symbols] = (
-                    improper.ene,
-                    improper.angle,
-                    improper.n_parm,
-                )
-            assert symbol_impropers[symbols][:3] == (
-                improper.ene,
-                improper.angle,
-                improper.n_parm,
-            )
-            symbol_impropers[symbols] += (improper.id, )
-        log_debug(msg)
-
-        msg = "Improper neighbor counts based on symbols are unique."
-        neighbors = [[x[2], x[0], x[1], x[3]] for x in symbol_impropers.keys()]
-        # The csmbls in getCountedSymbols is obtained from the following
-        csmbls = sorted(set([y for x in neighbors[1:] for y in x]))  # CHNO
-        counted = [self.countSymbols(x, csmbls=csmbls) for x in neighbors]
-        assert len(symbol_impropers) == len(set(counted))
-        log_debug(msg)
-
-        self.symbol_impropers = {
-            x: y[3:]
-            for x, y in zip(counted, symbol_impropers.values())
-        }
-
-    @staticmethod
-    def countSymbols(symbols, csmbls='CHNO'):
-        """
-
-        :param symbols:
-        :param csmbls:
-        :return:
-        """
-        return ''.join((symbols[0], ) + tuple(y + str(symbols[1:].count(y))
-                                              for y in csmbls))
-
 
 class DataFileReader(LammpsWriter):
 
@@ -1510,19 +1576,21 @@ class DataFileReader(LammpsWriter):
         self.data_file = data_file
         self.min_dist = min_dist
         self.lines = None
-        self.vdws = {}
-        self.radii = {}
+        self.masses = {}
         self.atoms = {}
         self.bonds = {}
         self.angles = {}
         self.dihedrals = {}
         self.impropers = {}
+        self.vdws = {}
+        self.radii = {}
         self.mols = {}
         self.excluded = collections.defaultdict(set)
 
     def run(self):
         self.read()
         self.setDescription()
+        self.setMasses()
         self.setAtoms()
         self.setBonds()
         self.setAngles()
@@ -1557,6 +1625,23 @@ class DataFileReader(LammpsWriter):
             for x in range(dsp_eidx) for y in self.BOX_DSP
             if y in self.lines[x]
         }
+
+    def setMasses(self):
+        sidx = self.mk_idxes[self.MASSES] + 2
+        for id, lid in enumerate(
+                range(sidx, sidx + self.struct_dsp[self.ATOMS]), 1):
+            splitted = self.lines[lid].split()
+            id, mass, ele = splitted[0], splitted[1], splitted[-2]
+            self.masses[int(id)] = types.SimpleNamespace(id=int(id),
+                                                         mass=float(mass),
+                                                         ele=ele)
+
+    def setAtoms(self):
+        sidx = self.mk_idxes[self.ATOMS_CAP] + 2
+        for lid in range(sidx, sidx + self.struct_dsp[self.ATOMS]):
+            id, mol_id, type_id, charge = self.lines[lid].split()[:4]
+            self.atoms[int(id)] = types.SimpleNamespace(
+                id=int(id), mol_id=int(mol_id), ele=self.masses[int(id)].ele)
 
     def setMols(self):
         mols = collections.defaultdict(list)
