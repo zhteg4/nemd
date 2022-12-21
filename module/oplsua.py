@@ -778,7 +778,7 @@ class LammpsIn(fileutils.LammpsInput):
             self.in_fh.write("dump_modify 1 sort id\n")
             atoms = self.ff.atoms.values()
             if self.concise:
-                atoms = [x for x in atoms if x.id in self.used_atom_types]
+                atoms = [x for x in atoms if x.id in self.atm_types]
             smbs = ' '.join(map(str, [x.symbol for x in atoms]))
             self.in_fh.write(f"dump_modify 1 element {smbs}\n")
         self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
@@ -923,11 +923,11 @@ class LammpsWriter(LammpsIn):
         self.dihedrals = {}
         self.impropers = {}
         self.symbol_impropers = {}
-        self.used_atom_types = []
-        self.used_bond_types = []
-        self.used_angle_types = []
-        self.used_dihedral_types = []
-        self.used_improper_types = []
+        self.atm_types = []
+        self.bnd_types = []
+        self.ang_types = []
+        self.dihe_types = []
+        self.impr_types = []
         self.data_fh = None
 
     def writeData(self, adjust_coords=True):
@@ -1319,18 +1319,16 @@ class LammpsWriter(LammpsIn):
         if not self.concise:
             return
 
-        self.used_atom_types = [0] + sorted(
-            set(
-                y.GetIntProp(self.TYPE_ID) for x in self.mols.values()
-                for y in x.GetAtoms()))
-        self.used_bond_types = [0] + sorted(
-            set(x[0] for x in self.bonds.values()))
-        self.used_angle_types = [0] + sorted(
-            set(x[0] for x in self.angles.values()))
-        self.used_dihedral_types = [0] + sorted(
-            set(x[0] for x in self.dihedrals.values()))
-        self.used_improper_types = [0] + sorted(
-            set(x[0] for x in self.impropers.values()))
+        atypes = sorted(set(x.GetIntProp(self.TYPE_ID) for x in self.atom))
+        self.atm_types = {y: x for x, y in enumerate(atypes, start=1)}
+        btypes = sorted(set(x[0] for x in self.bonds.values()))
+        self.bnd_types = {y: x for x, y in enumerate(btypes, start=1)}
+        antypes = sorted(set(x[0] for x in self.angles.values()))
+        self.ang_types = {y: x for x, y in enumerate(antypes, start=1)}
+        dtps = sorted(set(x[0] for x in self.dihedrals.values()))
+        self.dihe_types = {y: x for x, y in enumerate(dtps, start=1)}
+        itps = sorted(set(x[0] for x in self.impropers.values()))
+        self.impr_types = {y: x for x, y in enumerate(itps, start=1)}
 
     def writeDescription(self):
         """
@@ -1350,28 +1348,26 @@ class LammpsWriter(LammpsIn):
 
     def writeTopoType(self):
         """
-
-        :return:
+        Write topologic data. e.g. number of atoms, angles...
         """
-        atom_num = len(self.used_atom_types) - 1 if self.concise else len(
-            self.ff.atoms)
+        atom_num = len(self.atm_types) if self.concise else len(self.ff.atoms)
         self.data_fh.write(f"{atom_num} {self.ATOM_TYPES}\n")
-        bond_num = len(self.used_bond_types) - 1 if self.concise else len(
-            self.ff.bonds)
+        bond_num = len(self.bnd_types) if self.concise else len(self.ff.bonds)
         self.data_fh.write(f"{bond_num} {self.BOND_TYPES}\n")
-        angle_num = len(self.used_angle_types) - 1 if self.concise else len(
-            self.ff.angles)
-        self.data_fh.write(f"{angle_num} {self.ANGLE_TYPES}\n")
-        dihedral_num = len(
-            self.used_dihedral_types) - 1 if self.concise else len(
-                self.ff.dihedrals)
-        self.data_fh.write(f"{dihedral_num} {self.DIHEDRAL_TYPES}\n")
-        improper_num = len(
-            self.used_improper_types) - 1 if self.concise else len(
-                self.ff.impropers)
-        self.data_fh.write(f"{improper_num} {self.IMPROPER_TYPES}\n\n")
+        ang_num = len(self.ang_types) if self.concise else len(self.ff.angles)
+        self.data_fh.write(f"{ang_num} {self.ANGLE_TYPES}\n")
+        dnum = len(self.dihe_types) if self.concise else len(self.ff.dihedrals)
+        self.data_fh.write(f"{dnum} {self.DIHEDRAL_TYPES}\n")
+        inum = len(self.impr_types) if self.concise else len(self.ff.impropers)
+        self.data_fh.write(f"{inum} {self.IMPROPER_TYPES}\n\n")
 
     def writeBox(self, min_box=None, buffer=None):
+        """
+        Write box information.
+
+        :param min_box list: minimum box size
+        :param buffer list: buffer in three dimensions
+        """
         if min_box is None:
             min_box = (40., 40., 40.,) # yapf: disable
         if buffer is None:
@@ -1385,96 +1381,113 @@ class LammpsWriter(LammpsIn):
         centroid = xyzs.mean(axis=0)
         for dim in range(3):
             self.data_fh.write(
-                f"{centroid[dim]-box_hf[dim]:.2f} {centroid[dim]+box_hf[dim]:.2f} {self.LO_HI[dim]}\n"
-            )
+                f"{centroid[dim]-box_hf[dim]:.2f} {centroid[dim]+box_hf[dim]:.2f} "
+                f"{self.LO_HI[dim]}\n")
         self.data_fh.write("\n")
 
     def writeMasses(self):
+        """
+        Write out mass information.
+        """
         self.data_fh.write(f"{self.MASSES}\n\n")
         for atom_id, atom in self.ff.atoms.items():
-            if self.concise and atom_id not in self.used_atom_types:
+            if self.concise and atom_id not in self.atm_types:
                 continue
-            atm_id = self.used_atom_types.index(
-                atom_id) if self.concise else atom_id
+            atm_id = self.atm_types[atom_id] if self.concise else atom_id
             dscrptn = f"{atom.description} {atom.symbol} {atom_id}" if self.concise else atom.description
             self.data_fh.write(f"{atm_id} {atom.mass} # {dscrptn}\n")
         self.data_fh.write(f"\n")
 
     def writePairCoeffs(self):
+        """
+        Write pair coefficients.
+        """
         self.data_fh.write(f"{self.PAIR_COEFFS}\n\n")
         for atom in self.ff.atoms.values():
-            if self.concise and atom.id not in self.used_atom_types:
+            if self.concise and atom.id not in self.atm_types:
                 continue
             vdw = self.ff.vdws[atom.id]
-            atom_id = self.used_atom_types.index(
-                atom.id) if self.concise else atom.id
+            atom_id = self.atm_types[atom.id] if self.concise else atom.id
             self.data_fh.write(f"{atom_id} {vdw.ene} {vdw.dist}\n")
         self.data_fh.write("\n")
 
     def writeBondCoeffs(self):
-        if len(self.used_bond_types) < 2 and self.concise:
+        """
+        Write bond coefficients.
+        """
+        if len(self.bnd_types) < 2 and self.concise:
             return
 
         self.data_fh.write(f"{self.BOND_COEFFS}\n\n")
         for bond in self.ff.bonds.values():
-            if self.concise and bond.id not in self.used_bond_types:
+            if self.concise and bond.id not in self.bnd_types:
                 continue
-            bond_id = self.used_bond_types.index(
-                bond.id) if self.concise else bond.id
+            bond_id = self.bnd_types[bond.id] if self.concise else bond.id
             self.data_fh.write(f"{bond_id}  {bond.ene} {bond.dist}\n")
         self.data_fh.write("\n")
 
     def writeAngleCoeffs(self):
-        if len(self.used_angle_types) < 2 and self.concise:
+        """
+        Write angle coefficients.
+        """
+        if len(self.ang_types) < 2 and self.concise:
             return
 
         self.data_fh.write(f"{self.ANGLE_COEFFS}\n\n")
         for angle in self.ff.angles.values():
-            if self.concise and angle.id not in self.used_angle_types:
+            if self.concise and angle.id not in self.ang_types:
                 continue
-            angle_id = self.used_angle_types.index(
-                angle.id) if self.concise else angle.id
+            angle_id = self.ang_types[angle.id] if self.concise else angle.id
             self.data_fh.write(f"{angle_id} {angle.ene} {angle.angle}\n")
         self.data_fh.write("\n")
 
     def writeDihedralCoeffs(self):
-        if len(self.used_dihedral_types) < 2 and self.concise:
+        """
+        Write dihedral coefficients.
+        """
+        if len(self.dihe_types) < 2 and self.concise:
             return
 
         self.data_fh.write(f"{self.DIHEDRAL_COEFFS}\n\n")
-        for dihedral in self.ff.dihedrals.values():
-            if self.concise and dihedral.id not in self.used_dihedral_types:
+        for dihe in self.ff.dihedrals.values():
+            if self.concise and dihe.id not in self.dihe_types:
                 continue
-            dihedral_id = self.used_dihedral_types.index(
-                dihedral.id) if self.concise else dihedral.id
+            dihedral_id = self.dihe_types[dihe.id] if self.concise else dihe.id
             params = [0., 0., 0., 0.]
-            for ene_ang_n in dihedral.constants:
+            # LAMMPS: K1, K2, K3, K4 in 0.5*K1[1+cos(x)] + 0.5*K2[1-cos(2x)]...
+            # OPLS: [1 + cos(nx-gama)]
+            # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
+            for ene_ang_n in dihe.constants:
                 params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
-                if (ene_ang_n.angle == 180.) ^ (ene_ang_n.n_parm in (
-                        2,
-                        4,
-                )):
+                if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
                     params[ene_ang_n.n_parm] *= -1
             self.data_fh.write(
                 f"{dihedral_id}  {' '.join(map(str, params))}\n")
         self.data_fh.write("\n")
 
     def writeImproperCoeffs(self):
-        if len(self.used_dihedral_types) < 2 and self.concise:
+        """
+        Write improper coefficients.
+        """
+        if len(self.dihe_types) < 2 and self.concise:
             return
 
         self.data_fh.write(f"{self.IMPROPER_COEFFS}\n\n")
-        for improper in self.ff.impropers.values():
-            if self.concise and improper.id not in self.used_improper_types:
+        for impr in self.ff.impropers.values():
+            if self.concise and impr.id not in self.impr_types:
                 continue
-            improper_id = self.used_improper_types.index(
-                improper.id) if self.concise else improper.id
-            sign = 1 if improper.angle == 0. else -1
+            improper_id = self.impr_types[impr.id] if self.concise else impr.id
+            # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
+            # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
+            sign = 1 if impr.angle == 0. else -1
             self.data_fh.write(
-                f"{improper_id} {improper.ene} {sign} {improper.n_parm}\n")
+                f"{improper_id} {impr.ene} {sign} {impr.n_parm}\n")
         self.data_fh.write("\n")
 
     def writeAtoms(self):
+        """
+        Write atom coefficients.
+        """
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
         for mol_id, mol in self.mols.items():
             conformer = mol.GetConformer()
@@ -1490,79 +1503,64 @@ class LammpsWriter(LammpsIn):
                 charge = self.ff.charges[type_id] + ncharge
                 dsrptn = self.ff.atoms[type_id].description
                 symbol = self.ff.atoms[type_id].symbol
-                type_id = self.used_atom_types.index(
-                    type_id) if self.concise else type_id
+                type_id = self.atm_types[type_id] if self.concise else type_id
                 self.data_fh.write(
-                    f"{atom_id} {mol_id} {type_id} {charge:.4f} {xyz} # {dsrptn} {symbol}\n"
-                )
+                    f"{atom_id} {mol_id} {type_id} {charge:.4f} {xyz} "
+                    f"# {dsrptn} {symbol}\n")
         self.data_fh.write(f"\n")
 
-    def debugPrintReplacement(self, atoms, matches):
-        smbl_cnnts = [f'{x.GetSymbol()}{self.getAtomConnt(x)}' for x in atoms]
-        ids = [
-            getattr(matches[0], x, '') for x in ['id1', 'id2', 'id3', 'id4']
-        ]
-        ids = [x for x in ids if x]
-        id_smbl_cnnts = [
-            f'{self.ff.atoms[x].symbol}{self.ff.atoms[x].conn}' for x in ids
-        ]
-        log_debug(
-            f"{'~'.join(smbl_cnnts)} "
-            f"{'~'.join(map(str, [x.GetIntProp(self.TYPE_ID) for x in atoms]))} "
-            f"replaced by {'~'.join(map(str, id_smbl_cnnts))} {'~'.join(map(str, ids))}"
-        )
-
-    def getAtomConnt(self, atom):
-        implicit_h_num = atom.GetIntProp(self.IMPLICIT_H) if atom.HasProp(
-            self.IMPLICIT_H) else 0
-        return atom.GetDegree() + implicit_h_num
-
     def writeBonds(self):
+        """
+        Write bond coefficients.
+        """
         if not self.bonds:
             return
 
         self.data_fh.write(f"{self.BONDS.capitalize()}\n\n")
         for bond_id, (bond_type, id1, id2) in self.bonds.items():
-            bond_type = self.used_bond_types.index(
-                bond_type) if self.concise else bond_type
+            bond_type = self.bnd_types[bond_type] if self.concise else bond_type
             self.data_fh.write(f"{bond_id} {bond_type} {id1} {id2}\n")
         self.data_fh.write(f"\n")
 
     def writeAngles(self):
+        """
+        Write angle coefficients.
+        """
         if not self.angles:
             return
         self.data_fh.write(f"{self.ANGLES.capitalize()}\n\n")
-        angle_id = 0
-        for _, (type_id, id1, id2, id3) in self.angles.items():
-            angle_id += 1
-            angle_type = self.used_angle_types.index(
-                type_id) if self.concise else type_id
+        # Some angles may be filtered out by improper
+        for angle_id, value in enumerate(self.angles.items(), start=1):
+            _, (type_id, id1, id2, id3) = value
+            angle_type = self.ang_types[type_id] if self.concise else type_id
             self.data_fh.write(f"{angle_id} {angle_type} {id1} {id2} {id3}\n")
         self.data_fh.write(f"\n")
 
     def writeDihedrals(self):
+        """
+        Write dihedral coefficients.
+        """
         if not self.dihedrals:
             return
 
         self.data_fh.write(f"{self.DIHEDRALS.capitalize()}\n\n")
-        for dihedral_id, (type_id, id1, id2, id3,
-                          id4) in self.dihedrals.items():
-            type_id = self.used_dihedral_types.index(
-                type_id) if self.concise else type_id
+        for dihe_id, (type_id, id1, id2, id3, id4) in self.dihedrals.items():
+            type_id = self.dihe_types[type_id] if self.concise else type_id
             self.data_fh.write(
-                f"{dihedral_id} {type_id} {id1} {id2} {id3} {id4}\n")
+                f"{dihe_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
 
     def writeImpropers(self):
-
+        """
+        Write improper coefficients.
+        """
         if not self.impropers:
             return
 
         self.data_fh.write(f"{self.IMPROPERS.capitalize()}\n\n")
         for improper_id, (type_id, id1, id2, id3,
                           id4) in self.impropers.items():
-            type_id = self.used_improper_types.index(
-                type_id) if self.concise else type_id
+            type_id = self.impr_types[type_id] if self.concise else type_id
             self.data_fh.write(
                 f"{improper_id} {type_id} {id1} {id2} {id3} {id4}\n")
         self.data_fh.write(f"\n")
