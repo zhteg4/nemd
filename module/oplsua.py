@@ -1567,10 +1567,18 @@ class LammpsWriter(LammpsIn):
 
 
 class DataFileReader(LammpsWriter):
+    """
+    LAMMPS Data file reader
+    """
 
     SCALE = 0.6
 
     def __init__(self, data_file, min_dist=1.09 * 2):
+        """
+        :param data_file str: data file with path
+        :param min_dist: the minimum distance as clash (some h-bond has zero vdw
+            params)
+        """
         self.data_file = data_file
         self.min_dist = min_dist
         self.lines = None
@@ -1586,6 +1594,9 @@ class DataFileReader(LammpsWriter):
         self.excluded = collections.defaultdict(set)
 
     def run(self):
+        """
+        Main method to read and parse the data file.
+        """
         self.read()
         self.setDescription()
         self.setMasses()
@@ -1597,6 +1608,9 @@ class DataFileReader(LammpsWriter):
         self.setMols()
 
     def read(self):
+        """
+        Read the data file and index lines by section marker.
+        """
         with open(self.data_file, 'r') as df_fh:
             self.lines = df_fh.readlines()
             self.mk_idxes = {
@@ -1606,18 +1620,23 @@ class DataFileReader(LammpsWriter):
             }
 
     def setDescription(self):
-
+        """
+        Parse the description section for topo counts, type counts, and box size
+        """
         dsp_eidx = min(self.mk_idxes.values())
+        # {'atoms': 1620, 'bonds': 1593, 'angles': 1566, 'dihedrals': 2511}
         self.struct_dsp = {
             y: int(self.lines[x].split(y)[0])
             for x in range(dsp_eidx) for y in self.STRUCT_DSP
             if y in self.lines[x]
         }
+        # {'atom types': 7, 'bond types': 6, 'angle types': 5}
         self.dype_dsp = {
             y: int(self.lines[x].split(y)[0])
             for x in range(dsp_eidx) for y in self.TYPE_DSP
             if y in self.lines[x]
         }
+        # {'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], 'zlo zhi': ..}
         self.box_dsp = {
             y: [float(z) for z in self.lines[x].split(y)[0].split()]
             for x in range(dsp_eidx) for y in self.BOX_DSP
@@ -1625,9 +1644,12 @@ class DataFileReader(LammpsWriter):
         }
 
     def setMasses(self):
+        """
+        Parse the mass section for masses and elements.
+        """
         sidx = self.mk_idxes[self.MASSES] + 2
         for id, lid in enumerate(
-                range(sidx, sidx + self.struct_dsp[self.ATOMS]), 1):
+                range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]), 1):
             splitted = self.lines[lid].split()
             id, mass, ele = splitted[0], splitted[1], splitted[-2]
             self.masses[int(id)] = types.SimpleNamespace(id=int(id),
@@ -1635,20 +1657,47 @@ class DataFileReader(LammpsWriter):
                                                          ele=ele)
 
     def setAtoms(self):
+        """
+        Parse the atom section for atom id and molecule id.
+        """
         sidx = self.mk_idxes[self.ATOMS_CAP] + 2
         for lid in range(sidx, sidx + self.struct_dsp[self.ATOMS]):
             id, mol_id, type_id, charge = self.lines[lid].split()[:4]
             self.atoms[int(id)] = types.SimpleNamespace(
-                id=int(id), mol_id=int(mol_id), ele=self.masses[int(id)].ele)
+                id=int(id),
+                mol_id=int(mol_id),
+                type_id=int(type_id),
+                ele=self.masses[int(type_id)].ele)
 
     def setMols(self):
+        """
+        Group atoms into molecules by molecule ids.
+        """
         mols = collections.defaultdict(list)
         for atom in self.atoms.values():
             mols[atom.mol_id].append(atom.id)
         self.mols = dict(mols)
 
+    def setBonds(self):
+        """
+        Parse the atom section for atom id and molecule id.
+        """
+        sidx = self.mk_idxes[self.BONDS_CAP] + 2
+        for lid in range(sidx, sidx + self.struct_dsp[self.BONDS]):
+            id, type_id, id1, id2 = self.lines[lid].split()
+            self.bonds[int(id)] = types.SimpleNamespace(id=int(id),
+                                                        type_id=int(type_id),
+                                                        id1=int(id1),
+                                                        id2=int(id2))
+
     def setAngles(self):
-        sidx = self.mk_idxes[self.ANGLES_CAP] + 2
+        """
+        Parse the angle section for angle id and constructing atoms.
+        """
+        try:
+            sidx = self.mk_idxes[self.ANGLES_CAP] + 2
+        except KeyError:
+            return
         for id, lid in enumerate(
                 range(sidx, sidx + self.struct_dsp[self.ANGLES]), 1):
 
@@ -1660,7 +1709,13 @@ class DataFileReader(LammpsWriter):
                                                          id3=int(id3))
 
     def setDihedrals(self):
-        sidx = self.mk_idxes[self.DIHEDRALS_CAP] + 2
+        """
+        Parse the dihedral section for dihedral id and constructing atoms.
+        """
+        try:
+            sidx = self.mk_idxes[self.DIHEDRALS_CAP] + 2
+        except KeyError:
+            return
         for id, lid in enumerate(
                 range(sidx, sidx + self.struct_dsp[self.DIHEDRALS]), 1):
             id, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
@@ -1673,6 +1728,9 @@ class DataFileReader(LammpsWriter):
                 id4=int(id4))
 
     def setImpropers(self):
+        """
+        Parse the improper section for dihedral id and constructing atoms.
+        """
         try:
             sidx = self.mk_idxes[self.IMPROPERS_CAP] + 2
         except KeyError:
@@ -1689,24 +1747,38 @@ class DataFileReader(LammpsWriter):
                 id4=int(id4))
 
     def setClashParams(self, include14=True, scale=SCALE):
+        """
+        Set clash check related parameters including pair radii and exclusion.
+        """
         self.setClashExclusion(include14=not include14)
         self.setPairCoeffs()
         self.setVdwRadius(scale=scale)
 
     def setClashExclusion(self, include14=True):
-        pairs = [[x.id1, x.id2] for x in self.bonds.values()]
-        pairs += [[x.id1, x.id3] for x in self.angles.values()]
-        pairs += [
+        """
+        Bonded atoms and atoms in angles are in the exclusion. If include14=True,
+        the dihedral angles are in the exclusion as well.
+
+        :param include14 bool: If True, 1-4 interaction in a dihedral angle count
+            as exclusion.
+        """
+        pairs = set((x.id1, x.id2) for x in self.bonds.values())
+        pairs = pairs.union((x.id1, x.id3) for x in self.angles.values())
+        pairs = pairs.union([
             y for x in self.impropers.values()
             for y in itertools.combinations([x.id1, x.id2, x.id3, x.id4], 2)
-        ]
+        ])
         if include14:
-            pairs += [[x.id1, x.id4] for x in self.dihedrals.values()]
+            pairs = pairs.union(
+                (x.id1, x.id4) for x in self.dihedrals.values())
         for id1, id2 in pairs:
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
     def setPairCoeffs(self):
+        """
+        Paser the pair coefficient section.
+        """
         sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
         for lid in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
             id, ene, dist = self.lines[lid].split()
@@ -1715,16 +1787,26 @@ class DataFileReader(LammpsWriter):
                                                        ene=float(ene))
 
     def setVdwRadius(self, mix=LammpsWriter.GEOMETRIC, scale=1.):
+        """
+        Set the vdw radius based on the mixing rule and vdw radii.
+
+        :param mix str: the mixing rules, including GEOMETRIC, ARITHMETIC, and
+            SIXTHPOWER
+        :param scale float: scale the vdw radius by this factor
+
+        NOTE: the scaled radii here are more like diameters (or distance)
+            between two sites.
+        """
         radii = collections.defaultdict(dict)
         for id1, vdw1 in self.vdws.items():
             for id2, vdw2 in self.vdws.items():
-                if mix == LammpsWriter.GEOMETRIC:
+                if mix == self.GEOMETRIC:
                     dist = pow(vdw1.dist * vdw2.dist, 0.5)
-                elif mix == LammpsWriter.ARITHMETIC:
+                elif mix == self.ARITHMETIC:
                     dist = (vdw1.dist + vdw2.dist) / 2
-                elif mix == LammpsWriter.SIXTHPOWER:
-                    dist = pow((pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2,
-                               1 / 6)
+                elif mix == self.SIXTHPOWER:
+                    dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
+                    dist = pow(dist, 1 / 6)
                 dist *= pow(2, 1 / 6) * scale
                 if dist < self.min_dist:
                     dist = self.min_dist
