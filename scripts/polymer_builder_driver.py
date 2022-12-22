@@ -360,7 +360,7 @@ class Polymer(object):
         """
         Assign atom types to the structure.
         """
-        ff_typer = oplsua.OPLS_Typer(self.polym)
+        ff_typer = oplsua.OplsTyper(self.polym)
         ff_typer.run()
 
     def embedMol(self, trans=False):
@@ -407,7 +407,7 @@ class Conformer(object):
         :param polym 'rdkit.Chem.rdchem.Mol': the polymer to set conformer
         :param original_cru_mol 'rdkit.Chem.rdchem.Mol': the monomer mol
             constructing the polymer
-        :param ff 'OPLS_Parser': force field information.
+        :param ff 'OplsParser': force field information.
         :param trans bool: Whether all-tran conformation is requested.
         :param jobname str: The jobname
         :param minimization bool: Whether LAMMPS minimization is performed.

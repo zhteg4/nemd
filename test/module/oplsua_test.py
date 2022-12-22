@@ -9,16 +9,19 @@ from rdkit import RDLogger
 from rdkit.Chem import AllChem
 from contextlib import contextmanager
 
+BUTANE_DATA = os.path.join('polym_builder', '_relax', 'data.polym')
+BUTANE_DATA = testutils.test_file(BUTANE_DATA)
 
-class TestFragMol:
+
+class TestOplsParser:
 
     @pytest.fixture
     def nprsr(self):
-        return oplsua.OPLS_Parser()
+        return oplsua.OplsParser()
 
     @pytest.fixture
     def raw_prsr(self):
-        raw_prsr = oplsua.OPLS_Parser()
+        raw_prsr = oplsua.OplsParser()
         raw_prsr.setRawContent()
         return raw_prsr
 
@@ -53,3 +56,19 @@ class TestFragMol:
     def testSetDihedral(self, raw_prsr):
         raw_prsr.setDihedral()
         assert 628 == len(raw_prsr.dihedrals)
+
+
+class TestDataFileReader:
+
+    @pytest.fixture
+    def dfr(self):
+        return oplsua.DataFileReader(BUTANE_DATA)
+
+    def testRead(self, dfr):
+        dfr.read()
+        assert 1152 == len(dfr.lines)
+        assert 11 == len(dfr.mk_idxes)
+
+    def testSetDescription(self, dfr):
+        dfr.read()
+        dfr.setDescription()

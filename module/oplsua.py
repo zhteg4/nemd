@@ -51,14 +51,14 @@ def log_debug(msg):
 def get_opls_parser():
     """
     Read and parser opls force field file.
-    :return 'OPLS_Parser': the parser with force field information
+    :return 'OplsParser': the parser with force field information
     """
-    opls_parser = OPLS_Parser()
+    opls_parser = OplsParser()
     opls_parser.read()
     return opls_parser
 
 
-class OPLS_Typer:
+class OplsTyper:
     """
     Type the atoms and map SMILES fragments.
     """
@@ -260,7 +260,7 @@ class OPLS_Typer:
         atom.SetIntProp(self.DIHE_ATM_ID, self.DIHE_ATOM[type_id])
 
 
-class OPLS_Parser:
+class OplsParser:
     """
     Parse force field file and map atomic details.
     """
@@ -470,7 +470,7 @@ class OPLS_Parser:
 
         atypes = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
         try:
-            atypes = OPLS_Typer.BOND_ATOMS[tuple(sorted(atypes))]
+            atypes = OplsTyper.BOND_ATOMS[tuple(sorted(atypes))]
         except KeyError:
             # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
             pass
@@ -649,7 +649,7 @@ class OPLS_Parser:
             if x.id2 == tids[1] and x.id3 == tids[2]
         ]
         if not partial_matches:
-            rpm_ids = OPLS_Typer.DIHE_ATOMS[tuple(tids[1:3])]
+            rpm_ids = OplsTyper.DIHE_ATOMS[tuple(tids[1:3])]
             partial_matches = [
                 x for x in self.dihedrals.values()
                 if set([x.id2, x.id3]) == set(rpm_ids)
@@ -792,6 +792,15 @@ class LammpsIn(fileutils.LammpsInput):
         self.in_fh.write('thermo_modify flush yes\n')
         self.in_fh.write('thermo 1000\n')
 
+    def dumpImproper(self):
+        """
+        Compute and dump improper values with type.
+        """
+        self.in_fh.write(
+            'compute 1 all property/local itype iatom1 iatom2 iatom3 iatom4\n')
+        self.in_fh.write('compute 2 all improper/local chi\n')
+        self.in_fh.write('dump 1i all local 1000 tmp.dump index c_1[1] c_2\n')
+
     def writeRun(self,
                  start_temp=10.,
                  target_temp=None,
@@ -816,7 +825,7 @@ class LammpsIn(fileutils.LammpsInput):
         self.in_fh.write(
             f"fix 1 all nvt temp {start_temp} {start_temp} {self.timestep * tdamp}\n"
         )
-        self.in_fh.write("run 2000\n")
+        self.in_fh.write("run 20000\n")
 
         if len(self.mols) == 1:
             return
@@ -857,7 +866,7 @@ class LammpsWriter(LammpsIn):
     ATOM_ID = 'atom_id'
     RES_NUM = RES_NUM
     NEIGHBOR_CHARGE = 'neighbor_charge'
-    BOND_ATM_ID = OPLS_Typer.BOND_ATM_ID
+    BOND_ATM_ID = OplsTyper.BOND_ATM_ID
 
     ATOMS = 'atoms'
     BONDS = 'bonds'
@@ -905,7 +914,7 @@ class LammpsWriter(LammpsIn):
     def __init__(self, mols, ff, jobname, concise=True, *arg, **kwarg):
         """
         :param mols dict: keys are the molecule ids, and values are 'rdkit.Chem.rdchem.Mol'
-        :param ff 'oplsua.OPLS_Parser':
+        :param ff 'oplsua.OplsParser':
         :param jobname str: jobname based on which out filenames are defined
         :param concise bool: If False, all the atoms in the force field file shows
             up in the force field section of the data file. If True, only the present
@@ -1262,15 +1271,24 @@ class LammpsWriter(LammpsIn):
             #  are the two non-edge atom selections important?
             #  3) Moreover, do we have to delete over constrained angle? If so,
             #  how about the one facing the non-connected edge?
-            # Current implementation:
+            # My recommendation (not current implementation):
             # first plane: center + the two most heavy atom
             # second plane: the three non-center atoms
             # benefit: 1) O-C-O / O.O.R imposes symmetricity (RCOO)
             # 2) R-N-C / O.O.H exposes hydrogen out of plane vibration (RCNH)
-            neighbors = sorted(neighbors,
-                               key=lambda x: x.GetMass(),
-                               reverse=True)
-            atoms = [atom] + neighbors
+
+            # My Implementation:
+            # Use the center as the third according to "A New Force Field for
+            # Molecular Mechanical Simulation of Nucleic Acids and Proteins"
+            # No special treatment to the order of other atoms.
+
+            # My Reasoning: first or third functions the same for planar
+            # scenario as both 0 deg and 180 deg implies in plane. However,
+            # center as first or third defines different planes, leading to
+            # eiter ~45 deg or 120 deg as the equilibrium improper angle.
+            # 120 deg sounds more plausible and thus the third is chosen to be
+            # the center.
+            atoms = [neighbors[0], neighbors[1], atom, neighbors[2]]
             self.impropers[improper_id] = (improper_type_id, ) + tuple(
                 x.GetIntProp(self.ATOM_ID) for x in atoms)
 
@@ -1662,11 +1680,12 @@ class DataFileReader(LammpsWriter):
         """
         sidx = self.mk_idxes[self.ATOMS_CAP] + 2
         for lid in range(sidx, sidx + self.struct_dsp[self.ATOMS]):
-            id, mol_id, type_id, charge = self.lines[lid].split()[:4]
+            id, mol_id, type_id, charge, x, y, z = self.lines[lid].split()[:7]
             self.atoms[int(id)] = types.SimpleNamespace(
                 id=int(id),
                 mol_id=int(mol_id),
                 type_id=int(type_id),
+                xyz=(float(x), float(y), float(z)),
                 ele=self.masses[int(type_id)].ele)
 
     def setMols(self):
@@ -1821,7 +1840,7 @@ class DataFileReader(LammpsWriter):
 
 
 def main(argv):
-    opls_parser = OPLS_Parser()
+    opls_parser = OplsParser()
     opls_parser.read()
 
 
