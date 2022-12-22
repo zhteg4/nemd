@@ -2,11 +2,9 @@ import os
 import pytest
 import fragments
 import testutils
+import rdkitutils
 import numpy as np
 from rdkit import Chem
-from rdkit import RDLogger
-from rdkit.Chem import AllChem
-from contextlib import contextmanager
 
 BUTANE = 'CCCC'
 BUTENE = 'CC=CC'
@@ -21,10 +19,7 @@ BUTANE_DATA = os.path.join(BASE_DIR, 'butane.data')
 
 def getMol(smiles_str):
     real_smiles_str = CC3COOH if smiles_str == COOHPOLYM else smiles_str
-    with rdkit_preserve_hs() as ps:
-        mol = Chem.MolFromSmiles(real_smiles_str, ps)
-    with rdkit_warnings_ignored():
-        AllChem.EmbedMolecule(mol, useRandomCoords=True)
+    mol = rdkitutils.get_mol_from_smiles(real_smiles_str)
     if smiles_str == COOHPOLYM:
         markPolymProps(mol)
     return mol
@@ -43,26 +38,6 @@ def markPolymProps(mol):
         atom.SetBoolProp(fragments.FragMol.POLYM_HT, True)
     mol.SetBoolProp(fragments.FragMol.IS_MONO, True)
     return mol
-
-
-@contextmanager
-def rdkit_preserve_hs():
-    ps = Chem.SmilesParserParams()
-    ps.removeHs = False
-    try:
-        yield ps
-    finally:
-        ps.removeHs = True
-
-
-@contextmanager
-def rdkit_warnings_ignored():
-    lg = RDLogger.logger()
-    lg.setLevel(RDLogger.ERROR)
-    try:
-        yield lg
-    finally:
-        lg.setLevel(RDLogger.WARNING)
 
 
 class TestFragMol:

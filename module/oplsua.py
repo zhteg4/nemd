@@ -171,7 +171,11 @@ class OplsTyper:
 
     def filterMatch(self, match, frag):
         """
-        Filter substructure matches based on connectivity.
+        Filter substructure matches based on connectivity. The connecting atoms
+        usually have different connectivities. For example, first C in 'CC(=O)O'
+        fragment terminates while the second 'C' in 'CCC(=O)O' molecule is
+        connected to two carbons. Mark the first C in 'CC(=O)O' fragment as None
+        so that molecule won't type this terminating atom.
 
         :param match tuples: atom ids of one match
         :param frag: the fragment of one force field templated smiles

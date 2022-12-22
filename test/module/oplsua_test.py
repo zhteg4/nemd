@@ -1,7 +1,7 @@
 import os
 import pytest
 import oplsua
-import fragments
+import rdkitutils
 import testutils
 import numpy as np
 from rdkit import Chem
@@ -9,8 +9,45 @@ from rdkit import RDLogger
 from rdkit.Chem import AllChem
 from contextlib import contextmanager
 
+CC3COOH = '[H]OC(=O)CCC(CC(C)C(=O)O[H])C(=O)O[H]'
 BUTANE_DATA = testutils.test_file(os.path.join('polym_builder',
                                                'cooh123.data'))
+
+
+class TestOplsTyper:
+
+    CCOOH_SML = [x for x in oplsua.OplsTyper.SMILES if x.sml == 'CC(=O)O'][0]
+
+    @pytest.fixture
+    def opls_typer(self):
+        mol = rdkitutils.get_mol_from_smiles(CC3COOH, embeded=False)
+        return oplsua.OplsTyper(mol)
+
+    def testRun(self, opls_typer):
+        opls_typer.run()
+        assert all([x.HasProp('type_id') for x in opls_typer.mol.GetAtoms()])
+
+    def testFilterMatch(self, opls_typer):
+        frag = Chem.MolFromSmiles(self.CCOOH_SML.sml)
+        matches = opls_typer.mol.GetSubstructMatches(frag)
+        matches = [opls_typer.filterMatch(x, frag) for x in matches]
+        for match in matches:
+            assert match[0] is None
+
+    def testMarkMatches(self, opls_typer):
+        matches = [[None, 2, 3, 1], [None, 14, 15, 16], [None, 10, 11, 12]]
+        res_num, matom_ids = opls_typer.markMatches(matches, self.CCOOH_SML, 1)
+        assert 4 == res_num
+
+    def testMarkAtoms(self, opls_typer):
+        marked = opls_typer.markAtoms([None, 2, 3, 1], self.CCOOH_SML, 1)
+        assert 4 == len(marked)
+
+    def testMarkAtom(self, opls_typer):
+        atom = opls_typer.mol.GetAtomWithIdx(2)
+        opls_typer.markAtom(atom, 133, 1)
+        assert 133 == atom.GetIntProp('type_id')
+        assert 1 == atom.GetIntProp('res_num')
 
 
 class TestOplsParser:
@@ -132,4 +169,4 @@ class TestDataFileReader:
     def testSetVdwRadius(self, df_reader):
         df_reader.setPairCoeffs()
         df_reader.setVdwRadius()
-        assert 30 == len(len(df_reader.radii))
+        assert 30 == len(df_reader.radii)
