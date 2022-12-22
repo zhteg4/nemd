@@ -9,8 +9,8 @@ from rdkit import RDLogger
 from rdkit.Chem import AllChem
 from contextlib import contextmanager
 
-BUTANE_DATA = os.path.join('polym_builder', '_relax', 'data.polym')
-BUTANE_DATA = testutils.test_file(BUTANE_DATA)
+BUTANE_DATA = testutils.test_file(os.path.join('polym_builder',
+                                               'cooh123.data'))
 
 
 class TestOplsParser:
@@ -61,14 +61,75 @@ class TestOplsParser:
 class TestDataFileReader:
 
     @pytest.fixture
-    def dfr(self):
+    def raw_dfr(self):
         return oplsua.DataFileReader(BUTANE_DATA)
 
-    def testRead(self, dfr):
-        dfr.read()
-        assert 1152 == len(dfr.lines)
-        assert 11 == len(dfr.mk_idxes)
-
-    def testSetDescription(self, dfr):
+    @pytest.fixture
+    def dfr(self):
+        dfr = oplsua.DataFileReader(BUTANE_DATA)
         dfr.read()
         dfr.setDescription()
+        return dfr
+
+    @pytest.fixture
+    def df_reader(self):
+        df_reader = oplsua.DataFileReader(BUTANE_DATA)
+        df_reader.run()
+        return df_reader
+
+    def testRead(self, raw_dfr):
+        raw_dfr.read()
+        assert 210 == len(raw_dfr.lines)
+        assert 11 == len(raw_dfr.mk_idxes)
+
+    def testSetDescription(self, raw_dfr):
+        raw_dfr.read()
+        raw_dfr.setDescription()
+        assert 5 == len(raw_dfr.struct_dsp)
+        assert 5 == len(raw_dfr.dype_dsp)
+        assert 3 == len(raw_dfr.box_dsp)
+
+    def testSetMasses(self, dfr):
+        dfr.setMasses()
+        assert 8 == len(dfr.masses)
+
+    def testSetAtoms(self, dfr):
+        dfr.setMasses()
+        dfr.setAtoms()
+        assert 30 == len(dfr.atoms)
+
+    def testSetMols(self, dfr):
+        dfr.setMasses()
+        dfr.setAtoms()
+        dfr.setMols()
+        assert 3 == len(dfr.mols)
+
+    def testSetBonds(self, dfr):
+        dfr.setBonds()
+        assert 27 == len(dfr.bonds)
+
+    def testAngles(self, dfr):
+        dfr.setAngles()
+        assert 31 == len(dfr.angles)
+
+    def testSetDihedrals(self, dfr):
+        dfr.setDihedrals()
+        assert 30 == len(dfr.dihedrals)
+
+    def testSetImpropers(self, dfr):
+        dfr.setImpropers()
+        assert 7 == len(dfr.impropers)
+
+    @pytest.mark.parametrize(('include14', 'num'), [(True, 9), (False, 5)])
+    def testSetClashExclusion(self, df_reader, include14, num):
+        df_reader.setClashExclusion(include14=include14)
+        assert num == len(df_reader.excluded[7])
+
+    def testSetPairCoeffs(self, dfr):
+        dfr.setPairCoeffs()
+        assert 8 == len(dfr.vdws)
+
+    def testSetVdwRadius(self, df_reader):
+        df_reader.setPairCoeffs()
+        df_reader.setVdwRadius()
+        assert 30 == len(len(df_reader.radii))
