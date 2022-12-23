@@ -18,7 +18,7 @@ class Frame(pd.DataFrame):
     ZU = 'zu'
     UXYZ = [XU, YU, ZU]
 
-    def __init__(self, xyz=None, box=None):
+    def __init__(self, xyz=None, box=None, index=None):
         """
         :param xyz nx3 'numpy.ndarray' or 'DataFrame':
         :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
@@ -28,10 +28,8 @@ class Frame(pd.DataFrame):
             name = xyz.values.index.name
         except AttributeError:
             name = None
-        if name is None and xyz is not None:
+        if name is None and index is None and xyz is not None:
             index = range(1, xyz.shape[0] + 1)
-        else:
-            index = None
         super().__init__(data=xyz, index=index, columns=self.UXYZ)
         self.setBox(box)
 
@@ -104,7 +102,7 @@ class Frame(pd.DataFrame):
                 lambda x: math.remainder(x, self.attrs[self.SPAN][col]))
         return np.linalg.norm(dists, axis=1)
 
-    def wrapCoords(self, broken_bonds, dreader=None):
+    def wrapCoords(self, broken_bonds=False, dreader=None):
         """
         Wrap coordinates into the PBC box. If broken_bonds is False and mols is
         provided, the geometric center of each molecule is wrapped into the box.
@@ -279,11 +277,12 @@ class DistanceCell:
 
         xyz = row.values
         neighbors = self.getNeighbors(xyz)
+        # For small box, the same neighbor across PBCs appears multiple times
+        neighbors = set(neighbors)
         try:
             neighbors.remove(row.name)
-        except ValueError:
+        except KeyError:
             pass
-        neighbors = set(neighbors)
         if included:
             neighbors = neighbors.intersection(included)
         if excluded:

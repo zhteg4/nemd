@@ -2,13 +2,14 @@ import os
 import sys
 import math
 import copy
+import traj
+import scipy
 import oplsua
 import lammps
 import symbols
 import jobutils
 import logutils
 import functools
-import constants
 import fragments
 import structutils
 import parserutils
@@ -26,6 +27,11 @@ from rdkit.Chem import AllChem
 FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
 FlAG_MOL_NUM = '-mol_num'
+FlAG_DENSITY = '-density'
+FlAG_CELL = '-cell'
+GRID = 'grid'
+PACK = 'pack'
+GROW = 'grow'
 FlAG_SEED = '-seed'
 
 MOLT_OUT_EXT = fileutils.MOLT_FF_EXT
@@ -95,6 +101,22 @@ def get_parser():
                         metavar=FlAG_SEED[1:].upper(),
                         type=parserutils.type_random_seed,
                         help='Set random state using this seed.')
+    parser.add_argument(
+        FlAG_CELL,
+        metavar=FlAG_CELL[1:].upper(),
+        choices=[GRID, PACK, GROW],
+        default=PACK,
+        help=f'Amorphous cell type: {GRID} grids the space and '
+        f'put molecules into sub-cells; {PACK} randomly '
+        f'rotates and translates molecules; {GROW} grows '
+        f'molecules from the smallest rigid fragments.')
+    parser.add_argument(
+        FlAG_DENSITY,
+        metavar=FlAG_DENSITY[1:].upper(),
+        type=parserutils.type_positive_float,
+        default=0.5,
+        help=f'The density used for {PACK} and {GROW} amorphous'
+        f' cell. (g/cm^3)')
     jobutils.add_job_arguments(parser)
     return parser
 
@@ -139,6 +161,7 @@ class AmorphousCell(object):
         """
         self.setPolymers()
         self.setGriddedCell()
+        self.setPackedCell()
         self.write()
 
     def setPolymers(self):
@@ -151,6 +174,53 @@ class AmorphousCell(object):
             self.polymers.append(polym)
 
     def setGriddedCell(self):
+        """
+        Build gridded cell.
+        """
+        if self.options.cell != GRID:
+            return
+        cell = GridCell(self.polymers, self.options.mol_num)
+        cell.run()
+        self.mols = cell.mols
+
+    def setPackedCell(self):
+        """
+        Build packed cell.
+        """
+        if self.options.cell != PACK:
+            return
+        cell = PackedCell(self.polymers,
+                          self.options.mol_num,
+                          density=self.options.density)
+        cell.run()
+        self.mols = cell.mols
+
+    def write(self):
+        """
+        Write amorphous cell into data file
+        """
+        lmw = oplsua.LammpsData(self.mols, self.ff, self.jobname)
+        lmw.writeData(adjust_coords=False)
+        lmw.writeLammpsIn()
+        log(f'Data file written into {lmw.lammps_data}.')
+        log(f'In script written into {lmw.lammps_in}.')
+
+
+class GridCell:
+    """
+    Grid the space and place polymers into the sub-cells.
+    """
+
+    def __init__(self, polymers, polym_nums):
+        """
+        :param polymers 'Polymer': one polymer object for each type
+        :param polym_nums list: number of polymers per polymer type
+        """
+        self.polymers = polymers
+        self.polym_nums = polym_nums
+        self.mols = {}
+
+    def run(self):
         """
         Set gridded amorphous cell.
         """
@@ -172,7 +242,7 @@ class AmorphousCell(object):
         """
         Set polymer translational vectors based on medium box size.
         """
-        for polym, mol_num in zip(self.polymers, self.options.mol_num):
+        for polym, mol_num in zip(self.polymers, self.polym_nums):
             polym.mol_num = mol_num
             mol_nums_per_mbox = np.floor(self.mbox / polym.box).astype(int)
             polym.mol_num_per_mbox = np.product(mol_nums_per_mbox)
@@ -210,15 +280,98 @@ class AmorphousCell(object):
                 conformerutils.translation(mol.GetConformer(0),
                                            polymer.vecs[idx] + vector)
 
-    def write(self):
+
+class PackedCell:
+    """
+    Pack polymer by random rotation and translation.
+    """
+
+    def __init__(self, polymers, polym_nums, density=0.5):
         """
-        Write amorphous cell into data file
+        :param polymers 'Polymer': one polymer object for each type
+        :param polym_nums list: number of polymers per polymer type
+        :param density float: density of the molecules in cell
         """
-        lmw = oplsua.LammpsWriter(self.mols, self.ff, self.jobname)
-        lmw.writeData(adjust_coords=False)
-        lmw.writeLammpsIn()
-        log(f'Data file written into {lmw.lammps_data}.')
-        log(f'In script written into {lmw.lammps_in}.')
+        self.polymers = polymers
+        self.polym_nums = polym_nums
+        self.density = density
+        self.mols = {}
+        self.box = None
+
+    def run(self):
+        """
+        Set gridded amorphous cell.
+        """
+        self.setBoxes()
+        self.placeMols()
+
+    def setBoxes(self):
+        weight = sum(x.mw * y for x, y in zip(self.polymers, self.polym_nums))
+        vol = weight / self.density / scipy.constants.Avogadro
+        edge = math.pow(vol, 1 / 3)  # centimeter
+        edge *= scipy.constants.centi / scipy.constants.angstrom
+        self.box = [0, edge, 0, edge, 0, edge]
+
+    def placeMols(self):
+        """
+        Need to rotate the molecules
+        Need to break the following
+        """
+        mols = [
+            copy.copy(x.polym) for x, y in zip(self.polymers, self.polym_nums)
+            for _ in range(y)
+        ]
+        mols = {i: x for i, x in enumerate(mols, start=1)}
+
+        lmw = oplsua.LammpsData(mols, self.polymers[0].ff, 'tmp')
+        lmw.writeData()
+        df_reader = oplsua.DataFileReader('tmp.data')
+        df_reader.run()
+        df_reader.setClashParams()
+        index = [atom.id for atom in df_reader.atoms.values()]
+        xyz = [atom.xyz for atom in df_reader.atoms.values()]
+        frm = traj.Frame(xyz=xyz, index=index, box=self.box)
+        dcell = traj.DistanceCell(frm)
+        extg_aids = set()
+        for mol_id, atom_ids in df_reader.mols.items():
+            dcell.setUp()
+            clashes = True
+            while (clashes):
+                conf = mols[mol_id].GetConformer()
+                conformerutils.translation(conf,
+                                           np.random.rand(3) * self.box[1::2])
+                # conformerutils.rotate(conf, [1, 0, 0])
+                frm.loc[atom_ids] = conf.GetPositions()
+
+                for id, row in frm.loc[atom_ids].iterrows():
+                    clashes = dcell.getClashes(row,
+                                               included=extg_aids,
+                                               radii=df_reader.radii,
+                                               excluded=df_reader.excluded)
+                    if clashes:
+                        break
+            extg_aids.update(atom_ids)
+        frm.wrapCoords(dreader=df_reader)
+        for mol_id, atom_ids in df_reader.mols.items():
+            conf = mols[mol_id].GetConformer()
+            for id, atom_id in enumerate(atom_ids):
+                conf.SetAtomPosition(id, frm.loc[atom_id])
+        self.mols = mols
+
+
+class GrowedCell:
+    """
+    Grow the polymers from bit to full.
+    """
+
+    def __init__(self, polymers, polym_nums):
+        """
+        :param polymers 'Polymer': one polymer object for each type
+        :param polym_nums list: number of polymers per polymer type
+        """
+        self.polymers = polymers
+        self.polym_nums = polym_nums
+        self.mols = {}
 
 
 class Polymer(object):
@@ -226,11 +379,11 @@ class Polymer(object):
     Class to build a polymer from monomers.
     """
 
-    ATOM_ID = oplsua.LammpsWriter.ATOM_ID
+    ATOM_ID = oplsua.LammpsData.ATOM_ID
     TYPE_ID = oplsua.TYPE_ID
     BOND_ATM_ID = oplsua.BOND_ATM_ID
     RES_NUM = oplsua.RES_NUM
-    NEIGHBOR_CHARGE = oplsua.LammpsWriter.NEIGHBOR_CHARGE
+    NEIGHBOR_CHARGE = oplsua.LammpsData.NEIGHBOR_CHARGE
     IMPLICIT_H = oplsua.IMPLICIT_H
     MOL_NUM = 'mol_num'
     MONO_ATOM_IDX = 'mono_atom_idx'
@@ -254,7 +407,7 @@ class Polymer(object):
         self.box = None
         self.cru_mol = None
         self.molecules = []
-        self.buffer = oplsua.LammpsWriter.BUFFER
+        self.buffer = oplsua.LammpsData.BUFFER
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
 
@@ -372,6 +525,7 @@ class Polymer(object):
         """
         if self.polym.GetNumAtoms() <= 200 and not trans:
             AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
+            Chem.GetSymmSSSR(self.polym)
             return
 
         trans_conf = Conformer(self.polym, self.cru_mol, trans=trans)
@@ -381,9 +535,16 @@ class Polymer(object):
         """
         Write lammps data file.
         """
-        lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=self.mols)
+        lmw = oplsua.LammpsData(self.ff, self.jobname, mols=self.mols)
         lmw.writeData()
         lmw.writeLammpsIn()
+
+    @property
+    def molecular_weight(self):
+        atypes = [x.GetIntProp(self.TYPE_ID) for x in self.polym.GetAtoms()]
+        return sum(self.ff.atoms[x].mass for x in atypes)
+
+    mw = molecular_weight
 
 
 class Conformer(object):
@@ -601,7 +762,7 @@ class Conformer(object):
         Adjust the conformer coordinates based on the force field.
         """
         mols = {1: self.polym}
-        self.lmw = oplsua.LammpsWriter(self.ff, self.jobname, mols=mols)
+        self.lmw = oplsua.LammpsData(self.ff, self.jobname, mols=mols)
         if self.minimization:
             return
         self.lmw.adjustCoords()

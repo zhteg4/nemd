@@ -859,7 +859,7 @@ class LammpsIn(fileutils.LammpsInput):
         self.in_fh.write("run 100000\n")
 
 
-class LammpsWriter(LammpsIn):
+class LammpsData(LammpsIn):
     """
     Class to write out LAMMPS data file.
     """
@@ -1618,7 +1618,7 @@ class LammpsWriter(LammpsIn):
         self.data_fh.write(f"\n")
 
 
-class DataFileReader(LammpsWriter):
+class DataFileReader(LammpsData):
     """
     LAMMPS Data file reader
     """
@@ -1839,7 +1839,7 @@ class DataFileReader(LammpsWriter):
                                                        dist=float(dist),
                                                        ene=float(ene))
 
-    def setVdwRadius(self, mix=LammpsWriter.GEOMETRIC, scale=1.):
+    def setVdwRadius(self, mix=LammpsData.GEOMETRIC, scale=1.):
         """
         Set the vdw radius based on the mixing rule and vdw radii.
 

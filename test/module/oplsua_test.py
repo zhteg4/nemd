@@ -105,7 +105,7 @@ class TestLammpsIn:
             assert os.path.exists('lmp.in')
 
 
-class TestLammpsWriter:
+class TestLammpsData:
 
     @pytest.fixture
     def lmp_data(self):
@@ -114,7 +114,7 @@ class TestLammpsWriter:
         oplsua.OplsTyper(mol1).run()
         oplsua.OplsTyper(mol2).run()
         ff = oplsua.get_opls_parser()
-        return oplsua.LammpsWriter({1: mol1, 2: mol2}, ff, 'lmp')
+        return oplsua.LammpsData({1: mol1, 2: mol2}, ff, 'lmp')
 
     def testWriteData(self, lmp_data, tmp_path):
         with fileutils.chdir(tmp_path, rmtree=True):
