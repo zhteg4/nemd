@@ -703,7 +703,8 @@ class LammpsIn(fileutils.LammpsInput):
         :param jobname str: jobname based on which out filenames are defined
         :param lj_cut float: cut off distance for Lennard-Jones potential
         :param coul_cut float: cut off distance for Coulombic pairwise interaction
-        :param timestep float: timestep size for subsequent molecular dynamics simulations
+        :param timestep float: timestep size for subsequent molecular dynamics
+            simulations
         """
         self.jobname = jobname
         self.lj_cut = lj_cut
@@ -917,12 +918,13 @@ class LammpsWriter(LammpsIn):
 
     def __init__(self, mols, ff, jobname, concise=True, *arg, **kwarg):
         """
-        :param mols dict: keys are the molecule ids, and values are 'rdkit.Chem.rdchem.Mol'
-        :param ff 'oplsua.OplsParser':
+        :param mols dict: keys are the molecule ids, and values are
+            'rdkit.Chem.rdchem.Mol'
+        :param ff 'oplsua.OplsParser': the force field information
         :param jobname str: jobname based on which out filenames are defined
-        :param concise bool: If False, all the atoms in the force field file shows
-            up in the force field section of the data file. If True, only the present
-            ones are writen into the data file.
+        :param concise bool: If False, all the atoms in the force field file
+            shows up in the force field section of the data file. If True, only
+            the present ones are writen into the data file.
         """
         super().__init__(jobname, *arg, **kwarg)
         self.ff = ff
@@ -947,8 +949,7 @@ class LammpsWriter(LammpsIn):
         Whether any atom has charge.
         """
         charges = [
-            self.ff.charges[y.GetIntProp(self.TYPE_ID)]
-            for x in self.mols.values() for y in x.GetAtoms()
+            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atom
         ]
         return any(charges)
 
@@ -988,7 +989,7 @@ class LammpsWriter(LammpsIn):
             self.setDihedrals()
             self.setImproperSymbols()
             self.setImpropers()
-            self.AnglesByImpropers()
+            self.removeAngles()
             self.removeUnused()
             self.writeDescription()
             self.writeTopoType()
@@ -1010,6 +1011,7 @@ class LammpsWriter(LammpsIn):
         Set atom property.
         """
 
+        # atom id is stored as per atom property instead of global dict
         for atom_id, atom in enumerate(self.atom, start=1):
             atom.SetIntProp(self.ATOM_ID, atom_id)
 
@@ -1031,7 +1033,7 @@ class LammpsWriter(LammpsIn):
         :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
         """
 
-        return (mol for mol in self.mols.values())
+        return [mol for mol in self.mols.values()]
 
     def balanceCharge(self):
         """
@@ -1064,7 +1066,7 @@ class LammpsWriter(LammpsIn):
         """
         Set bonding information.
         """
-        bonds = [bond for mol in self.mols.values() for bond in mol.GetBonds()]
+        bonds = [bond for mol in self.molecule for bond in mol.GetBonds()]
         for bond_id, bond in enumerate(bonds, start=1):
             bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
             # BOND_ATM_ID defines bonding parameters marked during atom typing
@@ -1087,18 +1089,18 @@ class LammpsWriter(LammpsIn):
         if not adjust_bond_legnth:
             return
 
-        for mol_id, mol in self.mols.items():
+        for mol in self.molecule:
             conformer = mol.GetConformer()
             for bond in mol.GetBonds():
                 bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
                 ids = set([x.GetIntProp(self.ATOM_ID) for x in bonded_atoms])
-                mbond_type = [
+                bond_type = [
                     x for x, y, z in self.bonds.values()
                     if len(ids.intersection([y, z])) == 2
                 ][0]
-                dist = self.ff.bonds[mbond_type].dist
-                Chem.rdMolTransforms.SetBondLength(
-                    conformer, *[x.GetIdx() for x in bonded_atoms], dist)
+                dist = self.ff.bonds[bond_type].dist
+                idxs = [x.GetIdx() for x in bonded_atoms]
+                Chem.rdMolTransforms.SetBondLength(conformer, *idxs, dist)
 
     def adjustCoords(self):
         """
@@ -1334,7 +1336,7 @@ class LammpsWriter(LammpsIn):
                 ids = [improper.id1, improper.id2, improper.id3, improper.id4]
                 print(f"{[self.ff.atoms[x].description for x in ids]}")
 
-    def AnglesByImpropers(self):
+    def removeAngles(self):
         """
         One improper adds one restraint and thus one angle is removed.
 
@@ -1351,15 +1353,13 @@ class LammpsWriter(LammpsIn):
         """
 
         for idx, (itype, id1, id2, id3, id4) in self.impropers.items():
-            id234 = set([id2, id3, id4])
+            id14 = set([id1, id4])
             aidxs = [
                 aidx
                 for aidx, (atype, aid1, aid2, aid3) in self.angles.items()
-                if len(id234.intersection([aid1, aid3])) and id1 == aid2
+                if len(id14.intersection([aid1, aid3])) == 2 and id3 == aid2
             ]
-            if len(aidxs) != 3:
-                continue
-            self.angles.pop(aidxs[2])
+            self.angles.pop(aidxs[0])
 
     def removeUnused(self):
         """
@@ -1533,9 +1533,12 @@ class LammpsWriter(LammpsIn):
                 f"{improper_id} {impr.ene} {sign} {impr.n_parm}\n")
         self.data_fh.write("\n")
 
-    def writeAtoms(self):
+    def writeAtoms(self, comments=False):
         """
         Write atom coefficients.
+
+        :param comments bool: If True, additional descriptions including element
+            sysmbol are written after each atom line
         """
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
         for mol_id, mol in self.mols.items():
@@ -1553,9 +1556,9 @@ class LammpsWriter(LammpsIn):
                 dsrptn = self.ff.atoms[type_id].description
                 symbol = self.ff.atoms[type_id].symbol
                 type_id = self.atm_types[type_id] if self.concise else type_id
-                self.data_fh.write(
-                    f"{atom_id} {mol_id} {type_id} {charge:.4f} {xyz} "
-                    f"# {dsrptn} {symbol}\n")
+                cmmnt = f" # {dsrptn} {symbol}" if comments else ''
+                msg = f"{atom_id} {mol_id} {type_id} {charge:.4f} {xyz}%s\n"
+                self.data_fh.write(msg % cmmnt)
         self.data_fh.write(f"\n")
 
     def writeBonds(self):
@@ -1868,12 +1871,3 @@ class DataFileReader(LammpsWriter):
                 self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
                     atom2.type_id]
         self.radii = dict(self.radii)
-
-
-def main(argv):
-    opls_parser = OplsParser()
-    opls_parser.read()
-
-
-if __name__ == "__main__":
-    main(sys.argv[1:])

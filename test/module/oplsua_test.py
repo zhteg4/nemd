@@ -6,6 +6,7 @@ import testutils
 import rdkitutils
 from rdkit import Chem
 
+BUTANE = 'CCCC'
 CC3COOH = '[H]OC(=O)CCC(CC(C)C(=O)O[H])C(=O)O[H]'
 BUTANE_DATA = testutils.test_file(os.path.join('polym_builder',
                                                'cooh123.data'))
@@ -102,6 +103,85 @@ class TestLammpsIn:
         with fileutils.chdir(tmp_path, rmtree=True):
             lmp_in.writeLammpsIn()
             assert os.path.exists('lmp.in')
+
+
+class TestLammpsWriter:
+
+    @pytest.fixture
+    def lmp_data(self):
+        mol1 = rdkitutils.get_mol_from_smiles(BUTANE)
+        mol2 = rdkitutils.get_mol_from_smiles(CC3COOH)
+        oplsua.OplsTyper(mol1).run()
+        oplsua.OplsTyper(mol2).run()
+        ff = oplsua.get_opls_parser()
+        return oplsua.LammpsWriter({1: mol1, 2: mol2}, ff, 'lmp')
+
+    def testWriteData(self, lmp_data, tmp_path):
+        with fileutils.chdir(tmp_path, rmtree=True):
+            lmp_data.writeData()
+            assert os.path.exists('lmp.data')
+
+    def testWriteLammpsIn(self, lmp_data, tmp_path):
+        with fileutils.chdir(tmp_path, rmtree=True):
+            lmp_data.writeLammpsIn()
+            assert os.path.exists('lmp.in')
+
+    def testSetAtoms(self, lmp_data):
+        lmp_data.setAtoms()
+        assert 22 == len(set([x.GetIntProp('atom_id') for x in lmp_data.atom]))
+
+    def testBalanceCharge(self, lmp_data):
+        assert all([not x.HasProp('neighbor_charge') for x in lmp_data.atom])
+        lmp_data.balanceCharge()
+        atoms = [x for x in lmp_data.atom if x.HasProp('neighbor_charge')]
+        nchrgs = [round(x.GetDoubleProp('neighbor_charge'), 4) for x in atoms]
+        assert 3 == nchrgs.count(0.08)
+
+    def testSetBonds(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setBonds()
+        assert 20 == len(lmp_data.bonds)
+
+    def testAdjustBondLength(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setBonds()
+        lmp_data.adjustBondLength()
+        conf = lmp_data.mols[1].GetConformer()
+        assert 1.526 == Chem.rdMolTransforms.GetBondLength(conf, 0, 1)
+
+    def testSetAngles(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setAngles()
+        assert 23 == len(lmp_data.angles)
+
+    def testSetDihedrals(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setDihedrals()
+        assert 24 == len(lmp_data.dihedrals)
+
+    def testSetImproperSymbols(self, lmp_data):
+        lmp_data.setImproperSymbols()
+        assert 10 == len(lmp_data.symbol_impropers)
+
+    def testSetImpropers(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setImproperSymbols()
+        lmp_data.setImpropers()
+        assert 5 == len(lmp_data.impropers)
+
+    def testRemoveAngles(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setAngles()
+        lmp_data.setImproperSymbols()
+        lmp_data.setImpropers()
+        assert 23 == len(lmp_data.angles)
+        lmp_data.removeAngles()
+        assert 18 == len(lmp_data.angles)
+
+    def testRemoveAngles(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.removeUnused()
+        assert 8 == len(lmp_data.atm_types)
 
 
 class TestDataFileReader:
