@@ -4,12 +4,11 @@ import os
 import numpy as np
 import logutils
 import units
+import shutil
 from io import StringIO
-import itertools
 from dataclasses import dataclass
 from matplotlib import pyplot as plt
 from collections import namedtuple
-from _collections import defaultdict
 
 LogData = namedtuple('LogData', ['fix', 'data'])
 FixCommand = namedtuple('FixCommand', ['id', 'group_id', 'style', 'args'])
@@ -43,17 +42,21 @@ def get_ff(fn=None, name=OPLSAA, ext=MOLT_FF_EXT):
 
 class chdir:
 
-    def __init__(self, dirname):
+    def __init__(self, dirname, rmtree=False):
         self.dirname = dirname
+        self.rmtree = rmtree
         self.original_dir = os.getcwd()
 
     def __enter__(self):
         if not os.path.exists(self.dirname):
             os.mkdir(self.dirname)
         os.chdir(self.dirname)
+        self.dir = os.getcwd()
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         os.chdir(self.original_dir)
+        if self.rmtree:
+            shutil.rmtree(self.dir)
 
 
 @dataclass

@@ -1,13 +1,10 @@
 import os
 import pytest
 import oplsua
-import rdkitutils
+import fileutils
 import testutils
-import numpy as np
+import rdkitutils
 from rdkit import Chem
-from rdkit import RDLogger
-from rdkit.Chem import AllChem
-from contextlib import contextmanager
 
 CC3COOH = '[H]OC(=O)CCC(CC(C)C(=O)O[H])C(=O)O[H]'
 BUTANE_DATA = testutils.test_file(os.path.join('polym_builder',
@@ -93,6 +90,18 @@ class TestOplsParser:
     def testSetDihedral(self, raw_prsr):
         raw_prsr.setDihedral()
         assert 628 == len(raw_prsr.dihedrals)
+
+
+class TestLammpsIn:
+
+    @pytest.fixture
+    def lmp_in(self):
+        return oplsua.LammpsIn('lmp')
+
+    def testWriteLammpsIn(self, lmp_in, tmp_path):
+        with fileutils.chdir(tmp_path, rmtree=True):
+            lmp_in.writeLammpsIn()
+            assert os.path.exists('lmp.in')
 
 
 class TestDataFileReader:

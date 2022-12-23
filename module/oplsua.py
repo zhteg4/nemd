@@ -674,6 +674,7 @@ class LammpsIn(fileutils.LammpsInput):
     """
 
     IN_EXT = '.in'
+    DATA_EXT = '.data'
 
     LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
     LJ_CUT = 'lj/cut'
@@ -710,6 +711,7 @@ class LammpsIn(fileutils.LammpsInput):
         self.timestep = timestep
         self.concise = concise
         self.lammps_in = self.jobname + self.IN_EXT
+        self.lammps_data = self.jobname + self.DATA_EXT
         self.units = self.REAL
         self.atom_style = self.FULL
         self.bond_style = self.HARMONIC
@@ -755,13 +757,13 @@ class LammpsIn(fileutils.LammpsInput):
 
     def hasCharge(self):
         """
-        Whether any atom has charge.
+        Whether any atom has non-zero charge. This method should be overwritten
+        when force field and structure are available.
+
+        :return bool: True if any atom has non-zero charge.
         """
-        charges = [
-            self.ff.charges[y.GetIntProp(self.TYPE_ID)]
-            for x in self.mols.values() for y in x.GetAtoms()
-        ]
-        return any(charges)
+
+        return True
 
     def readData(self):
         """
@@ -780,11 +782,6 @@ class LammpsIn(fileutils.LammpsInput):
             self.in_fh.write(
                 "dump 1 all custom 1000 dump.custom id xu yu zu\n")
             self.in_fh.write("dump_modify 1 sort id\n")
-            atoms = self.ff.atoms.values()
-            if self.concise:
-                atoms = [x for x in atoms if x.id in self.atm_types]
-            smbs = ' '.join(map(str, [x.symbol for x in atoms]))
-            self.in_fh.write(f"dump_modify 1 element {smbs}\n")
         self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
         self.in_fh.write("minimize 1.0e-6 1.0e-8 10000 100000\n")
 
@@ -809,7 +806,9 @@ class LammpsIn(fileutils.LammpsInput):
                  start_temp=10.,
                  target_temp=None,
                  tdamp=100,
-                 pdamp=1000):
+                 pdamp=1000,
+                 nve_only=False,
+                 npt=True):
         """
         Write command to further equilibrate the system.
 
@@ -817,10 +816,12 @@ class LammpsIn(fileutils.LammpsInput):
         :param target_temp float: the target temperature at the end of the relaxation
         :param tdamp float: damping factor to control temperature
         :param pdamp float: damping factor to control pressure
+        :param nve_only bool: only run nve ensemble (one single small molecule)
+        :param npt bool: run npt ensemble (molecule can fill the space)
         """
 
         self.in_fh.write(f"velocity all create {start_temp} 482748\n")
-        if len(self.mols) == 1 and self.mols[1].GetNumAtoms() < 10:
+        if nve_only:
             # NVT on single molecule gives nan coords (guess due to translation)
             self.in_fh.write("fix 1 all nve\n")
             self.in_fh.write("run 2000\n")
@@ -831,7 +832,7 @@ class LammpsIn(fileutils.LammpsInput):
         )
         self.in_fh.write("run 20000\n")
 
-        if len(self.mols) == 1:
+        if not npt:
             return
 
         # Run relaxation on systems of multiple molecules
@@ -862,7 +863,6 @@ class LammpsWriter(LammpsIn):
     Class to write out LAMMPS data file.
     """
 
-    DATA_EXT = '.data'
     LAMMPS_DESCRIPTION = 'LAMMPS Description'
 
     TYPE_ID = TYPE_ID
@@ -929,7 +929,6 @@ class LammpsWriter(LammpsIn):
         self.mols = mols
         self.jobname = jobname
         self.concise = concise
-        self.lammps_data = self.jobname + self.DATA_EXT
         self.atoms = {}
         self.bonds = {}
         self.angles = {}
@@ -942,6 +941,34 @@ class LammpsWriter(LammpsIn):
         self.dihe_types = []
         self.impr_types = []
         self.data_fh = None
+
+    def hasCharge(self):
+        """
+        Whether any atom has charge.
+        """
+        charges = [
+            self.ff.charges[y.GetIntProp(self.TYPE_ID)]
+            for x in self.mols.values() for y in x.GetAtoms()
+        ]
+        return any(charges)
+
+    def writeDumpModify(self):
+        """
+        Write dump modify commands so that dump command can write out element.
+        """
+        atoms = self.ff.atoms.values()
+        if self.concise:
+            atoms = [x for x in atoms if x.id in self.atm_types]
+        smbs = ' '.join(map(str, [x.symbol for x in atoms]))
+        self.in_fh.write(f"dump_modify 1 element {smbs}\n")
+
+    def writeRun(self, *arg, **kwarg):
+        """
+        Write command to further equilibrate the system.
+        """
+        nve_only = len(self.mols) == 1 and self.mols[1].GetNumAtoms() < 10
+        npt = len(self.mols) > 1
+        super().writeRun(*arg, nve_only=nve_only, npt=npt, **kwarg)
 
     def writeData(self, adjust_coords=True):
         """
