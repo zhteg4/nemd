@@ -234,7 +234,7 @@ class GridCell:
 
     def run(self):
         """
-        Set gridded amorphous cell.
+        Create gridded amorphous cell.
         """
         self.setBoxes()
         self.setPolymVectors()
@@ -310,12 +310,13 @@ class PackedCell:
         self.polymers = polymers
         self.polym_nums = polym_nums
         self.density = density
-        self.mols = {}
         self.box = None
+        self.mols = {}
 
     def run(self):
         """
-        Set gridded amorphous cell.
+        Create amorphous cell by randomly placing molecules with random
+        orientations.
         """
         self.setBoxes()
         self.setMols()
@@ -325,7 +326,13 @@ class PackedCell:
 
     def runWithDensity(self, density):
         """
-        Set gridded amorphous cell.
+        Create amorphous cell of the target density by randomly placing
+        molecules with random orientations.
+
+        NOTE: the final density of the output cell may be smaller than the
+        target if the max number of trial attempt is reached.
+
+        :param density float: the target density
         """
         self.density = density
         self.setBoxes()
@@ -333,6 +340,9 @@ class PackedCell:
         self.placeMols()
 
     def setBoxes(self):
+        """
+        Set periodic boundary box size.
+        """
         weight = sum(x.mw * y for x, y in zip(self.polymers, self.polym_nums))
         vol = weight / self.density / scipy.constants.Avogadro
         edge = math.pow(vol, 1 / 3)  # centimeter
@@ -340,6 +350,9 @@ class PackedCell:
         self.box = [0, edge, 0, edge, 0, edge]
 
     def setMols(self):
+        """
+        Set molecules.
+        """
         mols = [
             copy.copy(x.polym) for x, y in zip(self.polymers, self.polym_nums)
             for _ in range(y)
@@ -347,6 +360,9 @@ class PackedCell:
         self.mols = {i: x for i, x in enumerate(mols, start=1)}
 
     def setDataReader(self):
+        """
+        Set data reader with clash parameters.
+        """
         lmw = oplsua.LammpsData(self.mols, self.polymers[0].ff, 'tmp')
         lmw.writeData()
         self.df_reader = oplsua.DataFileReader('tmp.data')
@@ -354,6 +370,9 @@ class PackedCell:
         self.df_reader.setClashParams()
 
     def setFrameAndDcell(self):
+        """
+        Set the trajectory frame and distance cell.
+        """
         index = [atom.id for atom in self.df_reader.atoms.values()]
         xyz = [atom.xyz for atom in self.df_reader.atoms.values()]
         self.frm = traj.Frame(xyz=xyz, index=index, box=self.box)
@@ -361,12 +380,19 @@ class PackedCell:
         self.dcell.setUp()
 
     def placeMols(self, max_trial=MAX_TRIAL_PER_DENSITY):
+        """
+        Place all molecules into the cell at certain density.
+
+        :param max_trial int: the max number of trials at one density.
+        :raise DensityError: if the max number of trials at this density is
+            reached.
+        """
         trial_num = 1
         while trial_num <= max_trial:
             self.extg_aids = set()
-            for mol_id, atom_ids in self.df_reader.mols.items():
+            for mol_id in self.df_reader.mols.keys():
                 try:
-                    self.placeMol(mol_id, atom_ids)
+                    self.placeMol(mol_id)
                 except MolError:
                     log_debug(f'{trial_num} trail fails. '
                               f'(Only {mol_id - 1} / {len(self.mols)} '
@@ -374,15 +400,24 @@ class PackedCell:
                     trial_num += 1
                     break
             else:
-                # Successfully placed all molecules (no break)
+                # All molecules successfully placed (no break)
                 return
         raise DensityError
 
-    def placeMol(self, mol_id, atom_ids, max_trial=MAX_TRIAL_PER_MOL):
+    def placeMol(self, mol_id, max_trial=MAX_TRIAL_PER_MOL):
+        """
+        Place molecules one molecule into the cell without clash.
+
+        :param mol_id int: the molecule id of the molecule to be placed into the
+            cell.
+        :param max_trial int: the max trial number for each molecule to be placed
+            into the cell.
+        """
+        atom_ids = self.df_reader.mols[mol_id]
         trial_per_mol = 1
         while trial_per_mol <= max_trial:
-            self.translateMol(mol_id, atom_ids)
-            if not self.getClashes(atom_ids):
+            self.translateMol(mol_id)
+            if not self.hasClashes(atom_ids):
                 self.extg_aids.update(atom_ids)
                 self.dcell.setUp()
                 return
@@ -390,16 +425,28 @@ class PackedCell:
         if trial_per_mol > max_trial:
             raise MolError
 
-    def translateMol(self, mol_id, atom_ids):
+    def translateMol(self, mol_id):
+        """
+        Do translation and rotation to the molecule so that the centroid will be
+        randomly point in the cell and the orientation is also randomly picked.
 
+        :param mol_id int: the molecule id of the molecule to be placed into the
+            cell.
+        """
         conf = self.mols[mol_id].GetConformer()
         centroid = np.array(conformerutils.centroid(conf))
         conformerutils.translation(conf, -centroid)
         conformerutils.rand_rotate(conf)
         conformerutils.translation(conf, self.frm.getPoint())
+        atom_ids = self.df_reader.mols[mol_id]
         self.frm.loc[atom_ids] = conf.GetPositions()
 
-    def getClashes(self, atom_ids):
+    def hasClashes(self, atom_ids):
+        """
+        Whether these atoms have any clashes with the existing atoms in the cell.
+
+        :param atom_ids list of int: the atom ids to check clashes
+        """
         for id, row in self.frm.loc[atom_ids].iterrows():
             clashes = self.dcell.getClashes(row,
                                             included=self.extg_aids,
@@ -411,10 +458,16 @@ class PackedCell:
 
 
 class MolError(RuntimeError):
+    """
+    When max number of the failure for this molecule has been reached.
+    """
     pass
 
 
 class DensityError(RuntimeError):
+    """
+    When max number of the failure at this density has been reached.
+    """
     pass
 
 

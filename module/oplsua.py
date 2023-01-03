@@ -1,4 +1,3 @@
-import sys
 import types
 import symbols
 import logutils
@@ -932,6 +931,8 @@ class LammpsData(LammpsIn):
         :param concise bool: If False, all the atoms in the force field file
             shows up in the force field section of the data file. If True, only
             the present ones are writen into the data file.
+        :param concise bool: the force field information
+        :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
         """
         super().__init__(jobname, *arg, **kwarg)
         self.ff = ff
@@ -1445,7 +1446,8 @@ class LammpsData(LammpsIn):
         """
 
         if self.box is not None:
-            return [x * 0.5 for x in self.box[1::2]]
+            return [(x - y) * 0.5
+                    for x, y in zip(self.box[1::2], self.box[::2])]
 
         if min_box is None:
             # PBC should be 2x larger than the cutoff, otherwise one particle
