@@ -12,10 +12,15 @@ def translation(conf, vect):
 
 
 def rotate(conf, ivect, tvect):
-
     rotation, rmsd = Rotation.align_vectors(tvect, ivect)
     mtrx = np.identity(4)
     mtrx[:-1, :-1] = rotation.as_matrix()
+    Chem.rdMolTransforms.TransformConformer(conf, mtrx)
+
+
+def rand_rotate(conf):
+    mtrx = np.identity(4)
+    mtrx[:-1, :-1] = Rotation.random().as_matrix()
     Chem.rdMolTransforms.TransformConformer(conf, mtrx)
 
 

@@ -65,6 +65,20 @@ class Frame(pd.DataFrame):
                 ])
                 yield cls(frm, box=box)
 
+    def getPoint(self):
+        """
+        Get the XYZ of in the span.
+
+        :param atom_id int: atom id
+        :return row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
+        """
+
+        span = np.array([x for x in self.attrs[self.SPAN].values()])
+        point = np.random.rand(3) * span
+        point = [x + y for x, y in zip(point, self.attrs[self.BOX][::2])]
+
+        return np.array(point)
+
     def getXYZ(self, atom_id):
         """
         Get the XYZ of the atom id.
@@ -283,9 +297,9 @@ class DistanceCell:
             neighbors.remove(row.name)
         except KeyError:
             pass
-        if included:
+        if included is not None:
             neighbors = neighbors.intersection(included)
-        if excluded:
+        if excluded is not None:
             neighbors = neighbors.difference(excluded[row.name])
         neighbors = list(neighbors)
         dists = self.frm.getDists(neighbors, xyz)
