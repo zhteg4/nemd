@@ -916,7 +916,7 @@ class LammpsData(LammpsIn):
 
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
 
-    def __init__(self, mols, ff, jobname, *arg, concise=True, box=None, **kwarg):
+    def __init__(self, mols, ff, jobname, concise=True, *arg, **kwarg):
         """
         :param mols dict: keys are the molecule ids, and values are
             'rdkit.Chem.rdchem.Mol'
@@ -931,7 +931,6 @@ class LammpsData(LammpsIn):
         self.mols = mols
         self.jobname = jobname
         self.concise = concise
-        self.box = box
         self.atoms = {}
         self.bonds = {}
         self.angles = {}
@@ -1418,40 +1417,22 @@ class LammpsData(LammpsIn):
         :param min_box list: minimum box size
         :param buffer list: buffer in three dimensions
         """
+        if min_box is None:
+            min_box = (40., 40., 40.,) # yapf: disable
+        if buffer is None:
+            buffer = self.BUFFER # yapf: disable
         xyzs = np.concatenate(
             [x.GetConformer(0).GetPositions() for x in self.mols.values()])
+        box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
+        box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
+        if len(self.mols) == 1:
+            box_hf = [x * 1.2 for x in box_hf]
         centroid = xyzs.mean(axis=0)
-        box_hf = self.getHalfBox(xyzs, min_box=min_box, buffer=buffer)
         for dim in range(3):
             self.data_fh.write(
                 f"{centroid[dim]-box_hf[dim]:.2f} {centroid[dim]+box_hf[dim]:.2f} "
                 f"{self.LO_HI[dim]}\n")
         self.data_fh.write("\n")
-
-    def getHalfBox(self, xyzs, min_box=None, buffer=None):
-        """
-        Get the half box size based on interaction minimum, buffer, and structure
-        span.
-
-        :return list of three floats: the xyz box limits.
-        """
-        if self.box is not None:
-            return [x * 0.5 for x in self.box]
-        if min_box is None:
-            # PBC should be 2x larger than the cutoff, otherwise one particle
-            # can interact with another particle within its cutoff twice: within
-            # the box and across the PBC.
-            cut_x2 = min([self.lj_cut, self.coul_cut]) * 2
-            min_box = (cut_x2, cut_x2, cut_x2,) # yapf: disable
-        if buffer is None:
-            buffer = self.BUFFER # yapf: disable
-        box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
-        box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        if len(self.mols) != 1:
-            return box_hf
-        # All-trans single molecule with internal tension runs into clashes
-        # across PBCs and thus larger box is used.
-        return [x * 1.2 for x in box_hf]
 
     def writeMasses(self):
         """

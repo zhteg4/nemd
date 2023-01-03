@@ -152,7 +152,6 @@ class AmorphousCell(object):
         self.molecules = {}
         self.mols = {}
         self.ff = ff
-        self.box = None
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
 
@@ -184,34 +183,23 @@ class AmorphousCell(object):
         cell.run()
         self.mols = cell.mols
 
-    def setPackedCell(self, mini_density=0.01):
+    def setPackedCell(self):
         """
         Build packed cell.
         """
         if self.options.cell != PACK:
             return
         cell = PackedCell(self.polymers,
-                          self.options.mol_num)
-        cell.setMols()
-        cell.setDataReader()
-        density = self.options.density
-        while(density > mini_density):
-            try:
-                cell.runWithDensity(density)
-            except MaxTrialPerBoxError:
-                density -= 0.1 if density > 0.1 else 0.02
-                import pdb;
-                pdb.set_trace()
-                continue
-
-            self.mols = cell.mols
-            return
+                          self.options.mol_num,
+                          density=self.options.density)
+        cell.run()
+        self.mols = cell.mols
 
     def write(self):
         """
         Write amorphous cell into data file
         """
-        lmw = oplsua.LammpsData(self.mols, self.ff, self.jobname, box=self.box)
+        lmw = oplsua.LammpsData(self.mols, self.ff, self.jobname)
         lmw.writeData(adjust_coords=False)
         lmw.writeLammpsIn()
         log(f'Data file written into {lmw.lammps_data}.')
@@ -315,30 +303,7 @@ class PackedCell:
         Set gridded amorphous cell.
         """
         self.setBoxes()
-        self.setMols()
-        self.setDataReader()
-        self.setFrame()
-        self.placeMolsMultiTrials()
-
-    def placeMolsMultiTrials(self, max_trial=10):
-
-        trail_idx = 0
-        while trail_idx < max_trial:
-            trail_idx += 1
-            if trail_idx >= max_trial:
-                raise MaxTrialPerBoxError
-
-            try:
-                self.placeMols()
-            except MaxTrialPerMolError:
-                continue
-            return
-
-    def runWithDensity(self, density):
-        self.density = density
-        self.setBoxes()
-        self.setFrame()
-        self.placeMolsMultiTrials()
+        self.placeMols()
 
     def setBoxes(self):
         weight = sum(x.mw * y for x, y in zip(self.polymers, self.polym_nums))
@@ -347,68 +312,51 @@ class PackedCell:
         edge *= scipy.constants.centi / scipy.constants.angstrom
         self.box = [0, edge, 0, edge, 0, edge]
 
-    def setMols(self):
+    def placeMols(self):
+        """
+        Need to rotate the molecules
+        Need to break the following
+        """
         mols = [
             copy.copy(x.polym) for x, y in zip(self.polymers, self.polym_nums)
             for _ in range(y)
         ]
-        self.mols = {i: x for i, x in enumerate(mols, start=1)}
+        mols = {i: x for i, x in enumerate(mols, start=1)}
 
-    def setDataReader(self):
-        lmw = oplsua.LammpsData(self.mols, self.polymers[0].ff, 'tmp')
+        lmw = oplsua.LammpsData(mols, self.polymers[0].ff, 'tmp')
         lmw.writeData()
-        self.df_reader = oplsua.DataFileReader('tmp.data')
-        self.df_reader.run()
-        self.df_reader.setClashParams()
+        df_reader = oplsua.DataFileReader('tmp.data')
+        df_reader.run()
+        df_reader.setClashParams()
+        index = [atom.id for atom in df_reader.atoms.values()]
+        xyz = [atom.xyz for atom in df_reader.atoms.values()]
+        frm = traj.Frame(xyz=xyz, index=index, box=self.box)
+        dcell = traj.DistanceCell(frm)
+        extg_aids = set()
+        for mol_id, atom_ids in df_reader.mols.items():
+            dcell.setUp()
+            clashes = True
+            while (clashes):
+                conf = mols[mol_id].GetConformer()
+                conformerutils.translation(conf,
+                                           np.random.rand(3) * self.box[1::2])
+                # conformerutils.rotate(conf, [1, 0, 0])
+                frm.loc[atom_ids] = conf.GetPositions()
 
-    def setFrame(self):
-        index = [atom.id for atom in self.df_reader.atoms.values()]
-        xyz = [atom.xyz for atom in self.df_reader.atoms.values()]
-        self.frm = traj.Frame(xyz=xyz, index=index, box=self.box)
-
-    def placeMols(self):
-        self.extg_aids = set()
-        self.dcell = traj.DistanceCell(self.frm)
-        for mol_id, atom_ids in self.df_reader.mols.items():
-            self.placeMol(mol_id, atom_ids)
-
-    def placeMol(self, mol_id, atom_ids, max_trial=10):
-        trial_per_mol = 1
-        while trial_per_mol <= max_trial:
-            self.translateMol(mol_id, atom_ids)
-            self.dcell.setUp()
-            if not self.getClashes(atom_ids):
-                self.extg_aids.update(atom_ids)
-                return
-            trial_per_mol += 1
-        if trial_per_mol > max_trial:
-            raise MaxTrialPerMolError
-
-    def translateMol(self, mol_id, atom_ids):
-        conf = self.mols[mol_id].GetConformer()
-        centroid = np.array(conformerutils.centroid(conf))
-        conformerutils.translation(conf, -centroid)
-        # conformerutils.rand_rotate(conf)
-        conformerutils.translation(conf, self.frm.getPoint())
-        self.frm.loc[atom_ids] = conf.GetPositions()
-
-    def getClashes(self, atom_ids):
-        for id, row in self.frm.loc[atom_ids].iterrows():
-            clashes = self.dcell.getClashes(row,
-                                       included=self.extg_aids,
-                                       radii=self.df_reader.radii,
-                                       excluded=self.df_reader.excluded)
-            if clashes:
-                return False
-        return True
-
-
-class MaxTrialPerMolError(RuntimeError):
-    pass
-
-
-class MaxTrialPerBoxError(RuntimeError):
-    pass
+                for id, row in frm.loc[atom_ids].iterrows():
+                    clashes = dcell.getClashes(row,
+                                               included=extg_aids,
+                                               radii=df_reader.radii,
+                                               excluded=df_reader.excluded)
+                    if clashes:
+                        break
+            extg_aids.update(atom_ids)
+        frm.wrapCoords(dreader=df_reader)
+        for mol_id, atom_ids in df_reader.mols.items():
+            conf = mols[mol_id].GetConformer()
+            for id, atom_id in enumerate(atom_ids):
+                conf.SetAtomPosition(id, frm.loc[atom_id])
+        self.mols = mols
 
 
 class GrowedCell:
