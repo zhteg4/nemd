@@ -74,6 +74,18 @@ class Frame(pd.DataFrame):
         """
         return self.loc[atom_id]
 
+    def getPoint(self):
+        """
+        Get the XYZ of in the span.
+
+        :param atom_id int: atom id
+        :return row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
+        """
+        span = np.array([x for x in self.attrs[self.SPAN].values()])
+        point = np.random.rand(3) * span
+        point = [x + y for x, y in zip(point, self.attrs[self.BOX][::2])]
+        return np.array(point)
+
     def setBox(self, box):
         """
         Set the box span from box limits.
