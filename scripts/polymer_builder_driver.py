@@ -105,7 +105,7 @@ def get_parser():
         FlAG_CELL,
         metavar=FlAG_CELL[1:].upper(),
         choices=[GRID, PACK, GROW],
-        default=PACK,
+        default=GROW,
         help=f'Amorphous cell type: {GRID} grids the space and '
         f'put molecules into sub-cells; {PACK} randomly '
         f'rotates and translates molecules; {GROW} grows '
@@ -113,10 +113,9 @@ def get_parser():
     parser.add_argument(
         FlAG_DENSITY,
         metavar=FlAG_DENSITY[1:].upper(),
-        type=parserutils.type_positive_float,
+        type=functools.partial(parserutils.type_ranged_float, bottom=AmorphousCell.MINIMUM_DENSITY, top=30),
         default=0.5,
-        help=f'The density used for {PACK} and {GROW} amorphous'
-        f' cell. (g/cm^3)')
+        help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)')
     jobutils.add_job_arguments(parser)
     return parser
 
@@ -137,6 +136,8 @@ class AmorphousCell(object):
     """
     Build amorphous cell from molecules. (polymers may be built from monomers first)
     """
+
+    MINIMUM_DENSITY = 0.001
 
     def __init__(self, options, jobname, ff=None):
         """
@@ -163,6 +164,7 @@ class AmorphousCell(object):
         self.setPolymers()
         self.setGriddedCell()
         self.setPackedCell()
+        self.setGrowedCell()
         self.write()
 
     def setPolymers(self):
@@ -184,22 +186,36 @@ class AmorphousCell(object):
         cell.run()
         self.mols = cell.mols
 
-    def setPackedCell(self, mini_density=0.01):
+    def setPackedCell(self, mini_density=MINIMUM_DENSITY):
         """
         Build packed cell.
         """
         if self.options.cell != PACK:
             return
-        cell = PackedCell(self.polymers, self.options.mol_num)
+        self.createCell(cell_type=PACK, mini_density=mini_density)
+
+    def setGrowedCell(self, mini_density=0.01):
+        """
+        Build packed cell.
+        """
+        if self.options.cell != GROW:
+            return
+        self.createCell(cell_type=GROW, mini_density=mini_density)
+
+    def createCell(self, cell_type=PACK, mini_density=MINIMUM_DENSITY):
+
+        cell_builder = PackedCell if cell_type==PACK else GrowedCell
+        cell = cell_builder(self.polymers, self.options.mol_num)
         cell.setMols()
         cell.setDataReader()
+        cell.setAtomMapNum()
         density = self.options.density
 
-        while density > mini_density:
+        while density >= mini_density:
             try:
                 cell.runWithDensity(density)
             except DensityError:
-                density -= 0.1 if density > 0.1 else 0.02
+                density -= 0.1 if density > 0.1 else 0.01
                 log(f'Density is reduced to {density:.4f} g/cm^3')
             else:
                 break
@@ -214,8 +230,8 @@ class AmorphousCell(object):
         lmw = oplsua.LammpsData(self.mols, self.ff, self.jobname, box=self.box)
         lmw.writeData(adjust_coords=False)
         lmw.writeLammpsIn()
-        log(f'Data file written into {lmw.lammps_data}.')
-        log(f'In script written into {lmw.lammps_in}.')
+        log(f'Data file written into {lmw.lammps_data}')
+        log(f'In script written into {lmw.lammps_in}')
 
 
 class GridCell:
@@ -321,6 +337,7 @@ class PackedCell:
         self.setBoxes()
         self.setMols()
         self.setDataReader()
+        self.setAtomMapNum()
         self.setFrameAndDcell()
         self.placeMols()
 
@@ -358,6 +375,8 @@ class PackedCell:
             for _ in range(y)
         ]
         self.mols = {i: x for i, x in enumerate(mols, start=1)}
+        for mol_id, mol in self.mols.items():
+            mol.SetIntProp('mol_id', mol_id)
 
     def setDataReader(self):
         """
@@ -368,6 +387,16 @@ class PackedCell:
         self.df_reader = oplsua.DataFileReader('tmp.data')
         self.df_reader.run()
         self.df_reader.setClashParams()
+
+    def setAtomMapNum(self):
+        """
+        Set atom force field id.
+        """
+        for mol_id in self.mols.keys():
+            mol = self.mols[mol_id]
+            atom_fids = self.df_reader.mols[mol_id]
+            for atom, atom_fid in zip(mol.GetAtoms(), atom_fids):
+                atom.SetAtomMapNum(atom_fid)
 
     def setFrameAndDcell(self):
         """
@@ -419,13 +448,16 @@ class PackedCell:
             self.translateMol(mol_id)
             if not self.hasClashes(atom_ids):
                 self.extg_aids.update(atom_ids)
+                # Only update the distance cell after one molecule successful
+                # placed into the cell as only inter-molecular clashes are
+                # checked for packed cell.
                 self.dcell.setUp()
                 return
             trial_per_mol += 1
         if trial_per_mol > max_trial:
             raise MolError
 
-    def translateMol(self, mol_id):
+    def translateMol(self, mol_id, atom_ids=None):
         """
         Do translation and rotation to the molecule so that the centroid will be
         randomly point in the cell and the orientation is also randomly picked.
@@ -433,12 +465,13 @@ class PackedCell:
         :param mol_id int: the molecule id of the molecule to be placed into the
             cell.
         """
-        conf = self.mols[mol_id].GetConformer()
-        centroid = np.array(conformerutils.centroid(conf))
+        mol = self.mols[mol_id]
+        conf = mol.GetConformer()
+        centroid = np.array(conformerutils.centroid(conf, atom_ids=atom_ids))
         conformerutils.translation(conf, -centroid)
         conformerutils.rand_rotate(conf)
         conformerutils.translation(conf, self.frm.getPoint())
-        atom_ids = self.df_reader.mols[mol_id]
+        atom_ids = [x.GetAtomMapNum() for x in mol.GetAtoms()]
         self.frm.loc[atom_ids] = conf.GetPositions()
 
     def hasClashes(self, atom_ids):
@@ -471,19 +504,73 @@ class DensityError(RuntimeError):
     pass
 
 
-class GrowedCell:
+class GrowedCell(PackedCell):
     """
     Grow the polymers from bit to full.
     """
 
-    def __init__(self, polymers, polym_nums):
+    MAX_TRIAL_PER_DENSITY = 10
+    MAX_TRIAL_PER_MOL = 10
+
+    def __init__(self, *arg, **kwarg):
         """
         :param polymers 'Polymer': one polymer object for each type
         :param polym_nums list: number of polymers per polymer type
         """
-        self.polymers = polymers
-        self.polym_nums = polym_nums
-        self.mols = {}
+        super().__init__(*arg, **kwarg)
+
+    def placeMols(self, max_trial=MAX_TRIAL_PER_DENSITY):
+        """
+        Place all molecules into the cell at certain density.
+
+        :param max_trial int: the max number of trials at one density.
+        :raise DensityError: if the max number of trials at this density is
+            reached.
+        """
+
+        frag_mols = fragments.FagMols(self.mols.values(), data_file='tmp.data', box=self.box)
+        frag_mols.run()
+        # trial_num = 1
+        # while trial_num <= max_trial:
+        #     self.extg_aids = set()
+        #     for mol_id in self.df_reader.mols.keys():
+        #         try:
+        #             self.placeMol(mol_id)
+        #         except MolError:
+        #             log_debug(f'{trial_num} trail fails. '
+        #                       f'(Only {mol_id - 1} / {len(self.mols)} '
+        #                       f'molecules placed in the cell.)')
+        #             trial_num += 1
+        #             break
+        #     else:
+        #         # All molecules successfully placed (no break)
+        #         return
+        # raise DensityError
+
+    def placeMol(self, mol_id, max_trial=MAX_TRIAL_PER_MOL):
+        """
+        Place molecules one molecule into the cell without clash.
+
+        :param mol_id int: the molecule id of the molecule to be placed into the
+            cell.
+        :param max_trial int: the max trial number for each molecule to be placed
+            into the cell.
+        """
+        atom_ids = self.df_reader.mols[mol_id]
+        trial_per_mol = 1
+        while trial_per_mol <= max_trial:
+            self.translateMol(mol_id)
+            if not self.hasClashes(atom_ids):
+                self.extg_aids.update(atom_ids)
+                # Only update the distance cell after one molecule successful
+                # placed into the cell as only inter-molecular clashes are
+                # checked for packed cell.
+                self.dcell.setUp()
+                return
+            trial_per_mol += 1
+        if trial_per_mol > max_trial:
+            raise MolError
+
 
 
 class Polymer(object):
@@ -874,7 +961,7 @@ class Conformer(object):
         Adjust the conformer coordinates based on the force field.
         """
         mols = {1: self.polym}
-        self.lmw = oplsua.LammpsData(self.ff, self.jobname, mols=mols)
+        self.lmw = oplsua.LammpsData(mols, self.ff, self.jobname)
         if self.minimization:
             return
         self.lmw.adjustCoords()

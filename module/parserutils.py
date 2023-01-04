@@ -1,6 +1,7 @@
 import os
 import symbols
 import argparse
+import constants
 import numpy as np
 from rdkit import Chem
 
@@ -37,7 +38,21 @@ def type_float(arg):
 def type_positive_float(arg):
     value = type_float(arg)
     if value <= 0:
-        raise argparse.ArgumentTypeError(f'{value} is not a possitive float.')
+        raise argparse.ArgumentTypeError(f'{value} is not a positive float.')
+    return value
+
+
+def type_ranged_float(arg, bottom=-constants.LARGE_NUM, top=constants.LARGE_NUM,
+                      included_bottom=True, include_top=True):
+    value = type_float(arg)
+    if included_bottom and value < bottom:
+        raise argparse.ArgumentTypeError(f'{value} is smaller than {bottom}.')
+    if not included_bottom and value <= bottom:
+        raise argparse.ArgumentTypeError(f'{value} should be larger than {bottom}.')
+    if include_top and value > top:
+        raise argparse.ArgumentTypeError(f'{value} is larger than {bottom}.')
+    if not include_top and value >= top:
+        raise argparse.ArgumentTypeError(f'{value} should be smaller than {bottom}.')
     return value
 
 

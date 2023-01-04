@@ -5,6 +5,7 @@ import logutils
 import itertools
 import prop_names
 import structutils
+import conformerutils
 import numpy as np
 from rdkit import Chem
 
@@ -198,7 +199,27 @@ class Fragment:
         return False
 
 
-class FragMol:
+class FragMixIn:
+
+    def readData(self):
+        """
+        Read data  file and set clash parameters.
+        """
+        self.data_reader = oplsua.DataFileReader(self.data_file)
+        self.data_reader.run()
+        self.data_reader.setClashParams()
+
+    def setDCellParams(self):
+        """
+        Set distance cell parameters.
+        """
+        self.max_clash_dist = max(
+            [y for x in self.data_reader.radii.values() for y in x.values()])
+        self.cell_rez = self.max_clash_dist * traj.DistanceCell.SCALE
+        self.cell_cut = self.max_clash_dist
+
+
+class FragMol(FragMixIn):
     """
     Fragment molecule class to hold fragment information.
     """
@@ -318,6 +339,7 @@ class FragMol:
             for nfrag in frag.nfrags:
                 nfrag.pfrag = frag
 
+
     def fragments(self):
         """
         Return all fragments.
@@ -334,7 +356,8 @@ class FragMol:
 
     def getNumFrags(self):
         """
-        Return the number of the total fragments
+        Return the number of the total fragments.
+
         :return int: number of the total fragments.
         """
         return len(self.fragments())
@@ -351,22 +374,9 @@ class FragMol:
             x for x in range(self.mol.GetNumAtoms()) if x not in atom_ids_set
         ])
 
-    def readData(self):
-        """
-        Read data  file and set clash parameters.
-        """
-        self.data_reader = oplsua.DataFileReader(self.data_file)
-        self.data_reader.run()
-        self.data_reader.setClashParams()
-
-    def setDCellParams(self):
-        """
-        Set distance cell parameters.
-        """
-        self.max_clash_dist = max(
-            [y for x in self.data_reader.radii.values() for y in x.values()])
-        self.cell_rez = self.max_clash_dist * traj.DistanceCell.SCALE
-        self.cell_cut = self.max_clash_dist
+    def setGlobalAtomIds(self):
+        for frag in self.fragments():
+            frag.gids = [self.mol.GetAtomWithIdx(x).GetAtomMapNum() for x in frag.atom_ids]
 
     def setCoords(self):
         """
@@ -387,7 +397,6 @@ class FragMol:
     def setDcell(self):
         """
         Set distance cell.
-        :return:
         """
         self.frm.loc[:] = self.conf.GetPositions()
         self.dcell = traj.DistanceCell(frm=self.frm,
@@ -418,6 +427,7 @@ class FragMol:
     def setConformer(self, seed=2022):
         """
         Set conformer coordinates without clashes.
+
         :param seed int: seed to set random state.
         """
         log_debug(f"{self.getNumFrags()} fragments found.")
@@ -427,7 +437,7 @@ class FragMol:
             frag = frags.pop(0)
             success = frag.setConformer()
             if success:
-                self.extg_aids = self.extg_aids.union(frag.atom_ids)
+                self.extg_aids.update(frag.atom_ids)
                 frags += frag.nfrags
                 continue
             # 1）Find the previous fragment with available dihedral candidates.
@@ -455,3 +465,130 @@ class FragMol:
         self.setCoords()
         self.setFrm()
         self.setConformer(2022)
+
+
+class FagMols(FragMixIn):
+
+    def __init__(self, mols, data_file=None, box=None):
+        self.mols = mols
+        self.data_file = data_file
+        self.box = box
+        self.confs = None
+        self.fmols = None
+
+    def run(self):
+        self.fragmentize()
+        self.readData()
+        self.setDCellParams()
+        self.setCoords()
+        self.setFrm()
+        self.setConformer(2022)
+
+    def fragmentize(self):
+        self.fmols = [FragMol(x) for x in self.mols]
+        for fmol in self.fmols:
+            fmol.addNxtFrags()
+            fmol.setPreFrags()
+            fmol.setInitAtomIds()
+            fmol.setGlobalAtomIds()
+
+    def setCoords(self):
+        """
+        Set conformer coordinates from data file.
+        """
+        self.confs = [x.GetConformer() for x in self.mols]
+        for mol, conf in zip(self.mols, self.confs):
+            for atom in mol.GetAtoms():
+                xyz = self.data_reader.atoms[atom.GetAtomMapNum()].xyz
+                conf.SetAtomPosition(atom.GetIdx(), np.array(xyz))
+
+    def setFrm(self):
+        """
+        Set traj frame.
+        """
+        xyz = np.array([x.xyz for x in self.data_reader.atoms.values()])
+        self.frm = traj.Frame(xyz=xyz, box=self.box)
+
+    def setDcell(self):
+        """
+        Set distance cell.
+        """
+        self.frm.loc[:] = np.concatenate([x.GetPositions() for x in self.confs], axis=0)
+        self.dcell = traj.DistanceCell(frm=self.frm,
+                                       cut=self.cell_cut,
+                                       resolution=self.cell_rez)
+        self.dcell.setUp()
+
+    def setConformer(self, seed=2022):
+        """
+        Set conformer coordinates without clashes.
+
+        :param seed int: seed to set random state.
+        """
+        self.extg_aids = set()
+        log_debug(f"{[x.getNumFrags() for x in self.fmols]} fragments found.")
+        random.seed(seed)
+        frags = [x.init_frag for x in self.fmols]
+        self.dcell = traj.DistanceCell(frm=self.frm,
+                                       cut=self.cell_cut,
+                                       resolution=self.cell_rez)
+        self.dcell.setUp()
+        for frag in frags:
+            while True:
+                conf = frag.fmol.mol.GetConformer()
+                aids = list(frag.fmol.extg_aids)
+                centroid = np.array(conformerutils.centroid(conf, atom_ids=aids))
+                conformerutils.translation(conf, -centroid)
+                conformerutils.rand_rotate(conf)
+                point = self.frm.getPoint()
+                conformerutils.translation(conf, point)
+                atom_ids = [x.GetAtomMapNum() for x in frag.fmol.mol.GetAtoms()]
+                self.frm.loc[atom_ids] = conf.GetPositions()
+                gids = [frag.fmol.mol.GetAtomWithIdx(x).GetAtomMapNum() for x in aids]
+                gids = atom_ids
+                if not self.hasClashes(gids):
+                    self.extg_aids.update(gids)
+                    # Only update the distance cell after one molecule successful
+                    # placed into the cell as only inter-molecular clashes are
+                    # checked for packed cell.
+                    self.dcell.setUp()
+                    print(len(self.extg_aids))
+                    break
+        # while frags:
+        #     frag = frags.pop(0)
+        #     self.setDcell()
+        #     while frag.vals:
+        #         frag.setDihedralDeg()
+        #         if self.hasClashes(frag.gids):
+        #             continue
+        #         self.extg_aids.update(frag.gids)
+        #         frags += frag.nfrags
+        #         print(self.extg_aids)
+        #         break
+        #     if not frag.vals:
+        #         import pdb; pdb.set_trace()
+
+            # # 1）Find the previous fragment with available dihedral candidates.
+            # frag = frag.getPreAvailFrag()
+            # # 2）Find the next fragments who have been placed into the cell.
+            # nxt_frags = frag.getNxtFrags()
+            # [x.resetVals() for x in nxt_frags]
+            # ratom_ids = [y for x in [frag] + nxt_frags for y in x.atom_ids]
+            # self.extg_aids = self.extg_aids.difference(ratom_ids)
+            # # 3）Fragment after the next fragments were added to the growing
+            # # frags before this backmove step.
+            # nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
+            # frags = [frag] + list(set(frags).difference(nnxt_frags))
+            # log_debug(f"{len(self.extg_aids)}, {len(frag.vals)}: {frag}")
+
+    def hasClashes(self, gids):
+        frag_rows = [self.frm.loc[x] for x in gids]
+        for row in frag_rows:
+            clashes = self.dcell.getClashes(
+                row,
+                included=self.extg_aids,
+                radii=self.data_reader.radii,
+                excluded=self.data_reader.excluded)
+            if clashes:
+                return True
+        return False
