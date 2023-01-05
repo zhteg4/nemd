@@ -113,9 +113,12 @@ def get_parser():
     parser.add_argument(
         FlAG_DENSITY,
         metavar=FlAG_DENSITY[1:].upper(),
-        type=functools.partial(parserutils.type_ranged_float, bottom=AmorphousCell.MINIMUM_DENSITY, top=30),
+        type=functools.partial(parserutils.type_ranged_float,
+                               bottom=AmorphousCell.MINIMUM_DENSITY,
+                               top=30),
         default=0.5,
-        help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)')
+        help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
+    )
     jobutils.add_job_arguments(parser)
     return parser
 
@@ -204,7 +207,7 @@ class AmorphousCell(object):
 
     def createCell(self, cell_type=PACK, mini_density=MINIMUM_DENSITY):
 
-        cell_builder = PackedCell if cell_type==PACK else GrowedCell
+        cell_builder = PackedCell if cell_type == PACK else GrowedCell
         cell = cell_builder(self.polymers, self.options.mol_num)
         cell.setMols()
         cell.setDataReader()
@@ -528,7 +531,9 @@ class GrowedCell(PackedCell):
             reached.
         """
 
-        frag_mols = fragments.FagMols(self.mols.values(), data_file='tmp.data', box=self.box)
+        frag_mols = fragments.FagMols(self.mols,
+                                      data_file='tmp.data',
+                                      box=self.box)
         frag_mols.run()
         # trial_num = 1
         # while trial_num <= max_trial:
@@ -570,7 +575,6 @@ class GrowedCell(PackedCell):
             trial_per_mol += 1
         if trial_per_mol > max_trial:
             raise MolError
-
 
 
 class Polymer(object):

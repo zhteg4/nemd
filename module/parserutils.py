@@ -42,17 +42,22 @@ def type_positive_float(arg):
     return value
 
 
-def type_ranged_float(arg, bottom=-constants.LARGE_NUM, top=constants.LARGE_NUM,
-                      included_bottom=True, include_top=True):
+def type_ranged_float(arg,
+                      bottom=-constants.LARGE_NUM,
+                      top=constants.LARGE_NUM,
+                      included_bottom=True,
+                      include_top=True):
     value = type_float(arg)
     if included_bottom and value < bottom:
         raise argparse.ArgumentTypeError(f'{value} is smaller than {bottom}.')
     if not included_bottom and value <= bottom:
-        raise argparse.ArgumentTypeError(f'{value} should be larger than {bottom}.')
+        raise argparse.ArgumentTypeError(
+            f'{value} should be larger than {bottom}.')
     if include_top and value > top:
         raise argparse.ArgumentTypeError(f'{value} is larger than {bottom}.')
     if not include_top and value >= top:
-        raise argparse.ArgumentTypeError(f'{value} should be smaller than {bottom}.')
+        raise argparse.ArgumentTypeError(
+            f'{value} should be smaller than {bottom}.')
     return value
 
 
