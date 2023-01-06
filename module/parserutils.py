@@ -2,6 +2,7 @@ import os
 import symbols
 import argparse
 import constants
+import random
 import numpy as np
 from rdkit import Chem
 
@@ -64,6 +65,7 @@ def type_ranged_float(arg,
 def type_random_seed(arg):
     value = type_int(arg)
     np.random.seed(value)
+    random.seed(value)
     return value
 
 

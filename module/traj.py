@@ -288,9 +288,10 @@ class DistanceCell:
         :param threshold clash radii: clash criteria when radii not defined
         :return list of tuple: clashed atom ids, distance, and threshold
         """
-
         xyz = row.values
         neighbors = self.getNeighbors(xyz)
+        if not neighbors:
+            return
         # For small box, the same neighbor across PBCs appears multiple times
         neighbors = set(neighbors)
         try:

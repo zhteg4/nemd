@@ -1,6 +1,5 @@
 import traj
 import oplsua
-import random
 import logutils
 import itertools
 import prop_names
@@ -141,7 +140,7 @@ class Fragment:
 
         :return float: the picked dihedral value
         """
-        val = random.choice(self.vals)
+        val = np.random.choice(self.vals)
         self.vals.remove(val)
         self.fval = False
         return val
@@ -431,14 +430,11 @@ class FragMol(FragMixIn):
                 return True
         return False
 
-    def setConformer(self, seed=2022):
+    def setConformer(self):
         """
         Set conformer coordinates without clashes.
-
-        :param seed int: seed to set random state.
         """
         log_debug(f"{self.getNumFrags()} fragments found.")
-        random.seed(seed)
         frags = [self.init_frag]
         while (frags):
             frag = frags.pop(0)
@@ -471,7 +467,7 @@ class FragMol(FragMixIn):
         self.setDCellParams()
         self.setCoords()
         self.setFrm()
-        self.setConformer(2022)
+        self.setConformer()
 
 
 class FagMols(FragMixIn):
@@ -489,7 +485,7 @@ class FagMols(FragMixIn):
         self.setDCellParams()
         self.setCoords()
         self.setFrm()
-        self.setConformer(2022)
+        self.setConformer()
 
     def fragmentize(self):
         self.fmols = {i: FragMol(x) for i, x in self.mols.items()}
@@ -529,13 +525,10 @@ class FagMols(FragMixIn):
                                        resolution=self.cell_rez)
         self.dcell.setUp()
 
-    def setConformer(self, seed=2022):
+    def setConformer(self):
         """
         Set conformer coordinates without clashes.
-
-        :param seed int: seed to set random state.
         """
-        random.seed(seed)
         log_debug(
             f"{[x.getNumFrags() for x in self.fmols.values()]} fragments")
 
@@ -544,7 +537,7 @@ class FagMols(FragMixIn):
                                        resolution=self.cell_rez)
         self.dcell.setUp()
 
-        self.extg_aids = set()
+        self.extg_gids = set()
         frags = [x.init_frag for x in self.fmols.values()]
 
         for frag in frags:
@@ -556,11 +549,11 @@ class FagMols(FragMixIn):
                 frag.setDihedralDeg()
                 if self.hasClashes(frag.gids):
                     continue
-                self.extg_aids.update(frag.gids)
-                frags += frag.nfrags
-                print(len(self.extg_aids))
                 # Successfully grew one fragment
+                self.extg_gids.update(frag.gids)
+                frags += frag.nfrags
                 self.setDcell()
+                print(len(self.extg_gids), frag.fmol.mol.GetIntProp('mol_id'))
                 break
             else:
                 # The molecule has grown to a dead end (no break)
@@ -576,15 +569,18 @@ class FagMols(FragMixIn):
             centroid = np.array(conformerutils.centroid(conf, atom_ids=aids))
             conformerutils.translation(conf, -centroid)
             conformerutils.rand_rotate(conf)
-            conformerutils.translation(conf, self.frm.getPoint())
+            point = self.frm.getPoint()
+            print(point)
+            conformerutils.translation(conf, point)
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
-            if not self.hasClashes(frag.fmol.extg_gids):
-                self.extg_aids.update(frag.fmol.extg_gids)
+            gids = frag.fmol.extg_gids
+            if not self.hasClashes(gids):
+                self.extg_gids.update(gids)
                 # Only update the distance cell after one molecule successful
                 # placed into the cell as only inter-molecular clashes are
                 # checked for packed cell.
                 self.dcell.setUp()
-                print(len(self.extg_aids))
+                print(len(self.extg_gids))
                 break
 
     def backMove(self, frag, frags):
@@ -595,20 +591,20 @@ class FagMols(FragMixIn):
         # 2）Find the next fragments who have been placed into the cell.
         nxt_frags = frag.getNxtFrags()
         [x.resetVals() for x in nxt_frags]
-        ratom_ids = [y for x in [frag] + nxt_frags for y in x.gids]
-        self.extg_aids = self.extg_aids.difference(ratom_ids)
+        ratom_ids = [y for x in nxt_frags for y in x.gids]
+        self.extg_gids = self.extg_gids.difference(ratom_ids)
         # 3）Fragment after the next fragments were added to the growing
         # frags before this backmove step.
         nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
         frags = [frag] + list(set(frags).difference(nnxt_frags))
-        log_debug(f"{len(self.extg_aids)}, {len(frag.vals)}: {frag}")
+        log_debug(f"{len(self.extg_gids)}, {len(frag.vals)}: {frag}")
         return frags, found
 
     def hasClashes(self, gids):
         frag_rows = [self.frm.loc[x] for x in gids]
         for row in frag_rows:
             clashes = self.dcell.getClashes(row,
-                                            included=self.extg_aids,
+                                            included=self.extg_gids,
                                             radii=self.data_reader.radii,
                                             excluded=self.data_reader.excluded)
             if clashes:

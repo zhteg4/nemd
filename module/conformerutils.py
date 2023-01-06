@@ -38,7 +38,8 @@ def rand_rotate(conf):
     :param conf 'rdkit.Chem.rdchem.Conformer': rotate this conformer
     """
     mtrx = np.identity(4)
-    mtrx[:-1, :-1] = Rotation.random().as_matrix()
+    seed = np.random.get_state()[1][0]
+    mtrx[:-1, :-1] = Rotation.random(random_state=seed).as_matrix()
     Chem.rdMolTransforms.TransformConformer(conf, mtrx)
 
 
