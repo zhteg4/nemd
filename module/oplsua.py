@@ -1896,7 +1896,7 @@ class DataFileReader(LammpsData):
                 dist *= pow(2, 1 / 6) * scale
                 if dist < self.min_dist:
                     dist = self.min_dist
-                radii[id1][id2] = dist
+                radii[id1][id2] = round(dist, 4)
 
         self.radii = collections.defaultdict(dict)
         for atom1 in self.atoms.values():

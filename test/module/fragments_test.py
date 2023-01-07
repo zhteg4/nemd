@@ -251,3 +251,34 @@ class TestFragment:
         oval = frag.getDihedralDeg()
         frag.setConformer()
         assert oval != frag.getDihedralDeg()
+
+
+class TestFragMols:
+    SMILES1 = '[C:1][C:2]([C:3](=[O:4])[O:5][H:6])[C:7][C:8]([C:9](=[O:10])[O:11][H:12])[C:13][C:14]([C:15](=[O:16])[O:17][H:18])[C:19][C:20]([C:21](=[O:22])[O:23][H:24])[C:25][C:26]([C:27](=[O:28])[O:29][H:30])[C:31][C:32][C:33](=[O:34])[O:35][H:36]'
+    SMILES2 = '[C:37][C:38]([C:39](=[O:40])[O:41][H:42])[C:43][C:44]([C:45](=[O:46])[O:47][H:48])[C:49][C:50]([C:51](=[O:52])[O:53][H:54])[C:55][C:56]([C:57](=[O:58])[O:59][H:60])[C:61][C:62]([C:63](=[O:64])[O:65][H:66])[C:67][C:68][C:69](=[O:70])[O:71][H:72]'
+    SMILES3 = '[C:73][C:74]([C:75](=[O:76])[O:77][H:78])[C:79][C:80]([C:81](=[O:82])[O:83][H:84])[C:85][C:86]([C:87](=[O:88])[O:89][H:90])[C:91][C:92]([C:93](=[O:94])[O:95][H:96])[C:97][C:98]([C:99](=[O:100])[O:101][H:102])[C:103][C:104][C:105](=[O:106])[O:107][H:108]'
+
+    @pytest.fixture
+    def fmols(self):
+        mol1 = getMol(self.SMILES1)
+        mol2 = getMol(self.SMILES2)
+        mol3 = getMol(self.SMILES3)
+        data_file = testutils.test_file(
+            os.path.join('polym_builder', 'cooh6x3.data'))
+        box = [
+            0, 19.321654197203486, 0, 19.321654197203486, 0, 19.321654197203486
+        ]
+        fmols = fragments.FragMols({
+            1: mol1,
+            2: mol2,
+            3: mol3
+        },
+                                   data_file,
+                                   box=box)
+        return fmols
+
+    def testFragmentize(self, fmols):
+        fmols.fragmentize()
+        str_fmols_1st = str(fmols.fmols[1].fragments())
+        assert str_fmols_1st == str(fmols.fmols[2].fragments())
+        assert str_fmols_1st == str(fmols.fmols[2].fragments())

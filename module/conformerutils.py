@@ -36,9 +36,11 @@ def rand_rotate(conf):
     Randomly rotate the conformer.
 
     :param conf 'rdkit.Chem.rdchem.Conformer': rotate this conformer
+
+    NOTE: the random state is set according to the numpy random seed.
     """
     mtrx = np.identity(4)
-    seed = np.random.get_state()[1][0]
+    seed = np.random.randint(0, 2**32 - 1)
     mtrx[:-1, :-1] = Rotation.random(random_state=seed).as_matrix()
     Chem.rdMolTransforms.TransformConformer(conf, mtrx)
 

@@ -470,7 +470,7 @@ class FragMol(FragMixIn):
         self.setConformer()
 
 
-class FagMols(FragMixIn):
+class FragMols(FragMixIn):
 
     def __init__(self, mols, data_file=None, box=None):
         self.mols = mols
@@ -530,7 +530,7 @@ class FagMols(FragMixIn):
         Set conformer coordinates without clashes.
         """
         log_debug(
-            f"{[x.getNumFrags() for x in self.fmols.values()]} fragments")
+            f"{sum([x.getNumFrags() for x in self.fmols.values()])} fragments")
 
         self.dcell = traj.DistanceCell(frm=self.frm,
                                        cut=self.cell_cut,
@@ -545,6 +545,7 @@ class FagMols(FragMixIn):
 
         while frags:
             frag = frags.pop(0)
+            log_debug(f'{len(self.extg_gids)} atoms placed.')
             while frag.vals:
                 frag.setDihedralDeg()
                 if self.hasClashes(frag.gids):
@@ -553,7 +554,6 @@ class FagMols(FragMixIn):
                 self.extg_gids.update(frag.gids)
                 frags += frag.nfrags
                 self.setDcell()
-                print(len(self.extg_gids), frag.fmol.mol.GetIntProp('mol_id'))
                 break
             else:
                 # The molecule has grown to a dead end (no break)
@@ -569,9 +569,7 @@ class FagMols(FragMixIn):
             centroid = np.array(conformerutils.centroid(conf, atom_ids=aids))
             conformerutils.translation(conf, -centroid)
             conformerutils.rand_rotate(conf)
-            point = self.frm.getPoint()
-            print(point)
-            conformerutils.translation(conf, point)
+            conformerutils.translation(conf, self.frm.getPoint())
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
             gids = frag.fmol.extg_gids
             if not self.hasClashes(gids):
@@ -580,7 +578,6 @@ class FagMols(FragMixIn):
                 # placed into the cell as only inter-molecular clashes are
                 # checked for packed cell.
                 self.dcell.setUp()
-                print(len(self.extg_gids))
                 break
 
     def backMove(self, frag, frags):
@@ -596,7 +593,7 @@ class FagMols(FragMixIn):
         # 3）Fragment after the next fragments were added to the growing
         # frags before this backmove step.
         nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
-        frags = [frag] + list(set(frags).difference(nnxt_frags))
+        frags = [frag] + [x for x in frags if x not in nnxt_frags]
         log_debug(f"{len(self.extg_gids)}, {len(frag.vals)}: {frag}")
         return frags, found
 

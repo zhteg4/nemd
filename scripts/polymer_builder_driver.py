@@ -531,9 +531,9 @@ class GrowedCell(PackedCell):
             reached.
         """
 
-        frag_mols = fragments.FagMols(self.mols,
-                                      data_file='tmp.data',
-                                      box=self.box)
+        frag_mols = fragments.FragMols(self.mols,
+                                       data_file='tmp.data',
+                                       box=self.box)
         frag_mols.run()
         # trial_num = 1
         # while trial_num <= max_trial:

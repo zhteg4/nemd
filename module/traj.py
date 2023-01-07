@@ -290,8 +290,6 @@ class DistanceCell:
         """
         xyz = row.values
         neighbors = self.getNeighbors(xyz)
-        if not neighbors:
-            return
         # For small box, the same neighbor across PBCs appears multiple times
         neighbors = set(neighbors)
         try:
@@ -302,8 +300,10 @@ class DistanceCell:
             neighbors = neighbors.intersection(included)
         if excluded is not None:
             neighbors = neighbors.difference(excluded[row.name])
+        if not neighbors:
+            return
         neighbors = list(neighbors)
-        dists = self.frm.getDists(neighbors, xyz)
+        dists = self.frm.getDists(neighbors, xyz).round(4)
         if radii:
             thresholds = [radii[row.name][x] for x in neighbors]
         else:
