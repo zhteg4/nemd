@@ -214,7 +214,6 @@ class FragMixIn:
         """
         self.max_clash_dist = max(
             [y for x in self.data_reader.radii.values() for y in x.values()])
-        self.cell_rez = self.max_clash_dist * traj.DistanceCell.SCALE
         self.cell_cut = self.max_clash_dist
 
 
@@ -522,7 +521,7 @@ class FragMols(FragMixIn):
         self.frm.loc[:] = np.concatenate(pos, axis=0)
         self.dcell = traj.DistanceCell(frm=self.frm,
                                        cut=self.cell_cut,
-                                       resolution=self.cell_rez)
+                                       resolution=traj.DistanceCell.AUTO)
         self.dcell.setUp()
 
     def setConformer(self):
@@ -532,10 +531,7 @@ class FragMols(FragMixIn):
         log_debug(
             f"{sum([x.getNumFrags() for x in self.fmols.values()])} fragments")
 
-        self.dcell = traj.DistanceCell(frm=self.frm,
-                                       cut=self.cell_cut,
-                                       resolution=self.cell_rez)
-        self.dcell.setUp()
+        self.setDcell()
 
         self.extg_gids = set()
         frags = [x.init_frag for x in self.fmols.values()]

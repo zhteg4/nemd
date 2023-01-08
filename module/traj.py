@@ -193,6 +193,7 @@ class DistanceCell:
 
     SCALE = oplsua.DataFileReader.SCALE
     BOX = Frame.BOX
+    AUTO = 'auto'
 
     def __init__(self, frm=None, cut=6., resolution=2.):
         """
@@ -225,9 +226,15 @@ class DistanceCell:
     def setgrids(self):
         """
         Set grids and indexes.
+
         Indexes: the number of cells in three dimensions
         Grids: the length of the cell in each dimension
         """
+        if self.resolution == self.AUTO:
+            self.indexes = [math.floor(x / self.cut) for x in self.span]
+            self.grids = np.array(
+                [x / i for x, i in zip(self.span, self.indexes)])
+            return
         self.indexes = [math.ceil(x / self.resolution) for x in self.span]
         self.grids = np.array([x / i for x, i in zip(self.span, self.indexes)])
 
