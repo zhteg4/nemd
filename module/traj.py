@@ -109,6 +109,10 @@ class Frame(pd.DataFrame):
         :param atom_id int: atom ids
         :param xyz (3,) 'pandas.core.series.Series': xyz coordinates and atom id
         :return list of floats: distances
+
+        NOTE: the following slows down the performance
+            dists %= self.attrs[self.SPAN]
+            dists[dists > self.attrs[self.HSPAN]] -= self.attrs[self.SPAN]
         """
         dists = self.getXYZ(ids) - xyz
         for col in self.UXYZ:
