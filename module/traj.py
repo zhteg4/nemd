@@ -114,10 +114,11 @@ class Frame(pd.DataFrame):
             dists %= self.attrs[self.SPAN]
             dists[dists > self.attrs[self.HSPAN]] -= self.attrs[self.SPAN]
         """
-        dists = self.getXYZ(ids) - xyz
-        for col in self.UXYZ:
-            dists[col] = dists[col].apply(
-                lambda x: math.remainder(x, self.attrs[self.SPAN][col]))
+        dists = (self.getXYZ(ids) - xyz).to_numpy()
+        for id, col in enumerate(self.UXYZ):
+            dists[:, id] = np.frompyfunc(
+                lambda x: math.remainder(x, self.attrs[self.SPAN][col]), 1,
+                1)(dists[:, id])
         return np.linalg.norm(dists, axis=1)
 
     def wrapCoords(self, broken_bonds=False, dreader=None):
