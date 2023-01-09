@@ -368,6 +368,7 @@ class PackedCell:
         edge = math.pow(vol, 1 / 3)  # centimeter
         edge *= scipy.constants.centi / scipy.constants.angstrom
         self.box = [0, edge, 0, edge, 0, edge]
+        log(f'Cubic box of size {edge:.2f} angstrom is created.')
 
     def setMols(self):
         """
@@ -533,7 +534,8 @@ class GrowedCell(PackedCell):
 
         frag_mols = fragments.FragMols(self.mols,
                                        data_file='tmp.data',
-                                       box=self.box)
+                                       box=self.box,
+                                       logger=logger)
         frag_mols.run()
         # trial_num = 1
         # while trial_num <= max_trial:

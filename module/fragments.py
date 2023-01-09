@@ -6,6 +6,8 @@ import prop_names
 import structutils
 import conformerutils
 import numpy as np
+import pandas as pd
+import networkx as nx
 from rdkit import Chem
 
 logger = logutils.createModuleLogger(file_path=__file__)
@@ -207,6 +209,11 @@ class FragMixIn:
         self.data_reader = oplsua.DataFileReader(self.data_file)
         self.data_reader.run()
         self.data_reader.setClashParams()
+        radii = {
+            x: np.mean([x for x in y.values()])
+            for x, y in self.data_reader.radii.items()
+        }
+        self.name = sorted(radii, key=lambda x: radii[x])[-1]
 
     def setDCellParams(self):
         """
@@ -455,6 +462,15 @@ class FragMol(FragMixIn):
             frags = [frag] + list(set(frags).difference(nnxt_frags))
             log_debug(f"{len(self.extg_aids)}, {len(frag.vals)}: {frag}")
 
+    def setInitSize(self, buffer=1.):
+        xyzs = np.array([self.conf.GetAtomPosition(x) for x in self.extg_aids])
+        xyzs -= self.getInitCentroid()
+        self.init_radius = np.linalg.norm(xyzs, axis=1).max() + buffer
+
+    def getInitCentroid(self):
+        return conformerutils.centroid(self.conf,
+                                       atom_ids=list(self.extg_aids))
+
     def run(self):
         """
         Main method for fragmentation and conformer search.
@@ -471,12 +487,18 @@ class FragMol(FragMixIn):
 
 class FragMols(FragMixIn):
 
-    def __init__(self, mols, data_file=None, box=None):
+    def __init__(self, mols, data_file=None, box=None, logger=logger):
         self.mols = mols
         self.data_file = data_file
         self.box = box
+        self.logger = logger
         self.confs = None
         self.fmols = None
+
+    def log(self, msg, timestamp=False):
+        if not self.logger:
+            return
+        logutils.log(self.logger, msg, timestamp=timestamp)
 
     def run(self):
         self.fragmentize()
@@ -493,6 +515,7 @@ class FragMols(FragMixIn):
             fmol.setPreFrags()
             fmol.setInitAtomIds()
             fmol.setGlobalAtomIds()
+            fmol.setInitSize()
 
     def setCoords(self):
         """
@@ -531,14 +554,17 @@ class FragMols(FragMixIn):
         log_debug(
             f"{sum([x.getNumFrags() for x in self.fmols.values()])} fragments")
 
-        self.setDcell()
-
-        self.extg_gids = set()
         frags = [x.init_frag for x in self.fmols.values()]
-
+        self.setInitFrm(frags)
+        self.setDcell()
+        self.extg_gids = set()
         for frag in frags:
             self.placeOneInitFrag(frag)
+        self.log(f'{len(frags)} initiators have been placed into the cell.')
 
+        failed_num = 0
+        growing_frag_num = len(
+            set([x.fmol.mol.GetIntProp('mol_id') for x in frags]))
         while frags:
             frag = frags.pop(0)
             log_debug(f'{len(self.extg_gids)} atoms placed.')
@@ -550,6 +576,15 @@ class FragMols(FragMixIn):
                 self.extg_gids.update(frag.gids)
                 frags += frag.nfrags
                 self.setDcell()
+                gfrag_num = len(
+                    set([x.fmol.mol.GetIntProp('mol_id') for x in frags]))
+                if gfrag_num != growing_frag_num:
+                    self.log(
+                        f'{len(self.mols) - gfrag_num} finished; {failed_num} failed.'
+                    )
+                    growing_frag_num = gfrag_num
+                print(len(self.extg_gids),
+                      len(self.mols) - gfrag_num, failed_num)
                 break
             else:
                 # The molecule has grown to a dead end (no break)
@@ -557,24 +592,81 @@ class FragMols(FragMixIn):
                 if not success:
                     frags[0].resetVals()
                     self.placeOneInitFrag(frags[0])
+                    failed_num += 1
 
-    def placeOneInitFrag(self, frag):
+    def setInitFrm(self, frags):
+        data = np.array([[x.fmol.init_radius] + [np.inf] * 3 for x in frags])
+        index = [x.fmol.mol.GetIntProp('mol_id') for x in frags]
+        self.init_df = pd.DataFrame(data=data,
+                                    index=index,
+                                    columns=['radius', 'x', 'y', 'z'])
+
+    def placeOneInitFrag(self, frag, point=None):
         while True:
             conf = frag.fmol.mol.GetConformer()
             aids = list(frag.fmol.extg_aids)
             centroid = np.array(conformerutils.centroid(conf, atom_ids=aids))
             conformerutils.translation(conf, -centroid)
             conformerutils.rand_rotate(conf)
-            conformerutils.translation(conf, self.frm.getPoint())
+            if point is None:
+                point = self.frm.getPoint()
+            conformerutils.translation(conf, point)
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
             gids = frag.fmol.extg_gids
-            if not self.hasClashes(gids):
-                self.extg_gids.update(gids)
-                # Only update the distance cell after one molecule successful
-                # placed into the cell as only inter-molecular clashes are
-                # checked for packed cell.
-                self.dcell.setUp()
-                break
+            if self.hasClashes(gids):
+                continue
+            mol_id = frag.fmol.mol.GetIntProp('mol_id')
+            self.init_df.loc[mol_id][1:] = point
+            dists = self.init_df.loc[self.init_df.index != mol_id,
+                                     self.init_df.columns != 'radius'] - point
+            dists = np.linalg.norm(dists, axis=1)
+            radii = self.init_df.loc[self.init_df.index != mol_id,
+                                     'radius'] + self.init_df.loc[mol_id,
+                                                                  'radius']
+            if (dists < radii).any():
+                continue
+            # Only update the distance cell after one molecule successful
+            # placed into the cell as only inter-molecular clashes are
+            # checked for packed cell.
+            self.dcell.setUp()
+            self.extg_gids.update(gids)
+            return
+
+    def getVoid(self):
+        indexes = [range(x) for x in self.dcell.indexes]
+        nodes = list(itertools.product(*indexes))
+        graph = nx.Graph()
+        graph.add_nodes_from(nodes)
+        for node in nodes:
+            ids = set(itertools.permutations([0, 0, 1])).union(
+                itertools.permutations([0, 0, -1]))
+            for id in ids:
+                neighbor = tuple([
+                    (x + y) % z
+                    for x, y, z in zip(node, id, self.dcell.indexes)
+                ])
+                graph.add_edge(neighbor, node)
+        node_to_remove = []
+        for node in graph.nodes:
+            xyz = self.dcell.grids * node
+            row = pd.Series(data=xyz, name=self.name)
+            clashes = self.dcell.getClashes(row,
+                                            included=self.extg_gids,
+                                            radii=self.data_reader.radii,
+                                            excluded=self.data_reader.excluded)
+            if clashes:
+                node_to_remove.append(node)
+
+        graph.remove_nodes_from(node)
+        largest_cc = max(nx.connected_components(graph), key=len)
+        cutoff = int(max(self.dcell.indexes) / 3)
+        largest_cc = {
+            x:
+            len(nx.single_source_shortest_path_length(graph, x, cutoff=cutoff))
+            for x in largest_cc
+        }
+        node = sorted(largest_cc, key=lambda x: largest_cc[x])[-1]
+        return self.dcell.grids * node
 
     def backMove(self, frag, frags):
         # 1）Find the previous fragment with available dihedral candidates.
@@ -585,6 +677,8 @@ class FragMols(FragMixIn):
         nxt_frags = frag.getNxtFrags()
         [x.resetVals() for x in nxt_frags]
         ratom_ids = [y for x in nxt_frags for y in x.gids]
+        if not found:
+            ratom_ids += frag.fmol.extg_gids
         self.extg_gids = self.extg_gids.difference(ratom_ids)
         # 3）Fragment after the next fragments were added to the growing
         # frags before this backmove step.

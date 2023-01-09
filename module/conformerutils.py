@@ -57,5 +57,8 @@ def centroid(conf, atom_ids=None):
 
     bv = DataStructs.ExplicitBitVect(conf.GetNumAtoms())
     bv.SetBitsFromList(atom_ids)
-    weights = rdBase._vectd().extend(bv.ToList())
-    return Chem.rdMolTransforms.ComputeCentroid(conf, weights=weights)
+    weights = rdBase._vectd()
+    weights.extend(bv.ToList())
+    return Chem.rdMolTransforms.ComputeCentroid(conf,
+                                                weights=weights,
+                                                ignoreHs=False)
