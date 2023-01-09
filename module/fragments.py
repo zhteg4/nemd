@@ -608,8 +608,7 @@ class FragMols(FragMixIn):
             centroid = np.array(conformerutils.centroid(conf, atom_ids=aids))
             conformerutils.translation(conf, -centroid)
             conformerutils.rand_rotate(conf)
-            if point is None:
-                point = self.frm.getPoint()
+            point = self.frm.getPoint()
             conformerutils.translation(conf, point)
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
             gids = frag.fmol.extg_gids

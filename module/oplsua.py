@@ -1656,9 +1656,9 @@ class DataFileReader(LammpsData):
     LAMMPS Data file reader
     """
 
-    SCALE = 0.6
+    SCALE = 0.5
 
-    def __init__(self, data_file, min_dist=1.09 * 2):
+    def __init__(self, data_file, min_dist=1.09 * 2.1):
         """
         :param data_file str: data file with path
         :param min_dist: the minimum distance as clash (some h-bond has zero vdw
@@ -1832,7 +1832,7 @@ class DataFileReader(LammpsData):
                 id3=int(id3),
                 id4=int(id4))
 
-    def setClashParams(self, include14=True, scale=SCALE):
+    def setClashParams(self, include14=False, scale=SCALE):
         """
         Set clash check related parameters including pair radii and exclusion.
         """
