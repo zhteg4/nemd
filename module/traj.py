@@ -191,9 +191,9 @@ class Frame(pd.DataFrame):
         self.to_csv(fh, mode='a', index=True, sep=' ', header=True)
 
     def pairDists(self):
-        dists, eid = [], self.shape[0] + 1
+        dists, eid= [],self.shape[0] + 1
         for id, row in self.iterrows():
-            dist = self.getDists(range(id + 1, eid), row)
+            dist = self.getDists(range(id+1, eid), row)
             dists.append(dist)
         return np.concatenate(dists)
 
@@ -356,7 +356,7 @@ class DistanceCell:
                                   for x, y, z in zip(node, ids, self.indexes)])
                 self.graph.add_edge(neighbor, node)
 
-    def removeClashedNodes(self):
+    def rmClashNodes(self):
         rnodes = []
         for node in self.graph.nodes:
             xyz = self.grids * node
@@ -370,7 +370,7 @@ class DistanceCell:
 
     def getVoid(self):
         mcc = max(nx.connected_components(self.graph), key=len)
-        cut = min(max(self.indexes) / 2, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
+        cut = min(max(self.indexes) / 3, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
         largest_cc = {
             x: len(
                 nx.single_source_shortest_path_length(self.graph,
@@ -382,3 +382,7 @@ class DistanceCell:
         nodes = [x for x, y in largest_cc.items() if y == max_num]
         np.random.shuffle(nodes)
         return self.grids * nodes[0]
+
+    def getDistsWithIds(self, ids):
+        dists = [self.frm.getDists(self.extg_gids, self.frm.loc[x]) for x in ids]
+        return pd.concat(dists, axis=1)
