@@ -7,7 +7,6 @@ import structutils
 import conformerutils
 import numpy as np
 import pandas as pd
-import networkx as nx
 from rdkit import Chem
 
 logger = logutils.createModuleLogger(file_path=__file__)
@@ -413,7 +412,7 @@ class FragMol(FragMixIn):
         self.frm.loc[:] = self.conf.GetPositions()
         self.dcell = traj.DistanceCell(frm=self.frm,
                                        cut=self.cell_cut,
-                                       resolution=self.cell_rez)
+                                       resolution='auto')
         self.dcell.setUp()
 
     def hasClashes(self, atom_ids):
@@ -546,13 +545,16 @@ class FragMols(FragMixIn):
         """
         Set distance cell.
         """
-        pos = [x.GetPositions() for x in self.confs.values()]
-        self.frm.loc[:] = np.concatenate(pos, axis=0)
+        self.updateFrm()
         self.dcell = traj.DistanceCell(frm=self.frm,
                                        cut=self.cell_cut,
                                        resolution=traj.DistanceCell.AUTO)
         self.dcell.setUp()
         self.dcell.setGraph()
+
+    def updateFrm(self):
+        pos = [x.GetPositions() for x in self.confs.values()]
+        self.frm.loc[:] = np.concatenate(pos, axis=0)
 
     def updateDcell(self, gids):
         """
@@ -560,9 +562,8 @@ class FragMols(FragMixIn):
         """
         pos = [x.GetPositions() for x in self.confs.values()]
         self.frm.loc[:] = np.concatenate(pos, axis=0)
-        self.dcell.update(self.frm)
+        self.dcell.setAtomCell()
         self.dcell.addGids(gids)
-        self.dcell.rmClashNodes()
 
     def reportStatus(self, frags, mol_num, failed_num):
         cur_mol_num = len(set([x.fmol.molecule_id for x in frags]))
@@ -583,9 +584,7 @@ class FragMols(FragMixIn):
         self.setDcell()
         for frag in frags:
             self.placeInitFrag(frag)
-        dists = self.initDists()
-        self.log(f'{len(frags)} initiators have been placed into the cell. '
-                 f'({dists.min():.2f}-{dists.max():.2f})')
+        self.logInitFragsPlaced(frags)
 
         failed_num = 0
         mol_num = len(set([x.fmol.molecule_id for x in frags]))
@@ -594,6 +593,7 @@ class FragMols(FragMixIn):
             log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
             while frag.vals:
                 frag.setDihedralDeg()
+                self.updateFrm()
                 if self.hasClashes(frag.gids):
                     continue
                 # Successfully grew one fragment
@@ -602,16 +602,22 @@ class FragMols(FragMixIn):
                 mol_num = self.reportStatus(frags, mol_num, failed_num)
                 break
             else:
-                # The molecule has grown to a dead end (no break)
                 frags, success = self.backMove(frag, frags)
+
                 if not success:
+                    # The molecule has grown to a dead end (no break)
                     failed_num += 1
                     frags[0].resetVals()
-                    self.dcell.rmClashNodes()
+                    self.dcell.setGraph()
                     self.placeInitFrag(frags[0])
                     self.reportRelocation(frags[0])
 
-        import pdb;pdb.set_trace()
+    def logInitFragsPlaced(self, frags):
+        self.log(f'{len(frags)} initiators have been placed into the cell.')
+        if len(self.mols) == 1:
+            return
+        self.log(
+            f'({self.initDists().min():.2f} as the minimum pair distance)')
 
     def initDists(self):
         xyz = self.init_df.loc[:, self.init_df.columns != 'radius'].to_numpy()
@@ -620,20 +626,23 @@ class FragMols(FragMixIn):
 
     def setInitFrm(self, frags):
 
-        data = np.array([[x.fmol.init_radius] + [np.inf, np.inf, np.inf] for x in frags])
+        data = np.array([[x.fmol.init_radius] + [np.inf, np.inf, np.inf]
+                         for x in frags])
         index = [x.fmol.mol.GetIntProp('mol_id') for x in frags]
         self.init_df = pd.DataFrame(data=data,
                                     index=index,
                                     columns=['radius'] + traj.Frame.UXYZ)
 
-    def placeInitFrag(self, frag, max_trial_num=1000):
-        for _ in range(max_trial_num):
+    def placeInitFrag(self, frag):
+        self.dcell.rmClashNodes()
+        points = self.dcell.getVoids()
+        for point in points:
             conf = frag.fmol.mol.GetConformer()
             aids = list(frag.fmol.extg_aids)
             centroid = np.array(conformerutils.centroid(conf, atom_ids=aids))
             conformerutils.translation(conf, -centroid)
             conformerutils.rand_rotate(conf)
-            conformerutils.translation(conf, self.dcell.getVoid())
+            conformerutils.translation(conf, point)
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
             gids = frag.fmol.extg_gids
             if self.hasClashes(gids):
@@ -642,18 +651,17 @@ class FragMols(FragMixIn):
             # placed into the cell as only inter-molecular clashes are
             # checked for packed cell.
             self.updateDcell(gids)
+            self.init_df.loc[frag.fmol.molecule_id][1:] = point
             return
         raise ValueError(f'Failed to relocate the dead molecule.')
 
     def reportRelocation(self, frag):
         idists = self.initDists()
         dists = self.dcell.getDistsWithIds(frag.fmol.extg_gids)
-        self.log(
-            f"Relocate the initiator of "
-            f"{frag.fmol.mol.GetIntProp('mol_id')} "
-            f"(initiator: {idists.min():.2f}-{idists.max():.2f};"
-            f"close contact: {dists.min():.2f}) "
-        )
+        self.log(f"Relocate the initiator of "
+                 f"{frag.fmol.mol.GetIntProp('mol_id')} "
+                 f"(initiator: {idists.min():.2f}-{idists.max():.2f};"
+                 f"close contact: {dists.min():.2f}) ")
 
     def backMove(self, frag, frags):
         # 1）Find the previous fragment with available dihedral candidates.
