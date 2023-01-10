@@ -570,7 +570,9 @@ class FragMols(FragMixIn):
         for frag in frags:
             self.dcell.removeClashedNodes()
             self.placeOneInitFrag(frag)
-        self.log(f'{len(frags)} initiators have been placed into the cell.')
+        dists = self.pairDists()
+        self.log(f'{len(frags)} initiators have been placed into the cell. '
+                 f'([{dists.min():.2f}-{dists.max():.2f}])')
         self.pairDists()
         failed_num = 0
         growing_frag_num = len(
@@ -599,23 +601,27 @@ class FragMols(FragMixIn):
                 # The molecule has grown to a dead end (no break)
                 frags, success = self.backMove(frag, frags)
                 if not success:
+                    failed_num += 1
                     frags[0].resetVals()
                     self.dcell.removeClashedNodes()
                     self.placeOneInitFrag(frags[0])
-                    failed_num += 1
+                    idists = self.pairDists()
+                    dists = [
+                        self.frm.getDists(self.dcell.extg_gids,
+                                          self.frm.loc[x])
+                        for x in frags[0].fmol.extg_gids
+                    ]
+                    dists = pd.concat(dists, axis=1)
+                    self.log(
+                        f"Relocate the initiator of "
+                        f"{frags[0].fmol.mol.GetIntProp('mol_id')} "
+                        f"(initiator: {idists.min():.2f}-{idists.max():.2f};"
+                        f"close contact: {dists.min():.2f}) ")
 
     def pairDists(self):
-        xyzs = self.init_df.loc[:, self.init_df.columns != 'radius']
-
-        data = [
-            y - k for x, y in xyzs.iterrows()
-            for j, k in xyzs.loc[x + 1:].iterrows()
-        ]
-        dists = pd.concat(data, axis=1).transpose().to_numpy()
-        dist_df = traj.Frame(xyz=dists, box=self.box)
-        import pdb
-        pdb.set_trace()
-        pass
+        xyz = self.init_df.loc[:, self.init_df.columns != 'radius'].to_numpy()
+        init_frm = traj.Frame(xyz=xyz, box=self.box)
+        return init_frm.pairDists()
 
     def setInitFrm(self, frags):
         data = np.array([[x.fmol.init_radius] + [np.inf] * 3 for x in frags])
@@ -646,8 +652,6 @@ class FragMols(FragMixIn):
                                      'radius'] + self.init_df.loc[mol_id,
                                                                   'radius']
             if (dists < radii).any():
-                import pdb
-                pdb.set_trace()
                 continue
             # Only update the distance cell after one molecule successful
             # placed into the cell as only inter-molecular clashes are

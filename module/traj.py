@@ -191,10 +191,11 @@ class Frame(pd.DataFrame):
         self.to_csv(fh, mode='a', index=True, sep=' ', header=True)
 
     def pairDists(self):
-        data = [
-            y - k for x, y in xyzs.iterrows()
-            for j, k in xyzs.loc[x + 1:].iterrows()
-        ]
+        dists, eid = [], self.shape[0] + 1
+        for id, row in self.iterrows():
+            dist = self.getDists(range(id + 1, eid), row)
+            dists.append(dist)
+        return np.concatenate(dists)
 
 
 class DistanceCell:
