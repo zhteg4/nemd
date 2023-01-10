@@ -620,7 +620,7 @@ class FragMols(FragMixIn):
 
     def setInitFrm(self, frags):
 
-        data = np.array([[x.fmol.init_radius] + [0, 0, 0] for x in frags])
+        data = np.array([[x.fmol.init_radius] + [np.inf, np.inf, np.inf] for x in frags])
         index = [x.fmol.mol.GetIntProp('mol_id') for x in frags]
         self.init_df = pd.DataFrame(data=data,
                                     index=index,
@@ -633,22 +633,10 @@ class FragMols(FragMixIn):
             centroid = np.array(conformerutils.centroid(conf, atom_ids=aids))
             conformerutils.translation(conf, -centroid)
             conformerutils.rand_rotate(conf)
-            point = self.dcell.getVoid()
-            conformerutils.translation(conf, point)
+            conformerutils.translation(conf, self.dcell.getVoid())
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
             gids = frag.fmol.extg_gids
             if self.hasClashes(gids):
-                continue
-            mol_id = frag.fmol.molecule_id
-            self.init_df.loc[mol_id][1:] = point
-            xyz = self.init_df.loc[:,
-                  self.init_df.columns != 'radius'].to_numpy()
-            init_frm = traj.Frame(xyz=xyz, box=self.box)
-            ids = [x for x in self.init_df.index if x != mol_id]
-            dists = init_frm.getDists(ids, point)
-            radii = self.init_df.loc[self.init_df.index != mol_id, 'radius']
-            radii += self.init_df.loc[mol_id, 'radius']
-            if (dists < radii).any():
                 continue
             # Only update the distance cell after one molecule successful
             # placed into the cell as only inter-molecular clashes are
