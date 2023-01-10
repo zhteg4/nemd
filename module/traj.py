@@ -4,6 +4,7 @@ import symbols
 import itertools
 import numpy as np
 import pandas as pd
+import networkx as nx
 
 
 class Frame(pd.DataFrame):
@@ -189,6 +190,12 @@ class Frame(pd.DataFrame):
         self.index = index
         self.to_csv(fh, mode='a', index=True, sep=' ', header=True)
 
+    def pairDists(self):
+        data = [
+            y - k for x, y in xyzs.iterrows()
+            for j, k in xyzs.loc[x + 1:].iterrows()
+        ]
+
 
 class DistanceCell:
     """
@@ -199,6 +206,8 @@ class DistanceCell:
     SCALE = oplsua.DataFileReader.SCALE
     BOX = Frame.BOX
     AUTO = 'auto'
+    INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
+                     (0, 0, -1)]
 
     def __init__(self, frm=None, cut=6., resolution=2.):
         """
@@ -212,6 +221,7 @@ class DistanceCell:
         self.span = None
         self.neigh_ids = None
         self.atom_cell = None
+        self.extg_gids = set()
 
     def setUp(self):
         self.setSpan()
@@ -323,3 +333,51 @@ class DistanceCell:
         clashes = [(row.name, x, y, z)
                    for x, y, z in zip(neighbors, dists, thresholds) if y < z]
         return clashes
+
+    def update(self, frm):
+        self.frm = frm
+        self.setAtomCell()
+
+    def removeGids(self, gids):
+        self.extg_gids = self.extg_gids.difference(gids)
+
+    def addGids(self, gids):
+        self.extg_gids.update(gids)
+
+    def setGraph(self):
+        indexes = [range(x) for x in self.indexes]
+        nodes = list(itertools.product(*indexes))
+        self.graph = nx.Graph()
+        self.graph.add_nodes_from(nodes)
+        for node in nodes:
+            for ids in self.INIT_NBR_INCR:
+                neighbor = tuple([(x + y) % z
+                                  for x, y, z in zip(node, ids, self.indexes)])
+                self.graph.add_edge(neighbor, node)
+
+    def removeClashedNodes(self):
+        rnodes = []
+        for node in self.graph.nodes:
+            xyz = self.grids * node
+            row = pd.Series(data=xyz)
+            clashes = self.getClashes(row,
+                                      included=self.extg_gids,
+                                      threshold=max(self.grids))
+            if clashes:
+                rnodes.append(node)
+        self.graph.remove_nodes_from(rnodes)
+
+    def getVoid(self):
+        mcc = max(nx.connected_components(self.graph), key=len)
+        cut = min(max(self.indexes) / 2, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
+        largest_cc = {
+            x: len(
+                nx.single_source_shortest_path_length(self.graph,
+                                                      x,
+                                                      cutoff=int(cut)))
+            for x in mcc
+        }
+        max_num = max(largest_cc.values())
+        nodes = [x for x, y in largest_cc.items() if y == max_num]
+        np.random.shuffle(nodes)
+        return self.grids * nodes[0]

@@ -547,6 +547,15 @@ class FragMols(FragMixIn):
                                        resolution=traj.DistanceCell.AUTO)
         self.dcell.setUp()
 
+    def updateDcell(self, gids):
+        """
+        Set distance cell.
+        """
+        pos = [x.GetPositions() for x in self.confs.values()]
+        self.frm.loc[:] = np.concatenate(pos, axis=0)
+        self.dcell.update(self.frm)
+        self.dcell.addGids(gids)
+
     def setConformer(self):
         """
         Set conformer coordinates without clashes.
@@ -557,25 +566,25 @@ class FragMols(FragMixIn):
         frags = [x.init_frag for x in self.fmols.values()]
         self.setInitFrm(frags)
         self.setDcell()
-        self.extg_gids = set()
+        self.dcell.setGraph()
         for frag in frags:
+            self.dcell.removeClashedNodes()
             self.placeOneInitFrag(frag)
         self.log(f'{len(frags)} initiators have been placed into the cell.')
-
+        self.pairDists()
         failed_num = 0
         growing_frag_num = len(
             set([x.fmol.mol.GetIntProp('mol_id') for x in frags]))
         while frags:
             frag = frags.pop(0)
-            log_debug(f'{len(self.extg_gids)} atoms placed.')
+            log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
             while frag.vals:
                 frag.setDihedralDeg()
                 if self.hasClashes(frag.gids):
                     continue
                 # Successfully grew one fragment
-                self.extg_gids.update(frag.gids)
                 frags += frag.nfrags
-                self.setDcell()
+                self.updateDcell(frag.gids)
                 gfrag_num = len(
                     set([x.fmol.mol.GetIntProp('mol_id') for x in frags]))
                 if gfrag_num != growing_frag_num:
@@ -583,7 +592,7 @@ class FragMols(FragMixIn):
                         f'{len(self.mols) - gfrag_num} finished; {failed_num} failed.'
                     )
                     growing_frag_num = gfrag_num
-                print(len(self.extg_gids),
+                print(len(self.dcell.extg_gids),
                       len(self.mols) - gfrag_num, failed_num)
                 break
             else:
@@ -591,24 +600,38 @@ class FragMols(FragMixIn):
                 frags, success = self.backMove(frag, frags)
                 if not success:
                     frags[0].resetVals()
+                    self.dcell.removeClashedNodes()
                     self.placeOneInitFrag(frags[0])
                     failed_num += 1
+
+    def pairDists(self):
+        xyzs = self.init_df.loc[:, self.init_df.columns != 'radius']
+
+        data = [
+            y - k for x, y in xyzs.iterrows()
+            for j, k in xyzs.loc[x + 1:].iterrows()
+        ]
+        dists = pd.concat(data, axis=1).transpose().to_numpy()
+        dist_df = traj.Frame(xyz=dists, box=self.box)
+        import pdb
+        pdb.set_trace()
+        pass
 
     def setInitFrm(self, frags):
         data = np.array([[x.fmol.init_radius] + [np.inf] * 3 for x in frags])
         index = [x.fmol.mol.GetIntProp('mol_id') for x in frags]
         self.init_df = pd.DataFrame(data=data,
                                     index=index,
-                                    columns=['radius', 'x', 'y', 'z'])
+                                    columns=['radius'] + traj.Frame.UXYZ)
 
-    def placeOneInitFrag(self, frag, point=None):
-        while True:
+    def placeOneInitFrag(self, frag, max_trial_num=1000):
+        for _ in range(max_trial_num):
             conf = frag.fmol.mol.GetConformer()
             aids = list(frag.fmol.extg_aids)
             centroid = np.array(conformerutils.centroid(conf, atom_ids=aids))
             conformerutils.translation(conf, -centroid)
             conformerutils.rand_rotate(conf)
-            point = self.frm.getPoint()
+            point = self.dcell.getVoid()
             conformerutils.translation(conf, point)
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
             gids = frag.fmol.extg_gids
@@ -623,49 +646,15 @@ class FragMols(FragMixIn):
                                      'radius'] + self.init_df.loc[mol_id,
                                                                   'radius']
             if (dists < radii).any():
+                import pdb
+                pdb.set_trace()
                 continue
             # Only update the distance cell after one molecule successful
             # placed into the cell as only inter-molecular clashes are
             # checked for packed cell.
-            self.dcell.setUp()
-            self.extg_gids.update(gids)
+            self.updateDcell(gids)
             return
-
-    def getVoid(self):
-        indexes = [range(x) for x in self.dcell.indexes]
-        nodes = list(itertools.product(*indexes))
-        graph = nx.Graph()
-        graph.add_nodes_from(nodes)
-        for node in nodes:
-            ids = set(itertools.permutations([0, 0, 1])).union(
-                itertools.permutations([0, 0, -1]))
-            for id in ids:
-                neighbor = tuple([
-                    (x + y) % z
-                    for x, y, z in zip(node, id, self.dcell.indexes)
-                ])
-                graph.add_edge(neighbor, node)
-        node_to_remove = []
-        for node in graph.nodes:
-            xyz = self.dcell.grids * node
-            row = pd.Series(data=xyz, name=self.name)
-            clashes = self.dcell.getClashes(row,
-                                            included=self.extg_gids,
-                                            radii=self.data_reader.radii,
-                                            excluded=self.data_reader.excluded)
-            if clashes:
-                node_to_remove.append(node)
-
-        graph.remove_nodes_from(node)
-        largest_cc = max(nx.connected_components(graph), key=len)
-        cutoff = int(max(self.dcell.indexes) / 3)
-        largest_cc = {
-            x:
-            len(nx.single_source_shortest_path_length(graph, x, cutoff=cutoff))
-            for x in largest_cc
-        }
-        node = sorted(largest_cc, key=lambda x: largest_cc[x])[-1]
-        return self.dcell.grids * node
+        raise ValueError(f'Failed to relocate the dead molecule.')
 
     def backMove(self, frag, frags):
         # 1）Find the previous fragment with available dihedral candidates.
@@ -678,19 +667,19 @@ class FragMols(FragMixIn):
         ratom_ids = [y for x in nxt_frags for y in x.gids]
         if not found:
             ratom_ids += frag.fmol.extg_gids
-        self.extg_gids = self.extg_gids.difference(ratom_ids)
+        self.dcell.removeGids(ratom_ids)
         # 3）Fragment after the next fragments were added to the growing
         # frags before this backmove step.
         nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
         frags = [frag] + [x for x in frags if x not in nnxt_frags]
-        log_debug(f"{len(self.extg_gids)}, {len(frag.vals)}: {frag}")
+        log_debug(f"{len(self.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
         return frags, found
 
     def hasClashes(self, gids):
         frag_rows = [self.frm.loc[x] for x in gids]
         for row in frag_rows:
             clashes = self.dcell.getClashes(row,
-                                            included=self.extg_gids,
+                                            included=self.dcell.extg_gids,
                                             radii=self.data_reader.radii,
                                             excluded=self.data_reader.excluded)
             if clashes:
