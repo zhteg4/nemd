@@ -942,6 +942,7 @@ class LammpsData(LammpsIn):
         self.box = box
         self.atoms = {}
         self.bonds = {}
+        self.rvrs_bonds = {}
         self.angles = {}
         self.dihedrals = {}
         self.impropers = {}
@@ -1083,11 +1084,11 @@ class LammpsData(LammpsIn):
                                   key=lambda x: x.GetIntProp(self.BOND_ATM_ID))
             matches = self.ff.getMatchedBonds(bonded_atoms)
             bond = matches[0]
-            self.bonds[bond_id] = (
-                bond.id,
-                bonded_atoms[0].GetIntProp(self.ATOM_ID),
-                bonded_atoms[1].GetIntProp(self.ATOM_ID),
-            )
+            atom_id1 = bonded_atoms[0].GetIntProp(self.ATOM_ID)
+            atom_id2 = bonded_atoms[1].GetIntProp(self.ATOM_ID)
+            atom_ids = sorted([atom_id1, atom_id2])
+            self.bonds[bond_id] = (bond.id, *atom_ids,)
+            self.rvrs_bonds[tuple(atom_ids)] = bond.id
 
     def adjustBondLength(self, adjust_bond_legnth=True):
         """
@@ -1103,10 +1104,7 @@ class LammpsData(LammpsIn):
             for bond in mol.GetBonds():
                 bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
                 ids = set([x.GetIntProp(self.ATOM_ID) for x in bonded_atoms])
-                bond_type = [
-                    x for x, y, z in self.bonds.values()
-                    if len(ids.intersection([y, z])) == 2
-                ][0]
+                bond_type = self.rvrs_bonds[tuple(sorted(ids))]
                 dist = self.ff.bonds[bond_type].dist
                 idxs = [x.GetIdx() for x in bonded_atoms]
                 Chem.rdMolTransforms.SetBondLength(conformer, *idxs, dist)
