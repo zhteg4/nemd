@@ -337,6 +337,7 @@ class PackedCell:
         Create amorphous cell by randomly placing molecules with random
         orientations.
         """
+
         self.setBoxes()
         self.setMols()
         self.setDataReader()
@@ -386,6 +387,7 @@ class PackedCell:
         """
         Set data reader with clash parameters.
         """
+
         lmw = oplsua.LammpsData(self.mols, self.polymers[0].ff, 'tmp')
         lmw.writeData()
         self.df_reader = oplsua.DataFileReader('tmp.data')

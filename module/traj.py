@@ -1,5 +1,6 @@
 import math
 import oplsua
+import random
 import symbols
 import itertools
 import numpy as np
@@ -353,15 +354,16 @@ class DistanceCell:
                 self.graph.add_edge(neighbor, node)
 
     def rmClashNodes(self):
+        xyzs = self.frm.loc[list(self.extg_gids)]
+        nodes = (xyzs / self.grids).round().astype(int)
+        nodes = set([tuple(x[1]) for x in nodes.iterrows()])
         rnodes = []
-        for node in self.graph.nodes:
-            xyz = self.grids * node
-            row = pd.Series(data=xyz)
-            clashes = self.getClashes(row,
-                                      included=self.extg_gids,
-                                      threshold=max(self.grids))
-            if clashes:
-                rnodes.append(node)
+        for node in nodes:
+            for neigh_id in self.neigh_ids:
+                rnode = tuple([(x + y) % z
+                               for x, y, z in zip(node, neigh_id, self.indexes)
+                               ])
+                rnodes.append(rnode)
         self.graph.remove_nodes_from(rnodes)
 
     def getVoids(self):
@@ -372,7 +374,7 @@ class DistanceCell:
                 nx.single_source_shortest_path_length(self.graph,
                                                       x,
                                                       cutoff=int(cut)))
-            for x in mcc
+            for x in random.sample(mcc, 100)
         }
         max_num = max(largest_cc.values())
         nodes = [x for x, y in largest_cc.items() if y == max_num]
