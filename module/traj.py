@@ -328,10 +328,10 @@ class DistanceCell:
             return
         neighbors = list(neighbors)
         dists = self.frm.getDists(neighbors, xyz).round(4)
-        if radii:
-            thresholds = [radii[row.name][x] for x in neighbors]
-        else:
+        if radii is None:
             thresholds = [threshold] * len(neighbors)
+        else:
+            thresholds = [radii[row.name][x] for x in neighbors]
         clashes = [(row.name, x, y, z)
                    for x, y, z in zip(neighbors, dists, thresholds) if y < z]
         return clashes

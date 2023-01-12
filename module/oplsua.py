@@ -1087,7 +1087,10 @@ class LammpsData(LammpsIn):
             atom_id1 = bonded_atoms[0].GetIntProp(self.ATOM_ID)
             atom_id2 = bonded_atoms[1].GetIntProp(self.ATOM_ID)
             atom_ids = sorted([atom_id1, atom_id2])
-            self.bonds[bond_id] = (bond.id, *atom_ids,)
+            self.bonds[bond_id] = (
+                bond.id,
+                *atom_ids,
+            )
             self.rvrs_bonds[tuple(atom_ids)] = bond.id
 
     def adjustBondLength(self, adjust_bond_legnth=True):
@@ -1564,32 +1567,36 @@ class LammpsData(LammpsIn):
                 f"{improper_id} {impr.ene} {sign} {impr.n_parm}\n")
         self.data_fh.write("\n")
 
-    def writeAtoms(self, comments=False):
+    def writeAtoms(self):
         """
         Write atom coefficients.
 
         :param comments bool: If True, additional descriptions including element
             sysmbol are written after each atom line
         """
+
+        def get_neigh_charge(atom):
+            try:
+                return atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
+            except KeyError:
+                return 0
+
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
         for mol_id, mol in self.mols.items():
+            data = np.zeros((mol.GetNumAtoms(), 7))
             conformer = mol.GetConformer()
-            for atom in mol.GetAtoms():
-                atom_id = atom.GetIntProp(self.ATOM_ID)
-                type_id = atom.GetIntProp(self.TYPE_ID)
-                xyz = conformer.GetAtomPosition(atom.GetIdx())
-                xyz = ' '.join(map(lambda x: f'{x:.3f}', xyz))
-                try:
-                    ncharge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
-                except KeyError:
-                    ncharge = 0
-                charge = self.ff.charges[type_id] + ncharge
-                dsrptn = self.ff.atoms[type_id].description
-                symbol = self.ff.atoms[type_id].symbol
-                type_id = self.atm_types[type_id] if self.concise else type_id
-                cmmnt = f" # {dsrptn} {symbol}" if comments else ''
-                msg = f"{atom_id} {mol_id} {type_id} {charge:.4f} {xyz}%s\n"
-                self.data_fh.write(msg % cmmnt)
+            data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]
+            data[:, 1] = mol_id
+            type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
+            data[:, 2] = [
+                self.atm_types[x] if self.concise else x for x in type_ids
+            ]
+            charges = [get_neigh_charge(x) for x in mol.GetAtoms()]
+            data[:, 3] = [
+                x + self.ff.charges[y] for x, y in zip(charges, type_ids)
+            ]
+            data[:, 4:] = conformer.GetPositions()
+            np.savetxt(self.data_fh, data, fmt='%i %i %i %.4f %.3f %.3f %.3f')
         self.data_fh.write(f"\n")
 
     def writeBonds(self):
@@ -1656,7 +1663,7 @@ class DataFileReader(LammpsData):
 
     SCALE = 0.5
 
-    def __init__(self, data_file, min_dist=1.09 * 2.1):
+    def __init__(self, data_file, min_dist=2):
         """
         :param data_file str: data file with path
         :param min_dist: the minimum distance as clash (some h-bond has zero vdw
@@ -1881,24 +1888,35 @@ class DataFileReader(LammpsData):
         NOTE: the scaled radii here are more like diameters (or distance)
             between two sites.
         """
-        radii = collections.defaultdict(dict)
-        for id1, vdw1 in self.vdws.items():
-            for id2, vdw2 in self.vdws.items():
-                if mix == self.GEOMETRIC:
-                    dist = pow(vdw1.dist * vdw2.dist, 0.5)
-                elif mix == self.ARITHMETIC:
-                    dist = (vdw1.dist + vdw2.dist) / 2
-                elif mix == self.SIXTHPOWER:
-                    dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
-                    dist = pow(dist, 1 / 6)
-                dist *= pow(2, 1 / 6) * scale
-                if dist < self.min_dist:
-                    dist = self.min_dist
-                radii[id1][id2] = round(dist, 4)
+        # LammpsData.GEOMETRIC is optimized for speed and is supported
+        radii = [0] + [
+            self.vdws[x.type_id].dist for x in self.atoms.values()
+        ]
+        shape = len(self.atoms) + 1
+        self.radii = np.full((shape, shape), radii, dtype='float16')
+        self.radii *= self.radii.transpose()
+        self.radii = np.sqrt(self.radii)
+        self.radii *= pow(2, 1 / 6) * scale
+        self.radii[self.radii < self.min_dist] = self.min_dist
 
-        self.radii = collections.defaultdict(dict)
-        for atom1 in self.atoms.values():
-            for atom2 in self.atoms.values():
-                self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
-                    atom2.type_id]
-        self.radii = dict(self.radii)
+        # radii = collections.defaultdict(dict)
+        # for id1, vdw1 in self.vdws.items():
+        #     for id2, vdw2 in self.vdws.items():
+        #         if mix == self.GEOMETRIC:
+        #             dist = pow(vdw1.dist * vdw2.dist, 0.5)
+        #         elif mix == self.ARITHMETIC:
+        #             dist = (vdw1.dist + vdw2.dist) / 2
+        #         elif mix == self.SIXTHPOWER:
+        #             dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
+        #             dist = pow(dist, 1 / 6)
+        #         dist *= pow(2, 1 / 6) * scale
+        #         if dist < self.min_dist:
+        #             dist = self.min_dist
+        #         radii[id1][id2] = round(dist, 4)
+        #
+        # self.radii = collections.defaultdict(dict)
+        # for atom1 in self.atoms.values():
+        #     for atom2 in self.atoms.values():
+        #         self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
+        #             atom2.type_id]
+        # self.radii = dict(self.radii)

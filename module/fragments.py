@@ -208,18 +208,13 @@ class FragMixIn:
         self.data_reader = oplsua.DataFileReader(self.data_file)
         self.data_reader.run()
         self.data_reader.setClashParams()
-        radii = {
-            x: np.mean([x for x in y.values()])
-            for x, y in self.data_reader.radii.items()
-        }
-        self.name = sorted(radii, key=lambda x: radii[x])[-1]
 
     def setDCellParams(self):
         """
         Set distance cell parameters.
         """
-        self.max_clash_dist = max(
-            [y for x in self.data_reader.radii.values() for y in x.values()])
+
+        self.max_clash_dist = self.data_reader.radii.max()
         self.cell_cut = self.max_clash_dist
 
 
