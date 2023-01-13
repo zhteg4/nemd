@@ -22,7 +22,7 @@ def log_debug(msg):
 class Fragment:
 
     def __repr__(self):
-        return f"{self.dihe}: {self.atom_ids}"
+        return f"{self.dihe}: {self.aids}"
 
     def __init__(self, dihe, fmol):
         """
@@ -32,7 +32,7 @@ class Fragment:
         """
         self.dihe = dihe
         self.fmol = fmol
-        self.atom_ids = []
+        self.aids = []
         self.pfrag = None
         self.nfrags = []
         self.vals = []
@@ -83,7 +83,7 @@ class Fragment:
         :return list of list: each sublist has four atom ids.
         """
         if self.dihe:
-            pairs = zip([self.dihe[1]] * len(self.atom_ids), self.atom_ids)
+            pairs = zip([self.dihe[1]] * len(self.aids), self.aids)
         else:
             pairs = self.fmol.findPolymPair()
 
@@ -102,7 +102,7 @@ class Fragment:
         """
         Set up the fragment.
         """
-        self.atom_ids = self.fmol.getSwingAtoms(*self.dihe)
+        self.aids = self.fmol.getSwingAtoms(*self.dihe)
 
     def addFrag(self, nfrag):
         """
@@ -110,7 +110,7 @@ class Fragment:
 
         :param nfrag 'Fragment': the next fragment to be added.
         """
-        self.atom_ids = sorted(set(self.atom_ids).difference(nfrag.atom_ids))
+        self.aids = sorted(set(self.aids).difference(nfrag.aids))
         self.nfrags.append(nfrag)
 
     def setDihedralDeg(self, val=None):
@@ -182,7 +182,7 @@ class Fragment:
 
         :return bool: clash exists or not.
         """
-        return self.fmol.hasClashes(self.atom_ids)
+        return self.fmol.hasClashes(self.aids)
 
     def setConformer(self):
         """
@@ -366,12 +366,11 @@ class FragMol(FragMixIn):
         Set initial atom ids that don't belong to any fragments.
         """
         frags = self.fragments()
-        atom_ids = [y for x in frags for y in x.atom_ids]
-        atom_ids_set = set(atom_ids)
-        assert len(atom_ids) == len(atom_ids_set)
-        self.extg_aids = set([
-            x for x in range(self.mol.GetNumAtoms()) if x not in atom_ids_set
-        ])
+        aids = [y for x in frags for y in x.aids]
+        aids_set = set(aids)
+        assert len(aids) == len(aids_set)
+        self.extg_aids = set(
+            [x for x in range(self.mol.GetNumAtoms()) if x not in aids_set])
 
     def setGlobalAtomIds(self):
         """
@@ -383,8 +382,7 @@ class FragMol(FragMixIn):
         ])
         for frag in self.fragments():
             frag.gids = [
-                self.mol.GetAtomWithIdx(x).GetAtomMapNum()
-                for x in frag.atom_ids
+                self.mol.GetAtomWithIdx(x).GetAtomMapNum() for x in frag.aids
             ]
 
     def setCoords(self):
@@ -413,16 +411,16 @@ class FragMol(FragMixIn):
                                        resolution='auto')
         self.dcell.setUp()
 
-    def hasClashes(self, atom_ids):
+    def hasClashes(self, aids):
         """
         Whether the input atoms have clashes with the existing atoms.
 
-        :param atom_ids list of ints: list of atom ids
+        :param aids list of ints: list of atom ids
         :return bool: clashes exist or not.
         """
 
         self.frm.loc[:] = self.conf.GetPositions()
-        frag_rows = [self.frm.iloc[x] for x in atom_ids]
+        frag_rows = [self.frm.iloc[x] for x in aids]
         for row in frag_rows:
             clashes = self.dcell.getClashes(
                 row,
@@ -443,7 +441,7 @@ class FragMol(FragMixIn):
             frag = frags.pop(0)
             success = frag.setConformer()
             if success:
-                self.extg_aids.update(frag.atom_ids)
+                self.extg_aids.update(frag.aids)
                 frags += frag.nfrags
                 continue
             # 1）Find the previous fragment with available dihedral candidates.
@@ -451,8 +449,8 @@ class FragMol(FragMixIn):
             # 2）Find the next fragments who have been placed into the cell.
             nxt_frags = frag.getNxtFrags()
             [x.resetVals() for x in nxt_frags]
-            ratom_ids = [y for x in [frag] + nxt_frags for y in x.atom_ids]
-            self.extg_aids = self.extg_aids.difference(ratom_ids)
+            raids = [y for x in [frag] + nxt_frags for y in x.aids]
+            self.extg_aids = self.extg_aids.difference(raids)
             # 3）Fragment after the next fragments were added to the growing
             # frags before this backmove step.
             nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
@@ -465,8 +463,7 @@ class FragMol(FragMixIn):
         self.init_radius = np.linalg.norm(xyzs, axis=1).max() + buffer
 
     def getInitCentroid(self):
-        return conformerutils.centroid(self.conf,
-                                       atom_ids=list(self.extg_aids))
+        return conformerutils.centroid(self.conf, aids=list(self.extg_aids))
 
     @property
     def molecule_id(self):
@@ -560,8 +557,8 @@ class FragMols(FragMixIn):
         self.dcell.addGids(gids)
 
     def remove(self, gids):
-        self.atomCellRemove(gids)
-        self.removeGids(gids)
+        self.dcell.atomCellRemove(gids)
+        self.dcell.removeGids(gids)
 
     def reportStatus(self, frags, mol_num, failed_num):
         cur_mol_num = len(set([x.fmol.molecule_id for x in frags]))
@@ -637,7 +634,7 @@ class FragMols(FragMixIn):
         for point in points:
             conf = frag.fmol.mol.GetConformer()
             aids = list(frag.fmol.extg_aids)
-            centroid = np.array(conformerutils.centroid(conf, atom_ids=aids))
+            centroid = np.array(conformerutils.centroid(conf, aids=aids))
             conformerutils.translation(conf, -centroid)
             conformerutils.rand_rotate(conf)
             conformerutils.translation(conf, point)

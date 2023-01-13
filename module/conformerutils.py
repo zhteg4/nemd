@@ -45,18 +45,18 @@ def rand_rotate(conf):
     Chem.rdMolTransforms.TransformConformer(conf, mtrx)
 
 
-def centroid(conf, atom_ids=None):
+def centroid(conf, aids=None):
     """
     Compute the centroid of the whole conformer ar the selected atoms.
 
     :param conf 'rdkit.Chem.rdchem.Conformer': whose centroid to be computed
     :param atom_ids list: the selected atom ids
     """
-    if atom_ids is None:
+    if aids is None:
         return Chem.rdMolTransforms.ComputeCentroid(conf)
 
     bv = DataStructs.ExplicitBitVect(conf.GetNumAtoms())
-    bv.SetBitsFromList(atom_ids)
+    bv.SetBitsFromList(aids)
     weights = rdBase._vectd()
     weights.extend(bv.ToList())
     return Chem.rdMolTransforms.ComputeCentroid(conf,
