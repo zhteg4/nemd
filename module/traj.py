@@ -354,12 +354,15 @@ class DistanceCell:
     def addGids(self, gids):
         self.extg_gids.update(gids)
 
-    def setGraph(self):
+    def setGraph(self, gindex=10):
         """
         Set graph using grid intersection as nodes and connect neighbor nodes.
         """
         self.graph = nx.Graph()
-        indexes = [range(x) for x in self.indexes]
+        mgrid = self.span.min() / gindex
+        self.gindexes = (self.span / mgrid).round().astype(int)
+        self.ggrids = self.span / self.gindexes
+        indexes = [range(x) for x in self.gindexes]
         nodes = list(itertools.product(*indexes))
         self.graph.add_nodes_from(nodes)
         for node in nodes:
@@ -370,20 +373,17 @@ class DistanceCell:
 
     def rmClashNodes(self):
         xyzs = self.frm.loc[list(self.extg_gids)]
-        nodes = (xyzs / self.grids).round().astype(int)
+        nodes = (xyzs / self.ggrids).round().astype(int)
         nodes = set([tuple(x[1]) for x in nodes.iterrows()])
         rnodes = []
         for node in nodes:
-            for neigh_id in self.neigh_ids:
-                rnode = tuple([(x + y) % z
-                               for x, y, z in zip(node, neigh_id, self.indexes)
-                               ])
-                rnodes.append(rnode)
-        self.graph.remove_nodes_from(rnodes)
+            rnode = tuple([x % y for x, y in zip(node, self.gindexes)])
+            rnodes.append(rnode)
+        self.graph.remove_nodes_from(nodes)
 
     def getVoids(self):
         mcc = max(nx.connected_components(self.graph), key=len)
-        cut = min(max(self.indexes) / 3, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
+        cut = min(max(self.gindexes) / 3, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
         largest_cc = {
             x: len(
                 nx.single_source_shortest_path_length(self.graph,
@@ -394,7 +394,7 @@ class DistanceCell:
         max_num = max(largest_cc.values())
         nodes = [x for x, y in largest_cc.items() if y == max_num]
         np.random.shuffle(nodes)
-        return [self.grids * x for x in nodes]
+        return [self.ggrids * x for x in nodes]
 
     def getDistsWithIds(self, ids):
         dists = [
