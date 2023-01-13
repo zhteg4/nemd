@@ -943,6 +943,7 @@ class LammpsData(LammpsIn):
         self.atoms = {}
         self.bonds = {}
         self.rvrs_bonds = {}
+        self.rvrs_angles = {}
         self.angles = {}
         self.dihedrals = {}
         self.impropers = {}
@@ -1130,6 +1131,7 @@ class LammpsData(LammpsIn):
             angle = self.ff.getMatchedAngles(atoms)[0]
             atom_ids = tuple(x.GetIntProp(self.ATOM_ID) for x in atoms)
             self.angles[angle_id] = (angle.id, ) + atom_ids
+            self.rvrs_angles[tuple(atom_ids)] = angle_id
 
     def setDihedrals(self):
         """
@@ -1363,13 +1365,7 @@ class LammpsData(LammpsIn):
         """
 
         for idx, (itype, id1, id2, id3, id4) in self.impropers.items():
-            id14 = set([id1, id4])
-            aidxs = [
-                aidx
-                for aidx, (atype, aid1, aid2, aid3) in self.angles.items()
-                if len(id14.intersection([aid1, aid3])) == 2 and id3 == aid2
-            ]
-            self.angles.pop(aidxs[0])
+            self.angles.pop(self.rvrs_angles[tuple([id1, id3, id4])])
 
     def removeUnused(self):
         """

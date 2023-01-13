@@ -391,6 +391,7 @@ class PackedCell:
         lmw = oplsua.LammpsData(self.mols, self.polymers[0].ff, 'tmp')
         lmw.writeData()
         self.df_reader = oplsua.DataFileReader('tmp.data')
+        import sys; sys.exit()
         self.df_reader.run()
         self.df_reader.setClashParams()
 
