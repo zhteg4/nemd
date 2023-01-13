@@ -355,9 +355,12 @@ class DistanceCell:
         self.extg_gids.update(gids)
 
     def setGraph(self):
+        """
+        Set graph using grid intersection as nodes and connect neighbor nodes.
+        """
+        self.graph = nx.Graph()
         indexes = [range(x) for x in self.indexes]
         nodes = list(itertools.product(*indexes))
-        self.graph = nx.Graph()
         self.graph.add_nodes_from(nodes)
         for node in nodes:
             for ids in self.INIT_NBR_INCR:

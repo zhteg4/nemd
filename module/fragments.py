@@ -542,7 +542,7 @@ class FragMols(FragMixIn):
 
     def setDcell(self):
         """
-        Set distance cell.
+        Set distance cell for neighbor atom and graph for voids searching.
         """
         self.updateFrm()
         self.dcell = traj.DistanceCell(frm=self.frm,
@@ -552,11 +552,21 @@ class FragMols(FragMixIn):
         self.dcell.setGraph()
 
     def add(self, gids):
+        """
+        Update trajectory frame, add atoms to the atom cell and existing record.
+
+        :param gids list: gids of the atoms to be added
+        """
         self.updateFrm()
         self.dcell.atomCellUpdate(gids)
         self.dcell.addGids(gids)
 
     def remove(self, gids):
+        """
+        Remove atoms from the atom cell and existing record.
+
+        :param gids list: gids of the atoms to be removed
+        """
         self.dcell.atomCellRemove(gids)
         self.dcell.removeGids(gids)
 

@@ -106,9 +106,9 @@ def get_parser():
         metavar=FlAG_CELL[1:].upper(),
         choices=[GRID, PACK, GROW],
         default=GROW,
-        help=f'Amorphous cell type: {GRID} grids the space and '
-        f'put molecules into sub-cells; {PACK} randomly '
-        f'rotates and translates molecules; {GROW} grows '
+        help=f'Amorphous cell type: \'{GRID}\' grids the space and '
+        f'put molecules into sub-cells; \'{PACK}\' randomly '
+        f'rotates and translates molecules; \'{GROW}\' grows '
         f'molecules from the smallest rigid fragments.')
     parser.add_argument(
         FlAG_DENSITY,
@@ -448,12 +448,12 @@ class PackedCell:
         :param max_trial int: the max trial number for each molecule to be placed
             into the cell.
         """
-        atom_ids = self.df_reader.mols[mol_id]
+        aids = self.df_reader.mols[mol_id]
         trial_per_mol = 1
         while trial_per_mol <= max_trial:
             self.translateMol(mol_id)
-            if not self.hasClashes(atom_ids):
-                self.extg_aids.update(atom_ids)
+            if not self.hasClashes(aids):
+                self.extg_aids.update(aids)
                 # Only update the distance cell after one molecule successful
                 # placed into the cell as only inter-molecular clashes are
                 # checked for packed cell.
@@ -463,7 +463,7 @@ class PackedCell:
         if trial_per_mol > max_trial:
             raise MolError
 
-    def translateMol(self, mol_id, atom_ids=None):
+    def translateMol(self, mol_id, aids=None):
         """
         Do translation and rotation to the molecule so that the centroid will be
         randomly point in the cell and the orientation is also randomly picked.
@@ -473,20 +473,20 @@ class PackedCell:
         """
         mol = self.mols[mol_id]
         conf = mol.GetConformer()
-        centroid = np.array(conformerutils.centroid(conf, atom_ids=atom_ids))
+        centroid = np.array(conformerutils.centroid(conf, aids=aids))
         conformerutils.translation(conf, -centroid)
         conformerutils.rand_rotate(conf)
         conformerutils.translation(conf, self.frm.getPoint())
-        atom_ids = [x.GetAtomMapNum() for x in mol.GetAtoms()]
-        self.frm.loc[atom_ids] = conf.GetPositions()
+        aids = [x.GetAtomMapNum() for x in mol.GetAtoms()]
+        self.frm.loc[aids] = conf.GetPositions()
 
-    def hasClashes(self, atom_ids):
+    def hasClashes(self, aids):
         """
         Whether these atoms have any clashes with the existing atoms in the cell.
 
-        :param atom_ids list of int: the atom ids to check clashes
+        :param aids list of int: the atom ids to check clashes
         """
-        for id, row in self.frm.loc[atom_ids].iterrows():
+        for id, row in self.frm.loc[aids].iterrows():
             clashes = self.dcell.getClashes(row,
                                             included=self.extg_aids,
                                             radii=self.df_reader.radii,
@@ -565,12 +565,12 @@ class GrowedCell(PackedCell):
         :param max_trial int: the max trial number for each molecule to be placed
             into the cell.
         """
-        atom_ids = self.df_reader.mols[mol_id]
+        aids = self.df_reader.mols[mol_id]
         trial_per_mol = 1
         while trial_per_mol <= max_trial:
             self.translateMol(mol_id)
-            if not self.hasClashes(atom_ids):
-                self.extg_aids.update(atom_ids)
+            if not self.hasClashes(aids):
+                self.extg_aids.update(aids)
                 # Only update the distance cell after one molecule successful
                 # placed into the cell as only inter-molecular clashes are
                 # checked for packed cell.
@@ -768,9 +768,9 @@ class Conformer(object):
                  polym,
                  original_cru_mol,
                  ff=None,
-                 trans=False,
+                 trans=True,
                  jobname=None,
-                 minimization=True):
+                 minimization=False):
         """
         :param polym 'rdkit.Chem.rdchem.Mol': the polymer to set conformer
         :param original_cru_mol 'rdkit.Chem.rdchem.Mol': the monomer mol
@@ -791,7 +791,7 @@ class Conformer(object):
         if self.jobname is None:
             self.jobname = 'conf_search'
         self.relax_dir = '_relax'
-        self.data_file = 'data.polym'
+        self.data_file = 'polym.data'
         self.conformer = None
         self.lmw = None
 
@@ -842,19 +842,19 @@ class Conformer(object):
         if len(cap_idxs) != 2:
             raise ValueError(f'{len(cap_idxs)} capping atoms are found.')
         graph = structutils.getGraph(self.cru_mol)
-        self.cru_bk_atom_ids = nx.shortest_path(graph, *cap_idxs)
+        self.cru_bk_aids = nx.shortest_path(graph, *cap_idxs)
 
     def transAndRotate(self):
         """
         Set trans-conformer with translation and rotation.
         """
 
-        for dihe in zip(self.cru_bk_atom_ids[:-3], self.cru_bk_atom_ids[1:-2],
-                        self.cru_bk_atom_ids[2:-1], self.cru_bk_atom_ids[3:]):
+        for dihe in zip(self.cru_bk_aids[:-3], self.cru_bk_aids[1:-2],
+                        self.cru_bk_aids[2:-1], self.cru_bk_aids[3:]):
             Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer, *dihe, 180)
 
         cntrd = conformerutils.centroid(self.cru_conformer,
-                                        atom_ids=self.cru_bk_atom_ids)
+                                        aids=self.cru_bk_aids)
 
         conformerutils.translation(self.cru_conformer, -np.array(cntrd))
         abc_norms = self.getABCVectors()
@@ -879,9 +879,8 @@ class Conformer(object):
             vect /= np.linalg.norm(vect)
             return vect
 
-        bh_xyzs = np.array([
-            self.cru_conformer.GetAtomPosition(x) for x in self.cru_bk_atom_ids
-        ])
+        bh_xyzs = np.array(
+            [self.cru_conformer.GetAtomPosition(x) for x in self.cru_bk_aids])
         bvectors = (bh_xyzs[1:, :] - bh_xyzs[:-1, :])
         nc_vector = get_norm(bvectors[::2].mean(axis=0))
         nm_mvector = get_norm(bvectors[1::2].mean(axis=0))
@@ -912,7 +911,7 @@ class Conformer(object):
         # Search for atom pairs connecting the backbone and the side group
         bonds = self.cru_mol.GetBonds()
         bonded_aids = [(x.GetBeginAtomIdx(), x.GetEndAtomIdx()) for x in bonds]
-        bk_ids = set(self.cru_bk_atom_ids)
+        bk_ids = set(self.cru_bk_aids)
         side_aids = [
             x for x in bonded_aids if len(bk_ids.intersection(x)) == 1
         ]
