@@ -341,6 +341,7 @@ class FragMol(FragMixIn):
     def fragments(self):
         """
         Return all fragments.
+
         :return list: each of the item is one fragment.
         """
         all_frags = []
@@ -373,7 +374,9 @@ class FragMol(FragMixIn):
         ])
 
     def setGlobalAtomIds(self):
-
+        """
+        Set Global atom ids for each fragment and existing atoms.
+        """
         self.gids = [x.GetAtomMapNum() for x in self.mol.GetAtoms()]
         self.extg_gids = set([
             self.mol.GetAtomWithIdx(x).GetAtomMapNum() for x in self.extg_aids
@@ -536,6 +539,10 @@ class FragMols(FragMixIn):
         xyz = np.array([x.xyz for x in self.data_reader.atoms.values()])
         self.frm = traj.Frame(xyz=xyz, box=self.box)
 
+    def updateFrm(self):
+        pos = [x.GetPositions() for x in self.confs.values()]
+        self.frm.loc[:] = np.concatenate(pos, axis=0)
+
     def setDcell(self):
         """
         Set distance cell.
@@ -547,24 +554,14 @@ class FragMols(FragMixIn):
         self.dcell.setUp()
         self.dcell.setGraph()
 
-    def updateFrm(self):
-        pos = [x.GetPositions() for x in self.confs.values()]
-        self.frm.loc[:] = np.concatenate(pos, axis=0)
-
-    def updateDcell(self, gids):
-        """
-        Set distance cell.
-        """
-        pos = [x.GetPositions() for x in self.confs.values()]
-        self.frm.loc[:] = np.concatenate(pos, axis=0)
-        self.dcell.setAtomCell()
-        self.dcell.addGids(gids)
-
-    def addAtomsToDcell(self, gids):
-        pos = [x.GetPositions() for x in self.confs.values()]
-        self.frm.loc[:] = np.concatenate(pos, axis=0)
+    def add(self, gids):
+        self.updateFrm()
         self.dcell.atomCellUpdate(gids)
         self.dcell.addGids(gids)
+
+    def remove(self, gids):
+        self.atomCellRemove(gids)
+        self.removeGids(gids)
 
     def reportStatus(self, frags, mol_num, failed_num):
         cur_mol_num = len(set([x.fmol.molecule_id for x in frags]))
@@ -599,7 +596,7 @@ class FragMols(FragMixIn):
                     continue
                 # Successfully grew one fragment
                 frags += frag.nfrags
-                self.addAtomsToDcell(frag.gids)
+                self.add(frag.gids)
                 mol_num = self.reportStatus(frags, mol_num, failed_num)
                 break
             else:
@@ -651,7 +648,7 @@ class FragMols(FragMixIn):
             # Only update the distance cell after one molecule successful
             # placed into the cell as only inter-molecular clashes are
             # checked for packed cell.
-            self.updateDcell(gids)
+            self.add(list(gids))
             self.init_df.loc[frag.fmol.molecule_id][1:] = point
             return
         raise ValueError(f'Failed to relocate the dead molecule.')
@@ -672,10 +669,10 @@ class FragMols(FragMixIn):
         # 2）Find the next fragments who have been placed into the cell.
         nxt_frags = frag.getNxtFrags()
         [x.resetVals() for x in nxt_frags]
-        ratom_ids = [y for x in nxt_frags for y in x.gids]
+        ratom_gids = [y for x in nxt_frags for y in x.gids]
         if not found:
-            ratom_ids += frag.fmol.extg_gids
-        self.dcell.removeGids(ratom_ids)
+            ratom_gids += frag.fmol.extg_gids
+        self.remove(ratom_gids)
         # 3）Fragment after the next fragments were added to the growing
         # frags before this backmove step.
         nnxt_frags = [y for x in nxt_frags for y in x.nfrags]

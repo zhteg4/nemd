@@ -289,6 +289,12 @@ class DistanceCell:
         for row in ids.itertuples():
             self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
 
+    def atomCellRemove(self, gids):
+        ids = ((self.frm.loc[gids]) /
+               self.grids).round().astype(int) % self.indexes
+        for row in ids.itertuples():
+            self.atom_cell[row.xu, row.yu, row.zu][row.Index] = False
+
     def getNeighbors(self, xyz):
         """
         Get the neighbor atom ids from the neighbor cells (including the current
