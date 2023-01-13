@@ -1663,7 +1663,7 @@ class DataFileReader(LammpsData):
 
     SCALE = 0.5
 
-    def __init__(self, data_file, min_dist=2):
+    def __init__(self, data_file, min_dist=2.):
         """
         :param data_file str: data file with path
         :param min_dist: the minimum distance as clash (some h-bond has zero vdw
@@ -1889,9 +1889,7 @@ class DataFileReader(LammpsData):
             between two sites.
         """
         # LammpsData.GEOMETRIC is optimized for speed and is supported
-        radii = [0] + [
-            self.vdws[x.type_id].dist for x in self.atoms.values()
-        ]
+        radii = [0] + [self.vdws[x.type_id].dist for x in self.atoms.values()]
         shape = len(self.atoms) + 1
         self.radii = np.full((shape, shape), radii, dtype='float16')
         self.radii *= self.radii.transpose()

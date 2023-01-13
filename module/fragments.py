@@ -560,6 +560,12 @@ class FragMols(FragMixIn):
         self.dcell.setAtomCell()
         self.dcell.addGids(gids)
 
+    def addAtomsToDcell(self, gids):
+        pos = [x.GetPositions() for x in self.confs.values()]
+        self.frm.loc[:] = np.concatenate(pos, axis=0)
+        self.dcell.atomCellUpdate(gids)
+        self.dcell.addGids(gids)
+
     def reportStatus(self, frags, mol_num, failed_num):
         cur_mol_num = len(set([x.fmol.molecule_id for x in frags]))
         if cur_mol_num == mol_num:
@@ -593,7 +599,7 @@ class FragMols(FragMixIn):
                     continue
                 # Successfully grew one fragment
                 frags += frag.nfrags
-                self.updateDcell(frag.gids)
+                self.addAtomsToDcell(frag.gids)
                 mol_num = self.reportStatus(frags, mol_num, failed_num)
                 break
             else:
