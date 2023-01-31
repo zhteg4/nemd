@@ -492,6 +492,8 @@ class FragMols(FragMixIn):
         self.logger = logger
         self.confs = None
         self.fmols = None
+        self.failed_num = 0  # The failed attempts in growing molecules
+        self.mol_num = None  # the last reported growing molecule number
 
     def log(self, msg, timestamp=False):
         if not self.logger:
@@ -570,13 +572,21 @@ class FragMols(FragMixIn):
         self.dcell.atomCellRemove(gids)
         self.dcell.removeGids(gids)
 
-    def reportStatus(self, frags, mol_num, failed_num):
-        cur_mol_num = len(set([x.fmol.molecule_id for x in frags]))
-        if cur_mol_num == mol_num:
-            return mol_num
+    def reportStatus(self, frags):
+        """
+        Report the growing and failed molecule status.
 
-        finished_num = len(self.mols) - cur_mol_num
-        self.log(f'{finished_num} finished; {failed_num} failed.')
+        :param frags list of 'fragments.Fragment': the growing fragments
+        """
+
+        cur_mol_num = len(set([x.fmol.molecule_id for x in frags]))
+        if cur_mol_num == self.mol_num:
+            # No change of the growing molecule number from previous report
+            return
+
+        self.mol_num = cur_mol_num
+        finished_num = len(self.mols) - self.mol_num
+        self.log(f'{finished_num} finished; {self.failed_num} failed.')
         return cur_mol_num
 
     def setConformer(self):
@@ -591,11 +601,8 @@ class FragMols(FragMixIn):
             self.placeInitFrag(frag)
         self.logInitFragsPlaced(frags)
 
-        failed_num = 0
-        mol_num = len(set([x.fmol.molecule_id for x in frags]))
         while frags:
             frag = frags.pop(0)
-            log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
             while frag.vals:
                 frag.setDihedralDeg()
                 self.updateFrm()
@@ -604,33 +611,49 @@ class FragMols(FragMixIn):
                 # Successfully grew one fragment
                 frags += frag.nfrags
                 self.add(frag.gids)
-                mol_num = self.reportStatus(frags, mol_num, failed_num)
+                self.reportStatus(frags)
                 break
             else:
                 frags, success = self.backMove(frag, frags)
-
                 if not success:
                     # The molecule has grown to a dead end (no break)
-                    failed_num += 1
+                    self.failed_num += 1
                     frags[0].resetVals()
+                    # The method backmove() deletes some extg_gids
                     self.dcell.setGraph()
                     self.placeInitFrag(frags[0])
                     self.reportRelocation(frags[0])
+            log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
 
     def logInitFragsPlaced(self, frags):
+        """
+        Log the initiator fragments status after the first placements.
+
+        :param frags list of 'fragments.Fragment': the initiator of each frag
+            has been placed into the cell.
+        """
+
         self.log(f'{len(frags)} initiators have been placed into the cell.')
         if len(self.mols) == 1:
             return
         self.log(
-            f'({self.initDists().min():.2f} as the minimum pair distance)')
+            f'({self.getInitDists().min():.2f} as the minimum pair distance)')
 
-    def initDists(self):
+    def getInitDists(self):
+        """
+        Calculate the initiator pair distances.
+
+        :return array: each value is a distance between two initiators.
+        """
         xyz = self.init_df.loc[:, self.init_df.columns != 'radius'].to_numpy()
-        init_frm = traj.Frame(xyz=xyz, box=self.box)
-        return init_frm.pairDists()
+        return traj.Frame(xyz=xyz, box=self.box).pairDists()
 
     def setInitFrm(self, frags):
-
+        """
+        Set the
+        :param frags:
+        :return:
+        """
         data = np.array([[x.fmol.init_radius] + [np.inf, np.inf, np.inf]
                          for x in frags])
         index = [x.fmol.mol.GetIntProp('mol_id') for x in frags]
@@ -661,7 +684,7 @@ class FragMols(FragMixIn):
         raise ValueError(f'Failed to relocate the dead molecule.')
 
     def reportRelocation(self, frag):
-        idists = self.initDists()
+        idists = self.getInitDists()
         dists = self.dcell.getDistsWithIds(frag.fmol.extg_gids)
         self.log(f"Relocate the initiator of "
                  f"{frag.fmol.mol.GetIntProp('mol_id')} "

@@ -470,6 +470,7 @@ class PackedCell:
 
         :param mol_id int: the molecule id of the molecule to be placed into the
             cell.
+        :param aids list: list of atom ids whose centroid is translated.
         """
         mol = self.mols[mol_id]
         conf = mol.GetConformer()
@@ -539,46 +540,6 @@ class GrowedCell(PackedCell):
                                        box=self.box,
                                        logger=logger)
         frag_mols.run()
-        # trial_num = 1
-        # while trial_num <= max_trial:
-        #     self.extg_aids = set()
-        #     for mol_id in self.df_reader.mols.keys():
-        #         try:
-        #             self.placeMol(mol_id)
-        #         except MolError:
-        #             log_debug(f'{trial_num} trail fails. '
-        #                       f'(Only {mol_id - 1} / {len(self.mols)} '
-        #                       f'molecules placed in the cell.)')
-        #             trial_num += 1
-        #             break
-        #     else:
-        #         # All molecules successfully placed (no break)
-        #         return
-        # raise DensityError
-
-    def placeMol(self, mol_id, max_trial=MAX_TRIAL_PER_MOL):
-        """
-        Place molecules one molecule into the cell without clash.
-
-        :param mol_id int: the molecule id of the molecule to be placed into the
-            cell.
-        :param max_trial int: the max trial number for each molecule to be placed
-            into the cell.
-        """
-        aids = self.df_reader.mols[mol_id]
-        trial_per_mol = 1
-        while trial_per_mol <= max_trial:
-            self.translateMol(mol_id)
-            if not self.hasClashes(aids):
-                self.extg_aids.update(aids)
-                # Only update the distance cell after one molecule successful
-                # placed into the cell as only inter-molecular clashes are
-                # checked for packed cell.
-                self.dcell.setUp()
-                return
-            trial_per_mol += 1
-        if trial_per_mol > max_trial:
-            raise MolError
 
 
 class Polymer(object):

@@ -9,7 +9,6 @@ import nemd
 import plotutils
 import environutils
 import jobutils
-import numpy as np
 
 FLAG_IN_FILE = 'in_file'
 FLAG_TEMP_FILE = '-temp_file'
