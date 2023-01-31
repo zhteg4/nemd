@@ -60,6 +60,8 @@ def logOptions(logger, options):
     logger.info(f"." * 10 + command_options + f"." * 10)
     for key, val in options.__dict__.items():
         logger.info(f"{key}: {val}")
+    time = datetime.now().isoformat(sep=' ', timespec='minutes')
+    logger.info(f"JobStart: {time}")
     logger.info(f"." * (20 + len(command_options)))
 
 
