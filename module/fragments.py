@@ -229,6 +229,7 @@ class FragMol(FragMixIn):
     IS_MONO = prop_names.IS_MONO
     MONO_ID = prop_names.MONO_ID
     POLYM_HT = prop_names.POLYM_HT
+    MOL_ID = prop_names.MOL_ID
 
     def __init__(self, mol, data_file=None):
         """
@@ -457,17 +458,17 @@ class FragMol(FragMixIn):
             frags = [frag] + list(set(frags).difference(nnxt_frags))
             log_debug(f"{len(self.extg_aids)}, {len(frag.vals)}: {frag}")
 
-    def setInitSize(self, buffer=1.):
-        xyzs = np.array([self.conf.GetAtomPosition(x) for x in self.extg_aids])
-        xyzs -= self.getInitCentroid()
-        self.init_radius = np.linalg.norm(xyzs, axis=1).max() + buffer
-
     def getInitCentroid(self):
         return conformerutils.centroid(self.conf, aids=list(self.extg_aids))
 
     @property
     def molecule_id(self):
-        return self.mol.GetIntProp('mol_id')
+        """
+        Return molecule id
+
+        :return int: the molecule id.
+        """
+        return self.mol.GetIntProp(self.MOL_ID)
 
     def run(self):
         """
@@ -515,7 +516,6 @@ class FragMols(FragMixIn):
             fmol.setPreFrags()
             fmol.setInitAtomIds()
             fmol.setGlobalAtomIds()
-            fmol.setInitSize()
         total_frag_num = sum([x.getNumFrags() for x in self.fmols.values()])
         log_debug(f"{total_frag_num} fragments in total.")
 
@@ -637,16 +637,8 @@ class FragMols(FragMixIn):
         if len(self.mols) == 1:
             return
         self.log(
-            f'({self.getInitDists().min():.2f} as the minimum pair distance)')
-
-    def getInitDists(self):
-        """
-        Calculate the initiator pair distances.
-
-        :return array: each value is a distance between two initiators.
-        """
-        xyz = self.init_df.loc[:, self.init_df.columns != 'radius'].to_numpy()
-        return traj.Frame(xyz=xyz, box=self.box).pairDists()
+            f'({self.init_tf.pairDists().min():.2f} as the minimum pair distance)'
+        )
 
     def setInitFrm(self, frags):
         """
@@ -654,12 +646,10 @@ class FragMols(FragMixIn):
         :param frags:
         :return:
         """
-        data = np.array([[x.fmol.init_radius] + [np.inf, np.inf, np.inf]
-                         for x in frags])
-        index = [x.fmol.mol.GetIntProp('mol_id') for x in frags]
-        self.init_df = pd.DataFrame(data=data,
-                                    index=index,
-                                    columns=['radius'] + traj.Frame.UXYZ)
+
+        data = np.full((len(frags), 3), np.inf)
+        index = [x.fmol.molecule_id for x in frags]
+        self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
 
     def placeInitFrag(self, frag):
         self.dcell.rmClashNodes()
@@ -679,15 +669,15 @@ class FragMols(FragMixIn):
             # placed into the cell as only inter-molecular clashes are
             # checked for packed cell.
             self.add(list(gids))
-            self.init_df.loc[frag.fmol.molecule_id][1:] = point
+            self.init_tf.loc[frag.fmol.molecule_id] = point
             return
         raise ValueError(f'Failed to relocate the dead molecule.')
 
     def reportRelocation(self, frag):
-        idists = self.getInitDists()
+        idists = self.init_tf.pairDists()
         dists = self.dcell.getDistsWithIds(frag.fmol.extg_gids)
         self.log(f"Relocate the initiator of "
-                 f"{frag.fmol.mol.GetIntProp('mol_id')} "
+                 f"{frag.fmol.molecule_id} "
                  f"(initiator: {idists.min():.2f}-{idists.max():.2f};"
                  f"close contact: {dists.min():.2f}) ")
 

@@ -381,7 +381,7 @@ class PackedCell:
         ]
         self.mols = {i: x for i, x in enumerate(mols, start=1)}
         for mol_id, mol in self.mols.items():
-            mol.SetIntProp('mol_id', mol_id)
+            mol.SetIntProp(prop_names.MOL_ID, mol_id)
 
     def setDataReader(self):
         """
