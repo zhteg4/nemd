@@ -458,9 +458,6 @@ class FragMol(FragMixIn):
             frags = [frag] + list(set(frags).difference(nnxt_frags))
             log_debug(f"{len(self.extg_aids)}, {len(frag.vals)}: {frag}")
 
-    def getInitCentroid(self):
-        return conformerutils.centroid(self.conf, aids=list(self.extg_aids))
-
     @property
     def molecule_id(self):
         """
@@ -497,11 +494,21 @@ class FragMols(FragMixIn):
         self.mol_num = None  # the last reported growing molecule number
 
     def log(self, msg, timestamp=False):
+        """
+        Log information into the log file.
+
+        :param msg str: the message to print into the log
+        :param timestamp bool: whether stamp with time
+        """
+
         if not self.logger:
             return
         logutils.log(self.logger, msg, timestamp=timestamp)
 
     def run(self):
+        """
+        Main method to fragmentize and set conformer.
+        """
         self.fragmentize()
         self.readData()
         self.setDCellParams()
@@ -510,6 +517,9 @@ class FragMols(FragMixIn):
         self.setConformer()
 
     def fragmentize(self):
+        """
+        Break the molecule into the smallest rigid fragments.
+        """
         self.fmols = {i: FragMol(x) for i, x in self.mols.items()}
         for fmol in self.fmols.values():
             fmol.addNxtFrags()
@@ -539,6 +549,9 @@ class FragMols(FragMixIn):
         self.frm = traj.Frame(xyz=xyz, box=self.box)
 
     def updateFrm(self):
+        """
+        Update the coordinate frame based on the current conformer.
+        """
         pos = [x.GetPositions() for x in self.confs.values()]
         self.frm.loc[:] = np.concatenate(pos, axis=0)
 
@@ -642,9 +655,9 @@ class FragMols(FragMixIn):
 
     def setInitFrm(self, frags):
         """
-        Set the
-        :param frags:
-        :return:
+        Set the traj frame for initiators.
+
+        :param frags list of 'fragments.Fragment': fragment from each molecule
         """
 
         data = np.full((len(frags), 3), np.inf)
@@ -652,6 +665,16 @@ class FragMols(FragMixIn):
         self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
 
     def placeInitFrag(self, frag):
+        """
+        Place the initiator fragment into the cell with random position, random
+        orientation, and large separation.
+
+        :param frag 'fragments.Fragment': the fragment to place
+
+        :raise ValueError: when no void to place the initiator fragment of the
+            dead molecule.
+        """
+
         self.dcell.rmClashNodes()
         points = self.dcell.getVoids()
         for point in points:
@@ -674,6 +697,11 @@ class FragMols(FragMixIn):
         raise ValueError(f'Failed to relocate the dead molecule.')
 
     def reportRelocation(self, frag):
+        """
+        Report the status after relocate a initiator fragment.
+        :param frag 'fragments.Fragment': the relocated fragment
+        """
+
         idists = self.init_tf.pairDists()
         dists = self.dcell.getDistsWithIds(frag.fmol.extg_gids)
         self.log(f"Relocate the initiator of "
@@ -682,6 +710,12 @@ class FragMols(FragMixIn):
                  f"close contact: {dists.min():.2f}) ")
 
     def backMove(self, frag, frags):
+        """
+        Back move fragment so that the obstacle can be walked around later.
+
+        :param frag 'fragments.Fragment': fragment to perform back move
+        :param frags list: growing fragments
+        """
         # 1）Find the previous fragment with available dihedral candidates.
         pfrag = frag.getPreAvailFrag()
         found = bool(pfrag)
@@ -701,6 +735,12 @@ class FragMols(FragMixIn):
         return frags, found
 
     def hasClashes(self, gids):
+        """
+        Whether the atoms has clashes with existing atoms in the cell.
+
+        :param gids list: golabal atom ids to check clashes against.
+        :return bool: True if clashes are found.
+        """
         frag_rows = [self.frm.loc[x] for x in gids]
         for row in frag_rows:
             clashes = self.dcell.getClashes(row,
