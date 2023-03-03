@@ -12,6 +12,8 @@ https://github.com/openmm/openmmforcefields
 OpenFF Toolkit https://open-forcefield-toolkit.readthedocs.io/_/downloads/en/latest/pdf/
 Discover program needs the forcefield atom type of each atom in the molecule or system in order to determine which forcefield parameters
 http://www.uoxray.uoregon.edu/local/manuals/biosym/discovery/General/Forcefields/Assign_Atom_Types.html#Intro
+sGDML, ML force field https://pubs.acs.org/doi/full/10.1021/acs.chemrev.0c01111
+ChemoPy, freely available python package for computational biology and chemoinformatics
 
 JobControl:
 https://docs.signac.io/en/latest/tutorial.html#implementing-a-simple-workflow
@@ -24,3 +26,6 @@ https://www.nsf.gov/awardsearch/showAward?AWD_ID=1835630
 https://zenodo.org/ Transform to OPen Science (TOPS)
 
 Thermally Conductivie Plastics Market: https://www.marketsandmarkets.com/Market-Reports/thermally-conductive-plastics-market-148526587.html
+
+Machine Learning:
+ https://github.com/ samoturk/mol2vec
