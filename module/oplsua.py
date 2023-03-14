@@ -1365,7 +1365,10 @@ class LammpsData(LammpsIn):
         """
 
         for idx, (itype, id1, id2, id3, id4) in self.impropers.items():
-            self.angles.pop(self.rvrs_angles[tuple([id1, id3, id4])])
+            angle_atom_ids = tuple([id1, id3, id4])
+            if angle_atom_ids not in self.rvrs_angles:
+                angle_atom_ids = angle_atom_ids[::-1]
+            self.angles.pop(self.rvrs_angles[angle_atom_ids])
 
     def removeUnused(self):
         """
@@ -1836,6 +1839,10 @@ class DataFileReader(LammpsData):
     def setClashParams(self, include14=False, scale=SCALE):
         """
         Set clash check related parameters including pair radii and exclusion.
+
+        :param include14 bool: whether to include atom separated by 2 bonds for
+            clash check.
+        :param scale float: the scale param on vdw radius in clash check.
         """
         self.setClashExclusion(include14=not include14)
         self.setPairCoeffs()
@@ -1884,33 +1891,36 @@ class DataFileReader(LammpsData):
         NOTE: the scaled radii here are more like diameters (or distance)
             between two sites.
         """
-        # LammpsData.GEOMETRIC is optimized for speed and is supported
-        radii = [0] + [self.vdws[x.type_id].dist for x in self.atoms.values()]
-        shape = len(self.atoms) + 1
-        self.radii = np.full((shape, shape), radii, dtype='float16')
-        self.radii *= self.radii.transpose()
-        self.radii = np.sqrt(self.radii)
-        self.radii *= pow(2, 1 / 6) * scale
-        self.radii[self.radii < self.min_dist] = self.min_dist
+        if mix == LammpsData.GEOMETRIC:
+            # LammpsData.GEOMETRIC is optimized for speed and is supported
+            radii = [0] + [self.vdws[x.type_id].dist for x in self.atoms.values()]
+            shape = len(self.atoms) + 1
+            self.radii = np.full((shape, shape), radii, dtype='float16')
+            self.radii[:, 0] = self.radii[0, :]
+            self.radii *= self.radii.transpose()
+            self.radii = np.sqrt(self.radii)
+            self.radii *= pow(2, 1 / 6) * scale
+            self.radii[self.radii < self.min_dist] = self.min_dist
+            return
 
-        # radii = collections.defaultdict(dict)
-        # for id1, vdw1 in self.vdws.items():
-        #     for id2, vdw2 in self.vdws.items():
-        #         if mix == self.GEOMETRIC:
-        #             dist = pow(vdw1.dist * vdw2.dist, 0.5)
-        #         elif mix == self.ARITHMETIC:
-        #             dist = (vdw1.dist + vdw2.dist) / 2
-        #         elif mix == self.SIXTHPOWER:
-        #             dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
-        #             dist = pow(dist, 1 / 6)
-        #         dist *= pow(2, 1 / 6) * scale
-        #         if dist < self.min_dist:
-        #             dist = self.min_dist
-        #         radii[id1][id2] = round(dist, 4)
-        #
-        # self.radii = collections.defaultdict(dict)
-        # for atom1 in self.atoms.values():
-        #     for atom2 in self.atoms.values():
-        #         self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
-        #             atom2.type_id]
-        # self.radii = dict(self.radii)
+        radii = collections.defaultdict(dict)
+        for id1, vdw1 in self.vdws.items():
+            for id2, vdw2 in self.vdws.items():
+                if mix == self.GEOMETRIC:
+                    dist = pow(vdw1.dist * vdw2.dist, 0.5)
+                elif mix == self.ARITHMETIC:
+                    dist = (vdw1.dist + vdw2.dist) / 2
+                elif mix == self.SIXTHPOWER:
+                    dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
+                    dist = pow(dist, 1 / 6)
+                dist *= pow(2, 1 / 6) * scale
+                if dist < self.min_dist:
+                    dist = self.min_dist
+                radii[id1][id2] = round(dist, 4)
+
+        self.radii = collections.defaultdict(dict)
+        for atom1 in self.atoms.values():
+            for atom2 in self.atoms.values():
+                self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
+                    atom2.type_id]
+        self.radii = dict(self.radii)

@@ -201,20 +201,23 @@ class Fragment:
 
 class FragMixIn:
 
-    def readData(self):
+    def readData(self, include14=False):
         """
         Read data  file and set clash parameters.
         """
         self.data_reader = oplsua.DataFileReader(self.data_file)
         self.data_reader.run()
-        self.data_reader.setClashParams()
+        self.data_reader.setClashParams(include14=include14)
 
     def setDCellParams(self):
         """
         Set distance cell parameters.
         """
 
-        self.max_clash_dist = self.data_reader.radii.max()
+        # memory saving flaot16 to regular float32
+        self.max_clash_dist = float(self.data_reader.radii.max())
+        # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
+        # seperated by 1 max_clash_dist, meaning no clashes.
         self.cell_cut = self.max_clash_dist
 
 
@@ -419,7 +422,8 @@ class FragMol(FragMixIn):
         :param aids list of ints: list of atom ids
         :return bool: clashes exist or not.
         """
-
+        # frm and self.data_reader.radii use gid starting from 1
+        # while aid starts from 0.
         self.frm.loc[:] = self.conf.GetPositions()
         frag_rows = [self.frm.iloc[x] for x in aids]
         for row in frag_rows:

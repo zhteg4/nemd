@@ -90,7 +90,7 @@ class TestFragMol:
         assert has_pre == bool(frags[-1].pfrag)
 
     @pytest.mark.parametrize(('smiles_str', 'data_file', 'num'),
-                             [(BUTANE, BUTANE_DATA, 4)])
+                             [(BUTANE, BUTANE_DATA, 5)])
     def testReadData(self, fmol, num):
         fmol.readData()
         assert num == len(fmol.data_reader.radii)
@@ -100,8 +100,7 @@ class TestFragMol:
     def testSetDCellParams(self, fmol):
         fmol.readData()
         fmol.setDCellParams()
-        np.testing.assert_allclose(1.5779571475133165, fmol.cell_rez)
-        np.testing.assert_allclose(2.629928579188861, fmol.cell_cut)
+        np.testing.assert_allclose(2.191, fmol.cell_cut, 0.001)
 
     @pytest.mark.parametrize(('smiles_str', 'data_file'),
                              [(BUTANE, BUTANE_DATA)])
@@ -135,7 +134,7 @@ class TestFragMol:
         fmol.addNxtFrags()
         fmol.setPreFrags()
         fmol.setInitAtomIds()
-        fmol.readData()
+        fmol.readData(include14=True)
         fmol.setDCellParams()
         fmol.setCoords()
         fmol.setFrm()
@@ -151,7 +150,7 @@ class TestFragMol:
         fmol.addNxtFrags()
         fmol.setPreFrags()
         fmol.setInitAtomIds()
-        fmol.readData()
+        fmol.readData(include14=True)
         fmol.setDCellParams()
         fmol.setCoords()
         fmol.setFrm()

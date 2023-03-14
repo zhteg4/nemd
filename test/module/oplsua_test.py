@@ -258,4 +258,5 @@ class TestDataFileReader:
     def testSetVdwRadius(self, df_reader):
         df_reader.setPairCoeffs()
         df_reader.setVdwRadius()
-        assert 30 == len(df_reader.radii)
+        # gid starts from 1 but there is one placeholder at index 0 for speeding
+        assert 31 == len(df_reader.radii)
