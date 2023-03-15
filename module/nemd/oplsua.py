@@ -1893,7 +1893,9 @@ class DataFileReader(LammpsData):
         """
         if mix == LammpsData.GEOMETRIC:
             # LammpsData.GEOMETRIC is optimized for speed and is supported
-            radii = [0] + [self.vdws[x.type_id].dist for x in self.atoms.values()]
+            radii = [0] + [
+                self.vdws[x.type_id].dist for x in self.atoms.values()
+            ]
             shape = len(self.atoms) + 1
             self.radii = np.full((shape, shape), radii, dtype='float16')
             self.radii[:, 0] = self.radii[0, :]

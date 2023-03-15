@@ -4,6 +4,10 @@ import pkgutil
 NEMD_DEBUG = 'NEMD_DEBUG'
 NEMD_SRC = 'NEMD_SRC'
 DEBUG = 'DEBUG'
+JOBNAME = 'JOBNAME'
+INTERACTIVE = 'INTERACTIVE'
+NEMD = 'nemd'
+MODULE = 'module'
 
 
 def is_debug():
@@ -38,16 +42,28 @@ def get_module_path():
     """
     nemd_src = get_nemd_src()
     if not nemd_src:
-        return os.path.dirname(pkgutil.get_loader('nemd').path)
-    return os.path.join(nemd_src, 'module', 'nemd')
+        return os.path.dirname(pkgutil.get_loader(NEMD).path)
+    return os.path.join(nemd_src, MODULE, NEMD)
 
 
 def get_jobname(default_jobname):
-    jobname = os.environ.get('JOBNAME')
+    """
+    Get the joabname from environment settings or the input default one.
+
+    :param default_jobname str: the default one if the environment one is missing.
+
+    :return str: the jobname.
+    """
+    jobname = os.environ.get(JOBNAME)
     if jobname:
         return jobname
     return default_jobname
 
 
 def is_interactive():
-    return os.environ.get('INTERACTIVE')
+    """
+    Whether interactive mode is on.
+
+    :return bool: If interactive mode is on.
+    """
+    return os.environ.get(INTERACTIVE)
