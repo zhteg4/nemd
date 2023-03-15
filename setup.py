@@ -11,8 +11,8 @@ setup(
     packages=['nemd'],
     package_dir={'nemd': 'module/nemd'},
     package_data={'nemd': ['ff/*.prm']},
-    scripts=['scripts/polymer_builder_driver.py'],
-    install_requires=['matplotlib', 'numpy', 'chemparse', 'rdkit', 'networkx', 'scipy'],
+    scripts=['bash_scripts/run_nemd', 'scripts/polymer_builder_driver.py'],
+    install_requires=['matplotlib', 'numpy', 'chemparse', 'rdkit', 'networkx', 'scipy','lammps'],
     classifiers=[
         'Development Status :: 1 - Planning',
         'Intended Audience :: Science/Research',

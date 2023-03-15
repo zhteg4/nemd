@@ -7,6 +7,7 @@ fi
 
 SCRIPT_DIR="$(dirname "$1")"
 if [ -d $SCRIPT_DIR ]; then
+    # Relative or absolute path is provided by users
     SCRIPT_ABS_PATH="$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
 fi
 
@@ -17,7 +18,15 @@ fi
 if [ -z "$SCRIPT_PATH" ]; then
     args=("$@")
     SCRIPT_BASENAME=`basename ${args[0]}`
-    SCRIPT_PATH=$NEMD_SCRIPTS/$SCRIPT_BASENAME
+    if [ -z "$NEMD_SCRIPTS" ]; then
+        SCRIPT_PATH=`which $SCRIPT_BASENAME`
+    else
+        SCRIPT_PATH=$NEMD_SCRIPTS/$SCRIPT_BASENAME
+    fi
+    if [ -z "$SCRIPT_PATH" ]; then
+        echo "Please install $SCRIPT_BASENAME, or source the premake file in the source code."
+        exit
+    fi
 fi
 
 if [ ! -f $SCRIPT_PATH ]; then
