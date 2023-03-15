@@ -1,9 +1,9 @@
-import environutils
+from nemd import environutils
 import math
 import os
 import numpy as np
-import logutils
-import units
+from nemd import logutils
+from nemd import units
 import shutil
 from io import StringIO
 from dataclasses import dataclass

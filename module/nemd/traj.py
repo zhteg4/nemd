@@ -1,7 +1,7 @@
 import math
-import oplsua
+from nemd import oplsua
 import random
-import symbols
+from nemd import symbols
 import itertools
 import numpy as np
 import pandas as pd

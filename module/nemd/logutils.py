@@ -1,5 +1,5 @@
 import os
-import environutils
+from nemd import environutils
 import logging
 import pathlib
 from datetime import datetime

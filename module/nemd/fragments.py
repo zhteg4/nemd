@@ -1,10 +1,10 @@
-import traj
-import oplsua
-import logutils
+from nemd import traj
+from nemd import oplsua
+from nemd import logutils
 import itertools
-import prop_names
-import structutils
-import conformerutils
+from nemd import prop_names
+from nemd import structutils
+from nemd import conformerutils
 import numpy as np
 import pandas as pd
 from rdkit import Chem

@@ -2,23 +2,23 @@ import os
 import sys
 import math
 import copy
-import traj
+from nemd import traj
 import scipy
-import oplsua
+from nemd import oplsua
 import lammps
-import symbols
-import jobutils
-import logutils
+from nemd import symbols
+from nemd import jobutils
+from nemd import logutils
 import functools
-import fragments
-import structutils
-import parserutils
-import fileutils
+from nemd import fragments
+from nemd import structutils
+from nemd import parserutils
+from nemd import fileutils
 import itertools
-import prop_names
+from nemd import prop_names
 import collections
-import environutils
-import conformerutils
+from nemd import environutils
+from nemd import conformerutils
 import numpy as np
 import networkx as nx
 from rdkit import Chem

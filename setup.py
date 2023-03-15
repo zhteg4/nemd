@@ -1,16 +1,16 @@
 from setuptools import setup
 
 setup(
-    name='nemd3',
+    name='nemd',
     version='0.1.0',    
     description='A example Python package',
     url='https://github.com/shuds13/pyexample',
     author='Stephen Hudson',
     author_email='shudson@anl.gov',
     license='BSD 2-clause',
-    packages=['nemd3'],
-    package_dir={'nemd3': 'module1/nemd'},
-#    package_data={'nemd3': ['ff/*.prm']},
+    packages=['nemd'],
+    package_dir={'nemd': 'module/nemd'},
+    package_data={'nemd': ['ff/*.prm']},
     scripts=['scripts/polymer_builder_driver.py'],
     install_requires=['matplotlib', 'numpy', 'chemparse', 'rdkit', 'networkx', 'scipy'],
     classifiers=[

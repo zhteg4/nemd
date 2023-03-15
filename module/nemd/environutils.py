@@ -16,7 +16,7 @@ def get_module_path():
     nemd_src = get_nemd_src()
     if not nemd_src:
         return
-    return os.path.join(nemd_src, 'module')
+    return os.path.join(nemd_src, 'module', 'nemd')
 
 
 def get_jobname(default_jobname):

@@ -1,7 +1,7 @@
 import os
-import symbols
+from nemd import symbols
 import argparse
-import constants
+from nemd import constants
 import random
 import numpy as np
 from rdkit import Chem

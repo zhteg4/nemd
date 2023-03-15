@@ -1,12 +1,12 @@
 import types
-import symbols
-import logutils
-import fileutils
+from nemd import symbols
+from nemd import logutils
+from nemd import fileutils
 import chemparse
 import itertools
-import constants
+from nemd import constants
 import collections
-import environutils
+from nemd import environutils
 import numpy as np
 from rdkit import Chem
 from collections import namedtuple
