@@ -1,8 +1,8 @@
 import os
-import traj
 import pytest
-import testutils
 import numpy as np
+from nemd import traj
+from nemd import testutils
 
 TRAJS = 'trajs'
 BASE_DIR = testutils.test_file(TRAJS)

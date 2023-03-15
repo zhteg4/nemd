@@ -1,8 +1,8 @@
 import os
 import sys
-import fileutils
 import pytest
-import testutils
+from nemd import fileutils
+from nemd import testutils
 
 from unittest import mock
 from PyQt5 import QtCore, QtGui, QtWidgets

@@ -123,6 +123,39 @@ def get_parser():
     return parser
 
 
+class Validator:
+
+    def __init__(self, argv):
+        self.argv = argv
+        self.options = None
+
+    def run(self):
+        self.parse()
+        self.cruNum()
+        self.molNum()
+
+    def parse(self):
+        self.options = get_parser().parse_args(self.argv)
+
+    def cruNum(self):
+        if self.options.cru_num is None:
+            self.options.cru_num = [1] * len(self.options.cru)
+            return
+        if len(self.options.cru_num) == len(self.options.cru):
+            return
+        raise ValueError(f'{len(self.options.cru_num)} cru num defined, but '
+                         f'{len(self.options.cru_num)} cru found.')
+
+    def molNum(self):
+        if self.options.mol_num is None:
+            self.options.mol_num = [1] * len(self.options.cru_num)
+            return
+        if len(self.options.cru_num) == len(self.options.mol_num):
+            return
+        raise ValueError(f'{len(self.options.cru_num)} cru num defined, but '
+                         f'{len(self.options.mol_num)} molecules found.')
+
+
 def validate_options(argv):
     """
     Parse and validate the command args
@@ -130,9 +163,9 @@ def validate_options(argv):
     :param argv list: list of command input.
     :return: 'argparse.ArgumentParser':  Parsed command-line options out of sys.argv
     """
-    parser = get_parser()
-    options = parser.parse_args(argv)
-    return options
+    validator = Validator(argv)
+    validator.run()
+    return validator.options
 
 
 class AmorphousCell(object):

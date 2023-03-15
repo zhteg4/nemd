@@ -1772,6 +1772,9 @@ class DataFileReader(LammpsData):
         """
         Parse the atom section for atom id and molecule id.
         """
+        if self.BONDS_CAP not in self.mk_idxes:
+            return
+
         sidx = self.mk_idxes[self.BONDS_CAP] + 2
         for lid in range(sidx, sidx + self.struct_dsp[self.BONDS]):
             id, type_id, id1, id2 = self.lines[lid].split()

@@ -1,8 +1,8 @@
 import os
-import testutils
-import fileutils
 import pytest
-from testutils import SINGLE_NEMD, CRYSTAL_NEMD
+from nemd import testutils
+from nemd import fileutils
+from nemd.testutils import SINGLE_NEMD, CRYSTAL_NEMD
 
 
 class TestTempReader(object):

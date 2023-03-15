@@ -1,11 +1,12 @@
 import os
 import sys
-import fileutils
 import pytest
-import testutils
 from rdkit import Chem
+from nemd import fileutils
+from nemd import testutils
 
 from unittest import mock
+
 import polymer_builder_driver as driver
 
 BASE_DIR = testutils.test_file('polym_builder')

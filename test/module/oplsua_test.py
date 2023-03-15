@@ -1,10 +1,10 @@
 import os
 import pytest
-import oplsua
-import fileutils
-import testutils
-import rdkitutils
 from rdkit import Chem
+from nemd import oplsua
+from nemd import fileutils
+from nemd import testutils
+from nemd import rdkitutils
 
 BUTANE = 'CCCC'
 CC3COOH = '[H]OC(=O)CCC(CC(C)C(=O)O[H])C(=O)O[H]'

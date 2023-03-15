@@ -1,1 +1,2 @@
-python3 -m yapf -i --verbose $NEMD_SRC/*.py $NEMD_SRC/module/nemd/*.py $NEMD_SRC/scripts/*.py $NEMD_SRC/test/module/*.py $NEMD_SRC/test/*.py
+python3 -m yapf -i --verbose $NEMD_SRC/*.py $NEMD_SRC/module/nemd/*.py \
+$NEMD_SRC/scripts/*.py $NEMD_SRC/test/module/*.py $NEMD_SRC/test/*.py

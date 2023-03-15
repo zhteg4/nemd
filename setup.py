@@ -14,7 +14,7 @@ setup(
     scripts=['bash_scripts/run_nemd', 'scripts/polymer_builder_driver.py'],
     install_requires=[
         'matplotlib', 'numpy', 'chemparse', 'rdkit', 'networkx', 'scipy',
-        'lammps', 'yapf'
+        'lammps', 'PyQt5', 'yapf', 'pytest'
     ],
     classifiers=[
         'Development Status :: 1 - Planning',

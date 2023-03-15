@@ -1,10 +1,10 @@
 import os
 import pytest
-import fragments
-import testutils
-import rdkitutils
 import numpy as np
 from rdkit import Chem
+from nemd import fragments
+from nemd import testutils
+from nemd import rdkitutils
 
 BUTANE = 'CCCC'
 BUTENE = 'CC=CC'
@@ -70,8 +70,8 @@ class TestFragMol:
         assert pln == len(npath)
 
     @pytest.mark.parametrize(('smiles_str', 'data_file', 'num'),
-                             [(BUTANE, None, 1), (BUTENE, None, 0),
-                              (CCCOOH, None, 2), (BENZENE, None, 0),
+                             [(BUTANE, None, 1), (BUTENE, None, 1),
+                              (CCCOOH, None, 2), (BENZENE, None, 1),
                               (COOHPOLYM, None, 10)])
     def testAddNxtFrags(self, fmol, num):
         fmol.addNxtFrags()
@@ -85,7 +85,7 @@ class TestFragMol:
         fmol.addNxtFrags()
         fmol.setPreFrags()
         frags = fmol.fragments()
-        if not frags:
+        if not frags[0].dihe :
             return
         assert has_pre == bool(frags[-1].pfrag)
 
