@@ -403,12 +403,11 @@ class DistanceCell:
             largest_cc_rv[size].append(node)
         sizes = sorted(set(largest_cc.values()), reverse=True)
         sel_nodes, sel_num = [], 0
-        while sel_num < num:
+        while len(sel_nodes) < num:
             size = sizes.pop(0)
             sub_nodes = largest_cc_rv[size]
-            np.random.shuffle([1, 2, 3])
+            np.random.shuffle(sub_nodes)
             sel_nodes += sub_nodes
-            sel_num += len(sub_nodes)
         return [self.ggrids * x for x in sel_nodes]
 
     def getDistsWithIds(self, ids):

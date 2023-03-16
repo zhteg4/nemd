@@ -1,12 +1,11 @@
 import os
 import sys
 import pytest
-from nemd import fileutils
 from nemd import testutils
 
 from unittest import mock
-from PyQt5 import QtCore, QtGui, QtWidgets
-from testutils import SINGLE_NEMD, CRYSTAL_NEMD
+from PyQt6 import QtWidgets
+from nemd.testutils import SINGLE_NEMD, CRYSTAL_NEMD
 
 import thermal_conductivity_gui as gui
 
