@@ -85,7 +85,7 @@ class TestFragMol:
         fmol.addNxtFrags()
         fmol.setPreFrags()
         frags = fmol.fragments()
-        if not frags[0].dihe :
+        if not frags[0].dihe:
             return
         assert has_pre == bool(frags[-1].pfrag)
 

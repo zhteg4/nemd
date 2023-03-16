@@ -1,4 +1,4 @@
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 class PushButton(QtWidgets.QFrame):
@@ -19,7 +19,7 @@ class PushButton(QtWidgets.QFrame):
         self.setLayout(self.layout)
         self.button = QtWidgets.QPushButton(text)
         self.button.sizePolicy().setHorizontalPolicy(
-            QtWidgets.QSizePolicy.Fixed)
+            QtWidgets.QSizePolicy.Policy.Fixed)
         self.layout.addWidget(self.button)
         if command:
             self.button.clicked.connect(command)
@@ -29,7 +29,7 @@ class PushButton(QtWidgets.QFrame):
 
         font = self.button.font()
         font_metrics = QtGui.QFontMetrics(font)
-        text_width = font_metrics.width(text)
+        text_width = font_metrics.averageCharWidth() * len(text)
         text_height = font_metrics.height()
         button_height = self.button.sizeHint().height()
         self.button.setFixedSize(

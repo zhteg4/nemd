@@ -4,11 +4,11 @@ import sys  # We need sys so that we can pass argv to QApplication
 import numpy as np
 from types import SimpleNamespace
 
-import nemd
-import widgets
-import fileutils
+from nemd import nemd_tc
+from nemd import widgets
+from nemd import fileutils
 import matplotlib
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 from matplotlib import colors as mcolors
 from matplotlib import lines
 from matplotlib.figure import Figure
@@ -315,11 +315,11 @@ class QMainWindow(QtWidgets.QMainWindow):
         self.app = app
         super().__init__(*args, **kwargs)
         self.error_dialog = QtWidgets.QMessageBox(self)
-        self.error_dialog.setIcon(QtWidgets.QMessageBox.Critical)
+        # self.error_dialog.setIcon(QtWidgets.QMessageBox.critical)
 
     def error(self, msg):
         self.error_dialog.setText(msg)
-        self.error_dialog.exec_()
+        self.error_dialog.exec()
 
 
 class NemdPanel(QMainWindow):
@@ -391,9 +391,14 @@ class NemdPanel(QMainWindow):
         if not log_file:
             dlg = QtWidgets.QFileDialog(self)
             dlg.setDirectory(self.previous_dir)
-            dlg.setFileMode(QtWidgets.QFileDialog.AnyFile)
+            dlg.setFileMode(QtWidgets.QFileDialog.FileMode.AnyFile)
             dlg.setNameFilters(["Driver log (*-driver.log)"])
-            if dlg.exec_():
+            # Printed to terminal: python3[16731:2156112] +
+            # [CATransaction synchronize] called within transaction
+            # Sounds like a macos Ventura  issue:
+            # https://forum.qt.io/topic/141868/macos-catransaction-synchronize-called-within-transaction
+            # https://github.com/python/cpython/issues/101895
+            if dlg.exec():
                 log_file = dlg.selectedFiles()[0]
         if not log_file or not os.path.isfile(log_file):
             self.error('Please select a driver.log file.')
@@ -453,7 +458,7 @@ class NemdPanel(QMainWindow):
         self.canvas.dataRangeChanged()
 
     def setThermalConductivity(self):
-        thermal_conductivity = nemd.ThermalConductivity(
+        thermal_conductivity = nemd_tc.ThermalConductivity(
             self.temp_gradient_le.value(), self.heat_flow_le.value(),
             self.cross_area_le.value())
         thermal_conductivity.run()
@@ -466,7 +471,7 @@ class NemdPanel(QMainWindow):
 
     def panel(self):
         self.show()
-        sys.exit(self.app.exec_())
+        sys.exit(self.app.exec())
 
 
 def get_panel(app=None):
