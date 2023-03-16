@@ -45,9 +45,6 @@ class Fragment:
         Reset the dihedral angle values and state.
         """
         self.fval, self.val = True, None
-        if not self.dihe:
-            # init_frag without dihe means rigid body
-            return
         self.vals = list(np.linspace(0, 360, 36, endpoint=False))
 
     def setFrags(self):
@@ -621,7 +618,8 @@ class FragMols(FragMixIn):
 
         while frags:
             frag = frags.pop(0)
-            if not frag.vals and frag.fval:
+            if not frag.dihe:
+                # init_frag without dihe means rigid body
                 continue
             while frag.vals:
                 frag.setDihedralDeg()
