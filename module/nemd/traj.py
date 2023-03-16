@@ -1,3 +1,4 @@
+import collections
 import math
 from nemd import oplsua
 import random
@@ -381,7 +382,13 @@ class DistanceCell:
             rnodes.append(rnode)
         self.graph.remove_nodes_from(nodes)
 
-    def getVoids(self):
+    def getVoids(self, num=10):
+        """
+        Get the points from the voids.
+
+        :param num int: number of voids returned
+        :return list: list of points whether the void centers are
+        """
         mcc = max(nx.connected_components(self.graph), key=len)
         cut = min(max(self.gindexes) / 3, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
         largest_cc = {
@@ -389,12 +396,20 @@ class DistanceCell:
                 nx.single_source_shortest_path_length(self.graph,
                                                       x,
                                                       cutoff=int(cut)))
-            for x in random.sample(mcc, 100)
+            for x in random.sample(list(mcc), num*10)
         }
-        max_num = max(largest_cc.values())
-        nodes = [x for x, y in largest_cc.items() if y == max_num]
-        np.random.shuffle(nodes)
-        return [self.ggrids * x for x in nodes]
+        largest_cc_rv = collections.defaultdict(list)
+        for node, size in largest_cc.items():
+            largest_cc_rv[size].append(node)
+        sizes = sorted(set(largest_cc.values()), reverse=True)
+        sel_nodes, sel_num = [], 0
+        while sel_num < num:
+            size = sizes.pop(0)
+            sub_nodes = largest_cc_rv[size]
+            np.random.shuffle([1, 2, 3])
+            sel_nodes += sub_nodes
+            sel_num += len(sub_nodes)
+        return [self.ggrids * x for x in sel_nodes]
 
     def getDistsWithIds(self, ids):
         dists = [
