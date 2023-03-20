@@ -1,38 +1,26 @@
-import json
 import os
+import signac
+import filecmp
+import subprocess
+from nemd import fileutils
+from nemd.nflow import FlowProject
 
-from flow import FlowProject
+CMD = 'run_nemd polymer_builder_driver.py *CC* -cru_num 10 -mol_num 10 -seed 5678'
 
-
-def volume_computed(job):
-    return job.isfile("volume.txt")
-
-# @FlowProject.label
-@FlowProject.post(volume_computed)
 @FlowProject.operation
-def compute_volume(job):
-    volume = job.sp.N * job.sp.kT / job.sp.p
-    with open(job.fn("volume.txt"), "w") as file:
-        file.write(str(volume) + "\n")
+def build_polymer(job):
+    with fileutils.chdir(job.fn('')):
+        subprocess.run(CMD.split())
 
-# @FlowProject.pre(volume_computed)
-# @FlowProject.post.isfile("data.json")
-# @FlowProject.operation
-# def store_volume_in_json_file(job):
-#     with open(job.fn("volume.txt")) as textfile:
-#         data = {"volume": float(textfile.read())}
-#         with open(job.fn("data.json"), "w") as jsonfile:
-#             json.dump(data, jsonfile)
+@FlowProject.pre.after(build_polymer)
+@FlowProject.operation
+def cmp_data(job):
+    assert filecmp.cmp( 'polymer_builder.data', job.fn('polymer_builder.data'))
 
 
 if __name__ == "__main__":
-    # init.py
-    import signac
 
     project = signac.init_project(root=os.getcwd(), workspace='workspace')
-
-    for p in range(1, 3):
-        sp = {"p": p, "kT": 1.0, "N": 1000}
-        job = project.open_job(sp)
-        job.init()
-    FlowProject().main()
+    job = project.open_job({'V':0})
+    job.init()
+    FlowProject().run()
