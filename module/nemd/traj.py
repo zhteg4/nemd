@@ -260,7 +260,6 @@ class DistanceCell:
         """
         Cells with separation distances less than the cutoff are set as neighbors.
         """
-
         def separation_dist(ijk):
             separation_ids = [y - 1 if y else y for y in ijk]
             return np.linalg.norm(self.grids * separation_ids)
@@ -396,7 +395,7 @@ class DistanceCell:
                 nx.single_source_shortest_path_length(self.graph,
                                                       x,
                                                       cutoff=int(cut)))
-            for x in random.sample(list(mcc), num*10)
+            for x in random.sample(list(mcc), num * 10)
         }
         largest_cc_rv = collections.defaultdict(list)
         for node, size in largest_cc.items():

@@ -11,7 +11,6 @@ CC3COOH_RANDOMIZED = os.path.join(BASE_DIR, 'CC3COOH_randomized.custom')
 
 
 class TestTraj:
-
     @pytest.fixture
     def raw_frms(self, filename):
         return traj.Frame.read(filename)
@@ -36,7 +35,6 @@ class TestTraj:
 
 
 class TestDistanceCell:
-
     @pytest.fixture
     def dcell(self, filename):
         frm = next(traj.Frame.read(filename))

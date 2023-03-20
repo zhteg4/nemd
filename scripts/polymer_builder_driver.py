@@ -2,27 +2,27 @@ import os
 import sys
 import math
 import copy
-from nemd import traj
 import scipy
-from nemd import oplsua
 import lammps
-from nemd import symbols
-from nemd import jobutils
-from nemd import logutils
-import functools
-from nemd import fragments
-from nemd import structutils
-from nemd import parserutils
-from nemd import fileutils
 import itertools
-from nemd import prop_names
+import functools
 import collections
-from nemd import environutils
-from nemd import conformerutils
 import numpy as np
 import networkx as nx
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from nemd import traj
+from nemd import oplsua
+from nemd import symbols
+from nemd import jobutils
+from nemd import logutils
+from nemd import fragments
+from nemd import structutils
+from nemd import parserutils
+from nemd import fileutils
+from nemd import prop_names
+from nemd import environutils
+from nemd import conformerutils
 
 FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
@@ -124,7 +124,6 @@ def get_parser():
 
 
 class Validator:
-
     def __init__(self, argv):
         self.argv = argv
         self.options = None
@@ -274,7 +273,6 @@ class GridCell:
     """
     Grid the space and place polymers into the sub-cells.
     """
-
     def __init__(self, polymers, polym_nums):
         """
         :param polymers 'Polymer': one polymer object for each type
@@ -862,7 +860,6 @@ class Conformer(object):
         :return 3x3 'numpy.ndarray': a vector is parallel with the backbone,
             b and c vectors are perpendicular with the backbone.
         """
-
         def get_norm(vect):
             """
             Get the normalized vector.
@@ -888,7 +885,6 @@ class Conformer(object):
         """
         Rotate the bond between the backbone and side group.
         """
-
         def get_other_atom(aid1, aid2):
             """
             Get one atom id that is bonded to aid1 beyond aid2.

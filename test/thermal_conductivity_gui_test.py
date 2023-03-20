@@ -16,7 +16,6 @@ APP = QtWidgets.QApplication(sys.argv)
 
 
 class TestNemdPanel(object):
-
     @pytest.fixture
     def panel(self):
         return gui.get_panel(app=APP)

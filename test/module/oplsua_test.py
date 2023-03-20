@@ -49,7 +49,6 @@ class TestOplsTyper:
 
 
 class TestOplsParser:
-
     @pytest.fixture
     def nprsr(self):
         return oplsua.OplsParser()
@@ -94,7 +93,6 @@ class TestOplsParser:
 
 
 class TestLammpsIn:
-
     @pytest.fixture
     def lmp_in(self):
         return oplsua.LammpsIn('lmp')
@@ -106,7 +104,6 @@ class TestLammpsIn:
 
 
 class TestLammpsData:
-
     @pytest.fixture
     def lmp_data(self):
         mol1 = rdkitutils.get_mol_from_smiles(BUTANE)
@@ -185,7 +182,6 @@ class TestLammpsData:
 
 
 class TestDataFileReader:
-
     @pytest.fixture
     def raw_dfr(self):
         return oplsua.DataFileReader(BUTANE_DATA)

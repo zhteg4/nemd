@@ -41,7 +41,6 @@ def markPolymProps(mol):
 
 
 class TestFragMol:
-
     @pytest.fixture
     def fmol(self, smiles_str, data_file):
         mol = getMol(smiles_str)
@@ -162,7 +161,6 @@ class TestFragMol:
 
 
 class TestFragment:
-
     @pytest.fixture
     def frag(self, smiles_str, data_file):
         mol = getMol(smiles_str)

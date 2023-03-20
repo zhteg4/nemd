@@ -1573,7 +1573,6 @@ class LammpsData(LammpsIn):
         :param comments bool: If True, additional descriptions including element
             sysmbol are written after each atom line
         """
-
         def get_neigh_charge(atom):
             try:
                 return atom.GetDoubleProp(self.NEIGHBOR_CHARGE)

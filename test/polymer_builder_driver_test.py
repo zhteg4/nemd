@@ -13,7 +13,6 @@ BASE_DIR = testutils.test_file('polym_builder')
 
 
 class TestTransConformer(object):
-
     @pytest.fixture
     def raw_conf(self):
         polym = driver.Conformer.read(os.path.join(BASE_DIR, 'polym.sdf'))

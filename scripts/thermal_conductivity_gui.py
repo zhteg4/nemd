@@ -158,7 +158,6 @@ class LineWithVSpan(DraggableLine):
 
 
 class Canvas(FigureCanvasQTAgg):
-
     def __init__(self, width=5, height=4, dpi=100, command=None):
         self.command = command
         self.fig = Figure(figsize=(width, height), dpi=dpi)
@@ -310,7 +309,6 @@ class Canvas(FigureCanvasQTAgg):
 
 
 class QMainWindow(QtWidgets.QMainWindow):
-
     def __init__(self, app, *args, **kwargs):
         self.app = app
         super().__init__(*args, **kwargs)
@@ -323,7 +321,6 @@ class QMainWindow(QtWidgets.QMainWindow):
 
 
 class NemdPanel(QMainWindow):
-
     def __init__(self, app, *args, **kwargs):
         super(NemdPanel, self).__init__(app, *args, **kwargs)
         self.setWindowTitle('Thermal Conductivity Viewer')

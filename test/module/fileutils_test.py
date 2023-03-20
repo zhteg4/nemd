@@ -6,7 +6,6 @@ from nemd.testutils import SINGLE_NEMD, CRYSTAL_NEMD
 
 
 class TestTempReader(object):
-
     @pytest.fixture
     def temp_reader(self):
         temp_file = testutils.test_file(
@@ -20,7 +19,6 @@ class TestTempReader(object):
 
 
 class TestEnergyReader(object):
-
     @pytest.fixture
     def energy_reader(self):
         ene_file = testutils.test_file(os.path.join(SINGLE_NEMD, 'en_ex.log'))
@@ -34,7 +32,6 @@ class TestEnergyReader(object):
 
 
 class TestLammpsInput(object):
-
     @pytest.fixture
     def lammps_input_reader(self):
         input_file = testutils.test_file(
@@ -51,7 +48,6 @@ class TestLammpsInput(object):
 
 
 class TestLammpsLogReader(object):
-
     @pytest.fixture
     def lammps_log_reader(self):
         log_file = testutils.test_file(os.path.join(CRYSTAL_NEMD,

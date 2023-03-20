@@ -2,7 +2,6 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 class PushButton(QtWidgets.QFrame):
-
     def __init__(self,
                  text,
                  label='',
@@ -38,7 +37,6 @@ class PushButton(QtWidgets.QFrame):
 
 
 class LineEdit(QtWidgets.QFrame):
-
     def __init__(self,
                  text,
                  label='',
@@ -76,7 +74,6 @@ class LineEdit(QtWidgets.QFrame):
 
 
 class FloatLineEdit(LineEdit):
-
     def __init__(self, *args, **kwargs):
 
         super().__init__(*args, **kwargs)

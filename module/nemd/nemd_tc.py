@@ -2,7 +2,6 @@ from scipy import constants
 
 
 class ThermalConductivity(object):
-
     def __init__(self, temp_gradient, energy_flow, cross_sectional_area):
         self.temp_gradient = temp_gradient
         self.energy_flow = energy_flow
