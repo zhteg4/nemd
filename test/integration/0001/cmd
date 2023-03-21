@@ -1,0 +1,1 @@
+run_nemd polymer_builder_driver.py *CC* -cru_num 10 -mol_num 10 -seed 5678
