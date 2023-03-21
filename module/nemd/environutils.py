@@ -7,7 +7,9 @@ DEBUG = 'DEBUG'
 JOBNAME = 'JOBNAME'
 INTERACTIVE = 'INTERACTIVE'
 NEMD = 'nemd'
+TEST = 'test'
 MODULE = 'module'
+INTEGRATION = 'integration'
 
 
 def is_debug():
@@ -44,6 +46,21 @@ def get_module_path():
     if not nemd_src:
         return os.path.dirname(pkgutil.get_loader(NEMD).path)
     return os.path.join(nemd_src, MODULE, NEMD)
+
+
+def get_integration_test_dir():
+    """
+    Get the module path.
+
+    NOTE: If installed, all modules are assumed to sit together. In dev mode,
+    the module is search
+
+    :return str: the module path
+    """
+    nemd_src = get_nemd_src()
+    if not nemd_src:
+        raise ValueError(f'Please set {NEMD_SRC} pointing to the source code.')
+    return os.path.join(nemd_src, TEST, INTEGRATION)
 
 
 def get_jobname(default_jobname):
