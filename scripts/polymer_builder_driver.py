@@ -124,17 +124,13 @@ def get_parser():
 
 
 class Validator:
-    def __init__(self, argv):
-        self.argv = argv
-        self.options = None
+    def __init__(self, options):
+        self.options = options
 
     def run(self):
         self.parse()
         self.cruNum()
         self.molNum()
-
-    def parse(self):
-        self.options = get_parser().parse_args(self.argv)
 
     def cruNum(self):
         if self.options.cru_num is None:
@@ -1052,7 +1048,8 @@ def main(argv):
 
     jobname = environutils.get_jobname(JOBNAME)
     logger = logutils.createDriverLogger(jobname=jobname)
-    options = validate_options(argv)
+    options = get_parser().parse_args(argv)
+    options = validate_options(options)
     logutils.logOptions(logger, options)
     cell = AmorphousCell(options, jobname)
     cell.run()

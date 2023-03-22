@@ -1,4 +1,3 @@
-from nemd import environutils
 import math
 import os
 import numpy as np
@@ -6,6 +5,7 @@ from nemd import logutils
 from nemd import units
 import shutil
 from io import StringIO
+from nemd import environutils
 from dataclasses import dataclass
 from matplotlib import pyplot as plt
 from collections import namedtuple
@@ -23,6 +23,7 @@ OPLSUA = 'oplsua'
 MOLT_FF_EXT = '.lt'
 RRM_EXT = '.prm'
 FF = 'ff'
+STATUS_LOG = '_status.log'
 
 logger = logutils.createModuleLogger(file_path=__file__)
 

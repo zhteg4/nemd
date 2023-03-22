@@ -26,6 +26,12 @@ def type_file(arg):
     raise argparse.ArgumentTypeError(f'{arg} not found.')
 
 
+def type_dir(arg):
+    if os.path.isdir(arg):
+        return arg
+    raise argparse.ArgumentTypeError(f'{arg} is not an existing directory.')
+
+
 def type_float(arg):
     try:
         value = float(arg)
