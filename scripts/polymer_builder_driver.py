@@ -128,7 +128,6 @@ class Validator:
         self.options = options
 
     def run(self):
-        self.parse()
         self.cruNum()
         self.molNum()
 
