@@ -71,6 +71,15 @@ def log_error(msg):
 
 @FlowProject.label
 def cmd_completed(job):
+    """
+    The function to determine whether the main command has been executed.
+
+    :param job 'signac.contrib.job.Job': the job object
+    :return bool: whether the main command has been executed.
+
+    NOTE：This should be modified when using with slurm schedular.
+    """
+
     return bool([
         x for x in glob.glob(job.fn(symbols.WILD_CARD))
         if not os.path.basename(x).startswith(SIGNAC)
@@ -80,6 +89,12 @@ def cmd_completed(job):
 @FlowProject.post(cmd_completed)
 @FlowProject.operation(cmd=True)
 def run_cmd(job):
+    """
+    The method to run the main command.
+
+    :param job 'signac.contrib.job.Job': the job object
+    :return str: the shell command to execute
+    """
     test_cmd_file = os.path.join(job.document[DIR], CMD)
     with open(test_cmd_file) as fh:
         lines = [x.strip() for x in fh.readlines()]
@@ -88,6 +103,12 @@ def run_cmd(job):
 
 
 def checked(job):
+    """
+    The method to question whether the checking process has been performed.
+
+    :param job 'signac.contrib.job.Job': the job object
+    :return str: the shell command to execute
+    """
     return SUCCESS in job.document
 
 
@@ -95,9 +116,13 @@ def checked(job):
 @FlowProject.post(checked)
 @FlowProject.operation
 def check(job):
-    # assert filecmp.cmp('polymer_builder.data', job.fn('polymer_builder.data'))
-    check_file = os.path.join(job.document[DIR], CHECK)
-    results = Results(check_file, job)
+    """
+    The method parses the check file and document the results.
+
+    :param job 'signac.contrib.job.Job': the job object
+    :return str: the shell command to execute
+    """
+    results = Results(job)
     try:
         results.run()
     except (FileNotFoundError, KeyError, ValueError) as err:
@@ -108,12 +133,18 @@ def check(job):
 
 
 class CMP:
+    """
+    The class to perform file comparison.
+    """
     def __init__(self, original, target, job=None):
         self.orignal = original.strip().strip('\'"')
         self.target = target.strip().strip('\'"')
         self.job = job
 
     def run(self):
+        """
+        The main method to compare files.
+        """
         self.orignal = os.path.join(self.job.document[DIR], self.orignal)
         if not os.path.isfile(self.orignal):
             raise FileNotFoundError(f"{self.orignal} not found")
@@ -125,39 +156,60 @@ class CMP:
 
 
 class Results:
+    """
+    Class to parse the check file and execute the inside operations.
+    """
 
     CMD_BRACKET_RE = '\s.*?\(.*?\)'
     PAIRED_BRACKET_RE = '\(.*?\)'
     CMD = {'cmp': CMP}
 
-    def __init__(self, check_file, job):
-        self.check_file = check_file
+    def __init__(self, job):
+        """
+        :param job 'signac.contrib.job.Job': the signac job
+        """
         self.job = job
         self.line = None
         self.operators = []
 
     def run(self):
+        """
+        Main method to get the results.
+        """
         self.setLine()
         self.parserLine()
         self.executeOperators()
 
     def setLine(self):
-        with open(self.check_file) as fh:
+        """
+        Set the one line command by locating, reading, and cleaning the check file.
+        """
+        check_file = os.path.join(self.job.document[DIR], CHECK)
+        with open(check_file) as fh:
             lines = [x.strip() for x in fh.readlines()]
         operators = [x for x in lines if not x.startswith(symbols.POUND)]
         self.line = ' ' + ' '.join(operators)
 
     def parserLine(self):
+        """
+        Parse the one line command to get the operators.
+        """
         for operator in re.finditer(self.CMD_BRACKET_RE, self.line):
             operator = operator.group().strip()
             operator = operator.strip(AND + ' ').strip()
             self.operators.append(operator)
 
     def executeOperators(self):
+        """
+        Execute all operators. Raise errors during operation if one failed.
+        """
         for operator in self.operators:
             self.execute(operator)
 
     def execute(self, operator):
+        """
+        Lookup the command class and execute.
+        """
         bracketed = re.findall(self.PAIRED_BRACKET_RE, operator)[0]
         cmd = operator.replace(bracketed, '')
         try:
@@ -171,7 +223,14 @@ class Results:
 
 
 class Integration:
+    """
+    The main class to run integration tests.
+    """
     def __init__(self, options, jobname):
+        """
+        :param options 'argparse.Namespace': parsed commandline options.
+        :param jobname str: the jobname
+        """
         self.options = options
         self.jobname = jobname
         self.test_dirs = None
@@ -182,6 +241,9 @@ class Integration:
         self.status_fh = None
 
     def run(self):
+        """
+        The main method to run the integration tests.
+        """
         with open(self.status_file, 'w') as self.status_fh:
             self.setTests()
             self.setProject()
@@ -190,6 +252,10 @@ class Integration:
             self.logStatus()
 
     def setTests(self):
+        """
+        Set the test dirs by looking for the sub-folder tests or the input
+        folder itself.
+        """
         base_dir = os.path.join(self.options.dir, symbols.WILD_CARD)
         self.test_dirs = [
             x for x in glob.glob(base_dir)
@@ -202,18 +268,30 @@ class Integration:
         log(f"{len(self.test_dirs)} tests found.")
 
     def setProject(self, workspace='workspace'):
+        """
+        Initiate the project.
+        """
         self.project = FlowProject.init_project(workspace=workspace)
 
     def addJobs(self):
+        """
+        Add jobs to the project.
+        """
         for test_dir in self.test_dirs:
             job = self.project.open_job({ID: os.path.basename(test_dir)})
             job.document[DIR] = test_dir
             job.init()
 
     def runProject(self):
+        """
+        Run all jobs registered in the project
+        """
         self.project.run()
 
     def logStatus(self):
+        """
+        Look into each job and report the status.
+        """
         # Fetching status and Fetching labels are printed to err handler
         self.project.print_status(detailed=True,
                                   file=self.status_fh,
@@ -248,6 +326,12 @@ def get_parser():
 
 
 def validate_options(argv):
+    """
+    Parse and validate the command options.
+
+    :param argv list: command arguments
+    :return 'argparse.Namespace': parsed command line options.
+    """
     parser = get_parser()
     options = parser.parse_args(argv)
     if not options.dir:
