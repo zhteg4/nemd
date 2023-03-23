@@ -1,11 +1,18 @@
+# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+# Authors: Teng Zhang (2022010236@hust.edu.cn)
+"""
+This post molecular dynamics driver perform trajectory analysis.
+"""
 import os
 import sys
-import traj
-import oplsua
-import jobutils
-import logutils
-import parserutils
-import environutils
+from nemd import traj
+from nemd import oplsua
+from nemd import jobutils
+from nemd import logutils
+from nemd import parserutils
+from nemd import environutils
 
 FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
@@ -55,8 +62,7 @@ def get_parser():
     :return 'argparse.ArgumentParser':  argparse figures out how to parse those
         out of sys.argv.
     """
-    parser = parserutils.get_parser(
-        description='Perform tasks on customer dump')
+    parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(FlAG_CUSTOM_DUMP,
                         metavar=FlAG_CUSTOM_DUMP.upper(),
                         type=parserutils.type_file,

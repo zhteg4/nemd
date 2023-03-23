@@ -1,3 +1,16 @@
+# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+# Authors: Teng Zhang (2022010236@hust.edu.cn)
+"""
+This integration driver runs integration tests in one folder or all sub-folders.
+The (sub-)folder name must be one integer to define the job id.
+One test must contain one cmd file and a check file.
+
+Supported check commands are:
+cmd to compare two files;
+..(more to come)
+"""
 import os
 import re
 import sys
@@ -234,9 +247,14 @@ def get_parser():
     return parser
 
 
-def validate_options(options):
+def validate_options(argv):
+    parser = get_parser()
+    options = parser.parse_args(argv)
     if not options.dir:
-        options.dir = environutils.get_integration_test_dir()
+        try:
+            options.dir = environutils.get_integration_test_dir()
+        except ValueError as err:
+            parser.error(str(err))
     return options
 
 
@@ -246,13 +264,7 @@ logger = None
 def main(argv):
     global logger
 
-    parser = get_parser()
-    options = parser.parse_args(argv)
-    try:
-        options = validate_options(options)
-    except ValueError as err:
-        parser.error(str(err))
-
+    options = validate_options(argv)
     jobname = environutils.get_jobname(JOBNAME)
     logger = logutils.createDriverLogger(jobname=jobname)
     logutils.logOptions(logger, options)

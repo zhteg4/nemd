@@ -1,9 +1,9 @@
 import os
-from nemd import environutils
 import logging
 import pathlib
 from datetime import datetime
 
+from nemd import environutils
 
 def createLogger(basename, verbose=None, file_ext='-driver.log'):
     if verbose is None:

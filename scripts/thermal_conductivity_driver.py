@@ -1,14 +1,21 @@
+# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+# Authors: Teng Zhang (2022010236@hust.edu.cn)
+"""
+This driver calculates thermal conductivity via non-equilibrium thermodynamics.
+"""
+import os
 import sys
 import argparse
-import logutils
-import os
-import units
-import parserutils
-import fileutils
-import nemd
-import plotutils
-import environutils
-import jobutils
+from nemd import units
+from nemd import nemd_tc
+from nemd import logutils
+from nemd import jobutils
+from nemd import fileutils
+from nemd import plotutils
+from nemd import parserutils
+from nemd import environutils
 
 FLAG_IN_FILE = 'in_file'
 FLAG_TEMP_FILE = '-temp_file'
@@ -67,7 +74,7 @@ def get_parser():
 
 
 def validate_options(argv):
-    parser = get_parser()
+    parser = get_parser(description=__doc__)
     options = parser.parse_args(argv)
 
     if options.log_file is None:
@@ -175,7 +182,7 @@ class Nemd(object):
         temp_ene_plotter.plot()
 
     def setThermalConductivity(self):
-        thermal_conductivity = nemd.ThermalConductivity(
+        thermal_conductivity = nemd_tc.ThermalConductivity(
             self.lammps_temp.slope,
             self.lammps_energy.slope,
             self.lammps_log.cross_sectional_area,

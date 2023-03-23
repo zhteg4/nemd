@@ -1,3 +1,11 @@
+# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+# Authors: Teng Zhang (2022010236@hust.edu.cn)
+"""
+This module handles 'rdkit.Chem.rdchem.Conformer' for translation, rotation,
+centroid, and so on.
+"""
 import numpy as np
 from rdkit import rdBase
 from rdkit import DataStructs

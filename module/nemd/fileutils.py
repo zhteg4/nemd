@@ -1,14 +1,15 @@
-import math
 import os
-import numpy as np
-from nemd import logutils
-from nemd import units
+import math
 import shutil
+import numpy as np
 from io import StringIO
-from nemd import environutils
 from dataclasses import dataclass
-from matplotlib import pyplot as plt
 from collections import namedtuple
+from matplotlib import pyplot as plt
+
+from nemd import units
+from nemd import logutils
+from nemd import environutils
 
 LogData = namedtuple('LogData', ['fix', 'data'])
 FixCommand = namedtuple('FixCommand', ['id', 'group_id', 'style', 'args'])

@@ -1,13 +1,20 @@
-import collections
+# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+# Authors: Teng Zhang (2022010236@hust.edu.cn)
+"""
+This module read, parser, and analyze trajectories.
+"""
 import math
-from nemd import oplsua
 import random
-from nemd import symbols
 import itertools
+import collections
 import numpy as np
 import pandas as pd
 import networkx as nx
 
+from nemd import oplsua
+from nemd import symbols
 
 class Frame(pd.DataFrame):
     """

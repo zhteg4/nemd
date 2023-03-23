@@ -1,15 +1,24 @@
+# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+# Authors: Teng Zhang (2022010236@hust.edu.cn)
+"""
+This module handles opls-ua related typing, parameterization, assignment,
+datafile, and in-script.
+"""
 import types
-from nemd import symbols
-from nemd import logutils
-from nemd import fileutils
 import chemparse
 import itertools
-from nemd import constants
 import collections
-from nemd import environutils
 import numpy as np
 from rdkit import Chem
 from collections import namedtuple
+
+from nemd import symbols
+from nemd import logutils
+from nemd import fileutils
+from nemd import constants
+from nemd import environutils
 
 BOND_ATM_ID = 'bond_atm_id'
 ANGLE_ATM_ID = 'angle_atm_id'

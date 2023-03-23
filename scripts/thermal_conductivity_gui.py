@@ -1,21 +1,29 @@
+# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+# Authors: Teng Zhang (2022010236@hust.edu.cn)
+"""
+This graphical user interface virtualizes temperature profile and energy flow,
+allowing users to recalculate thermal conductivity by customizing temperature
+range and heat flux using non-equilibrium molecular dynamics method.
+"""
 import os
 import re
-import sys  # We need sys so that we can pass argv to QApplication
+import sys
 import numpy as np
 from types import SimpleNamespace
-
-from nemd import nemd_tc
-from nemd import widgets
-from nemd import fileutils
-import matplotlib
-from PyQt6 import QtCore, QtGui, QtWidgets
-from matplotlib import colors as mcolors
+from PyQt6 import QtWidgets
 from matplotlib import lines
+from matplotlib import colors
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 
-COLORS = dict(mcolors.BASE_COLORS, **mcolors.CSS4_COLORS)
+from nemd import nemd_tc
+from nemd import widgets
+from nemd import fileutils
+
+COLORS = dict(colors.BASE_COLORS, **colors.CSS4_COLORS)
 
 
 class DraggableLine(object):

@@ -1,13 +1,20 @@
+# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+# Authors: Teng Zhang (2022010236@hust.edu.cn)
+"""
+This module fragmentizes molecules into the smallest rigid bodies.
+"""
+import itertools
+import numpy as np
+from rdkit import Chem
+
 from nemd import traj
 from nemd import oplsua
 from nemd import logutils
-import itertools
 from nemd import prop_names
 from nemd import structutils
 from nemd import conformerutils
-import numpy as np
-import pandas as pd
-from rdkit import Chem
 
 logger = logutils.createModuleLogger(file_path=__file__)
 

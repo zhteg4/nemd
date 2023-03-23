@@ -1,3 +1,11 @@
+# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
+# All rights reserved.
+# This software is licensed under the BSD 3-Clause License.
+# Authors: Teng Zhang (2022010236@hust.edu.cn)
+"""
+This polymer driver builds polymers from constitutional repeat units and pack
+molecules into condensed phase amorphous cell.
+"""
 import os
 import sys
 import math
@@ -77,8 +85,7 @@ def get_parser():
     :return 'argparse.ArgumentParser':  argparse figures out how to parse those
         out of sys.argv.
     """
-    parser = parserutils.get_parser(
-        description='Build amorphous cell from molecules and monomers.')
+    parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(
         FlAG_CRU,
         metavar=FlAG_CRU.upper(),
@@ -157,8 +164,13 @@ def validate_options(argv):
     :param argv list: list of command input.
     :return: 'argparse.ArgumentParser':  Parsed command-line options out of sys.argv
     """
-    validator = Validator(argv)
-    validator.run()
+    parser = get_parser()
+    options = parser.parse_args(argv)
+    validator = Validator(options)
+    try:
+        validator.run()
+    except ValueError as err:
+        parser.error(err)
     return validator.options
 
 
@@ -1045,10 +1057,9 @@ logger = None
 def main(argv):
     global logger
 
+    options = validate_options(argv)
     jobname = environutils.get_jobname(JOBNAME)
     logger = logutils.createDriverLogger(jobname=jobname)
-    options = get_parser().parse_args(argv)
-    options = validate_options(options)
     logutils.logOptions(logger, options)
     cell = AmorphousCell(options, jobname)
     cell.run()
