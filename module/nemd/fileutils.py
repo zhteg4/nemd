@@ -24,7 +24,8 @@ OPLSUA = 'oplsua'
 MOLT_FF_EXT = '.lt'
 RRM_EXT = '.prm'
 FF = 'ff'
-STATUS_LOG = '_status.log'
+LOG = '.log'
+STATUS_LOG = f'_status{LOG}'
 
 logger = logutils.createModuleLogger(file_path=__file__)
 
@@ -58,6 +59,13 @@ class chdir:
         os.chdir(self.original_dir)
         if self.rmtree:
             shutil.rmtree(self.dir)
+
+
+def rmtree(dir_path):
+    try:
+        shutil.rmtree(dir_path)
+    except FileNotFoundError:
+        pass
 
 
 @dataclass

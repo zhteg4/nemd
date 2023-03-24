@@ -13,6 +13,7 @@ cmd to compare two files;
 """
 import os
 import re
+import shutil
 import sys
 import glob
 import filecmp
@@ -36,6 +37,7 @@ SIGNAC = 'signac'
 JOBNAME = 'integration_test'
 
 FLAG_DIR = DIR
+FLAG_CLEAN = '-clean'
 
 
 def log_debug(msg):
@@ -226,6 +228,10 @@ class Integration:
     """
     The main class to run integration tests.
     """
+
+    WORKSPACE = 'workspace'
+    FLOW_PROJECT = 'flow.project'
+
     def __init__(self, options, jobname):
         """
         :param options 'argparse.Namespace': parsed commandline options.
@@ -237,7 +243,7 @@ class Integration:
         self.project = None
         self.status_file = self.jobname + fileutils.STATUS_LOG
         # flow/project.py gets logger from logging.getLogger(__name__)
-        logutils.createModuleLogger('flow.project', file_ext='.log')
+        logutils.createModuleLogger(self.FLOW_PROJECT, file_ext=fileutils.LOG)
         self.status_fh = None
 
     def run(self):
@@ -245,11 +251,17 @@ class Integration:
         The main method to run the integration tests.
         """
         with open(self.status_file, 'w') as self.status_fh:
+            self.clean()
             self.setTests()
             self.setProject()
             self.addJobs()
             self.runProject()
             self.logStatus()
+
+    def clean(self):
+        if not self.options.clean:
+            return
+        shutil.rmtree(self.WORKSPACE)
 
     def setTests(self):
         """
@@ -314,13 +326,16 @@ def get_parser():
     :return 'argparse.ArgumentParser':  argparse figures out how to parse those
         out of sys.argv.
     """
-    parser = parserutils.get_parser(
-        description='Build amorphous cell from molecules and monomers.')
+    parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(FLAG_DIR,
                         metavar=FLAG_DIR.upper(),
                         type=parserutils.type_dir,
                         nargs='?',
                         help='The directory to search for integration tests.')
+    parser.add_argument(
+        FLAG_CLEAN,
+        action='store_true',
+        help='Clean prevous results (if any) and run new ones.')
     jobutils.add_job_arguments(parser)
     return parser
 

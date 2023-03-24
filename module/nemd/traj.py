@@ -16,6 +16,7 @@ import networkx as nx
 from nemd import oplsua
 from nemd import symbols
 
+
 class Frame(pd.DataFrame):
     """
     Class to hold coordinate information.

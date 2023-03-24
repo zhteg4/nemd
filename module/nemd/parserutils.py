@@ -6,6 +6,7 @@ from rdkit import Chem
 from nemd import symbols
 from nemd import constants
 
+
 class CapitalisedHelpFormatter(argparse.HelpFormatter):
     def add_usage(self, usage, actions, groups, prefix=None):
         if prefix is None:

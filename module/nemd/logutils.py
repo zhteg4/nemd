@@ -5,6 +5,7 @@ from datetime import datetime
 
 from nemd import environutils
 
+
 def createLogger(basename, verbose=None, file_ext='-driver.log'):
     if verbose is None:
         verbose = environutils.is_debug()
