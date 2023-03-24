@@ -259,6 +259,9 @@ class Integration:
             self.logStatus()
 
     def clean(self):
+        """
+        Remove the previous results on request.
+        """
         if not self.options.clean:
             return
         shutil.rmtree(self.WORKSPACE)
