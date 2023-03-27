@@ -31,3 +31,9 @@ brew install meld
 
 # Store git password
 # git config --global credential.helper store
+
+# visualization softwware to investigate
+# https://blog.csdn.net/weixin_39760434/article/details/110526957
+# https://amber-md.github.io/pytraj/latest/installation.html#install-anaconda-for-all-python-packages
+# https://two.avogadro.cc/install/index.html
+# https://mdtraj.org/1.9.4/installation.html
