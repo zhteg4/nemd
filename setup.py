@@ -15,7 +15,8 @@ setup(
     install_requires=[
         'matplotlib', 'numpy', 'chemparse', 'rdkit', 'networkx', 'scipy',
         'pandas', 'signac', 'signac-flow', 'lammps', 'pyside6', 'PyQt6',
-        'yapf', 'pytest'
+        'yapf', 'pytest', 'moleview', 'xyz2graph @ git+https://github.com/zotko/xyz2graph.git',
+        'vmd-python @ git+https://github.com/Eigenstate/vmd-python.git'
     ],
     classifiers=[
         'Development Status :: 1 - Planning',
