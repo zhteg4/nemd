@@ -11,6 +11,7 @@ from nemd import traj
 from nemd import oplsua
 from nemd import jobutils
 from nemd import logutils
+from nemd import molview
 from nemd import parserutils
 from nemd import environutils
 
@@ -18,6 +19,7 @@ FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
 FlAG_TASK = '-task'
 CLASH = 'clash'
+VIEW = 'view'
 XYZ = 'xyz'
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
@@ -72,7 +74,7 @@ def get_parser():
                         type=parserutils.type_file,
                         help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
-                        choices=[XYZ, CLASH],
+                        choices=[XYZ, CLASH, VIEW],
                         default=[XYZ],
                         nargs='+',
                         help=f'{XYZ} writes out .xyz for VMD visualization;'
@@ -125,6 +127,7 @@ class CustomDump(object):
         self.setStruct()
         self.checkClashes()
         self.writeXYZ()
+        self.view()
         log('Finished', timestamp=True)
 
     def setStruct(self):
@@ -192,6 +195,21 @@ class CustomDump(object):
                     frm.glue(dreader=self.data_reader)
                 frm.write(self.out_fh, dreader=self.data_reader)
         log(f"Coordinates are written into {self.outfile}")
+
+    def view(self):
+        """
+
+        :return:
+        """
+
+        if VIEW not in self.options.task:
+            return
+
+        frm_view = molview.FrameView(self.data_reader)
+        frm_view.setData()
+        frm_view.scatters()
+        frm_view.lines()
+        frm_view.show()
 
 
 logger = None

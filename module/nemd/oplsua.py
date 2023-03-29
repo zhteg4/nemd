@@ -1697,12 +1697,18 @@ class DataFileReader(LammpsData):
         self.read()
         self.setDescription()
         self.setMasses()
+        self.setPairCoeffs()
         self.setAtoms()
         self.setBonds()
         self.setAngles()
         self.setDihedrals()
         self.setImpropers()
         self.setMols()
+
+    def setMinimumDist(self):
+        for id in self.vdws.keys():
+            if self.vdws[id].dist < self.min_dist:
+                self.vdws[id].dist = self.min_dist
 
     def read(self):
         """
@@ -1766,6 +1772,36 @@ class DataFileReader(LammpsData):
                 type_id=int(type_id),
                 xyz=(float(x), float(y), float(z)),
                 ele=self.masses[int(type_id)].ele)
+
+    @property
+    def atom(self):
+        """
+        Handy way to get all atoms.
+
+        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
+        """
+
+        return (x for x in self.atoms.values())
+
+    @property
+    def atom_num(self):
+        """
+        Handy way to get all atoms.
+
+        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
+        """
+
+        return len(self.atoms)
+
+    @property
+    def molecule(self):
+        """
+        Handy way to get all atoms.
+
+        :return list of list: each sublist contains one int as atom id
+        """
+
+        return super().molecule
 
     def setMols(self):
         """
