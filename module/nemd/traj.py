@@ -63,7 +63,7 @@ class Frame(pd.DataFrame):
                 frm = pd.read_csv(dmp_fh,
                                   nrows=atom_num,
                                   header=None,
-                                  delimiter='\s',
+                                  delimiter=r'\s',
                                   index_col=0,
                                   names=names,
                                   engine='python')
