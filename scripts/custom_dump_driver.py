@@ -198,8 +198,7 @@ class CustomDump(object):
 
     def view(self):
         """
-
-        :return:
+        View the atom coordinates.
         """
 
         if VIEW not in self.options.task:
