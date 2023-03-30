@@ -7,6 +7,9 @@ import plotly.graph_objects as graph_objects
 
 class FrameView:
     """Viewer datafile and trajectory frame"""
+
+    XYZU = traj.Frame.XYZU
+
     def __init__(self, data_reader, scale=5.):
         """
         :param data_reader `nemd.oplsua.DataFileReader`: datafile reader with
@@ -14,7 +17,7 @@ class FrameView:
         :param scale float: scale the LJ dist by this to obtain marker size.
         """
         self.data_reader = data_reader
-        self.fig = graph_objects.Figure(layout={'height': 800})
+        self.fig = graph_objects.Figure()
         self.scale = scale
 
     def setData(self):
@@ -23,7 +26,7 @@ class FrameView:
         """
         index = list(self.data_reader.atoms.keys())
         xyz = np.array([x.xyz for x in self.data_reader.atom])
-        self.data = pd.DataFrame(xyz, index, columns=['x', 'y', 'z'])
+        self.data = pd.DataFrame(xyz, index, columns=self.XYZU)
         self.data_reader.setMinimumDist()
         type_ids = [x.type_id for x in self.data_reader.atom]
         sizes = [self.data_reader.vdws[x].dist * self.scale for x in type_ids]
@@ -50,9 +53,9 @@ class FrameView:
             idx = (self.data[['element', 'size']] == [ele, size]).all(axis=1)
             data = self.data[idx]
             marker = dict(size=size, color=data['color'].values[0])
-            marker = graph_objects.Scatter3d(x=data.x,
-                                             y=data.y,
-                                             z=data.z,
+            marker = graph_objects.Scatter3d(x=data.xu,
+                                             y=data.yu,
+                                             z=data.zu,
                                              opacity=0.9,
                                              mode='markers',
                                              name=ele,
@@ -66,23 +69,22 @@ class FrameView:
         for bond in self.data_reader.bonds.values():
             atom1 = self.data_reader.atoms[bond.id1]
             atom2 = self.data_reader.atoms[bond.id2]
-            pnt1 = np.array(atom1.xyz)
-            pnt2 = np.array(atom2.xyz)
-            mdp = (pnt1 + pnt2) / 2
-            self.line(np.array([pnt1, mdp]), atom1)
-            self.line(np.array([mdp, pnt2]), atom2)
+            pnts = self.data.loc[[atom1.id, atom2.id]][self.XYZU]
+            pnts = pd.concat((pnts, pnts.mean().to_frame().transpose()))
+            self.line(pnts[::2], atom1)
+            self.line(pnts[1::], atom2)
 
     def line(self, xyz, atom):
         """
         Plot half bond spanning from one atom to the mid point.
 
-        :param xyz `numpy.ndarray`: the bond xyz span
+        :param xyz `numpy.ndarray`: the bond XYZU span
         :param atom 'types.SimpleNamespace': the bonded atom
         """
         line = dict(width=8, color=self.data.xs(atom.id).color)
-        line = graph_objects.Scatter3d(x=xyz[:, 0],
-                                       y=xyz[:, 1],
-                                       z=xyz[:, 2],
+        line = graph_objects.Scatter3d(x=xyz.xu,
+                                       y=xyz.yu,
+                                       z=xyz.zu,
                                        opacity=0.8,
                                        mode='lines',
                                        showlegend=False,
@@ -90,6 +92,9 @@ class FrameView:
         self.fig.add_trace(line)
 
     def updateLayout(self):
+        """
+        Update the figure layout.
+        """
         camera = dict(up=dict(x=0, y=0, z=1),
                       center=dict(x=0, y=0, z=0),
                       eye=dict(x=1.25, y=1.25, z=1.25))

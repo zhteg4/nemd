@@ -27,7 +27,7 @@ class Frame(pd.DataFrame):
     XU = 'xu'
     YU = 'yu'
     ZU = 'zu'
-    UXYZ = [XU, YU, ZU]
+    XYZU = [XU, YU, ZU]
 
     def __init__(self, xyz=None, box=None, index=None):
         """
@@ -41,7 +41,7 @@ class Frame(pd.DataFrame):
             name = None
         if name is None and index is None and xyz is not None:
             index = range(1, xyz.shape[0] + 1)
-        super().__init__(data=xyz, index=index, columns=self.UXYZ)
+        super().__init__(data=xyz, index=index, columns=self.XYZU)
         self.setBox(box)
 
     @classmethod
@@ -106,10 +106,10 @@ class Frame(pd.DataFrame):
         :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
         """
         self.attrs[self.BOX] = box
-        self.attrs[self.SPAN] = {x: np.inf for x in self.UXYZ}
+        self.attrs[self.SPAN] = {x: np.inf for x in self.XYZU}
         if box is None:
             return
-        for idx, col in enumerate(self.UXYZ):
+        for idx, col in enumerate(self.XYZU):
             self.attrs[self.SPAN][col] = box[idx * 2 + 1] - box[idx * 2]
 
     def getDists(self, ids, xyz):
@@ -126,7 +126,7 @@ class Frame(pd.DataFrame):
             dists[dists > self.attrs[self.HSPAN]] -= self.attrs[self.SPAN]
         """
         dists = (self.getXYZ(ids) - xyz).to_numpy()
-        for id, col in enumerate(self.UXYZ):
+        for id, col in enumerate(self.XYZU):
             dists[:, id] = np.frompyfunc(
                 lambda x: math.remainder(x, self.attrs[self.SPAN][col]), 1,
                 1)(dists[:, id])
