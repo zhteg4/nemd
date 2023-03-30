@@ -15,7 +15,8 @@ setup(
     install_requires=[
         'matplotlib', 'numpy', 'chemparse', 'rdkit', 'networkx', 'scipy',
         'pandas', 'signac', 'signac-flow', 'lammps', 'pyside6', 'PyQt6',
-        'yapf', 'pytest', 'mendeleev', 'plotly', 'dash', 'flask>=2.2.2'
+        'yapf', 'pytest', 'mendeleev', 'plotly', 'dash', 'flask>=2.2.2',
+        'openpyxl', 'dash_bootstrap_components'
     ],
     classifiers=[
         'Development Status :: 1 - Planning',

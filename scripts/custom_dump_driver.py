@@ -208,6 +208,7 @@ class CustomDump(object):
         frm_view.setData()
         frm_view.scatters()
         frm_view.lines()
+        frm_view.updateLayout()
         frm_view.show()
 
 

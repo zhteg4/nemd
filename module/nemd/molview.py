@@ -14,7 +14,7 @@ class FrameView:
         :param scale float: scale the LJ dist by this to obtain marker size.
         """
         self.data_reader = data_reader
-        self.fig = graph_objects.Figure()
+        self.fig = graph_objects.Figure(layout={'height': 800})
         self.scale = scale
 
     def setData(self):
@@ -89,12 +89,14 @@ class FrameView:
                                        line=line)
         self.fig.add_trace(line)
 
-    def show(self):
-        """
-        Show the figure with plot.
-        """
+    def updateLayout(self):
         camera = dict(up=dict(x=0, y=0, z=1),
                       center=dict(x=0, y=0, z=0),
                       eye=dict(x=1.25, y=1.25, z=1.25))
         self.fig.update_layout(template='plotly_dark', scene_camera=camera)
+
+    def show(self):
+        """
+        Show the figure with plot.
+        """
         self.fig.show()

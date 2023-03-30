@@ -1048,7 +1048,7 @@ class LammpsData(LammpsIn):
     @property
     def molecule(self):
         """
-        Handy way to get all atoms.
+        Handy way to get all molecules.
 
         :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
         """
@@ -1796,7 +1796,7 @@ class DataFileReader(LammpsData):
     @property
     def molecule(self):
         """
-        Handy way to get all atoms.
+        Handy way to get all molecules.
 
         :return list of list: each sublist contains one int as atom id
         """
