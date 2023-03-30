@@ -7,6 +7,7 @@ This module handles opls-ua related typing, parameterization, assignment,
 datafile, and in-script.
 """
 import types
+import base64
 import chemparse
 import itertools
 import collections
@@ -1670,14 +1671,17 @@ class DataFileReader(LammpsData):
 
     SCALE = 0.5
 
-    def __init__(self, data_file, min_dist=2.):
+    def __init__(self, data_file=None, min_dist=2., contents=None):
         """
         :param data_file str: data file with path
         :param min_dist: the minimum distance as clash (some h-bond has zero vdw
             params)
+        :param contents `bytes`: parse this as the contents if data_file not
+            provided.
         """
         self.data_file = data_file
         self.min_dist = min_dist
+        self.contents = contents
         self.lines = None
         self.masses = {}
         self.atoms = {}
@@ -1695,6 +1699,7 @@ class DataFileReader(LammpsData):
         Main method to read and parse the data file.
         """
         self.read()
+        self.indexLines()
         self.setDescription()
         self.setMasses()
         self.setPairCoeffs()
@@ -1714,13 +1719,19 @@ class DataFileReader(LammpsData):
         """
         Read the data file and index lines by section marker.
         """
-        with open(self.data_file, 'r') as df_fh:
-            self.lines = df_fh.readlines()
-            self.mk_idxes = {
-                x: i
-                for i, l in enumerate(self.lines) for x in self.MARKERS
-                if l.startswith(x)
-            }
+        if self.data_file:
+            with open(self.data_file, 'r') as df_fh:
+                self.lines = df_fh.readlines()
+        else:
+            decoded = base64.b64decode(self.contents)
+            self.lines = decoded.decode("utf-8").splitlines()
+
+    def indexLines(self):
+        self.mk_idxes = {
+            x: i
+            for i, l in enumerate(self.lines) for x in self.MARKERS
+            if l.startswith(x)
+        }
 
     def setDescription(self):
         """

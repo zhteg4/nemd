@@ -1,8 +1,9 @@
-from nemd import traj
 import mendeleev
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as graph_objects
+
+from nemd import traj
 
 
 class FrameView:
@@ -43,7 +44,7 @@ class FrameView:
             index=index)
         self.data = pd.concat((self.data, sz_clr), axis=1)
 
-    def scatters(self):
+    def plotScatters(self):
         """
         Plot scattered markers for atoms.
         """
@@ -62,7 +63,7 @@ class FrameView:
                                              marker=marker)
             self.fig.add_trace(marker)
 
-    def lines(self):
+    def plotLines(self):
         """
         Plot lines for bonds.
         """
@@ -71,10 +72,10 @@ class FrameView:
             atom2 = self.data_reader.atoms[bond.id2]
             pnts = self.data.loc[[atom1.id, atom2.id]][self.XYZU]
             pnts = pd.concat((pnts, pnts.mean().to_frame().transpose()))
-            self.line(pnts[::2], atom1)
-            self.line(pnts[1::], atom2)
+            self.plotline(pnts[::2], atom1)
+            self.plotline(pnts[1::], atom2)
 
-    def line(self, xyz, atom):
+    def plotline(self, xyz, atom):
         """
         Plot half bond spanning from one atom to the mid point.
 
@@ -90,6 +91,12 @@ class FrameView:
                                        showlegend=False,
                                        line=line)
         self.fig.add_trace(line)
+
+    def clearPlot(self):
+        """
+        Clear the atom and bond plots.
+        """
+        self.fig.data = []
 
     def updateLayout(self):
         """
