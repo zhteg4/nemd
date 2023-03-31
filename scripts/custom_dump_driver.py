@@ -15,8 +15,8 @@ from nemd import molview
 from nemd import parserutils
 from nemd import environutils
 
-FlAG_CUSTOM_DUMP = 'custom_dump'
-FlAG_DATA_FILE = '-data_file'
+FlAG_CUSTOM_DUMP = traj.FlAG_CUSTOM_DUMP
+FlAG_DATA_FILE = traj.FlAG_DATA_FILE
 FlAG_TASK = '-task'
 CLASH = 'clash'
 VIEW = 'view'

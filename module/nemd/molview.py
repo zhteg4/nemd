@@ -25,6 +25,8 @@ class FrameView:
         """
         Set data frame with coordinates, elements, marker sizes, and color info.
         """
+        if not self.data_reader:
+            return
         index = list(self.data_reader.atoms.keys())
         xyz = np.array([x.xyz for x in self.data_reader.atom])
         self.data = pd.DataFrame(xyz, index, columns=self.XYZU)
@@ -48,9 +50,12 @@ class FrameView:
         """
         Plot scattered markers for atoms.
         """
+        if not self.data_reader:
+            return
         ele_vdw = [(x.ele, self.data_reader.vdws[x.id].dist * self.scale)
                    for x in self.data_reader.masses.values()]
-        for ele, size in set(ele_vdw):
+        for ele, size in sorted(set(ele_vdw), key=lambda x: x[1],
+                                reverse=True):
             idx = (self.data[['element', 'size']] == [ele, size]).all(axis=1)
             data = self.data[idx]
             marker = dict(size=size, color=data['color'].values[0])
@@ -67,6 +72,8 @@ class FrameView:
         """
         Plot lines for bonds.
         """
+        if not self.data_reader:
+            return
         for bond in self.data_reader.bonds.values():
             atom1 = self.data_reader.atoms[bond.id1]
             atom2 = self.data_reader.atoms[bond.id2]

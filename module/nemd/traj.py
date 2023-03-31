@@ -16,6 +16,9 @@ import networkx as nx
 from nemd import oplsua
 from nemd import symbols
 
+FlAG_CUSTOM_DUMP = 'custom_dump'
+FlAG_DATA_FILE = '-data_file'
+
 
 class Frame(pd.DataFrame):
     """
