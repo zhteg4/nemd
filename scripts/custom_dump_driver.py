@@ -206,8 +206,10 @@ class CustomDump(object):
 
         frm_view = molview.FrameView(self.data_reader)
         frm_view.setData()
-        frm_view.scatters()
-        frm_view.lines()
+        frm_view.plotScatters()
+        frm_view.plotLines()
+        frms = traj.Frame.read(self.options.custom_dump)
+        frm_view.setFrames(frms)
         frm_view.updateLayout()
         frm_view.show()
 

@@ -33,6 +33,7 @@ class App(dash.Dash):
         data_reader = None
         if self.options.data_file:
             data_reader = oplsua.DataFileReader(self.options.data_file)
+            data_reader.run()
         self.frm_vw = molview.FrameView(data_reader)
         self.frm_vw.setData()
 
@@ -66,11 +67,6 @@ class App(dash.Dash):
                 )
             ],
                           style={'display': 'inline-block'}),
-
-            # dash.dcc.RadioItems(options=['datafile', 'trajectory'],
-            #                     value='datafile',
-            #                     id='data_source',
-            #                     labelStyle={'margin-left': '15px'}),
             dash.dcc.Graph(figure={}, id='traj_fig', style={'height': '80vh'})
         ])
 
