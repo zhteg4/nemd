@@ -79,8 +79,9 @@ class App(dash.Dash):
         self.frm_vw = molview.FrameView(data_reader)
         self.frm_vw.setData()
         self.frm_vw.clearPlot()
-        self.frm_vw.plotScatters()
-        self.frm_vw.plotLines()
+        self.frm_vw.setScatters()
+        self.frm_vw.setLines()
+        self.frm_vw.addTraces()
         self.frm_vw.updateLayout()
         return self.frm_vw.fig
 

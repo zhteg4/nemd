@@ -21,6 +21,8 @@ class FrameView:
         self.fig = graph_objects.Figure()
         self.scale = scale
         self.data = None
+        self.markers = []
+        self.lines = []
 
     def setData(self):
         """
@@ -56,6 +58,12 @@ class FrameView:
         """
         self.data[self.XYZU] = frm
 
+    def addTraces(self):
+        """
+        Add traces to the figure.
+        """
+        self.fig.add_traces(self.markers + self.lines)
+
     def setFrames(self, frms):
         """
         Set animation from trajectory frames.
@@ -63,26 +71,27 @@ class FrameView:
         :param frms generator of 'nemd.traj.Frame': the trajectory frames to
             create the animation from.
         """
-        import pdb;pdb.set_trace()
+
         fig_frms = []
         for idx, frm in enumerate(frms):
             self.updateCoords(frm)
-            data = self.plotScatters(add_to_fig=False)
-            data += self.plotLines(add_to_fig=False)
-            fig_frms.append(graph_objects.Frame(data=data, name=f'{idx}'))
+            self.setScatters()
+            self.setLines()
+            data = self.markers + self.lines
+            fig_frm = graph_objects.Frame(data=data, name=f'{idx}')
+            fig_frms.append(fig_frm)
         self.fig.update(frames=fig_frms)
 
-    def plotScatters(self, add_to_fig=True):
+    def setScatters(self):
         """
-        Plot scattered markers for atoms.
+        Set scattered markers for atoms.
 
-        :param add_to_fig bool: add to the fig trace if True
         :return markers list of 'plotly.graph_objs._scatter3d.Scatter3d':
             the scatter markers to represent atoms.
         """
         if not self.data_reader:
             return
-        markers = []
+        self.markers = []
         ele_vdw = [(x.ele, self.data_reader.vdws[x.id].dist * self.scale)
                    for x in self.data_reader.masses.values()]
         for ele, size in sorted(set(ele_vdw), key=lambda x: x[1],
@@ -97,40 +106,32 @@ class FrameView:
                                              mode='markers',
                                              name=ele,
                                              marker=marker)
-            if add_to_fig:
-                self.fig.add_trace(marker)
-            markers.append(marker)
-        return markers
+            self.markers.append(marker)
 
-    def plotLines(self, add_to_fig=True):
+    def setLines(self):
         """
-        Plot lines for bonds.
+        Set lines for bonds.
 
-        :param add_to_fig bool: add to the fig trace if True
         :return markers list of 'plotly.graph_objs._scatter3d.Scatter3d':
             the line markers to represent bonds.
         """
         if not self.data_reader:
             return
-        lines = []
+        self.lines = []
         for bond in self.data_reader.bonds.values():
             atom1 = self.data_reader.atoms[bond.id1]
             atom2 = self.data_reader.atoms[bond.id2]
             pnts = self.data.loc[[atom1.id, atom2.id]][self.XYZU]
             pnts = pd.concat((pnts, pnts.mean().to_frame().transpose()))
-            lines.append(self.plotline(pnts[::2], atom1,
-                                       add_to_fig=add_to_fig))
-            lines.append(self.plotline(pnts[1::], atom2,
-                                       add_to_fig=add_to_fig))
-        return lines
+            self.setline(pnts[::2], atom1)
+            self.setline(pnts[1::], atom2)
 
-    def plotline(self, xyz, atom, add_to_fig=True):
+    def setline(self, xyz, atom):
         """
-        Plot half bond spanning from one atom to the mid point.
+        Set half bond spanning from one atom to the mid point.
 
         :param xyz `numpy.ndarray`: the bond XYZU span
         :param atom 'types.SimpleNamespace': the bonded atom
-        :param add_to_fig bool: add to the fig trace if True
         :return markers 'plotly.graph_objs._scatter3d.Scatter3d':
             the line markers to represent bonds.
         """
@@ -142,9 +143,8 @@ class FrameView:
                                        mode='lines',
                                        showlegend=False,
                                        line=line)
-        if add_to_fig:
-            self.fig.add_trace(line)
-        return line
+
+        self.lines.append(line)
 
     def clearPlot(self):
         """
@@ -161,13 +161,57 @@ class FrameView:
                       eye=dict(x=1.25, y=1.25, z=1.25))
         buttons = None
         if self.fig.frames:
-            buttons = [dict(label="Play", method="animate", args=[None])]
+            buttons = [
+                dict(label="Play",
+                     method="animate",
+                     args=[None, dict(fromcurrent=True)]),
+                dict(label='Pause',
+                     method="animate",
+                     args=[[None], dict(mode='immediate')])
+            ]
+
         self.fig.update_layout(
             template='plotly_dark',
             scene=self.getScene(),
             scene_camera=camera,
-            updatemenus=[dict(type="buttons", buttons=buttons)],
+            sliders=self.getSliders(),
+            updatemenus=[
+                dict(type="buttons",
+                     buttons=buttons,
+                     showactive=False,
+                     font={'color': '#000000'},
+                     direction="left",
+                     pad=dict(r=10, t=87),
+                     xanchor="right",
+                     yanchor="top",
+                     x=0.1,
+                     y=0)
+            ],
         )
+
+    def getSliders(self):
+        """
+        Get the sliders for the trajectory frames.
+
+        :return list of dict: add the these slider bars to he menus.
+        """
+        slider = dict(active=0,
+                      yanchor="top",
+                      xanchor="left",
+                      x=0.1,
+                      y=0,
+                      pad=dict(b=10, t=50),
+                      len=0.9,
+                      currentvalue=dict(prefix='Frame:',
+                                        visible=True,
+                                        xanchor='right'))
+        slider['steps'] = [
+            dict(label=x['name'],
+                 method='animate',
+                 args=[[x['name']], dict(mode='immediate')])
+            for x in self.fig.frames
+        ]
+        return [slider]
 
     def getScene(self):
         """

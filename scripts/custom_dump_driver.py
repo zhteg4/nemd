@@ -204,14 +204,15 @@ class CustomDump(object):
         if VIEW not in self.options.task:
             return
 
-        frm_view = molview.FrameView(self.data_reader)
-        frm_view.setData()
-        frm_view.plotScatters()
-        frm_view.plotLines()
+        frm_vw = molview.FrameView(self.data_reader)
+        frm_vw.setData()
+        frm_vw.setScatters()
+        frm_vw.setLines()
+        frm_vw.addTraces()
         frms = traj.Frame.read(self.options.custom_dump)
-        frm_view.setFrames(frms)
-        frm_view.updateLayout()
-        frm_view.show()
+        frm_vw.setFrames(frms)
+        frm_vw.updateLayout()
+        frm_vw.show()
 
 
 logger = None
