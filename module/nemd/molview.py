@@ -169,7 +169,6 @@ class FrameView:
                      method="animate",
                      args=[[None], dict(mode='immediate')])
             ]
-
         self.fig.update_layout(
             template='plotly_dark',
             scene=self.getScene(),

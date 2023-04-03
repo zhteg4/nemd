@@ -5,8 +5,10 @@
 """
 This module read, parser, and analyze trajectories.
 """
+import io
 import math
 import random
+import base64
 import itertools
 import collections
 import numpy as np
@@ -48,22 +50,25 @@ class Frame(pd.DataFrame):
         self.setBox(box)
 
     @classmethod
-    def read(cls, filename):
+    def read(cls, filename=None, contents=None):
         """
         Read a custom dumpy file with id, xu, yu, zu.
 
         :param filename str: the filename to read frames
+        :param contents `bytes`: parse the contents if filename not provided
         :return iterator of 'Frame': each frame has coordinates and box info
         """
-        with open(filename, 'r') as dmp_fh:
+        if filename is None and contents:
+            contents = base64.b64decode(contents).decode("utf-8")
+        with open(filename, 'r') if filename else io.StringIO(contents) as fh:
             while True:
-                lines = [dmp_fh.readline() for _ in range(9)]
+                lines = [fh.readline() for _ in range(9)]
                 if not all(lines):
                     return
                 atom_num = int(lines[3].strip('\n'))
                 # 'id', 'xu', 'yu', 'zu'
                 names = lines[-1].strip('\n').split()[-4:]
-                frm = pd.read_csv(dmp_fh,
+                frm = pd.read_csv(fh,
                                   nrows=atom_num,
                                   header=None,
                                   delimiter=r'\s',

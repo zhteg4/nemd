@@ -190,6 +190,7 @@ class TestDataFileReader:
     def dfr(self):
         dfr = oplsua.DataFileReader(BUTANE_DATA)
         dfr.read()
+        dfr.indexLines()
         dfr.setDescription()
         return dfr
 
@@ -202,10 +203,15 @@ class TestDataFileReader:
     def testRead(self, raw_dfr):
         raw_dfr.read()
         assert 210 == len(raw_dfr.lines)
+
+    def testIndexLines(self, raw_dfr):
+        raw_dfr.read()
+        raw_dfr.indexLines()
         assert 11 == len(raw_dfr.mk_idxes)
 
     def testSetDescription(self, raw_dfr):
         raw_dfr.read()
+        raw_dfr.indexLines()
         raw_dfr.setDescription()
         assert 5 == len(raw_dfr.struct_dsp)
         assert 5 == len(raw_dfr.dype_dsp)

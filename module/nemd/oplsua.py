@@ -1676,8 +1676,7 @@ class DataFileReader(LammpsData):
         :param data_file str: data file with path
         :param min_dist: the minimum distance as clash (some h-bond has zero vdw
             params)
-        :param contents `bytes`: parse this as the contents if data_file not
-            provided.
+        :param contents `bytes`: parse the contents if data_file not provided.
         """
         self.data_file = data_file
         self.min_dist = min_dist

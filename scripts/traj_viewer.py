@@ -12,30 +12,24 @@ FlAG_DATA_FILE = traj.FlAG_DATA_FILE
 
 
 class App(dash.Dash):
-    def __init__(self, *arg, options=None, **kwarg):
+    def __init__(self, *arg, **kwarg):
         super().__init__(*arg, **kwarg)
-        self.options = options
-        if not self.options:
-            self.options = SimpleNamespace(data_file=None, custom_dump=None)
-        self.setData()
         self.setLayout()
         self.callback(
             dash.Output(component_id='traj_fig', component_property='figure'),
-            dash.Input('select_datafile', 'contents'))(self.updateGraph)
+            dash.Input('datafile_input', 'contents'),
+            dash.Input('traj_input', 'contents'))(self.inputChanged)
         self.callback(
             dash.Output(component_id='datafile_lb',
                         component_property='children'),
-            dash.Output(component_id='select_lb',
+            dash.Output(component_id='select_data_lb',
                         component_property='children'),
-            dash.Input('select_datafile', 'filename'))(self.updateDataLabel)
-
-    def setData(self):
-        data_reader = None
-        if self.options.data_file:
-            data_reader = oplsua.DataFileReader(self.options.data_file)
-            data_reader.run()
-        self.frm_vw = molview.FrameView(data_reader)
-        self.frm_vw.setData()
+            dash.Input('datafile_input', 'filename'))(self.updateDataLabel)
+        self.callback(
+            dash.Output(component_id='traj_lb', component_property='children'),
+            dash.Output(component_id='select_traj_lb',
+                        component_property='children'),
+            dash.Input('traj_input', 'filename'))(self.updateTrajLabel)
 
     def setLayout(self):
         self.layout = dash.html.Div([
@@ -56,8 +50,32 @@ class App(dash.Dash):
                           }),
             dash.html.Div(children=[
                 dash.dcc.Upload(
-                    id='select_datafile',
-                    children=dash.html.Div(children='', id='select_lb'),
+                    id='datafile_input',
+                    children=dash.html.Div(children='', id='select_data_lb'),
+                    style={
+                        'borderWidth': '1px',
+                        'borderStyle': 'dashed',
+                        'borderRadius': '5px',
+                        'textAlign': 'center',
+                    },
+                )
+            ],
+                          style={'display': 'inline-block'}),
+            # New Line
+            dash.html.Div(),
+            dash.html.Div(children='Trajectory:',
+                          style={'display': 'inline-block'}),
+            dash.html.Div(children='',
+                          id='traj_lb',
+                          style={
+                              'display': 'inline-block',
+                              'margin-left': '10px',
+                              'margin-right': '5px'
+                          }),
+            dash.html.Div(children=[
+                dash.dcc.Upload(
+                    id='traj_input',
+                    children=dash.html.Div(children='', id='select_traj_lb'),
                     style={
                         'borderWidth': '1px',
                         'borderStyle': 'dashed',
@@ -70,7 +88,12 @@ class App(dash.Dash):
             dash.dcc.Graph(figure={}, id='traj_fig', style={'height': '80vh'})
         ])
 
-    def updateGraph(self, contents):
+    def inputChanged(self, data_contents, traj_contents):
+        if traj_contents:
+            return self.trajChanged(traj_contents)
+        return self.dataFileChanged(data_contents)
+
+    def dataFileChanged(self, contents):
         data_reader = None
         if contents:
             content_type, content_string = contents.split(',')
@@ -85,7 +108,22 @@ class App(dash.Dash):
         self.frm_vw.updateLayout()
         return self.frm_vw.fig
 
+    def trajChanged(self, contents):
+        if not contents:
+            return
+        if self.frm_vw.data is None:
+            return
+        content_type, content_string = contents.split(',')
+        frms = traj.Frame.read(contents=content_string)
+        self.frm_vw.setFrames(frms)
+        self.frm_vw.updateLayout()
+        return self.frm_vw.fig
+
     def updateDataLabel(self, filename):
+        select_lb = 'X' if filename else 'click to select'
+        return filename, select_lb
+
+    def updateTrajLabel(self, filename):
         select_lb = 'X' if filename else 'click to select'
         return filename, select_lb
 
@@ -114,7 +152,7 @@ def main(argv):
     app = App(__name__,
               options=options,
               external_stylesheets=[dbc.themes.DARKLY])
-    app.run_server(debug=True, )
+    app.run_server(debug=True)
 
 
 if __name__ == '__main__':

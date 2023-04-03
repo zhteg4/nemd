@@ -1,12 +1,8 @@
 import os
-import sys
 import pytest
-from rdkit import Chem
 from nemd import oplsua
 from nemd import molview
 from nemd import testutils
-
-from unittest import mock
 
 
 class TestTransConformer(object):
@@ -23,13 +19,14 @@ class TestTransConformer(object):
         frm_vw.setData()
         assert (30, 6) == frm_vw.data.shape
 
-    def testScatters(self, frm_vw):
-        frm_vw.setData()
-        frm_vw.scatters()
-        assert 7 == len(frm_vw.fig['data'])
+    def testSetScatters(self, frm_vw):
 
-    def testLines(self, frm_vw):
         frm_vw.setData()
-        frm_vw.scatters()
-        frm_vw.lines()
-        assert 61 == len(frm_vw.fig['data'])
+        frm_vw.setScatters()
+        assert 7 == len(frm_vw.markers)
+
+    def testSetLines(self, frm_vw):
+        frm_vw.setData()
+        frm_vw.setScatters()
+        frm_vw.setLines()
+        assert 54 == len(frm_vw.lines)
