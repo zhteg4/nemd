@@ -22,6 +22,26 @@ FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
 
 
+def get_frames(filename=None, contents=None):
+    """
+    Get the trajectory frames based on file extension.
+
+    :param filename str: the filename to read frames
+    :param contents `bytes`: parse the contents if filename not provided
+    :return iterator of 'Frame': each frame has coordinates and box info
+    """
+    is_xyz = False
+    if filename:
+        is_xyz = filename.endswith('.xyz')
+    if contents:
+        content_type, content_string = contents.split(',')
+        is_xyz = content_type.split(';')[0].endswith('x-xyz')
+        contents = base64.b64decode(content_string).decode("utf-8")
+    if is_xyz:
+        return Frame.readXYZ(filename=filename, contents=contents)
+    return Frame.read(filename=filename, contents=contents)
+
+
 class Frame(pd.DataFrame):
     """
     Class to hold coordinate information.
@@ -33,20 +53,24 @@ class Frame(pd.DataFrame):
     YU = 'yu'
     ZU = 'zu'
     XYZU = [XU, YU, ZU]
+    ELEMENT = 'element'
 
-    def __init__(self, xyz=None, box=None, index=None):
+    def __init__(self, xyz=None, box=None, index=None, columns=None):
         """
-        :param xyz nx3 'numpy.ndarray' or 'DataFrame':
+        :param xyz nx3 'numpy.ndarray' or 'DataFrame': xyz data
         :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
+        :param index list: the atom indexes
+        :param columns list: the data columns (e.g., xu, yu, zu, element)
         """
-
         try:
             name = xyz.values.index.name
         except AttributeError:
             name = None
         if name is None and index is None and xyz is not None:
             index = range(1, xyz.shape[0] + 1)
-        super().__init__(data=xyz, index=index, columns=self.XYZU)
+        if columns is None:
+            columns = self.XYZU
+        super().__init__(data=xyz, index=index, columns=columns)
         self.setBox(box)
 
     @classmethod
@@ -58,8 +82,6 @@ class Frame(pd.DataFrame):
         :param contents `bytes`: parse the contents if filename not provided
         :return iterator of 'Frame': each frame has coordinates and box info
         """
-        if filename is None and contents:
-            contents = base64.b64decode(contents).decode("utf-8")
         with open(filename, 'r') if filename else io.StringIO(contents) as fh:
             while True:
                 lines = [fh.readline() for _ in range(9)]
@@ -83,6 +105,31 @@ class Frame(pd.DataFrame):
                     for y in lines[x].strip('\n').split()
                 ])
                 yield cls(frm, box=box)
+
+    @classmethod
+    def readXYZ(cls, filename=None, contents=None):
+        """
+        Read a xyz dumpy file with element, xu, yu, zu.
+
+        :param filename str: the filename to read frames
+        :param contents `bytes`: parse the contents if filename not provided
+        :return iterator of 'Frame': each frame has coordinates and box info
+        """
+        with open(filename, 'r') if filename else io.StringIO(contents) as fh:
+            while True:
+                line = fh.readline()
+                if not line:
+                    return
+                atom_num = int(line.strip('\n'))
+                names = [cls.ELEMENT] + cls.XYZU
+                frm = pd.read_csv(fh,
+                                  nrows=atom_num,
+                                  header=0,
+                                  delimiter=r'\s',
+                                  names=names,
+                                  engine='python')
+                frm.index = pd.RangeIndex(1, atom_num + 1)
+                yield cls(frm, columns=cls.XYZU + [cls.ELEMENT])
 
     def getPoint(self):
         """

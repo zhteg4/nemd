@@ -11,6 +11,14 @@ class FrameView:
     """Viewer datafile and trajectory frame"""
 
     XYZU = traj.Frame.XYZU
+    X_ELE = 'X'
+    X_SIZE = 20
+    # Color from https://webmail.life.nthu.edu.tw/~fmhsu/rasframe/CPKCLRS.HTM
+    X_COLOR = '#FF1493'
+    ELEMENT = traj.Frame.ELEMENT
+    SIZE = 'size'
+    COLOR = 'color'
+    ELE_SZ_CLR = dict(element=None, size=None, color=None)
 
     def __init__(self, data_reader=None, scale=5.):
         """
@@ -36,19 +44,17 @@ class FrameView:
         xyz = np.array([x.xyz for x in self.data_reader.atom])
         data = pd.DataFrame(xyz, index, columns=self.XYZU)
         # Element, Size, Color
+        ele_sz_clr = self.ELE_SZ_CLR.copy()
         self.data_reader.setMinimumDist()
         type_ids = [x.type_id for x in self.data_reader.atom]
-        sizes = [self.data_reader.vdws[x].dist * self.scale for x in type_ids]
         element = {x: y.ele for x, y in self.data_reader.masses.items()}
-        elements = [element[x] for x in type_ids]
+        ele_sz_clr[self.ELEMENT] = [element[x] for x in type_ids]
+        ele_sz_clr[self.SIZE] = [
+            self.data_reader.vdws[x].dist * self.scale for x in type_ids
+        ]
         color = {x: mendeleev.element(y).cpk_color for x, y in element.items()}
-        color = [color[x] for x in type_ids]
-        sz_clr = pd.DataFrame(
-            {
-                'element': elements,
-                'size': sizes,
-                'color': color
-            }, index=index)
+        ele_sz_clr[self.COLOR] = [color[x] for x in type_ids]
+        sz_clr = pd.DataFrame(ele_sz_clr, index=index)
         self.data = pd.concat((data, sz_clr), axis=1)
 
     def updateCoords(self, frm):
@@ -57,7 +63,7 @@ class FrameView:
 
         :param frm 'nemd.traj.Frame': coordinate frame to update with
         """
-        self.data[self.XYZU] = frm
+        self.data[self.XYZU] = frm[self.XYZU]
 
     def addTraces(self):
         """
@@ -74,6 +80,7 @@ class FrameView:
         """
         if self.data is None:
             self.setDataFromTraj(frms)
+            self.setEleSz()
             self.setScatters()
             self.setLines()
             self.addTraces()
@@ -89,15 +96,33 @@ class FrameView:
         self.fig.update(frames=fig_frms)
 
     def setDataFromTraj(self, frms):
+        """
+        Set the data from trajectory frames.
+
+        :param frms generator of 'nemd.traj.Frame': the trajectory frames to
+            create the animation from.
+        """
         frm = more_itertools.peekable(frms).peek()
-        # https://webmail.life.nthu.edu.tw/~fmhsu/rasframe/CPKCLRS.HTM
-        sz_clr = pd.DataFrame(
-            {
-                'element': ['X'] * frm.shape[0],
-                'size': [20] * frm.shape[0],
-                'color': ['#FF1493'] * frm.shape[0]
-            },
-            index=range(1, frm.shape[0] + 1))
+        ele_sz_clr = self.ELE_SZ_CLR.copy()
+        try:
+            ele_sz_clr[self.ELEMENT] = frm.pop(self.ELEMENT)
+        except KeyError:
+            ele_sz_clr[self.ELEMENT] = [self.X_ELE] * frm.shape[0]
+            ele_sz_clr[self.COLOR] = [self.X_COLOR] * frm.shape[0]
+        else:
+            element = set(ele_sz_clr[self.ELEMENT])
+            color = {
+                x: self.X_COLOR
+                if x == self.X_ELE else mendeleev.element(x).cpk_color
+                for x in element
+            }
+            ele_sz_clr[self.COLOR] = [
+                color[x] for x in ele_sz_clr[self.ELEMENT]
+            ]
+        finally:
+            ele_sz_clr[self.SIZE] = [self.X_SIZE] * frm.shape[0]
+
+        sz_clr = pd.DataFrame(ele_sz_clr, index=range(1, frm.shape[0] + 1))
         self.data = pd.concat((frm, sz_clr), axis=1)
 
     def setScatters(self):
@@ -110,13 +135,7 @@ class FrameView:
         if self.data is None:
             return
         self.markers = []
-        if self.data_reader is None:
-            ele_vdw = [('X', 20)]
-        else:
-            ele_vdw = [(x.ele, self.data_reader.vdws[x.id].dist * self.scale)
-                       for x in self.data_reader.masses.values()]
-        for ele, size in sorted(set(ele_vdw), key=lambda x: x[1],
-                                reverse=True):
+        for ele, size in self.ele_sz:
             idx = (self.data[['element', 'size']] == [ele, size]).all(axis=1)
             data = self.data[idx]
             marker = dict(size=size, color=data['color'].values[0])
@@ -128,6 +147,16 @@ class FrameView:
                                              name=ele,
                                              marker=marker)
             self.markers.append(marker)
+
+    def setEleSz(self):
+        """
+        Set elements and sizes.
+        """
+        if self.data is None:
+            return
+        ele_sz = self.data[[self.ELEMENT, self.SIZE]]
+        ele_sz = set([tuple(y.values) for x, y in ele_sz.iterrows()])
+        self.ele_sz = sorted(set(ele_sz), key=lambda x: x[1], reverse=True)
 
     def setLines(self):
         """
@@ -167,10 +196,11 @@ class FrameView:
 
         self.lines.append(line)
 
-    def clearPlot(self):
+    def clearData(self):
         """
         Clear the atom and bond plots.
         """
+        self.data = None
         self.fig.data = []
         self.markers = []
         self.lines = []

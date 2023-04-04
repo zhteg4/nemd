@@ -1722,7 +1722,8 @@ class DataFileReader(LammpsData):
             with open(self.data_file, 'r') as df_fh:
                 self.lines = df_fh.readlines()
         else:
-            decoded = base64.b64decode(self.contents)
+            content_type, content_string = self.contents.split(',')
+            decoded = base64.b64decode(content_string)
             self.lines = decoded.decode("utf-8").splitlines()
 
     def indexLines(self):

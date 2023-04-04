@@ -70,7 +70,7 @@ def get_parser():
                         type=parserutils.type_file,
                         help='Custom dump file to analyze')
     parser.add_argument(FlAG_DATA_FILE,
-                        metavar=FlAG_DATA_FILE.upper(),
+                        metavar=FlAG_DATA_FILE[1:].upper(),
                         type=parserutils.type_file,
                         help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
@@ -184,6 +184,7 @@ class CustomDump(object):
         broken_bonds=False & glue=True is good for molecules droplets in vacuum
         Not all combination make physical senses.
         """
+
         if XYZ not in self.options.task:
             return
 
@@ -206,10 +207,11 @@ class CustomDump(object):
 
         frm_vw = molview.FrameView(data_reader=self.data_reader)
         frm_vw.setData()
+        frm_vw.setEleSz()
         frm_vw.setScatters()
         frm_vw.setLines()
         frm_vw.addTraces()
-        frms = traj.Frame.read(self.options.custom_dump)
+        frms = traj.get_frames(self.options.custom_dump)
         frm_vw.setFrames(frms)
         frm_vw.updateLayout()
         frm_vw.show()
