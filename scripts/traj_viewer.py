@@ -1,9 +1,8 @@
 import sys
 import dash
-from types import SimpleNamespace
 import dash_bootstrap_components as dbc
-from nemd import oplsua
 from nemd import traj
+from nemd import oplsua
 from nemd import molview
 from nemd import parserutils
 
@@ -14,6 +13,7 @@ FlAG_DATA_FILE = traj.FlAG_DATA_FILE
 class App(dash.Dash):
     def __init__(self, *arg, **kwarg):
         super().__init__(*arg, **kwarg)
+        self.frm_vw = molview.FrameView()
         self.setLayout()
         self.callback(
             dash.Output(component_id='traj_fig', component_property='figure'),
@@ -89,19 +89,27 @@ class App(dash.Dash):
         ])
 
     def inputChanged(self, data_contents, traj_contents):
-        if traj_contents:
-            return self.trajChanged(traj_contents)
-        return self.dataFileChanged(data_contents)
+        if not any([data_contents, traj_contents]):
+            return self.cleanPlot()
+        # ctx = dash.callback_context
+        # input_id = ctx.triggered[0]["prop_id"].split(".")[0]
+        self.dataFileChanged(data_contents)
+        return self.trajChanged(traj_contents)
+
+    def cleanPlot(self):
+        self.frm_vw.clearPlot()
+        self.frm_vw.updateLayout()
+        return self.frm_vw.fig
 
     def dataFileChanged(self, contents):
-        data_reader = None
-        if contents:
-            content_type, content_string = contents.split(',')
-            data_reader = oplsua.DataFileReader(contents=content_string)
-            data_reader.run()
-        self.frm_vw = molview.FrameView(data_reader)
-        self.frm_vw.setData()
+        if contents is None:
+            return self.frm_vw.fig
         self.frm_vw.clearPlot()
+        content_type, content_string = contents.split(',')
+        data_reader = oplsua.DataFileReader(contents=content_string)
+        data_reader.run()
+        self.frm_vw.data_reader = data_reader
+        self.frm_vw.setData()
         self.frm_vw.setScatters()
         self.frm_vw.setLines()
         self.frm_vw.addTraces()
@@ -109,10 +117,8 @@ class App(dash.Dash):
         return self.frm_vw.fig
 
     def trajChanged(self, contents):
-        if not contents:
-            return
-        if self.frm_vw.data is None:
-            return
+        if contents is None:
+            return self.frm_vw.fig
         content_type, content_string = contents.split(',')
         frms = traj.Frame.read(contents=content_string)
         self.frm_vw.setFrames(frms)
@@ -148,10 +154,7 @@ def get_parser():
 
 
 def main(argv):
-    options = get_parser().parse_args(argv)
-    app = App(__name__,
-              options=options,
-              external_stylesheets=[dbc.themes.DARKLY])
+    app = App(__name__, external_stylesheets=[dbc.themes.DARKLY])
     app.run_server(debug=True)
 
 

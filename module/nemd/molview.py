@@ -1,6 +1,7 @@
 import mendeleev
 import numpy as np
 import pandas as pd
+import more_itertools
 import plotly.graph_objects as graph_objects
 
 from nemd import traj
@@ -11,7 +12,7 @@ class FrameView:
 
     XYZU = traj.Frame.XYZU
 
-    def __init__(self, data_reader, scale=5.):
+    def __init__(self, data_reader=None, scale=5.):
         """
         :param data_reader `nemd.oplsua.DataFileReader`: datafile reader with
             atom, bond, element and other info.
@@ -71,6 +72,11 @@ class FrameView:
         :param frms generator of 'nemd.traj.Frame': the trajectory frames to
             create the animation from.
         """
+        if self.data is None:
+            self.setDataFromTraj(frms)
+            self.setScatters()
+            self.setLines()
+            self.addTraces()
 
         fig_frms = []
         for idx, frm in enumerate(frms):
@@ -82,6 +88,18 @@ class FrameView:
             fig_frms.append(fig_frm)
         self.fig.update(frames=fig_frms)
 
+    def setDataFromTraj(self, frms):
+        frm = more_itertools.peekable(frms).peek()
+        # https://webmail.life.nthu.edu.tw/~fmhsu/rasframe/CPKCLRS.HTM
+        sz_clr = pd.DataFrame(
+            {
+                'element': ['X'] * frm.shape[0],
+                'size': [20] * frm.shape[0],
+                'color': ['#FF1493'] * frm.shape[0]
+            },
+            index=range(1, frm.shape[0] + 1))
+        self.data = pd.concat((frm, sz_clr), axis=1)
+
     def setScatters(self):
         """
         Set scattered markers for atoms.
@@ -89,11 +107,14 @@ class FrameView:
         :return markers list of 'plotly.graph_objs._scatter3d.Scatter3d':
             the scatter markers to represent atoms.
         """
-        if not self.data_reader:
+        if self.data is None:
             return
         self.markers = []
-        ele_vdw = [(x.ele, self.data_reader.vdws[x.id].dist * self.scale)
-                   for x in self.data_reader.masses.values()]
+        if self.data_reader is None:
+            ele_vdw = [('X', 20)]
+        else:
+            ele_vdw = [(x.ele, self.data_reader.vdws[x.id].dist * self.scale)
+                       for x in self.data_reader.masses.values()]
         for ele, size in sorted(set(ele_vdw), key=lambda x: x[1],
                                 reverse=True):
             idx = (self.data[['element', 'size']] == [ele, size]).all(axis=1)
@@ -115,7 +136,7 @@ class FrameView:
         :return markers list of 'plotly.graph_objs._scatter3d.Scatter3d':
             the line markers to represent bonds.
         """
-        if not self.data_reader:
+        if self.data_reader is None:
             return
         self.lines = []
         for bond in self.data_reader.bonds.values():
@@ -151,6 +172,8 @@ class FrameView:
         Clear the atom and bond plots.
         """
         self.fig.data = []
+        self.markers = []
+        self.lines = []
 
     def updateLayout(self):
         """

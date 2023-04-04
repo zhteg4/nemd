@@ -204,7 +204,7 @@ class CustomDump(object):
         if VIEW not in self.options.task:
             return
 
-        frm_vw = molview.FrameView(self.data_reader)
+        frm_vw = molview.FrameView(data_reader=self.data_reader)
         frm_vw.setData()
         frm_vw.setScatters()
         frm_vw.setLines()
