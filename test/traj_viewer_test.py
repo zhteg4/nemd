@@ -12,5 +12,5 @@ class TestApp:
     def app(self):
         return viewer.App()
 
-    def testSetData(self, app):
+    def testSetData(self, app, dash_duo):
         pass

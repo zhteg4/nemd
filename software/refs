@@ -1,3 +1,8 @@
+dash testing
+brew install --cask chromedriver
+xattr -d com.apple.quarantine chromedriver
+tzhang in /usr/local/bin  % spctl --add --label 'Approved' chromedriver
+
 visco-elastic
 https://xiresearch.org/
 Equilibrium and non-equilibrium molecular dynamics approaches for the linear viscoelasticity of polymer melts

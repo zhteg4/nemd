@@ -20,13 +20,14 @@ class TestTransConformer(object):
         assert (30, 6) == frm_vw.data.shape
 
     def testSetScatters(self, frm_vw):
-
         frm_vw.setData()
+        frm_vw.setEleSz()
         frm_vw.setScatters()
         assert 7 == len(frm_vw.markers)
 
     def testSetLines(self, frm_vw):
         frm_vw.setData()
+        frm_vw.setEleSz()
         frm_vw.setScatters()
         frm_vw.setLines()
         assert 54 == len(frm_vw.lines)
