@@ -1,7 +1,8 @@
 dash testing
 brew install --cask chromedriver
+cd /usr/local/bin
 xattr -d com.apple.quarantine chromedriver
-tzhang in /usr/local/bin  % spctl --add --label 'Approved' chromedriver
+spctl --add --label 'Approved' chromedriver
 
 visco-elastic
 https://xiresearch.org/

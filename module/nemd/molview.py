@@ -1,10 +1,10 @@
-import mendeleev
 import numpy as np
 import pandas as pd
 import more_itertools
 import plotly.graph_objects as graph_objects
 
 from nemd import traj
+from nemd import nmendeleev
 
 
 class FrameView:
@@ -52,7 +52,10 @@ class FrameView:
         ele_sz_clr[self.SIZE] = [
             self.data_reader.vdws[x].dist * self.scale for x in type_ids
         ]
-        color = {x: mendeleev.element(y).cpk_color for x, y in element.items()}
+        color = {
+            x: nmendeleev.element(y).cpk_color
+            for x, y in element.items()
+        }
         ele_sz_clr[self.COLOR] = [color[x] for x in type_ids]
         sz_clr = pd.DataFrame(ele_sz_clr, index=index)
         self.data = pd.concat((data, sz_clr), axis=1)
@@ -113,7 +116,7 @@ class FrameView:
             element = set(ele_sz_clr[self.ELEMENT])
             color = {
                 x: self.X_COLOR
-                if x == self.X_ELE else mendeleev.element(x).cpk_color
+                if x == self.X_ELE else nmendeleev.element(x).cpk_color
                 for x in element
             }
             ele_sz_clr[self.COLOR] = [

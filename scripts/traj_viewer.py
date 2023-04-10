@@ -14,26 +14,37 @@ class App(dash.Dash):
 
     CANCEL_SYMBOL = 'X'
     CLICK_TO_SELECT = 'click to select'
+    TRAJ_INPUT = 'traj_input'
+    TRAJ_LB = 'traj_lb'
+    SELECT_TRAJ_LB = 'select_traj_lb'
+    DATAFILE_INPUT = 'datafile_input'
+    DATAFILE_LB = 'datafile_lb'
+    SELECT_DATA_LB = 'select_data_lb'
+    TRAJ_FIG = 'traj_fig'
+
+    BLUE_COLOR_HEX = '#7FDBFF'
 
     def __init__(self, *arg, **kwarg):
         super().__init__(*arg, **kwarg)
         self.frm_vw = molview.FrameView()
         self.setLayout()
         self.callback(
-            dash.Output(component_id='traj_fig', component_property='figure'),
-            dash.Input('datafile_input', 'contents'),
-            dash.Input('traj_input', 'contents'))(self.inputChanged)
+            dash.Output(component_id=self.TRAJ_FIG,
+                        component_property='figure'),
+            dash.Input(self.DATAFILE_INPUT, 'contents'),
+            dash.Input(self.TRAJ_INPUT, 'contents'))(self.inputChanged)
         self.callback(
-            dash.Output(component_id='datafile_lb',
+            dash.Output(component_id=self.DATAFILE_LB,
                         component_property='children'),
-            dash.Output(component_id='select_data_lb',
+            dash.Output(component_id=self.SELECT_DATA_LB,
                         component_property='children'),
-            dash.Input('datafile_input', 'filename'))(self.updateDataLabel)
+            dash.Input(self.DATAFILE_INPUT, 'filename'))(self.updateDataLabel)
         self.callback(
-            dash.Output(component_id='traj_lb', component_property='children'),
-            dash.Output(component_id='select_traj_lb',
+            dash.Output(component_id=self.TRAJ_LB,
                         component_property='children'),
-            dash.Input('traj_input', 'filename'))(self.updateTrajLabel)
+            dash.Output(component_id=self.SELECT_TRAJ_LB,
+                        component_property='children'),
+            dash.Input(self.TRAJ_INPUT, 'filename'))(self.updateTrajLabel)
 
     def setLayout(self):
         """
@@ -43,18 +54,20 @@ class App(dash.Dash):
             dash.html.H1(children='Molecular Trajectory Viewer',
                          style={
                              'textAlign': 'center',
-                             'color': '#7FDBFF'
+                             'color': self.BLUE_COLOR_HEX
                          }),
             dash.html.Hr(),
             ndash.LabeledUpload(label='Data File:',
-                                status_id='datafile_lb',
-                                button_id='datafile_input',
-                                click_id='select_data_lb'),
+                                status_id=self.DATAFILE_LB,
+                                button_id=self.DATAFILE_INPUT,
+                                click_id=self.SELECT_DATA_LB),
             ndash.LabeledUpload(label='Trajectory:',
-                                status_id='traj_lb',
-                                button_id='traj_input',
-                                click_id='select_traj_lb'),
-            dash.dcc.Graph(figure={}, id='traj_fig', style={'height': '80vh'})
+                                status_id=self.TRAJ_LB,
+                                button_id=self.TRAJ_INPUT,
+                                click_id=self.SELECT_TRAJ_LB),
+            dash.dcc.Graph(figure={},
+                           id=self.TRAJ_FIG,
+                           style={'height': '80vh'})
         ])
 
     def inputChanged(self, data_contents, traj_contents):
