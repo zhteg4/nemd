@@ -444,7 +444,7 @@ class DistanceCell:
             rnodes.append(rnode)
         self.graph.remove_nodes_from(nodes)
 
-    def getVoids(self, num=10):
+    def getVoids(self, num=50):
         """
         Get the points from the voids.
 
@@ -474,6 +474,7 @@ class DistanceCell:
 
     def getDistsWithIds(self, ids):
         dists = [
-            self.frm.getDists(self.extg_gids, self.frm.loc[x]) for x in ids
+            self.frm.getDists(list(self.extg_gids),
+                              self.frm.loc[x]).reshape(-1, 1) for x in ids
         ]
-        return pd.concat(dists, axis=1)
+        return np.concatenate(dists, axis=1)
