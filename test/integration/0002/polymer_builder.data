@@ -1,0 +1,39 @@
+LAMMPS Description
+
+10 atoms
+0 bonds
+0 angles
+0 dihedrals
+0 impropers
+
+1 atom types
+0 bond types
+0 angle types
+0 dihedral types
+0 improper types
+
+0.08 8.19 xlo xhi
+-0.97 7.13 ylo yhi
+-0.41 7.70 zlo zhi
+
+Masses
+
+1 16.043 # CH4 Methane C 81
+
+Pair Coeffs
+
+1 0.294 3.73
+
+Atoms
+
+1 1 1 0.0000 4.864 5.675 0.000
+2 2 1 0.0000 2.432 1.621 1.621
+3 3 1 0.0000 7.296 0.000 4.053
+4 4 1 0.0000 5.675 4.864 2.432
+5 5 1 0.0000 5.675 1.621 1.621
+6 6 1 0.0000 3.243 7.296 4.053
+7 7 1 0.0000 0.811 3.243 6.486
+8 8 1 0.0000 7.296 1.621 6.486
+9 9 1 0.0000 0.811 0.000 7.296
+10 10 1 0.0000 3.243 4.864 2.432
+

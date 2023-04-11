@@ -684,7 +684,6 @@ class FragMols(FragMixIn):
             dead molecule.
         """
 
-        # import pdb;pdb.set_trace()
         self.dcell.rmClashNodes()
         points = self.dcell.getVoids()
         for point in points:

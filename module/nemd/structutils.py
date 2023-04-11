@@ -12,11 +12,24 @@ WEIGHT = 'weight'
 
 
 def getGraph(mol):
+    """
+    Get the networkx graph on the input molecule.
+    :param mol `rdkit.Chem.rdchem.Mol`: the input molecule with/without bonds
+
+    :return `networkx.classes.graph.Graph`: graph with nodes and edges.
+    """
     graph = nx.Graph()
     edges = [(
         x.GetBeginAtom().GetIdx(),
         x.GetEndAtom().GetIdx(),
     ) for x in mol.GetBonds()]
+    if not edges:
+        # When bonds don't exist, just add the atom.
+        for atom in mol.GetAtoms():
+            graph.add_node(atom.GetIdx())
+        return graph
+    # When bonds exist, add edges and the associated atoms, assuming atoms in
+    # one molecule are bonded.
     graph.add_edges_from(edges)
     for edge in edges:
         for idx in range(2):
@@ -28,13 +41,24 @@ def getGraph(mol):
     return graph
 
 
-def findPath(graph=None, mol=None, source=None, target=None, weight=None):
+def findPath(graph=None, mol=None, source=None, target=None, **kwarg):
+    """
+    Find the path in a molecule.
+
+    :param graph 'networkx.classes.graph.Graph': molecular networkx graph
+    :param mol `rdkit.Chem.rdchem.Mol`: molecule to find path on
+    :param source int: the input source node
+    :param target int: the input target node
+    :return int, int, list: source node, target node, and the path inbetween
+    """
+
     if graph is None:
         graph = getGraph(mol)
     shortest_path = nx.shortest_path(graph,
                                      source=source,
                                      target=target,
-                                     weight=weight)
+                                     **kwarg)
+
     if target is not None:
         shortest_path = {target: shortest_path}
     if source is not None:
