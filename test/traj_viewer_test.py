@@ -1,6 +1,9 @@
+import io
 import os
 import time
 import pytest
+import logging
+import contextlib
 from nemd import testutils
 import traj_viewer as viewer
 
@@ -16,6 +19,7 @@ class TestApp:
     @pytest.fixture
     def app(self):
         app = viewer.App(__name__)
+        app.logger.setLevel(logging.WARNING)
         return app
 
     def loadFile(self, dash_duo, tag, afile):
@@ -31,11 +35,13 @@ class TestApp:
         return dash_duo.find_element(xpath, attribute=cls.XPATH)
 
     def testDataFileChanged(self, app, dash_duo):
-        dash_duo.start_server(app)
+        with contextlib.redirect_stdout(io.StringIO()):
+            dash_duo.start_server(app)
         ele = self.loadFile(dash_duo, tag='datafile_input', afile=DATA_FILE)
         assert ele.text == ''
         datafile_lb = self.getElement(dash_duo, tag='datafile_lb')
         assert datafile_lb.text == 'c6.data'
+        time.sleep(1)
         assert 11 == len(app.frm_vw.fig.data)
         ele = self.loadFile(dash_duo, tag='traj_input', afile=XYZ_FILE)
         time.sleep(1)
@@ -45,7 +51,8 @@ class TestApp:
         assert 11 == len(app.frm_vw.fig.data)
 
     def testTrajChanged(self, app, dash_duo):
-        dash_duo.start_server(app)
+        with contextlib.redirect_stdout(io.StringIO()):
+            dash_duo.start_server(app)
         ele = self.loadFile(dash_duo, tag='traj_input', afile=DUMP_FILE)
         assert ele.text == ''
         datafile_lb = self.getElement(dash_duo, tag='traj_lb')
