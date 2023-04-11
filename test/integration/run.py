@@ -13,10 +13,11 @@ cmd to compare two files;
 """
 import os
 import re
-import shutil
 import sys
 import glob
+import shutil
 import filecmp
+import datetime
 from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
@@ -38,6 +39,7 @@ JOBNAME = 'integration_test'
 
 FLAG_DIR = DIR
 FLAG_CLEAN = '-clean'
+FLAG_SLOW = '-slow'
 
 
 def log_debug(msg):
@@ -100,7 +102,7 @@ def run_cmd(job):
     test_cmd_file = os.path.join(job.document[DIR], CMD)
     with open(test_cmd_file) as fh:
         lines = [x.strip() for x in fh.readlines()]
-    cmd = symbols.SEMICOLON.join(lines)
+    cmd = symbols.SEMICOLON.join([x for x in lines if not x.startswith('#')])
     return f"cd {job.path}; {cmd}; cd -"
 
 
@@ -231,6 +233,9 @@ class Integration:
 
     WORKSPACE = 'workspace'
     FLOW_PROJECT = 'flow.project'
+    TAG = 'tag'
+    SLOW = 'slow'
+    TAG_KEYS = [SLOW]
 
     def __init__(self, options, jobname):
         """
@@ -253,6 +258,7 @@ class Integration:
         with open(self.status_file, 'w') as self.status_fh:
             self.clean()
             self.setTests()
+            self.skipTests()
             self.setProject()
             self.addJobs()
             self.runProject()
@@ -282,6 +288,16 @@ class Integration:
             log_error(f'No tests found in {self.options.dir}.')
         log(f"{len(self.test_dirs)} tests found.")
 
+    def skipTests(self):
+        """
+        Skip slow tests.
+        """
+        if self.options.slow is None:
+            return
+        orig_num = len(self.test_dirs)
+        self.test_dirs = [x for x in self.test_dirs if not self.isSLow(x)]
+        log(f"{orig_num - len(self.test_dirs)} tests skipped.")
+
     def setProject(self, workspace='workspace'):
         """
         Initiate the project.
@@ -296,6 +312,55 @@ class Integration:
             job = self.project.open_job({ID: os.path.basename(test_dir)})
             job.document[DIR] = test_dir
             job.init()
+
+    def isSLow(self, test_dir):
+        """
+        Whether the test is slow and gets skipped.
+
+        :param test_dir str: the directory of the test.
+        :return bool: True when the test is marked with a time longer than the
+            command line option requirement.
+        """
+        if self.options.slow is None:
+            return False
+        tags = self.getTags(test_dir, tag_keys=[self.SLOW])
+        return tags.get(self.SLOW, 0) > self.options.slow
+
+    def getTags(self, test_dir, tag_keys=None):
+        """
+        Get the tags in the test directory.
+
+        :param test_dir str: the test directory.
+        :param tag_keys list: tag keys to look for.
+        :return dict: tag keys and values
+
+        :raise ValueError: when the key is unknown.
+        """
+        if tag_keys is None:
+            tag_keys = self.TAG_KEYS
+        tag_file = os.path.join(test_dir, self.TAG)
+        if not os.path.isfile(tag_file):
+            return {}
+        with open(tag_file) as tfh:
+            lines = tfh.readlines()
+        line = symbols.SEMICOLON.join(lines)
+        tags = line.split(symbols.SEMICOLON)
+        key_vals = {}
+        for tag in tags:
+            for tag_key in tag_keys:
+                if tag.startswith(tag_key):
+                    break
+            else:
+                raise ValueError(f"Unknown {tag} found in {tag_file}. Only "
+                                 f"{self.TAG_KEYS} tags are supported.")
+            if tag_key == self.SLOW:
+                hms = re.search('\(.*?\)', tag).group()[2:-2]
+                hms = datetime.datetime.strptime(hms, '%H:%M:%S')
+                seconds = datetime.timedelta(
+                    hours=hms.hour, minutes=hms.minute,
+                    seconds=hms.second).total_seconds()
+                key_vals[tag_key] = seconds
+        return key_vals
 
     def runProject(self):
         """
@@ -338,7 +403,12 @@ def get_parser():
     parser.add_argument(
         FLAG_CLEAN,
         action='store_true',
-        help='Clean prevous results (if any) and run new ones.')
+        help='Clean previous results (if any) and run new ones.')
+    parser.add_argument(
+        FLAG_SLOW,
+        type=parserutils.type_positive_float,
+        metavar='SECOND',
+        help='Skip tests marked with time longer than this criteria.')
     jobutils.add_job_arguments(parser)
     return parser
 
