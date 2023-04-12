@@ -36,6 +36,7 @@ FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
 FlAG_MOL_NUM = '-mol_num'
 FlAG_DENSITY = '-density'
+FlAG_FORCE_FIELD = '-force_field'
 FlAG_CELL = '-cell'
 GRID = 'grid'
 PACK = 'pack'
@@ -126,6 +127,12 @@ def get_parser():
         default=0.5,
         help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
     )
+    parser.add_argument(
+        FlAG_FORCE_FIELD,
+        metavar=FlAG_FORCE_FIELD[1:].upper(),
+        type=parserutils.type_force_field,
+        default=oplsua.OplsTyper.OPLSUA_TIP3P,
+        help='The force field type (and model for water separated with comma).')
     jobutils.add_job_arguments(parser)
     return parser
 
@@ -214,7 +221,7 @@ class AmorphousCell(object):
         Build polymer from monomers if provided.
         """
         for cru, cru_num, in zip(self.options.cru, self.options.cru_num):
-            polym = Polymer(cru, cru_num)
+            polym = Polymer(cru, cru_num, wmodel=self.options.force_field.model)
             polym.run()
             self.polymers.append(polym)
 
@@ -590,6 +597,7 @@ class Polymer(object):
     BOND_ATM_ID = oplsua.BOND_ATM_ID
     RES_NUM = oplsua.RES_NUM
     NEIGHBOR_CHARGE = oplsua.LammpsData.NEIGHBOR_CHARGE
+    WATER_TIP3P=oplsua.OplsTyper.WATER_TIP3P
     IMPLICIT_H = oplsua.IMPLICIT_H
     MOL_NUM = 'mol_num'
     MONO_ATOM_IDX = 'mono_atom_idx'
@@ -599,15 +607,17 @@ class Polymer(object):
     IS_MONO = prop_names.IS_MONO
     MONO_ID = prop_names.MONO_ID
 
-    def __init__(self, cru, cru_num, ff=None):
+    def __init__(self, cru, cru_num, ff=None, wmodel=WATER_TIP3P):
         """
         :param cru str: the smiles string for monomer
         :param cru_num int: the number of monomers per polymer
         :param ff str: the file path for the force field
+        :param wmodel str: the model type for water
         """
         self.cru = cru
         self.cru_num = cru_num
         self.ff = ff
+        self.wmodel = wmodel
         self.polym = None
         self.polym_Hs = None
         self.box = None
@@ -719,7 +729,7 @@ class Polymer(object):
         """
         Assign atom types to the structure.
         """
-        ff_typer = oplsua.OplsTyper(self.polym)
+        ff_typer = oplsua.OplsTyper(self.polym, wmodel=self.wmodel)
         ff_typer.run()
 
     def embedMol(self, trans=False):

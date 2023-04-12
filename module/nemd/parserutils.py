@@ -1,8 +1,10 @@
 import os
 import random
 import argparse
+import collections
 import numpy as np
 from rdkit import Chem
+from nemd import oplsua
 from nemd import symbols
 from nemd import constants
 
@@ -87,7 +89,7 @@ def type_positive_int(arg):
     value = type_int(arg)
     if value < 1:
         raise argparse.ArgumentTypeError(
-            f'{value} is not a possitive integer.')
+            f'{value} is not a positive integer.')
     return value
 
 
@@ -117,3 +119,17 @@ def type_monomer_smiles(arg, allow_mol=False, canonize=True):
             raise argparse.ArgumentTypeError(
                 f"{symbols.WILD_CARD} connects more than one atom.")
     return Chem.CanonSmiles(arg) if canonize else arg
+
+FF_MODEL = collections.namedtuple('FF_MODEL', ['ff', 'model'])
+
+def type_force_field(arg, ff_model=oplsua.OplsTyper.FF_MODEL):
+    args = arg.split(',')
+    ff_type = args[0]
+    if ff_type not in ff_model:
+        msg = f"Only support {','.join(ff_model.keys())}, but found {ff_type}."
+        raise argparse.ArgumentTypeError(msg)
+    wmodel = args[1] if len(args) == 2 else ff_model[ff_type][0]
+    if wmodel not in ff_model[ff_type]:
+        msg = f"Only support {','.join(ff_model[ff_type])}, but found {wmodel}."
+        raise argparse.ArgumentTypeError(msg)
+    return FF_MODEL(ff=ff_type, model=wmodel)

@@ -72,6 +72,7 @@ class OplsTyper:
     Type the atoms and map SMILES fragments.
     """
 
+    OPLSUA = 'OPLSUA'
     TYPE_ID = TYPE_ID
     RES_NUM = RES_NUM
     BOND_ATM_ID = BOND_ATM_ID
@@ -126,17 +127,21 @@ class OplsTyper:
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17]}
     # yapf: disable
     DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,)}
-
-    TIP3P = 'TIP3P' # https://docs.lammps.org/Howto_tip3p.html
+    # https://docs.lammps.org/Howto_tip3p.html
+    TIP3P = 'TIP3P'
     SPC = 'SPC'
     WATER_TIP3P = f'Water ({TIP3P})'
     WATER_SPC = f'Water ({SPC})'
     UA_WATER_SPC = UA(sml='O', mp=(79,), hs={79: 80}, dsc=WATER_SPC)
     # yapf: enable
 
+    WMODELS = [TIP3P, SPC]
+    FF_MODEL = {OPLSUA: WMODELS}
+    OPLSUA_TIP3P = f'{OPLSUA},{TIP3P}'
     def __init__(self, mol, wmodel=TIP3P):
         """
         :param mol 'rdkit.Chem.rdchem.Mol': molecule to assign FF types
+        :param wmodel str: the model type for water
         """
         self.mol = mol
         if wmodel == self.TIP3P:
