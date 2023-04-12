@@ -23,8 +23,8 @@ Masses
 
 Pair Coeffs
 
-1 0.175 3.905
-2 0.118 3.905
+1 0.1750 3.9050
+2 0.1180 3.9050
 
 Bond Coeffs
 
@@ -41,9 +41,6 @@ Dihedral Coeffs
 1  0.0 0.0 4.0 0.0
 2  0.0 0.0 4.0 0.0
 3  0.0 0.0 4.0 0.0
-
-Improper Coeffs
-
 
 Atoms
 

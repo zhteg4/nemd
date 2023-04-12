@@ -103,9 +103,11 @@ class OplsTyper:
               UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
               UA(sml='CC', mp=(82, 82,), hs=None, dsc='Ethane'),
               UA(sml='CO', mp=(106, 104,), hs={104:105}, dsc='Methanol'),
+              UA(sml='CCO', mp=(83, 107, 104,), hs={104: 105}, dsc='Ethanol'),
               UA(sml='CCC', mp=(83, 86, 83,), hs=None, dsc='Propane'),
               UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
               UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
+              UA(sml='CC(C)O', mp=(84, 107, 84, 104,), hs={104:105}, dsc='Isopropanol'),
               UA(sml='CC=CC', mp=(84, 89, 89, 84, ), hs=None, dsc='2-Butene'),
               UA(sml='CN(C)C=O', mp=(156, 148, 156, 153, 151,), hs=None, dsc='N,N-Dimethylformamide'),
               # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
@@ -138,6 +140,7 @@ class OplsTyper:
     WMODELS = [TIP3P, SPC]
     FF_MODEL = {OPLSUA: WMODELS}
     OPLSUA_TIP3P = f'{OPLSUA},{TIP3P}'
+
     def __init__(self, mol, wmodel=TIP3P):
         """
         :param mol 'rdkit.Chem.rdchem.Mol': molecule to assign FF types
@@ -173,7 +176,7 @@ class OplsTyper:
             marked_atom_ids += [y for x in matom_ids for y in x]
             if all(x.HasProp(self.TYPE_ID) for x in self.mol.GetAtoms()):
                 break
-        log_debug(f"{len(marked_atom_ids)}, {self.mol.GetNumAtoms()}")
+        log_debug(f"{len(marked_atom_ids)} out of {self.mol.GetNumAtoms()} atoms marked")
         log_debug(f"{res_num - 1} residues found.")
         [log_debug(f'{x}: {y}') for x, y in marked_smiles.items()]
 
