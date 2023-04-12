@@ -107,7 +107,7 @@ class OplsTyper:
               UA(sml='CCC', mp=(83, 86, 83,), hs=None, dsc='Propane'),
               UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
               UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
-              UA(sml='CC(C)O', mp=(84, 107, 84, 104,), hs={104:105}, dsc='Isopropanol'),
+              UA(sml='CC(C)O', mp=(84, 108, 84, 104,), hs={104:105}, dsc='Isopropanol'),
               UA(sml='CC=CC', mp=(84, 89, 89, 84, ), hs=None, dsc='2-Butene'),
               UA(sml='CN(C)C=O', mp=(156, 148, 156, 153, 151,), hs=None, dsc='N,N-Dimethylformamide'),
               # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
@@ -115,26 +115,26 @@ class OplsTyper:
               # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
               UA(sml='CC(=O)O', mp=(137, 133, 134, 135), hs={135: 136}, dsc='Ethanoic acid')]
 
-    # yapf: enable
     SMILES = list(reversed(SMILES))
     ATOM_TOTAL = {i: i for i in range(1, 214)}
     BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
-    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3})
+    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3, 108: 107})
     ANGLE_ATOM = ATOM_TOTAL.copy()
-    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72})
+    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72, 108: 107})
     DIHE_ATOM = ATOM_TOTAL.copy()
-    DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72})
+    DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72, 108: 107})
     # C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17]}
-    # yapf: disable
+    ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86)}
     DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,)}
+    # yapf: enable
     # https://docs.lammps.org/Howto_tip3p.html
     TIP3P = 'TIP3P'
     SPC = 'SPC'
     WATER_TIP3P = f'Water ({TIP3P})'
     WATER_SPC = f'Water ({SPC})'
-    UA_WATER_SPC = UA(sml='O', mp=(79,), hs={79: 80}, dsc=WATER_SPC)
+    UA_WATER_SPC = UA(sml='O', mp=(79, ), hs={79: 80}, dsc=WATER_SPC)
     # yapf: enable
 
     WMODELS = [TIP3P, SPC]
@@ -176,7 +176,9 @@ class OplsTyper:
             marked_atom_ids += [y for x in matom_ids for y in x]
             if all(x.HasProp(self.TYPE_ID) for x in self.mol.GetAtoms()):
                 break
-        log_debug(f"{len(marked_atom_ids)} out of {self.mol.GetNumAtoms()} atoms marked")
+        log_debug(
+            f"{len(marked_atom_ids)} out of {self.mol.GetNumAtoms()} atoms marked"
+        )
         log_debug(f"{res_num - 1} residues found.")
         [log_debug(f'{x}: {y}') for x, y in marked_smiles.items()]
 
@@ -581,9 +583,15 @@ class OplsParser:
         if end_ids[0] > end_ids[1]:
             atoms = list(reversed(atoms))
 
-        tids = [x.GetIntProp(self.ANGLE_ATM_ID) for x in atoms]
+        tids = tuple([x.GetIntProp(self.ANGLE_ATM_ID) for x in atoms])
+        try:
+            tids = OplsTyper.ANGLE_ATOMS[tids]
+        except KeyError:
+            # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
+            pass
         matches = [
-            x for x in self.angles.values() if tids == [x.id1, x.id2, x.id3]
+            x for x in self.angles.values()
+            if tids == tuple([x.id1, x.id2, x.id3])
         ]
         if matches:
             return matches

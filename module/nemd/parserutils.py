@@ -88,8 +88,7 @@ def type_int(arg):
 def type_positive_int(arg):
     value = type_int(arg)
     if value < 1:
-        raise argparse.ArgumentTypeError(
-            f'{value} is not a positive integer.')
+        raise argparse.ArgumentTypeError(f'{value} is not a positive integer.')
     return value
 
 
@@ -120,7 +119,9 @@ def type_monomer_smiles(arg, allow_mol=False, canonize=True):
                 f"{symbols.WILD_CARD} connects more than one atom.")
     return Chem.CanonSmiles(arg) if canonize else arg
 
+
 FF_MODEL = collections.namedtuple('FF_MODEL', ['ff', 'model'])
+
 
 def type_force_field(arg, ff_model=oplsua.OplsTyper.FF_MODEL):
     args = arg.split(',')

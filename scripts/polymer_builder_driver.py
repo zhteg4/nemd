@@ -132,7 +132,8 @@ def get_parser():
         metavar=FlAG_FORCE_FIELD[1:].upper(),
         type=parserutils.type_force_field,
         default=oplsua.OplsTyper.OPLSUA_TIP3P,
-        help='The force field type (and model for water separated with comma).')
+        help='The force field type (and model for water separated with comma).'
+    )
     jobutils.add_job_arguments(parser)
     return parser
 
@@ -221,7 +222,9 @@ class AmorphousCell(object):
         Build polymer from monomers if provided.
         """
         for cru, cru_num, in zip(self.options.cru, self.options.cru_num):
-            polym = Polymer(cru, cru_num, wmodel=self.options.force_field.model)
+            polym = Polymer(cru,
+                            cru_num,
+                            wmodel=self.options.force_field.model)
             polym.run()
             self.polymers.append(polym)
 
@@ -597,7 +600,7 @@ class Polymer(object):
     BOND_ATM_ID = oplsua.BOND_ATM_ID
     RES_NUM = oplsua.RES_NUM
     NEIGHBOR_CHARGE = oplsua.LammpsData.NEIGHBOR_CHARGE
-    WATER_TIP3P=oplsua.OplsTyper.WATER_TIP3P
+    WATER_TIP3P = oplsua.OplsTyper.WATER_TIP3P
     IMPLICIT_H = oplsua.IMPLICIT_H
     MOL_NUM = 'mol_num'
     MONO_ATOM_IDX = 'mono_atom_idx'
