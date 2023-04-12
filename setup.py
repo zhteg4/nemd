@@ -17,7 +17,8 @@ setup(
         'pandas', 'signac', 'signac-flow', 'lammps', 'pyside6', 'PyQt6',
         'yapf', 'pytest', 'mendeleev', 'plotly', 'dash', 'flask>=2.2.2',
         'openpyxl', 'dash_bootstrap_components', 'dash-uploader',
-        'dash[testing]', 'more_itertools', 'chromedriver-py'
+        'dash[testing]', 'more_itertools', 'chromedriver-py', 'jupyterlab',
+        'notebook'
     ],
     classifiers=[
         'Development Status :: 1 - Planning',

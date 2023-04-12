@@ -81,9 +81,27 @@ class OplsTyper:
     LARGE_NUM = constants.LARGE_NUM
 
     # yapf: disable
-    SMILES = [UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
+    SMILES = [UA(sml='[Li+]', mp=(197,), hs=None, dsc='Li+ Lithium Ion'),
+              UA(sml='[Na+]', mp=(198,), hs=None, dsc='Na+ Sodium Ion'),
+              UA(sml='[K+]', mp=(199,), hs=None, dsc='K+ Potassium Ion'),
+              UA(sml='[Rb+]', mp=(200,), hs=None, dsc='Rb+ Rubidium Ion'),
+              UA(sml='[Cs+]', mp=(201,), hs=None, dsc='Cs+ Cesium Ion'),
+              UA(sml='[Mg+]', mp=(202,), hs=None, dsc='Mg+2 Magnesium Ion'),
+              UA(sml='[Ca+]', mp=(203,), hs=None, dsc='Ca+2 Calcium Ion'),
+              UA(sml='[Sr+]', mp=(204,), hs=None, dsc='Sr+2 Strontium Ion'),
+              UA(sml='[Ba+]', mp=(205,), hs=None, dsc='Ba+2 Barium Ion'),
+              UA(sml='[F-]', mp=(206,), hs=None, dsc='F- Fluoride Ion'),
+              UA(sml='[Cl-]', mp=(207,), hs=None, dsc='Cl- Chloride Ion'),
+              UA(sml='[Br-]', mp=(208,), hs=None, dsc='Br- Bromide Ion'),
+              UA(sml='[He]', mp=(209,), hs=None, dsc='Helium Atom'),
+              UA(sml='[Ne]', mp=(210,), hs=None, dsc='Neon Atom'),
+              UA(sml='[Ar]', mp=(211,), hs=None, dsc='Argon Atom'),
+              UA(sml='[Kr]', mp=(212,), hs=None, dsc='Krypton Atom'),
+              UA(sml='[Xe]', mp=(213,), hs=None, dsc='Xenon Atom'),
+              UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)'),
+              UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
               UA(sml='CC', mp=(82, 82,), hs=None, dsc='Ethane'),
-              UA(sml='CO', mp=(106, 104,), hs={104:105}, dsc='Ethane'),
+              UA(sml='CO', mp=(106, 104,), hs={104:105}, dsc='Methanol'),
               UA(sml='CCC', mp=(83, 86, 83,), hs=None, dsc='Propane'),
               UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
               UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
@@ -93,6 +111,7 @@ class OplsTyper:
               UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid'),
               # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
               UA(sml='CC(=O)O', mp=(137, 133, 134, 135), hs={135: 136}, dsc='Ethanoic acid')]
+
     # yapf: enable
     SMILES = list(reversed(SMILES))
     ATOM_TOTAL = {i: i for i in range(1, 214)}
@@ -107,50 +126,25 @@ class OplsTyper:
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17]}
     # yapf: disable
     DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,)}
-    # yapf: enable
-    DESCRIPTION_SMILES = {
-        'CH4 Methane': 'C',
-        'Ethane': 'CC',
-        'n-Butane': 'CCCC',
-        "Isobutane": 'CC(C)C',
-        "CH2 (generic)": '*-C-*',
-        "Benzene": 'C1=CC=CC=C1',
-        "Phenol": '	OC1=CC=CC=C1',
-        "2-Butene": 'CC=CC',
-        'Li+ Lithium Ion': '[Li+]',
-        'Na+ Sodium Ion': '[Na+]',
-        'K+ Potassium Ion': '[K+]',
-        'Rb+ Rubidium Ion': '[Rb+]',
-        'Cs+ Cesium Ion': '[Cs+]',
-        'Mg+2 Magnesium Ion': '[Mg+]',
-        'Ca+2 Calcium Ion': '[Ca+]',
-        'Sr+2 Strontium Ion': '[Sr+]',
-        'Ba+2 Barium Ion': '[Ba+]',
-        'F- Fluoride Ion': '[F-]',
-        'Cl- Chloride Ion': '[Cl-]',
-        'Br- Bromide Ion': '[Br-]',
-        'Helium Atom': '[He]',
-        'Neon Atom': '[Ne]',
-        'Argon Atom': '[Ar]',
-        'Krypton Atom': '[Kr]',
-        'Xenon Atom': '[Xe]',
-        'Peptide Amide': '*-NC(-*)=O',
-        'Acetone': ' CC(C)=O',
-        'Carboxylic Acid': 'OC(-*)=O',
-        'Methyl Acetate': 'COC(C)=O',
-        'Alcohol Hydroxyl': '*-O',
-        'Carboxylate': '[O-]C(-*)=O',
-        'Hydrogen Sulfide': 'S',
-        "SH Alkyl Sulfide": '*-CS',
-        'Methyl Sulfide': '*SC',
-        'Ethyl Sulfide': '*SCC'
-    }
 
-    def __init__(self, mol):
+    TIP3P = 'TIP3P' # https://docs.lammps.org/Howto_tip3p.html
+    SPC = 'SPC'
+    WATER_TIP3P = f'Water ({TIP3P})'
+    WATER_SPC = f'Water ({SPC})'
+    UA_WATER_SPC = UA(sml='O', mp=(79,), hs={79: 80}, dsc=WATER_SPC)
+    # yapf: enable
+
+    def __init__(self, mol, wmodel=TIP3P):
         """
         :param mol 'rdkit.Chem.rdchem.Mol': molecule to assign FF types
         """
         self.mol = mol
+        if wmodel == self.TIP3P:
+            return
+        idx = [
+            x for x, y in enumerate(self.SMILES) if y.dsc == self.WATER_TIP3P
+        ][0]
+        self.SMILES[idx] = self.UA_WATER_SPC
 
     def run(self):
         """
@@ -248,10 +242,10 @@ class OplsTyper:
             for nbr in atom.GetNeighbors():
                 if nbr.GetSymbol() != symbols.HYDROGEN:
                     continue
-                type_id = sml.hs[type_id]
-                self.markAtom(nbr, type_id, res_num)
+                htype_id = sml.hs[type_id]
+                self.markAtom(nbr, htype_id, res_num)
                 marked.append(nbr.GetIdx())
-                msg = f"{nbr.GetSymbol()}{nbr.GetDegree()} {nbr.GetIdx()} {type_id}"
+                msg = f"{nbr.GetSymbol()}{nbr.GetDegree()} {nbr.GetIdx()} {htype_id}"
                 log_debug(msg)
         return marked
 
@@ -1500,14 +1494,15 @@ class LammpsData(LammpsIn):
                 continue
             vdw = self.ff.vdws[atom.id]
             atom_id = self.atm_types[atom.id] if self.concise else atom.id
-            self.data_fh.write(f"{atom_id} {vdw.ene} {vdw.dist}\n")
+            self.data_fh.write(f"{atom_id} {vdw.ene:.4f} {vdw.dist:.4f}\n")
         self.data_fh.write("\n")
 
     def writeBondCoeffs(self):
         """
         Write bond coefficients.
         """
-        if len(self.bnd_types) < 2 and self.concise:
+
+        if not self.bnd_types:
             return
 
         self.data_fh.write(f"{self.BOND_COEFFS}\n\n")
@@ -1522,7 +1517,7 @@ class LammpsData(LammpsIn):
         """
         Write angle coefficients.
         """
-        if len(self.ang_types) < 2 and self.concise:
+        if not self.ang_types:
             return
 
         self.data_fh.write(f"{self.ANGLE_COEFFS}\n\n")
@@ -1537,7 +1532,7 @@ class LammpsData(LammpsIn):
         """
         Write dihedral coefficients.
         """
-        if len(self.dihe_types) < 2 and self.concise:
+        if not self.dihe_types:
             return
 
         self.data_fh.write(f"{self.DIHEDRAL_COEFFS}\n\n")
@@ -1561,7 +1556,7 @@ class LammpsData(LammpsIn):
         """
         Write improper coefficients.
         """
-        if len(self.dihe_types) < 2 and self.concise:
+        if not self.impr_types:
             return
 
         self.data_fh.write(f"{self.IMPROPER_COEFFS}\n\n")
@@ -1611,6 +1606,7 @@ class LammpsData(LammpsIn):
         """
         Write bond coefficients.
         """
+
         if not self.bonds:
             return
 
