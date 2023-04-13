@@ -89,7 +89,7 @@ class TestOplsParser:
 
     def testSetDihedral(self, raw_prsr):
         raw_prsr.setDihedral()
-        assert 628 == len(raw_prsr.dihedrals)
+        assert 629 == len(raw_prsr.dihedrals)
 
 
 class TestLammpsIn:

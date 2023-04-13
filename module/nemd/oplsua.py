@@ -112,7 +112,7 @@ class OplsTyper:
         # Aldehydes (with formyl group)
         # Ketone
               UA(sml='CC(=O)C', mp=(129, 127, 128, 129,), hs=None, dsc='Acetone'),
-        # UA(sml='CCC(=O)CC', mp=(83, 107, 104,), hs={104: 105}, dsc='Diethyl Ketone'),
+              UA(sml='CCC(=O)CC', mp=(7, 130, 127, 128, 130, 7, ), hs={104: 105}, dsc='Diethyl Ketone'),
         # UA(sml='CC(C)CC(=O)C(C)(C)C', mp=(83, 107, 104,), hs={104: 105}, dsc='t-Butyl Ketone'),
         # Alcohol
               UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)'),
@@ -132,15 +132,19 @@ class OplsTyper:
     ATOM_TOTAL = {i: i for i in range(1, 214)}
     BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
-    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3, 108: 107, 127:1, 128:2, 129:7})
+    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3,
+        108: 107, 127:1, 128:2, 129:7, 130:9})
     ANGLE_ATOM = ATOM_TOTAL.copy()
-    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72, 108: 107, 127:1, 129:7})
+    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72,
+        108: 107, 127:1, 129:7, 130:9})
     DIHE_ATOM = ATOM_TOTAL.copy()
-    DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72, 108: 107})
+    DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72,
+        108: 107, 127:1, 130: 9})
     # C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17], (86, 107): [86, 86]}
     ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86), (84, 107, 86): (86, 88, 83)}
-    DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,), (88, 107,): (6, 22,), (86, 107,): (6, 25,)}
+    DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,), (88, 107,): (6, 22,),
+        (86, 107,): (6, 25,)}
     # yapf: enable
     # https://docs.lammps.org/Howto_tip3p.html
     TIP3P = 'TIP3P'
@@ -517,7 +521,12 @@ class OplsParser:
             if len(matched) != 1:
                 continue
             # Compare the unmatched and sore them
-            atom_id = set([bond.id1, bond.id2]).difference(matched).pop()
+            try:
+                atom_id = set([bond.id1, bond.id2]).difference(matched).pop()
+            except KeyError:
+                # bond.id1, bond.id2, matched are the same and thus the unmatch
+                # bond.id1, bond.id2, and list(matched)[0] are the same
+                atom_id = bond.id1
             atom = [
                 x for x in bonded_atoms
                 if x.GetIntProp(self.BOND_ATM_ID) not in [bond.id1, bond.id2]
@@ -695,6 +704,7 @@ class OplsParser:
             raise ValueError(err)
         matches = self.getMatchesFromEnds(atoms, partial_matches)
         if not matches:
+            import pdb;pdb.set_trace()
             err = f"Cannot find params for dihedral between atom {'~'.join(map(str, tids))}."
             raise ValueError(err)
         return matches
