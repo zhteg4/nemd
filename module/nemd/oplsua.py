@@ -125,16 +125,16 @@ class OplsTyper:
     DIHE_ATOM = ATOM_TOTAL.copy()
     DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72, 108: 107})
     # C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
-    BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17]}
-    ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86)}
-    DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,)}
+    BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17], (86, 107): [86, 86]}
+    ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86), (84, 107, 86): (86, 88, 83)}
+    DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,), (88, 107,): (6, 22,), (86, 107,): (6, 25,)}
     # yapf: enable
     # https://docs.lammps.org/Howto_tip3p.html
     TIP3P = 'TIP3P'
     SPC = 'SPC'
     WATER_TIP3P = f'Water ({TIP3P})'
     WATER_SPC = f'Water ({SPC})'
-    UA_WATER_SPC = UA(sml='O', mp=(79, ), hs={79: 80}, dsc=WATER_SPC)
+    UA_WATER_SPC = UA(sml='O', mp=(79,), hs={79: 80}, dsc=WATER_SPC)
     # yapf: enable
 
     WMODELS = [TIP3P, SPC]
