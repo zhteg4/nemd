@@ -19,16 +19,17 @@ import numpy as np
 import networkx as nx
 from rdkit import Chem
 from rdkit.Chem import AllChem
+
 from nemd import traj
 from nemd import oplsua
 from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
 from nemd import fragments
-from nemd import structutils
-from nemd import parserutils
 from nemd import fileutils
 from nemd import prop_names
+from nemd import structutils
+from nemd import parserutils
 from nemd import environutils
 from nemd import conformerutils
 

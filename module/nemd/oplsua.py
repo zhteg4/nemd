@@ -119,7 +119,7 @@ class OplsTyper:
               UA(sml='CO', mp=(106, 104,), hs={104: 105}, dsc='Methanol'),
               UA(sml='CCO', mp=(83, 107, 104,), hs={104: 105}, dsc='Ethanol'),
               UA(sml='CC(C)O', mp=(84, 108, 84, 104,), hs={104:105}, dsc='Isopropanol'),
-        # Carboxylic Acids
+              # Carboxylic Acids
               # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
               UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid'),
               # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
@@ -151,7 +151,7 @@ class OplsTyper:
     SPC = 'SPC'
     WATER_TIP3P = f'Water ({TIP3P})'
     WATER_SPC = f'Water ({SPC})'
-    UA_WATER_SPC = UA(sml='O', mp=(79,), hs={79: 80}, dsc=WATER_SPC)
+    UA_WATER_SPC = UA(sml='O', mp=(79, ), hs={79: 80}, dsc=WATER_SPC)
     # yapf: enable
 
     WMODELS = [TIP3P, SPC]
@@ -555,7 +555,7 @@ class OplsParser:
         """
 
         implicit_h_num = atom.GetIntProp(cls.IMPLICIT_H) if atom.HasProp(
-            cls.IMPLICIT_H) else 0
+            cls.IMPLICIT_H) else atom.GetNumImplicitHs()
         return atom.GetDegree() + implicit_h_num
 
     def debugPrintReplacement(self, atoms, matches):
@@ -704,7 +704,6 @@ class OplsParser:
             raise ValueError(err)
         matches = self.getMatchesFromEnds(atoms, partial_matches)
         if not matches:
-            import pdb;pdb.set_trace()
             err = f"Cannot find params for dihedral between atom {'~'.join(map(str, tids))}."
             raise ValueError(err)
         return matches
@@ -1248,7 +1247,7 @@ class LammpsData(LammpsIn):
         msg = "Impropers from the same symbols are of the same constants."
         # {1: 'CNCO', 2: 'CNCO', 3: 'CNCO' ...
         symbolss = {
-            z: ''.join([
+            z: ''.join([str(self.ff.atoms[x.id3].conn)] + [
                 self.ff.atoms[y].symbol for y in [x.id1, x.id2, x.id3, x.id4]
             ])
             for z, x in self.ff.impropers.items()
@@ -1271,15 +1270,16 @@ class LammpsData(LammpsIn):
             symbol_impropers[symbols] += (improper.id, )
         log_debug(msg)
 
-        msg = "Improper neighbor counts based on symbols are unique."
+        # neighbors of CC(=O)C and CC(O)C have the same symbols
+        msg = "Improper neighbor counts based on center conn and symbols are unique."
         # The third one is the center ('Improper Torsional Parameters' in prm)
-        neighbors = [[x[2], x[0], x[1], x[3]] for x in symbol_impropers.keys()]
+        neighbors = [[x[0], x[3], x[1], x[2], x[4]]
+                     for x in symbol_impropers.keys()]
         # The csmbls in getCountedSymbols is obtained from the following
-        csmbls = sorted(set([y for x in neighbors[1:] for y in x]))  # CHNO
+        csmbls = sorted(set([y for x in neighbors for y in x[1:]]))  # CHNO
         counted = [self.countSymbols(x, csmbls=csmbls) for x in neighbors]
         assert len(symbol_impropers) == len(set(counted))
         log_debug(msg)
-
         self.symbol_impropers = {
             x: y[3:]
             for x, y in zip(counted, symbol_impropers.values())
@@ -1288,17 +1288,18 @@ class LammpsData(LammpsIn):
     @staticmethod
     def countSymbols(symbols, csmbls='CHNO'):
         """
-        Count improper cluster symbols: the first is the center atoms and the
-        rest connects with the center.
+        Count improper cluster symbols: the first is the center atom connectivity
+        including implicit hydrogen atoms. The second is the center atom symbol,
+        and the rest connects with the center.
 
         :param symbols list: the element symbols forming the improper cluster
             with first being the center
         :param csmbls str: all possible cluster symbols
         """
-        # e.g., ['C1', 'H0', 'N1', 'O1']
-        counted = [y + str(symbols[1:].count(y)) for y in csmbls]
-        # e.g., 'CC1H0N1O1'
-        return ''.join([symbols[0]] + counted)
+        # e.g., ['3', 'C', 'C', 'N', 'O']
+        counted = [y + str(symbols[2:].count(y)) for y in csmbls]
+        # e.g., '3CC1H0N1O1'
+        return ''.join(symbols[:2] + counted)
 
     def setImpropers(self, csymbols=IMPROPER_CENTER_SYMBOLS):
         """
@@ -1350,7 +1351,9 @@ class LammpsData(LammpsIn):
             # Sp2 N in Amino Acid
             improper_id += 1
             neighbor_symbols = [x.GetSymbol() for x in neighbors]
-            counted = self.countSymbols([atom_symbol] + neighbor_symbols)
+            counted = self.countSymbols(
+                [str(OplsParser.getAtomConnt(atom)), atom_symbol] +
+                neighbor_symbols)
             improper_type_id = self.symbol_impropers[counted][0]
             # FIXME: see docstring for current investigation. (NO ACTIONS TAKEN)
             #  1) LAMMPS recommends the first to be the center, while the prm

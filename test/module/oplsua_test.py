@@ -85,7 +85,7 @@ class TestOplsParser:
 
     def testSetImproper(self, raw_prsr):
         raw_prsr.setImproper()
-        assert 75 == len(raw_prsr.impropers)
+        assert 76 == len(raw_prsr.impropers)
 
     def testSetDihedral(self, raw_prsr):
         raw_prsr.setDihedral()
@@ -158,7 +158,7 @@ class TestLammpsData:
 
     def testSetImproperSymbols(self, lmp_data):
         lmp_data.setImproperSymbols()
-        assert 10 == len(lmp_data.symbol_impropers)
+        assert 11 == len(lmp_data.symbol_impropers)
 
     def testSetImpropers(self, lmp_data):
         lmp_data.setAtoms()
