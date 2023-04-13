@@ -82,7 +82,9 @@ class OplsTyper:
     LARGE_NUM = constants.LARGE_NUM
 
     # yapf: disable
-    SMILES = [UA(sml='[Li+]', mp=(197,), hs=None, dsc='Li+ Lithium Ion'),
+    SMILES = [
+        # Single Atom Particle
+              UA(sml='[Li+]', mp=(197,), hs=None, dsc='Li+ Lithium Ion'),
               UA(sml='[Na+]', mp=(198,), hs=None, dsc='Na+ Sodium Ion'),
               UA(sml='[K+]', mp=(199,), hs=None, dsc='K+ Potassium Ion'),
               UA(sml='[Rb+]', mp=(200,), hs=None, dsc='Rb+ Rubidium Ion'),
@@ -99,29 +101,40 @@ class OplsTyper:
               UA(sml='[Ar]', mp=(211,), hs=None, dsc='Argon Atom'),
               UA(sml='[Kr]', mp=(212,), hs=None, dsc='Krypton Atom'),
               UA(sml='[Xe]', mp=(213,), hs=None, dsc='Xenon Atom'),
-              UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)'),
+        # Alkane
               UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
               UA(sml='CC', mp=(82, 82,), hs=None, dsc='Ethane'),
-              UA(sml='CO', mp=(106, 104,), hs={104:105}, dsc='Methanol'),
-              UA(sml='CCO', mp=(83, 107, 104,), hs={104: 105}, dsc='Ethanol'),
               UA(sml='CCC', mp=(83, 86, 83,), hs=None, dsc='Propane'),
               UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
               UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
+        # Alkene
+              UA(sml='CC=CC', mp=(84, 89, 89, 84,), hs=None, dsc='2-Butene'),
+        # Aldehydes (with formyl group)
+        # Ketone
+              UA(sml='CC(=O)C', mp=(129, 127, 128, 129,), hs=None, dsc='Acetone'),
+        # UA(sml='CCC(=O)CC', mp=(83, 107, 104,), hs={104: 105}, dsc='Diethyl Ketone'),
+        # UA(sml='CC(C)CC(=O)C(C)(C)C', mp=(83, 107, 104,), hs={104: 105}, dsc='t-Butyl Ketone'),
+        # Alcohol
+              UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)'),
+              UA(sml='CO', mp=(106, 104,), hs={104: 105}, dsc='Methanol'),
+              UA(sml='CCO', mp=(83, 107, 104,), hs={104: 105}, dsc='Ethanol'),
               UA(sml='CC(C)O', mp=(84, 108, 84, 104,), hs={104:105}, dsc='Isopropanol'),
-              UA(sml='CC=CC', mp=(84, 89, 89, 84, ), hs=None, dsc='2-Butene'),
-              UA(sml='CN(C)C=O', mp=(156, 148, 156, 153, 151,), hs=None, dsc='N,N-Dimethylformamide'),
+        # Carboxylic Acids
               # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
               UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid'),
               # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
-              UA(sml='CC(=O)O', mp=(137, 133, 134, 135), hs={135: 136}, dsc='Ethanoic acid')]
+              UA(sml='CC(=O)O', mp=(137, 133, 134, 135), hs={135: 136}, dsc='Ethanoic acid'),
+        # Large Molecules
+              UA(sml='CN(C)C=O', mp=(156, 148, 156, 153, 151,), hs=None, dsc='N,N-Dimethylformamide')
+    ]
 
     SMILES = list(reversed(SMILES))
     ATOM_TOTAL = {i: i for i in range(1, 214)}
     BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
-    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3, 108: 107})
+    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3, 108: 107, 127:1, 128:2, 129:7})
     ANGLE_ATOM = ATOM_TOTAL.copy()
-    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72, 108: 107})
+    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72, 108: 107, 127:1, 129:7})
     DIHE_ATOM = ATOM_TOTAL.copy()
     DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72, 108: 107})
     # C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
@@ -1385,9 +1398,13 @@ class LammpsData(LammpsIn):
         """
 
         for idx, (itype, id1, id2, id3, id4) in self.impropers.items():
-            angle_atom_ids = tuple([id1, id3, id4])
-            if angle_atom_ids not in self.rvrs_angles:
-                angle_atom_ids = angle_atom_ids[::-1]
+            for eids in itertools.combinations([id2, id1, id4], 2):
+                angle_atom_ids = tuple([eids[0], id3, eids[1]])
+                if angle_atom_ids not in self.rvrs_angles:
+                    angle_atom_ids = angle_atom_ids[::-1]
+                angle_type = self.angles[self.rvrs_angles[angle_atom_ids]][0]
+                if np.isnan(self.ff.angles[angle_type].ene):
+                    break
             self.angles.pop(self.rvrs_angles[angle_atom_ids])
 
     def removeUnused(self):

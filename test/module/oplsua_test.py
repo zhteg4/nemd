@@ -81,7 +81,7 @@ class TestOplsParser:
 
     def testSetAngle(self, raw_prsr):
         raw_prsr.setAngle()
-        assert 306 == len(raw_prsr.angles)
+        assert 307 == len(raw_prsr.angles)
 
     def testSetImproper(self, raw_prsr):
         raw_prsr.setImproper()
