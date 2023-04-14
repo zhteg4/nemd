@@ -119,8 +119,8 @@ class OplsTyper:
               UA(sml='CO', mp=(106, 104,), hs={104: 105}, dsc='Methanol'),
               UA(sml='CCO', mp=(83, 107, 104,), hs={104: 105}, dsc='Ethanol'),
               UA(sml='CC(C)O', mp=(84, 108, 84, 104,), hs={104:105}, dsc='Isopropanol'),
-              # Carboxylic Acids
-              # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
+        # Carboxylic Acids
+        # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
               UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid'),
               # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
               UA(sml='CC(=O)O', mp=(137, 133, 134, 135), hs={135: 136}, dsc='Ethanoic acid'),
@@ -145,7 +145,6 @@ class OplsTyper:
     ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86), (84, 107, 86): (86, 88, 83)}
     DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,), (88, 107,): (6, 22,),
         (86, 107,): (6, 25,)}
-    # yapf: enable
     # https://docs.lammps.org/Howto_tip3p.html
     TIP3P = 'TIP3P'
     SPC = 'SPC'
