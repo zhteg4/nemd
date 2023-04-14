@@ -67,4 +67,4 @@ class TestApp:
         # cursor.execute(statement, parameters)
         time.sleep(1)
         assert 11 == len(app.frm_vw.fig.data)
-        assert 5 == len(app.frm_vw.fig.frames)
+        assert 6 == len(app.frm_vw.fig.frames)

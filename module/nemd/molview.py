@@ -211,6 +211,7 @@ class FrameView:
         """
         self.data = None
         self.fig.data = []
+        self.fig.frames = []
         self.markers = []
         self.lines = []
 
@@ -232,6 +233,7 @@ class FrameView:
                      args=[[None], dict(mode='immediate')])
             ]
         self.fig.update_layout(
+            uirevision=True,
             template='plotly_dark',
             scene=self.getScene(),
             scene_camera=camera,
