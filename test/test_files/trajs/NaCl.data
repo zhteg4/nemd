@@ -1,0 +1,33 @@
+LAMMPS Description
+
+2 atoms
+0 bonds
+0 angles
+0 dihedrals
+0 impropers
+
+2 atom types
+0 bond types
+0 angle types
+0 dihedral types
+0 improper types
+
+-0.58 5.21 xlo xhi
+0.00 5.79 ylo yhi
+2.32 8.11 zlo zhi
+
+Masses
+
+1 22.99 # Na+ Sodium Ion Na 198
+2 35.453 # Cl- Chloride Ion Cl 207
+
+Pair Coeffs
+
+1 0.0028 3.3304
+2 0.1180 4.4172
+
+Atoms
+
+1 1 2 -1.0000 4.508 5.313 7.930
+2 1 1 1.0000 0.124 0.477 2.492
+

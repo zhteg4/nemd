@@ -1,0 +1,39 @@
+LAMMPS Description
+
+2 atoms
+1 bonds
+0 angles
+0 dihedrals
+0 impropers
+
+1 atom types
+1 bond types
+0 angle types
+0 dihedral types
+0 improper types
+
+-1.86 2.78 xlo xhi
+-1.39 3.25 ylo yhi
+-1.86 2.78 zlo zhi
+
+Masses
+
+1 15.035 # CH3 Ethane C 82
+
+Pair Coeffs
+
+1 0.2070 3.7750
+
+Bond Coeffs
+
+1  260.0 1.526
+
+Atoms
+
+1 1 1 0.0000 -0.111 1.073 0.943
+2 1 1 0.0000 1.039 0.782 -0.016
+
+Bonds
+
+1 1 1 2
+

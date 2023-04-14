@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 import pandas as pd
 import more_itertools
@@ -82,7 +83,8 @@ class FrameView:
             create the animation from.
         """
         if self.data is None:
-            self.setDataFromTraj(frms)
+            frm = self.setDataFromTraj(frms)
+            frms = itertools.chain([frm], frms)
             self.setEleSz()
             self.setScatters()
             self.setLines()
@@ -104,7 +106,10 @@ class FrameView:
 
         :param frms generator of 'nemd.traj.Frame': the trajectory frames to
             create the animation from.
+
+        :return 'nemd.traj.Frame': the first trajectory frame.
         """
+        # peekable doesn't work for yield generator
         frm = more_itertools.peekable(frms).peek()
         ele_sz_clr = self.ELE_SZ_CLR.copy()
         try:
@@ -127,6 +132,7 @@ class FrameView:
 
         sz_clr = pd.DataFrame(ele_sz_clr, index=range(1, frm.shape[0] + 1))
         self.data = pd.concat((frm, sz_clr), axis=1)
+        return frm
 
     def setScatters(self):
         """
@@ -275,8 +281,9 @@ class FrameView:
         :return dict: keyword arguments for preference.
         """
         if self.fig.frames:
-            data = self.fig.frames[0]['data'][0]
-            data = np.array([data['x'], data['y'], data['z']]).transpose()
+            dts = self.fig.frames[0]['data']
+            dts = [np.array([i['x'], i['y'], i['z']]).transpose() for i in dts]
+            data = np.concatenate(dts, axis=0)
         elif self.data is not None:
             data = self.data[self.XYZU].to_numpy()
         else:
@@ -292,8 +299,8 @@ class FrameView:
                     zaxis=dict(range=[lbs[2], hbs[2]], autorange=False),
                     aspectmode='cube')
 
-    def show(self):
+    def show(self, *arg, **kwargs):
         """
         Show the figure with plot.
         """
-        self.fig.show()
+        self.fig.show(*arg, **kwargs)
