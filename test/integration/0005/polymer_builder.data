@@ -1,0 +1,65 @@
+LAMMPS Description
+
+4 atoms
+3 bonds
+2 angles
+0 dihedrals
+1 impropers
+
+3 atom types
+2 bond types
+1 angle types
+0 dihedral types
+1 improper types
+
+-0.58 5.20 xlo xhi
+0.00 5.78 ylo yhi
+2.31 8.09 zlo zhi
+
+Masses
+
+1 12.011 # C Ketone Carbonyl C 127
+2 15.999 # O Ketone Carbonyl O 128
+3 15.035 # CH3 Acetone C 129
+
+Pair Coeffs
+
+1 0.1050 3.7500
+2 0.2100 2.9600
+3 0.1600 3.9100
+
+Bond Coeffs
+
+1  570.0 1.229
+2  317.0 1.522
+
+Angle Coeffs
+
+1 80.0 120.4
+
+Improper Coeffs
+
+1 10.5 -1 2
+
+Atoms
+
+1 1 3 0.0620 1.720 1.726 5.920
+2 1 1 0.3000 2.326 2.955 5.259
+3 1 3 0.0620 2.583 2.886 3.761
+4 1 2 -0.4240 2.615 3.988 5.860
+
+Bonds
+
+1 2 1 2
+2 2 2 3
+3 1 2 4
+
+Angles
+
+1 1 4 2 1
+2 1 4 2 3
+
+Impropers
+
+1 1 1 3 2 4
+

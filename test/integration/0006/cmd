@@ -1,0 +1,2 @@
+# polymer builder on Diethyl Ketone CCC(=O)CC
+run_nemd polymer_builder_driver.py 'CCC(=O)CC' -cru_num 1 -force_field OPLSUA,SPC -seed 4321 -DEBUG

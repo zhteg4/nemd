@@ -1,0 +1,2 @@
+# polymer builder on Ethanol
+run_nemd polymer_builder_driver.py 'CCO' -cru_num 1 -force_field OPLSUA,TIP3P -seed 4321 -DEBUG
