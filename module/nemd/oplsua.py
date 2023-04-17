@@ -1475,7 +1475,6 @@ class LammpsData(LammpsIn):
         :param min_box list: minimum box size
         :param buffer list: buffer in three dimensions
         """
-
         xyzs = np.concatenate(
             [x.GetConformer(0).GetPositions() for x in self.mols.values()])
         centroid = xyzs.mean(axis=0)
@@ -1513,7 +1512,6 @@ class LammpsData(LammpsIn):
             return box_hf
         # All-trans single molecule with internal tension runs into clashes
         # across PBCs and thus larger box is used.
-
         return [x * 1.2 for x in box_hf]
 
     def writeMasses(self):
@@ -1810,6 +1808,50 @@ class DataFileReader(LammpsData):
             self.masses[int(id)] = types.SimpleNamespace(id=int(id),
                                                          mass=float(mass),
                                                          ele=ele)
+
+    def getBox(self):
+        """
+        Get the box.
+
+        :return list of float: xlo, xhi, ylo, yhi, zlo, zhi
+        """
+        return [y for x in self.box_dsp.values() for y in x]
+
+    def getBoxEdges(self):
+        """
+        Get the edges of the box.
+
+        :return list of list: each sublist contains two points describing one
+            edge.
+        """
+        box = self.getBox()
+        return self.getEdgesFromList(box)
+
+    @staticmethod
+    def getEdgesFromList(lo_hi):
+        """
+        Get the edges from point list of low and high points.
+
+        :param lo_hi list of float: xlo, xhi, ylo, yhi, zlo, zhi
+        :return list of list: each sublist contains two points describing one
+            edge.
+        """
+        lo_hi = [lo_hi[i * 2:i * 2 + 2] for i in range(3)]
+        los = [lh[0] for lh in lo_hi]
+        lo_edges = [[los[:], los[:]] for _ in range(3)]
+        for index, (lo, hi) in enumerate(lo_hi):
+            lo_edges[index][1][index] = hi
+        his = [lh[1] for lh in lo_hi]
+        hi_edges = [[his[:], his[:]] for _ in range(3)]
+        for index, (lo, hi) in enumerate(lo_hi):
+            hi_edges[index][1][index] = lo
+        spnts = collections.deque([x[1] for x in lo_edges])
+        epnts = collections.deque([x[1] for x in hi_edges])
+        epnts.rotate(1)
+        oedges = [[x, y] for x, y in zip(spnts, epnts)]
+        epnts.rotate(1)
+        oedges += [[x, y] for x, y in zip(spnts, epnts)]
+        return lo_edges + hi_edges + oedges
 
     def setAtoms(self):
         """

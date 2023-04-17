@@ -33,6 +33,7 @@ class FrameView:
         self.data = None
         self.markers = []
         self.lines = []
+        self.edges = []
 
     def setData(self):
         """
@@ -59,21 +60,26 @@ class FrameView:
         }
         ele_sz_clr[self.COLOR] = [color[x] for x in type_ids]
         sz_clr = pd.DataFrame(ele_sz_clr, index=index)
-        self.data = pd.concat((data, sz_clr), axis=1)
+        data = pd.concat((data, sz_clr), axis=1)
+        box = self.data_reader.getBox()
+        self.data = traj.Frame(data,
+                               box=box,
+                               columns=traj.Frame.XYZU_ELE_SZ_CLR)
 
-    def updateCoords(self, frm):
+    def updateDataWithFrm(self, frm):
         """
-        Update the coordinate data according to the trajectory frame.
+        Update the data according to the trajectory frame.
 
         :param frm 'nemd.traj.Frame': coordinate frame to update with
         """
         self.data[self.XYZU] = frm[self.XYZU]
+        self.data.setBox(frm.getBox())
 
     def addTraces(self):
         """
         Add traces to the figure.
         """
-        self.fig.add_traces(self.markers + self.lines)
+        self.fig.add_traces(self.markers + self.lines + self.edges)
 
     def setFrames(self, frms):
         """
@@ -88,14 +94,16 @@ class FrameView:
             self.setEleSz()
             self.setScatters()
             self.setLines()
+            self.setEdges()
             self.addTraces()
 
         fig_frms = []
         for idx, frm in enumerate(frms):
-            self.updateCoords(frm)
+            self.updateDataWithFrm(frm)
             self.setScatters()
             self.setLines()
-            data = self.markers + self.lines
+            self.setEdges()
+            data = self.markers + self.lines + self.edges
             fig_frm = graph_objects.Frame(data=data, name=f'{idx}')
             fig_frms.append(fig_frm)
         self.fig.update(frames=fig_frms)
@@ -131,7 +139,8 @@ class FrameView:
             ele_sz_clr[self.SIZE] = [self.X_SIZE] * frm.shape[0]
 
         sz_clr = pd.DataFrame(ele_sz_clr, index=range(1, frm.shape[0] + 1))
-        self.data = pd.concat((frm, sz_clr), axis=1)
+        data = pd.concat((frm, sz_clr), axis=1)
+        self.data = traj.Frame(data, box=frm.getBox(), columns=traj.Frame.XYZU_ELE_SZ_CLR)
         return frm
 
     def setScatters(self):
@@ -202,8 +211,32 @@ class FrameView:
                                        mode='lines',
                                        showlegend=False,
                                        line=line)
-
         self.lines.append(line)
+
+    def setEdges(self):
+        """
+        Set box edges.
+        """
+        self.edges = []
+        edges = self.data.getEdges()
+        for edge in edges:
+            self.setEdge(edge)
+
+    def setEdge(self, xyzs):
+        """
+        Set a box edges.
+
+        :param xyzs list of list: start and end points of the edge.
+        """
+        xyzs = np.array(xyzs)
+        edge = graph_objects.Scatter3d(x=xyzs[:, 0],
+                                       y=xyzs[:, 1],
+                                       z=xyzs[:, 2],
+                                       opacity=0.5,
+                                       mode='lines',
+                                       showlegend=False,
+                                       line=dict(width=8, color='#b300ff'))
+        self.edges.append(edge)
 
     def clearData(self):
         """
@@ -214,6 +247,7 @@ class FrameView:
         self.fig.frames = []
         self.markers = []
         self.lines = []
+        self.edges = []
 
     def updateLayout(self):
         """
@@ -258,6 +292,8 @@ class FrameView:
 
         :return list of dict: add the these slider bars to he menus.
         """
+        if not self.fig.frames:
+            return
         slider = dict(active=0,
                       yanchor="top",
                       xanchor="left",
@@ -282,17 +318,23 @@ class FrameView:
 
         :return dict: keyword arguments for preference.
         """
+        data = None
+        if self.fig.data:
+            data = np.concatenate([
+                np.array([i['x'], i['y'], i['z']]).transpose()
+                for i in self.fig.data
+            ])
         if self.fig.frames:
-            dts = self.fig.frames[0]['data']
-            dts = [np.array([i['x'], i['y'], i['z']]).transpose() for i in dts]
-            data = np.concatenate(dts, axis=0)
-        elif self.data is not None:
-            data = self.data[self.XYZU].to_numpy()
-        else:
+            datas = np.concatenate([
+                np.array([j['x'], j['y'], j['z']]).transpose()
+                for i in self.fig.frames for j in i['data']
+            ])
+            data = np.concatenate((data, datas), axis=0) if self.fig.data else datas
+        if data is None:
             return
         dmin = data.min(axis=0)
         dmax = data.max(axis=0)
-        dspan = ((dmax - dmin) * 2).max()
+        dspan = (dmax - dmin).max()
         cnt = data.mean(axis=0)
         lbs = cnt - dspan
         hbs = cnt + dspan

@@ -54,6 +54,9 @@ class Frame(pd.DataFrame):
     ZU = 'zu'
     XYZU = [XU, YU, ZU]
     ELEMENT = 'element'
+    SIZE = 'size'
+    COLOR = 'color'
+    XYZU_ELE_SZ_CLR = XYZU + [ELEMENT, SIZE, COLOR]
 
     def __init__(self, xyz=None, box=None, index=None, columns=None):
         """
@@ -166,6 +169,23 @@ class Frame(pd.DataFrame):
             return
         for idx, col in enumerate(self.XYZU):
             self.attrs[self.SPAN][col] = box[idx * 2 + 1] - box[idx * 2]
+
+    def getBox(self):
+        """
+        Set the box from box limits.
+
+        :param str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
+        """
+        return self.attrs[self.BOX]
+
+    def getEdges(self):
+        """
+        Get the edges of the box.
+
+        :return list of list: each sublist contains two points describing one
+            edge.
+        """
+        return oplsua.DataFileReader.getEdgesFromList(self.getBox())
 
     def getDists(self, ids, xyz):
         """

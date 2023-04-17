@@ -72,7 +72,7 @@ class TestTransConformer(object):
         assert frm_num == len(frm_df.fig.frames)
 
     @pytest.mark.parametrize(('traj_path', 'data_num', 'frm_num'),
-                             [(NACL_CUSTOM, 1, 4), (CC_CUSTOM, 1, 4)])
+                             [(NACL_CUSTOM, 13, 4), (CC_CUSTOM, 13, 4)])
     def testAll_Traj(self, frm_trj, data_num, frm_num):
         # frm_df.show(); pdb.set_trace(); to view in the browser
         assert data_num == len(frm_trj.fig.data)

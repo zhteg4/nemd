@@ -210,6 +210,7 @@ class CustomDump(object):
         frm_vw.setEleSz()
         frm_vw.setScatters()
         frm_vw.setLines()
+        frm_vw.setEdges()
         frm_vw.addTraces()
         frms = traj.get_frames(self.options.custom_dump)
         frm_vw.setFrames(frms)

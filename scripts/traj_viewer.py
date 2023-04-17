@@ -109,6 +109,7 @@ class App(dash.Dash):
         data_reader.run()
         self.frm_vw.data_reader = data_reader
         self.frm_vw.setData()
+        self.frm_vw.setEdges()
         self.frm_vw.setEleSz()
         self.frm_vw.setScatters()
         self.frm_vw.setLines()
