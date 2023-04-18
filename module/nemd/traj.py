@@ -192,7 +192,7 @@ class Frame(pd.DataFrame):
             edge.
         """
         box = self.getBox()
-        if not box:
+        if box is None:
             return []
         return oplsua.DataFileReader.getEdgesFromList(box)
 
