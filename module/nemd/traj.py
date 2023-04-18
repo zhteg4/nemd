@@ -279,7 +279,7 @@ class Frame(pd.DataFrame):
         :param points list: additional point to visualize.
         """
 
-        data = self.loc[visible] if visible else None
+        data = self.loc[visible] if visible else self
         if dreader is None:
             data.index = [symbols.UNKNOWN] * data.shape[0]
         else:

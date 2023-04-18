@@ -142,7 +142,8 @@ class OplsTyper:
         108: 107, 127:1, 130: 9})
     # C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17], (86, 107): [86, 86]}
-    ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86), (84, 107, 86): (86, 88, 83)}
+    ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86), (84, 107, 86): (86, 88, 83),
+        (86, 107, 86): (86, 88, 83)}
     DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,), (88, 107,): (6, 22,),
         (86, 107,): (6, 25,)}
     # https://docs.lammps.org/Howto_tip3p.html
