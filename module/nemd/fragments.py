@@ -694,15 +694,20 @@ class FragMols(FragMixIn):
             conformerutils.rand_rotate(conf)
             conformerutils.translation(conf, point)
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
-            gids = frag.fmol.extg_gids
-            if self.hasClashes(gids):
+            if self.hasClashes(frag.fmol.extg_gids):
                 continue
             # Only update the distance cell after one molecule successful
             # placed into the cell as only inter-molecular clashes are
             # checked for packed cell.
-            self.add(list(gids))
+            self.add(list(frag.fmol.extg_gids))
             self.init_tf.loc[frag.fmol.molecule_id] = point
             return
+
+        with open('placeInitFrag.xyz', 'w') as out_fh:
+            self.frm.write(out_fh,
+                           dreader=self.data_reader,
+                           visible=list(self.dcell.extg_gids),
+                           points=points)
         raise ValueError(f'Failed to relocate the dead molecule.')
 
     def reportRelocation(self, frag):

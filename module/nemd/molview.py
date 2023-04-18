@@ -140,7 +140,9 @@ class FrameView:
 
         sz_clr = pd.DataFrame(ele_sz_clr, index=range(1, frm.shape[0] + 1))
         data = pd.concat((frm, sz_clr), axis=1)
-        self.data = traj.Frame(data, box=frm.getBox(), columns=traj.Frame.XYZU_ELE_SZ_CLR)
+        self.data = traj.Frame(data,
+                               box=frm.getBox(),
+                               columns=traj.Frame.XYZU_ELE_SZ_CLR)
         return frm
 
     def setScatters(self):
@@ -329,7 +331,8 @@ class FrameView:
                 np.array([j['x'], j['y'], j['z']]).transpose()
                 for i in self.fig.frames for j in i['data']
             ])
-            data = np.concatenate((data, datas), axis=0) if self.fig.data else datas
+            data = np.concatenate(
+                (data, datas), axis=0) if self.fig.data else datas
         if data is None:
             return
         dmin = data.min(axis=0)

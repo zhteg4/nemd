@@ -110,12 +110,13 @@ class Frame(pd.DataFrame):
                 yield cls(frm, box=box)
 
     @classmethod
-    def readXYZ(cls, filename=None, contents=None):
+    def readXYZ(cls, filename=None, contents=None, box=None):
         """
         Read a xyz dumpy file with element, xu, yu, zu.
 
         :param filename str: the filename to read frames
         :param contents `bytes`: parse the contents if filename not provided
+        :param box list: box of the frame (overwritten by the file header)
         :return iterator of 'Frame': each frame has coordinates and box info
         """
         with open(filename, 'r') if filename else io.StringIO(contents) as fh:
@@ -125,14 +126,19 @@ class Frame(pd.DataFrame):
                     return
                 atom_num = int(line.strip('\n'))
                 names = [cls.ELEMENT] + cls.XYZU
+                line = fh.readline().strip().split()
+                if len(line) == 9:
+                    box = [
+                        float(z) for x, y in zip(line[1::3], line[2::3])
+                        for z in [x, y]
+                    ]
                 frm = pd.read_csv(fh,
                                   nrows=atom_num,
-                                  header=0,
                                   delimiter=r'\s',
                                   names=names,
                                   engine='python')
                 frm.index = pd.RangeIndex(1, atom_num + 1)
-                yield cls(frm, columns=cls.XYZU + [cls.ELEMENT])
+                yield cls(frm, columns=cls.XYZU + [cls.ELEMENT], box=box)
 
     def getPoint(self):
         """
@@ -185,7 +191,10 @@ class Frame(pd.DataFrame):
         :return list of list: each sublist contains two points describing one
             edge.
         """
-        return oplsua.DataFileReader.getEdgesFromList(self.getBox())
+        box = self.getBox()
+        if not box:
+            return []
+        return oplsua.DataFileReader.getEdgesFromList(box)
 
     def getDists(self, ids, xyz):
         """
@@ -260,20 +269,39 @@ class Frame(pd.DataFrame):
             cshift = cshifts.loc[id]
             self.loc[mol] += cshift
 
-    def write(self, fh, dreader=None):
+    def write(self, fh, dreader=None, visible=None, points=None):
         """
         Write XYZ to a file.
 
-        :param fh class '_io.TextIOWrapper': file handdle to write out xyz.
+        :param fh '_io.TextIOWrapper': file handdle to write out xyz.
+        :param dreader 'nemd.oplsua.DataFileReader': datafile reader for element info.
+        :param visible list: visible atom gids.
+        :param points list: additional point to visualize.
         """
 
-        fh.write(f'{self.shape[0]}\n')
+        data = self.loc[visible] if visible else None
         if dreader is None:
-            index = [symbols.UNKNOWN] * self.shape[0]
+            data.index = [symbols.UNKNOWN] * data.shape[0]
         else:
-            index = [dreader.atoms[x].ele for x in self.index]
-        self.index = index
-        self.to_csv(fh, mode='a', index=True, sep=' ', header=True)
+            data.index = [dreader.atoms[x].ele for x in data.index]
+        box = self.getBox()
+        header = [
+            f'{j} {box[i*2]} {box[i*2+1]}'
+            for i, j in enumerate(self.columns.to_list())
+        ]
+        if points:
+            points = np.array(points)
+            points = pd.DataFrame(points,
+                                  index=['X'] * points.shape[0],
+                                  columns=self.XYZU)
+            data = pd.concat((data, points), axis=0)
+        fh.write(f'{data.shape[0]}\n')
+        data.to_csv(fh,
+                    mode='a',
+                    index=True,
+                    sep=' ',
+                    header=header,
+                    quotechar=' ')
 
     def pairDists(self):
         dists, eid = [], self.shape[0] + 1
@@ -450,8 +478,9 @@ class DistanceCell:
         self.graph.add_nodes_from(nodes)
         for node in nodes:
             for ids in self.INIT_NBR_INCR:
-                neighbor = tuple([(x + y) % z
-                                  for x, y, z in zip(node, ids, self.indexes)])
+                neighbor = tuple([
+                    (x + y) % z for x, y, z in zip(node, ids, self.gindexes)
+                ])
                 self.graph.add_edge(neighbor, node)
 
     def rmClashNodes(self):
@@ -464,7 +493,7 @@ class DistanceCell:
             rnodes.append(rnode)
         self.graph.remove_nodes_from(nodes)
 
-    def getVoids(self, num=50):
+    def getVoids(self, num=27):
         """
         Get the points from the voids.
 
@@ -474,11 +503,8 @@ class DistanceCell:
         mcc = max(nx.connected_components(self.graph), key=len)
         cut = min(max(self.gindexes) / 3, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
         largest_cc = {
-            x: len(
-                nx.single_source_shortest_path_length(self.graph,
-                                                      x,
-                                                      cutoff=int(cut)))
-            for x in random.sample(list(mcc), num * 10)
+            x: len(nx.generators.ego_graph(self.graph, x, radius=cut))
+            for x in random.sample(list(mcc), num * 2)
         }
         largest_cc_rv = collections.defaultdict(list)
         for node, size in largest_cc.items():
