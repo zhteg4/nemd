@@ -270,7 +270,10 @@ class Integration:
         """
         if not self.options.clean:
             return
-        shutil.rmtree(self.WORKSPACE)
+        try:
+            shutil.rmtree(self.WORKSPACE)
+        except FileNotFoundError:
+            pass
 
     def setTests(self):
         """
