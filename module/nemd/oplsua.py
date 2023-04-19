@@ -107,13 +107,14 @@ class OplsTyper:
               UA(sml='CCC', mp=(83, 86, 83,), hs=None, dsc='Propane'),
               UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
               UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
+              UA(sml='CC(C)(C)C', mp=(85, 90, 85, 85, 85,), hs=None, dsc='Neopentane'),
         # Alkene
               UA(sml='CC=CC', mp=(84, 89, 89, 84,), hs=None, dsc='2-Butene'),
         # Aldehydes (with formyl group)
         # Ketone
               UA(sml='CC(=O)C', mp=(129, 127, 128, 129,), hs=None, dsc='Acetone'),
-              UA(sml='CCC(=O)CC', mp=(7, 130, 127, 128, 130, 7, ), hs={104: 105}, dsc='Diethyl Ketone'),
-        # UA(sml='CC(C)CC(=O)C(C)(C)C', mp=(83, 107, 104,), hs={104: 105}, dsc='t-Butyl Ketone'),
+              UA(sml='CCC(=O)CC', mp=(7, 130, 127, 128, 130, 7, ), hs=None, dsc='Diethyl Ketone'),
+        # UA(sml='CC(C)CC(=O)C(C)(C)C', mp=(), hs=None, dsc='t-Butyl Ketone'),
         # Alcohol
               UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)'),
               UA(sml='CO', mp=(106, 104,), hs={104: 105}, dsc='Methanol'),
@@ -133,7 +134,7 @@ class OplsTyper:
     BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
     BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3,
-        108: 107, 127:1, 128:2, 129:7, 130:9})
+        108: 107, 127: 1, 128: 2, 129: 7, 130: 9, 85: 9, 90: 1})
     ANGLE_ATOM = ATOM_TOTAL.copy()
     ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72,
         108: 107, 127:1, 129:7, 130:9})
@@ -1096,7 +1097,10 @@ class LammpsData(LammpsIn):
         for mol in self.mols.values():
             res_charge = collections.defaultdict(float)
             for atom in mol.GetAtoms():
-                res_num = atom.GetIntProp(self.RES_NUM)
+                try:
+                    res_num = atom.GetIntProp(self.RES_NUM)
+                except KeyError:
+                    raise KeyError(f'Typing missed for atom {atom.GetIdx()}')
                 type_id = atom.GetIntProp(self.TYPE_ID)
                 res_charge[res_num] += self.ff.charges[type_id]
 
