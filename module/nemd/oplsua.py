@@ -134,19 +134,19 @@ class OplsTyper:
     BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
     BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3,
-        108: 107, 127: 1, 128: 2, 129: 7, 130: 9, 85: 9, 90: 1})
+        108: 107, 127: 1, 128: 2, 129: 7, 130: 9, 85: 9, 90: 64})
     ANGLE_ATOM = ATOM_TOTAL.copy()
     ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72,
-        108: 107, 127:1, 129:7, 130:9})
+        108: 107, 127:1, 129:7, 130: 9})
     DIHE_ATOM = ATOM_TOTAL.copy()
     DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72,
-        108: 107, 127:1, 130: 9})
+        108: 107, 127: 1, 130: 9, 88: 6, 90: 9})
     # C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17], (86, 107): [86, 86]}
     ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86), (84, 107, 86): (86, 88, 83),
         (86, 107, 86): (86, 88, 83)}
     DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,), (88, 107,): (6, 22,),
-        (86, 107,): (6, 25,)}
+        (86, 107,): (6, 25,), (6, 86): (6, 66), (6, 26): (1, 6)}
     # https://docs.lammps.org/Howto_tip3p.html
     TIP3P = 'TIP3P'
     SPC = 'SPC'
@@ -176,6 +176,11 @@ class OplsTyper:
         """
         Assign atom types for force field assignment.
         """
+
+        self.doTyping()
+        self.reassignResnum()
+
+    def doTyping(self):
         marked_smiles = {}
         marked_atom_ids = []
         res_num = 1
@@ -199,6 +204,31 @@ class OplsTyper:
         )
         log_debug(f"{res_num - 1} residues found.")
         [log_debug(f'{x}: {y}') for x, y in marked_smiles.items()]
+
+    def reassignResnum(self):
+        res_atom = collections.defaultdict(list)
+        for atom in self.mol.GetAtoms():
+            try:
+                res_num = atom.GetIntProp(self.RES_NUM)
+            except KeyError:
+                raise KeyError(f'Typing missed for atom {atom.GetIdx()}')
+            res_atom[res_num].append(atom.GetIdx())
+        cbonds = [
+            x for x in self.mol.GetBonds() if x.GetBeginAtom().GetIntProp(
+                self.RES_NUM) != x.GetEndAtom().GetIntProp(self.RES_NUM)
+        ]
+        emol = Chem.EditableMol(Chem.Mol(self.mol))
+        [
+            emol.RemoveBond(x.GetBeginAtom().GetIdx(),
+                            x.GetEndAtom().GetIdx()) for x in cbonds
+        ]
+        frags = Chem.GetMolFrags(emol.GetMol())
+        [
+            self.mol.GetAtomWithIdx(y).SetIntProp(self.RES_NUM, i)
+            for i, x in enumerate(frags, 1)
+            for y in x
+        ]
+        log_debug(f"{len(frags)} residues reassigned.")
 
     def filterMatch(self, match, frag):
         """
@@ -1097,13 +1127,12 @@ class LammpsData(LammpsIn):
         for mol in self.mols.values():
             res_charge = collections.defaultdict(float)
             for atom in mol.GetAtoms():
-                try:
-                    res_num = atom.GetIntProp(self.RES_NUM)
-                except KeyError:
-                    raise KeyError(f'Typing missed for atom {atom.GetIdx()}')
+                res_num = atom.GetIntProp(self.RES_NUM)
                 type_id = atom.GetIntProp(self.TYPE_ID)
                 res_charge[res_num] += self.ff.charges[type_id]
 
+            res_snacharge = {x: 0 for x, y in res_charge.items() if y}
+            res_atom = {}
             for bond in mol.GetBonds():
                 batom, eatom = bond.GetBeginAtom(), bond.GetEndAtom()
                 bres_num = batom.GetIntProp(self.RES_NUM)
@@ -1111,13 +1140,25 @@ class LammpsData(LammpsIn):
                 if bres_num == eres_num:
                     continue
                 for atom, natom in [[batom, eatom], [eatom, batom]]:
-                    try:
-                        # When the atom has multiple residue neighbors
-                        charge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
-                    except KeyError:
-                        charge = 0.0
-                    ncharge = res_charge[natom.GetIntProp(self.RES_NUM)]
-                    atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
+                    nres_num = natom.GetIntProp(self.RES_NUM)
+                    ncharge = res_charge[nres_num]
+                    if not ncharge:
+                        continue
+                    snatom_charge = abs(self.ff.charges[natom.GetIntProp(
+                        self.TYPE_ID)])
+                    if snatom_charge > res_snacharge[nres_num]:
+                        res_atom[nres_num] = atom.GetIdx()
+                        res_snacharge[nres_num] = snatom_charge
+
+            for res, idx in res_atom.items():
+                atom = mol.GetAtomWithIdx(idx)
+                ncharge = res_charge[res]
+                try:
+                    # When the atom has multiple residue neighbors
+                    charge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
+                except KeyError:
+                    charge = 0.0
+                atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
 
     def setBonds(self):
         """
@@ -1628,9 +1669,12 @@ class LammpsData(LammpsIn):
         """
         def get_neigh_charge(atom):
             try:
-                return atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
+                charge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
             except KeyError:
-                return 0
+                charge = 0
+            else:
+                atom.ClearProp(self.NEIGHBOR_CHARGE)
+            return charge
 
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
         for mol_id, mol in self.mols.items():
