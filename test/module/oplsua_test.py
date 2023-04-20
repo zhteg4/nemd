@@ -81,7 +81,7 @@ class TestOplsParser:
 
     def testSetAngle(self, raw_prsr):
         raw_prsr.setAngle()
-        assert 307 == len(raw_prsr.angles)
+        assert 308 == len(raw_prsr.angles)
 
     def testSetImproper(self, raw_prsr):
         raw_prsr.setImproper()
@@ -89,7 +89,7 @@ class TestOplsParser:
 
     def testSetDihedral(self, raw_prsr):
         raw_prsr.setDihedral()
-        assert 629 == len(raw_prsr.dihedrals)
+        assert 630 == len(raw_prsr.dihedrals)
 
 
 class TestLammpsIn:

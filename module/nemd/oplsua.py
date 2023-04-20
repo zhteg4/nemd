@@ -140,13 +140,13 @@ class OplsTyper:
         108: 107, 127:1, 129:7, 130: 9})
     DIHE_ATOM = ATOM_TOTAL.copy()
     DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72,
-        108: 107, 127: 1, 130: 9, 88: 6, 90: 9})
+        108: 107, 127: 1, 130: 9, 86: 9, 88: 9, 90: 9})
     # C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
     BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17], (86, 107): [86, 86]}
     ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86), (84, 107, 86): (86, 88, 83),
         (86, 107, 86): (86, 88, 83)}
     DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,), (88, 107,): (6, 22,),
-        (86, 107,): (6, 25,), (6, 86): (6, 66), (6, 26): (1, 6)}
+        (86, 107,): (6, 25,), (9, 26): (1, 9), (9, 107): (9, 9)}
     # https://docs.lammps.org/Howto_tip3p.html
     TIP3P = 'TIP3P'
     SPC = 'SPC'
@@ -225,8 +225,7 @@ class OplsTyper:
         frags = Chem.GetMolFrags(emol.GetMol())
         [
             self.mol.GetAtomWithIdx(y).SetIntProp(self.RES_NUM, i)
-            for i, x in enumerate(frags, 1)
-            for y in x
+            for i, x in enumerate(frags, 1) for y in x
         ]
         log_debug(f"{len(frags)} residues reassigned.")
 
@@ -1635,7 +1634,8 @@ class LammpsData(LammpsIn):
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
             for ene_ang_n in dihe.constants:
                 params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
-                if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
+                if params[ene_ang_n.n_parm] and ((ene_ang_n.angle == 180.) ^
+                                                 (not ene_ang_n.n_parm % 2)):
                     params[ene_ang_n.n_parm] *= -1
             self.data_fh.write(
                 f"{dihedral_id}  {' '.join(map(str, params))}\n")
