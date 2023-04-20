@@ -156,7 +156,7 @@ class CMP:
         if not os.path.isfile(self.target):
             raise FileNotFoundError(f"{self.target} not found")
         if not filecmp.cmp(self.orignal, self.target):
-            raise ValueError(f"{self.target} is different from {self.orignal}")
+            raise ValueError(f"{self.orignal} and {self.target} are different")
 
 
 class Results:
@@ -385,8 +385,9 @@ class Integration:
         fjobs = [x for x in jobs if not x.document[SUCCESS]]
         log(f"{len(sjobs)} succeed; {len(fjobs)} failed.")
         for fjob in fjobs:
-            log(f'id: {fjob.sp[ID]}; dir: {os.path.basename(fjob.path)}')
-            log(f' {fjob.document[MSG]}')
+            dir = [x for x in self.test_dirs if x.endswith(fjob.sp[ID])][0]
+            log(f'id: {fjob.sp[ID]}; dir: {dir}')
+            log(f'{fjob.document[MSG]}')
         log('finished.', timestamp=True)
 
 
@@ -400,7 +401,7 @@ def get_parser():
     parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(FLAG_DIR,
                         metavar=FLAG_DIR.upper(),
-                        type=parserutils.type_dir,
+                        type=parserutils.type_itest_dir,
                         nargs='?',
                         help='The directory to search for integration tests.')
     parser.add_argument(

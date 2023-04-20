@@ -7,6 +7,7 @@ from rdkit import Chem
 from nemd import oplsua
 from nemd import symbols
 from nemd import constants
+from nemd import environutils
 
 
 class CapitalisedHelpFormatter(argparse.HelpFormatter):
@@ -32,6 +33,17 @@ def type_dir(arg):
     if os.path.isdir(arg):
         return arg
     raise argparse.ArgumentTypeError(f'{arg} is not an existing directory.')
+
+
+def type_itest_dir(arg):
+    try:
+        return type_dir(arg)
+    except argparse.ArgumentTypeError:
+        narg = os.path.join(environutils.get_integration_test_dir(), arg)
+    if os.path.isdir(narg):
+        return narg
+    raise argparse.ArgumentTypeError(
+        f'Neither {arg} or {narg} is not an existing directory.')
 
 
 def type_float(arg):
