@@ -27,6 +27,7 @@ from nemd import jobutils
 from nemd import logutils
 from nemd import fragments
 from nemd import fileutils
+from nemd import rdkitutils
 from nemd import prop_names
 from nemd import structutils
 from nemd import parserutils
@@ -743,8 +744,14 @@ class Polymer(object):
         :param trans bool: If True, all_trans conformer without entanglements is
             built.
         """
+
         if self.polym.GetNumAtoms() <= 200 and not trans:
-            AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
+            with rdkitutils.CaptureLogger() as log:
+                # Mg+2 triggers
+                # WARNING UFFTYPER: Warning: hybridization set to SP3 for atom 0
+                # ERROR UFFTYPER: Unrecognized charge state for atom: 0
+                AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
+                log_debug([f'{x} {y}' for x, y in log.items()])
             Chem.GetSymmSSSR(self.polym)
             return
 

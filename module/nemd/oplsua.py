@@ -89,7 +89,7 @@ class OplsTyper:
               UA(sml='[K+]', mp=(199,), hs=None, dsc='K+ Potassium Ion'),
               UA(sml='[Rb+]', mp=(200,), hs=None, dsc='Rb+ Rubidium Ion'),
               UA(sml='[Cs+]', mp=(201,), hs=None, dsc='Cs+ Cesium Ion'),
-              UA(sml='[Mg+]', mp=(202,), hs=None, dsc='Mg+2 Magnesium Ion'),
+              UA(sml='[Mg+2]', mp=(202,), hs=None, dsc='Mg+2 Magnesium Ion'),
               UA(sml='[Ca+]', mp=(203,), hs=None, dsc='Ca+2 Calcium Ion'),
               UA(sml='[Sr+]', mp=(204,), hs=None, dsc='Sr+2 Strontium Ion'),
               UA(sml='[Ba+]', mp=(205,), hs=None, dsc='Ba+2 Barium Ion'),
@@ -211,7 +211,9 @@ class OplsTyper:
             try:
                 res_num = atom.GetIntProp(self.RES_NUM)
             except KeyError:
-                raise KeyError(f'Typing missed for {atom.GetSymbol()} atom {atom.GetIdx()}')
+                raise KeyError(
+                    f'Typing missed for {atom.GetSymbol()} atom {atom.GetIdx()}'
+                )
             res_atom[res_num].append(atom.GetIdx())
         cbonds = [
             x for x in self.mol.GetBonds() if x.GetBeginAtom().GetIntProp(
