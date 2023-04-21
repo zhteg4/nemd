@@ -1,2 +1,0 @@
-# polymer builder on [Ca+2] [Sr+2] [Ba+2] [Cl-]
-run_nemd polymer_builder_driver.py '[Ca+2]' '[Sr+2]' '[Ba+2]' '[Cl-]' -mol_num 1 1 1 6 -force_field OPLSUA,TIP3P -seed 1234 -DEBUG

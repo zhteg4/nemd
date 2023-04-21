@@ -65,23 +65,23 @@ class TestOplsParser:
 
     def testSetAtomType(self, raw_prsr):
         raw_prsr.setAtomType()
-        assert 213 == len(raw_prsr.atoms)
+        assert 215 == len(raw_prsr.atoms)
 
     def testSetVdW(self, raw_prsr):
         raw_prsr.setVdW()
-        assert 213 == len(raw_prsr.vdws)
+        assert 215 == len(raw_prsr.vdws)
 
     def testSetCharge(self, raw_prsr):
         raw_prsr.setCharge()
-        assert 213 == len(raw_prsr.charges)
+        assert 215 == len(raw_prsr.charges)
 
     def testSetBond(self, raw_prsr):
         raw_prsr.setBond()
-        assert 150 == len(raw_prsr.bonds)
+        assert 151 == len(raw_prsr.bonds)
 
     def testSetAngle(self, raw_prsr):
         raw_prsr.setAngle()
-        assert 308 == len(raw_prsr.angles)
+        assert 309 == len(raw_prsr.angles)
 
     def testSetImproper(self, raw_prsr):
         raw_prsr.setImproper()

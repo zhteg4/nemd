@@ -82,6 +82,7 @@ class OplsTyper:
     LARGE_NUM = constants.LARGE_NUM
 
     # yapf: disable
+    UA_WATER_TIP3P = UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)')
     SMILES = [
         # Single Atom Particle
               UA(sml='[Li+]', mp=(197,), hs=None, dsc='Li+ Lithium Ion'),
@@ -116,7 +117,7 @@ class OplsTyper:
               UA(sml='CCC(=O)CC', mp=(7, 130, 127, 128, 130, 7, ), hs=None, dsc='Diethyl Ketone'),
         # t-Butyl Ketone CC(C)CC(=O)C(C)(C)C described by Neopentane, Acetone, and Diethyl Ketone
         # Alcohol
-              UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)'),
+              UA_WATER_TIP3P,
               UA(sml='CO', mp=(106, 104,), hs={104: 105}, dsc='Methanol'),
               UA(sml='CCO', mp=(83, 107, 104,), hs={104: 105}, dsc='Ethanol'),
               UA(sml='CC(C)O', mp=(84, 108, 84, 104,), hs={104:105}, dsc='Isopropanol'),
@@ -130,7 +131,7 @@ class OplsTyper:
     ]
 
     SMILES = list(reversed(SMILES))
-    ATOM_TOTAL = {i: i for i in range(1, 214)}
+    ATOM_TOTAL = {i: i for i in range(1, 216)}
     BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
     BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3,
@@ -150,13 +151,16 @@ class OplsTyper:
     # https://docs.lammps.org/Howto_tip3p.html
     TIP3P = 'TIP3P'
     SPC = 'SPC'
+    SPCE = 'SPCE'
     WATER_TIP3P = f'Water ({TIP3P})'
     WATER_SPC = f'Water ({SPC})'
+    WATER_SPCE = f'Water ({SPCE})'
     UA_WATER_SPC = UA(sml='O', mp=(79, ), hs={79: 80}, dsc=WATER_SPC)
+    UA_WATER_SPCE = UA(sml='O', mp=(214,), hs={214: 215}, dsc=WATER_SPCE)
     # yapf: enable
 
-    WMODELS = [TIP3P, SPC]
-    FF_MODEL = {OPLSUA: WMODELS}
+    WMODELS = {TIP3P: UA_WATER_TIP3P, SPC: UA_WATER_SPC, SPCE: UA_WATER_SPCE}
+    FF_MODEL = {OPLSUA: WMODELS.keys()}
     OPLSUA_TIP3P = f'{OPLSUA},{TIP3P}'
 
     def __init__(self, mol, wmodel=TIP3P):
@@ -170,7 +174,7 @@ class OplsTyper:
         idx = [
             x for x, y in enumerate(self.SMILES) if y.dsc == self.WATER_TIP3P
         ][0]
-        self.SMILES[idx] = self.UA_WATER_SPC
+        self.SMILES[idx] = self.WMODELS[wmodel]
 
     def run(self):
         """

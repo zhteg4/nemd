@@ -1,0 +1,2 @@
+# polymer builder on SPCE water
+run_nemd polymer_builder_driver.py O -force_field OPLSUA,SPCE -seed 123

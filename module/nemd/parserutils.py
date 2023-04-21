@@ -39,10 +39,13 @@ def type_itest_dir(arg):
     try:
         return type_dir(arg)
     except argparse.ArgumentTypeError:
-        narg = os.path.join(environutils.get_integration_test_dir(), arg)
-    if os.path.isdir(narg):
-        return narg
-    raise argparse.ArgumentTypeError(f'Neither {arg} or {narg} exists.')
+        dir = environutils.get_integration_test_dir()
+        nargs = [arg, '0' * (4 - len(arg)) + arg]
+        nargs = [os.path.join(dir, x) for x in nargs]
+        for narg in nargs:
+            if os.path.isdir(narg):
+                return narg
+    raise argparse.ArgumentTypeError(f"None of {', '.join([arg] + nargs)} exists.")
 
 
 def type_float(arg):
