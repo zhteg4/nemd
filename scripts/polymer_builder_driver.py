@@ -71,6 +71,18 @@ def log(msg, timestamp=False):
     logutils.log(logger, msg, timestamp=timestamp)
 
 
+def log_warning(msg, timestamp=False):
+    """
+    Print this warning message into log file.
+
+    :param msg: the msg to print
+    :param timestamp bool: the msg to be printed
+    """
+    if not logger:
+        return
+    logger.warning(msg)
+
+
 def log_error(msg):
     """
     Print this message and exit the program.
@@ -283,6 +295,8 @@ class AmorphousCell(object):
         """
         lmw = oplsua.LammpsData(self.mols, self.ff, self.jobname, box=self.box)
         lmw.writeData(adjust_coords=False)
+        if lmw.total_charge:
+            log_warning(f'The system has a net charge of {lmw.total_charge}')
         lmw.writeLammpsIn()
         log(f'Data file written into {lmw.lammps_data}')
         log(f'In script written into {lmw.lammps_in}')

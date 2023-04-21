@@ -1027,6 +1027,7 @@ class LammpsData(LammpsIn):
         self.ang_types = []
         self.dihe_types = []
         self.impr_types = []
+        self.total_charge = 0.
         self.data_fh = None
 
     def hasCharge(self):
@@ -1090,6 +1091,7 @@ class LammpsData(LammpsIn):
             self.writeAngles()
             self.writeDihedrals()
             self.writeImpropers()
+            self.setTotalCharge()
 
     def setAtoms(self):
         """
@@ -1661,6 +1663,16 @@ class LammpsData(LammpsIn):
             self.data_fh.write(
                 f"{improper_id} {impr.ene} {sign} {impr.n_parm}\n")
         self.data_fh.write("\n")
+
+    def setTotalCharge(self):
+        """
+        Set the total charge of the system.
+        """
+        charges = [
+            self.ff.charges[y.GetIntProp(self.TYPE_ID)]
+            for x in self.mols.values() for y in x.GetAtoms()
+        ]
+        self.total_charge = sum(charges)
 
     def writeAtoms(self):
         """
