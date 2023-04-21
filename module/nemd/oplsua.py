@@ -114,7 +114,7 @@ class OplsTyper:
         # Ketone
               UA(sml='CC(=O)C', mp=(129, 127, 128, 129,), hs=None, dsc='Acetone'),
               UA(sml='CCC(=O)CC', mp=(7, 130, 127, 128, 130, 7, ), hs=None, dsc='Diethyl Ketone'),
-        # UA(sml='CC(C)CC(=O)C(C)(C)C', mp=(), hs=None, dsc='t-Butyl Ketone'),
+        # t-Butyl Ketone CC(C)CC(=O)C(C)(C)C described by Neopentane, Acetone, and Diethyl Ketone
         # Alcohol
               UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)'),
               UA(sml='CO', mp=(106, 104,), hs={104: 105}, dsc='Methanol'),
@@ -1091,7 +1091,6 @@ class LammpsData(LammpsIn):
             self.writeAngles()
             self.writeDihedrals()
             self.writeImpropers()
-            self.setTotalCharge()
 
     def setAtoms(self):
         """
@@ -1664,16 +1663,6 @@ class LammpsData(LammpsIn):
                 f"{improper_id} {impr.ene} {sign} {impr.n_parm}\n")
         self.data_fh.write("\n")
 
-    def setTotalCharge(self):
-        """
-        Set the total charge of the system.
-        """
-        charges = [
-            self.ff.charges[y.GetIntProp(self.TYPE_ID)]
-            for x in self.mols.values() for y in x.GetAtoms()
-        ]
-        self.total_charge = sum(charges)
-
     def writeAtoms(self):
         """
         Write atom coefficients.
@@ -1704,6 +1693,7 @@ class LammpsData(LammpsIn):
             data[:, 3] = [
                 x + self.ff.charges[y] for x, y in zip(charges, type_ids)
             ]
+            self.total_charge += data[:, 3].sum()
             data[:, 4:] = conformer.GetPositions()
             np.savetxt(self.data_fh, data, fmt='%i %i %i %.4f %.3f %.3f %.3f')
         self.data_fh.write(f"\n")

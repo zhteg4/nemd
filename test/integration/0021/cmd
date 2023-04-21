@@ -1,2 +1,2 @@
-# polymer builder on He Ne Ar Kr Xe
-run_nemd polymer_builder_driver.py [He] [Ne] [Ar] [Kr] [Xe] -mol_num 5 5 5 5 5 -force_field OPLSUA,TIP3P -seed 1234 -DEBUG
+# polymer builder on t-Butyl Ketone
+run_nemd polymer_builder_driver.py 'CC(C)CC(=O)C(C)(C)C' -force_field OPLSUA,TIP3P -seed 1234 -DEBUG
