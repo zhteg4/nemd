@@ -211,7 +211,7 @@ class OplsTyper:
             try:
                 res_num = atom.GetIntProp(self.RES_NUM)
             except KeyError:
-                raise KeyError(f'Typing missed for atom {atom.GetIdx()}')
+                raise KeyError(f'Typing missed for {atom.GetSymbol()} atom {atom.GetIdx()}')
             res_atom[res_num].append(atom.GetIdx())
         cbonds = [
             x for x in self.mol.GetBonds() if x.GetBeginAtom().GetIntProp(

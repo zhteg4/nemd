@@ -1,0 +1,2 @@
+# polymer builder on LiF
+run_nemd polymer_builder_driver.py '[Li+].[F-]' -mol_num 10 -force_field OPLSUA,TIP3P -seed 1234 -DEBUG

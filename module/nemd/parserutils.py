@@ -42,8 +42,7 @@ def type_itest_dir(arg):
         narg = os.path.join(environutils.get_integration_test_dir(), arg)
     if os.path.isdir(narg):
         return narg
-    raise argparse.ArgumentTypeError(
-        f'Neither {arg} or {narg} is not an existing directory.')
+    raise argparse.ArgumentTypeError(f'Neither {arg} or {narg} exists.')
 
 
 def type_float(arg):
