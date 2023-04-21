@@ -746,12 +746,12 @@ class Polymer(object):
         """
 
         if self.polym.GetNumAtoms() <= 200 and not trans:
-            with rdkitutils.CaptureLogger() as log:
+            with rdkitutils.CaptureLogger() as logs:
                 # Mg+2 triggers
                 # WARNING UFFTYPER: Warning: hybridization set to SP3 for atom 0
                 # ERROR UFFTYPER: Unrecognized charge state for atom: 0
                 AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
-                log_debug([f'{x} {y}' for x, y in log.items()])
+                [log_debug(f'{x} {y}') for x, y in logs.items()]
             Chem.GetSymmSSSR(self.polym)
             return
 
