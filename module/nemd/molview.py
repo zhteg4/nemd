@@ -277,7 +277,6 @@ class FrameView:
             template='plotly_dark',
             scene=self.getScene(),
             scene_camera=camera,
-            clickmode='event+select',
             sliders=self.getSliders(),
             updatemenus=[
                 dict(type="buttons",

@@ -22,7 +22,6 @@ class App(dash.Dash):
     SELECT_DATA_LB = 'select_data_lb'
     POINT_SEL = 'point_sel'
     TRAJ_FIG = 'traj_fig'
-
     BLUE_COLOR_HEX = '#7FDBFF'
 
     def __init__(self, *arg, **kwarg):
@@ -58,24 +57,40 @@ class App(dash.Dash):
         Set the layout of the widget.
         """
         self.layout = dash.html.Div([
+            dbc.Row(
             dash.html.H1(children='Molecular Trajectory Viewer',
                          style={
                              'textAlign': 'center',
                              'color': self.BLUE_COLOR_HEX
-                         }),
-            dash.html.Hr(),
-            ndash.LabeledUpload(label='Data File:',
-                                status_id=self.DATAFILE_LB,
-                                button_id=self.DATAFILE_INPUT,
-                                click_id=self.SELECT_DATA_LB),
-            ndash.LabeledUpload(label='Trajectory:',
-                                status_id=self.TRAJ_LB,
-                                button_id=self.TRAJ_INPUT,
-                                click_id=self.SELECT_TRAJ_LB),
-            dash.dcc.Graph(figure={},
-                           id=self.TRAJ_FIG,
-                           style={'height': '80vh'}),
-            dash.html.Pre(id=self.POINT_SEL)
+                         })),
+            dbc.Row(dash.html.Hr()),
+            dbc.Row([
+            dbc.Col([
+                ndash.LabeledUpload(label='Data File:',
+                                    status_id=self.DATAFILE_LB,
+                                    button_id=self.DATAFILE_INPUT,
+                                    click_id=self.SELECT_DATA_LB),
+                ndash.LabeledUpload(label='Trajectory:',
+                                    status_id=self.TRAJ_LB,
+                                    button_id=self.TRAJ_INPUT,
+                                    click_id=self.SELECT_TRAJ_LB),
+                dash.html.Div([
+                    "Measure: ",
+                    dash.dcc.Dropdown(
+                        ['Position', 'Distance', 'Angle', 'Dihedral'],
+                        value='Position',
+                        id="measure_dd",
+                        style={
+                            'padding-left': 5,
+                            'color': '#000000'
+                        })
+                ]),
+                dash.html.Pre(id=self.POINT_SEL)
+            ], width=3),
+            dbc.Col(
+                dash.dcc.Graph(figure={},
+                               id=self.TRAJ_FIG,
+                               style={'height': '80vh'}), width=9)])
         ])
 
     def inputChanged(self, data_contents, traj_contents):
@@ -176,19 +191,20 @@ class App(dash.Dash):
             return
         point = data['points'][0]
         curve = self.frm_vw.fig.data[point['curveNumber']]
-        info = f"index={point['customdata']}, element={curve['name']}, " \
+        info = f"Informaton:\n index={point['customdata']}, element={curve['name']}, " \
                f"x={point['x']}, y={point['y']}, z={point['z']}"
         self.frm_vw.fig.data[point['curveNumber']]
 
-        self.frm_vw.fig.update_layout(scene=dict(annotations = [dict(
-            showarrow=False,
-            x=point['x'],
-            y=point['y'],
-            z=point['z'],
-            text="Point 1",
-            xanchor="left",
-            xshift=10,
-            opacity=0.7)]))
+        self.frm_vw.fig.update_layout(scene=dict(annotations=[
+            dict(showarrow=False,
+                 x=point['x'],
+                 y=point['y'],
+                 z=point['z'],
+                 text="Point 1",
+                 xanchor="left",
+                 xshift=10,
+                 opacity=0.7)
+        ]))
         return info, self.frm_vw.fig
 
 

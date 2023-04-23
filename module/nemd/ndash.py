@@ -12,12 +12,6 @@ class Upload(dash.dcc.Upload):
     """
 
     STYLE_KEY = 'style'
-    STYLE = {
-        'borderWidth': '1px',
-        'borderStyle': 'dashed',
-        'borderRadius': '5px',
-        'textAlign': 'center'
-    }
     BORDERWIDTH = 'borderWidth'
     BORDERSTYLE = 'borderStyle'
     DASHED = 'dashed'
@@ -25,6 +19,15 @@ class Upload(dash.dcc.Upload):
     TEXTALIGN = 'textAlign'
     CENTER = 'center'
 
+    STYLE = {
+        BORDERWIDTH: '1px',
+        BORDERSTYLE: DASHED,
+        BORDERRADIUS: '5px',
+        TEXTALIGN: CENTER,
+        'margin-left':5,
+        'padding-left': 10,
+        'padding-right': 10
+    }
     def __init__(self, *args, **kwargs):
         style = {**self.STYLE, **kwargs.pop(self.STYLE_KEY, {})}
         kwargs[self.STYLE_KEY] = style
@@ -37,17 +40,18 @@ class LabeledUpload(dash.html.Div):
     """
 
     STYLE = {'display': 'inline-block'}
-    STATUS_STYLE = {**STYLE, 'margin-left': '10px', 'margin-right': '5px'}
 
-    def __init__(self,
-                 label=None,
-                 status_id=None,
-                 button_id=None,
-                 click_id=None):
-        self.label = dash.html.Div(children=label, style=self.STYLE)
+    def __init__(
+        self,
+        label=None,
+        status_id=None,
+        button_id=None,
+        click_id=None,
+    ):
+        self.label = dash.html.Div(children=label)
         self.status = dash.html.Div(children='',
                                     id=status_id,
-                                    style=self.STATUS_STYLE)
+                                    style=self.STYLE)
         button = Upload(
             id=button_id,
             children=dash.html.Div(children='', id=click_id),
