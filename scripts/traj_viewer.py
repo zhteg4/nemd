@@ -140,7 +140,11 @@ class App(dash.Dash):
         """
         if contents is None:
             return self.frm_vw.fig
-        frms = traj.get_frames(contents=contents)
+        try:
+            frms = traj.get_frames(contents=contents)
+        except ValueError:
+            # Empty trajectory file
+            return self.frm_vw.fig
         self.frm_vw.setFrames(frms)
         self.frm_vw.updateLayout()
         return self.frm_vw.fig
