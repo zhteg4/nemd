@@ -165,7 +165,9 @@ class FrameView:
                                              opacity=0.9,
                                              mode='markers',
                                              name=ele,
-                                             marker=marker)
+                                             marker=marker,
+                                             hovertemplate='%{customdata}',
+                                             customdata=data.index.values)
             self.markers.append(marker)
 
     def setEleSz(self):
@@ -212,7 +214,8 @@ class FrameView:
                                        opacity=0.8,
                                        mode='lines',
                                        showlegend=False,
-                                       line=line)
+                                       line=line,
+                                       hoverinfo='skip')
         self.lines.append(line)
 
     def setEdges(self):
@@ -237,6 +240,7 @@ class FrameView:
                                        opacity=0.5,
                                        mode='lines',
                                        showlegend=False,
+                                       hoverinfo='skip',
                                        line=dict(width=8, color='#b300ff'))
         self.edges.append(edge)
 
@@ -273,6 +277,7 @@ class FrameView:
             template='plotly_dark',
             scene=self.getScene(),
             scene_camera=camera,
+            clickmode='event+select',
             sliders=self.getSliders(),
             updatemenus=[
                 dict(type="buttons",

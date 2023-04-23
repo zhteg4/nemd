@@ -20,6 +20,7 @@ class App(dash.Dash):
     DATAFILE_INPUT = 'datafile_input'
     DATAFILE_LB = 'datafile_lb'
     SELECT_DATA_LB = 'select_data_lb'
+    POINT_SEL = 'point_sel'
     TRAJ_FIG = 'traj_fig'
 
     BLUE_COLOR_HEX = '#7FDBFF'
@@ -45,6 +46,12 @@ class App(dash.Dash):
             dash.Output(component_id=self.SELECT_TRAJ_LB,
                         component_property='children'),
             dash.Input(self.TRAJ_INPUT, 'filename'))(self.updateTrajLabel)
+        self.callback(dash.Output(self.POINT_SEL, 'children'),
+                      dash.Output(self.TRAJ_FIG,
+                                  'figure',
+                                  allow_duplicate=True),
+                      dash.Input(self.TRAJ_FIG, 'clickData'),
+                      prevent_initial_call=True)(self.dataClicked)
 
     def setLayout(self):
         """
@@ -67,7 +74,8 @@ class App(dash.Dash):
                                 click_id=self.SELECT_TRAJ_LB),
             dash.dcc.Graph(figure={},
                            id=self.TRAJ_FIG,
-                           style={'height': '80vh'})
+                           style={'height': '80vh'}),
+            dash.html.Pre(id=self.POINT_SEL)
         ])
 
     def inputChanged(self, data_contents, traj_contents):
@@ -106,7 +114,12 @@ class App(dash.Dash):
         if contents is None:
             return self.frm_vw.fig
         data_reader = oplsua.DataFileReader(contents=contents)
-        data_reader.run()
+        try:
+            data_reader.run()
+        except ValueError:
+            print(contents)
+            # Triggered on reload without refreshed button clicked in debug mode
+            return self.frm_vw.fig
         self.frm_vw.data_reader = data_reader
         self.frm_vw.setData()
         self.frm_vw.setEdges()
@@ -153,6 +166,26 @@ class App(dash.Dash):
         """
         select_lb = self.CANCEL_SYMBOL if filename else self.CLICK_TO_SELECT
         return filename, select_lb
+
+    def dataClicked(self, data):
+        if data is None:
+            return
+        point = data['points'][0]
+        curve = self.frm_vw.fig.data[point['curveNumber']]
+        info = f"index={point['customdata']}, element={curve['name']}, " \
+               f"x={point['x']}, y={point['y']}, z={point['z']}"
+        self.frm_vw.fig.data[point['curveNumber']]
+
+        self.frm_vw.fig.update_layout(scene=dict(annotations = [dict(
+            showarrow=False,
+            x=point['x'],
+            y=point['y'],
+            z=point['z'],
+            text="Point 1",
+            xanchor="left",
+            xshift=10,
+            opacity=0.7)]))
+        return info, self.frm_vw.fig
 
 
 def main(argv):

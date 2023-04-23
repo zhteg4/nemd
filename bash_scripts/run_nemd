@@ -55,6 +55,6 @@ for ((i=0; i<=$#; i++)); do
 
 done
 
-echo "Running python3 $SCRIPT_PATH"
+echo "Running python3 $SCRIPT_ARGS"
 
 env FOO=BAR python3 $SCRIPT_ARGS

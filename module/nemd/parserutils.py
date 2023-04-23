@@ -45,7 +45,8 @@ def type_itest_dir(arg):
         for narg in nargs:
             if os.path.isdir(narg):
                 return narg
-    raise argparse.ArgumentTypeError(f"None of {', '.join([arg] + nargs)} exists.")
+    raise argparse.ArgumentTypeError(
+        f"None of {', '.join([arg] + nargs)} exists.")
 
 
 def type_float(arg):
