@@ -7,6 +7,7 @@ from nemd import traj
 from nemd import ndash
 from nemd import oplsua
 from nemd import molview
+from nemd import geometry
 
 FlAG_CUSTOM_DUMP = traj.FlAG_CUSTOM_DUMP
 FlAG_DATA_FILE = traj.FlAG_DATA_FILE
@@ -25,14 +26,25 @@ class App(dash.Dash):
     DATAFILE_LB = 'datafile_lb'
     SELECT_DATA_LB = 'select_data_lb'
     MEASURE_DD = 'measure_dd'
-    POINT_SEL = 'point_sel'
+    MEASURE_INFO_LB = 'measure_info_lb'
     TRAJ_FIG = 'traj_fig'
-    BLUE_COLOR_HEX = '#7FDBFF'
+    CLICKDATA = 'clickData'
+    TRAJ_FIG_CLICKDATA = f'{TRAJ_FIG}.{CLICKDATA}'
+    POINTS = 'points'
+    CUSTOMDATA = 'customdata'
+    CURVENUMBER = 'curveNumber'
+    NAME = 'name'
     POSITION = 'Position'
     DISTANCE = 'Distance'
     ANGLE = 'Angle'
     DIHEDRAL = 'Dihedral'
     MEASURE_COUNT = {POSITION: 1, DISTANCE: 2, ANGLE: 3, DIHEDRAL: 4}
+    MEASURE_FUNC = {
+        DISTANCE: geometry.distace,
+        ANGLE: geometry.angle,
+        DIHEDRAL: geometry.dihedral
+    }
+    MEASURE_UNIT = {DISTANCE: 'angstrom', ANGLE: 'degree', DIHEDRAL: 'degree'}
 
     def __init__(self, *arg, **kwarg):
         super().__init__(*arg, **kwarg)
@@ -56,7 +68,7 @@ class App(dash.Dash):
             dash.Output(component_id=self.SELECT_TRAJ_LB,
                         component_property='children'),
             dash.Input(self.TRAJ_INPUT, 'filename'))(self.updateTrajLabel)
-        self.callback(dash.Output(self.POINT_SEL, 'children'),
+        self.callback(dash.Output(self.MEASURE_INFO_LB, 'children'),
                       dash.Output(self.TRAJ_FIG,
                                   'figure',
                                   allow_duplicate=True),
@@ -69,12 +81,7 @@ class App(dash.Dash):
         Set the layout of the widget.
         """
         self.layout = dash.html.Div([
-            dbc.Row(
-                dash.html.H1(children='Molecular Trajectory Viewer',
-                             style={
-                                 'textAlign': 'center',
-                                 'color': self.BLUE_COLOR_HEX
-                             })),
+            dbc.Row(ndash.H1(children='Molecular Trajectory Viewer')),
             dbc.Row(dash.html.Hr()),
             dbc.Row([
                 dbc.Col([
@@ -86,17 +93,11 @@ class App(dash.Dash):
                                         status_id=self.TRAJ_LB,
                                         button_id=self.TRAJ_INPUT,
                                         click_id=self.SELECT_TRAJ_LB),
-                    dash.html.Div([
-                        "Measure: ",
-                        dash.dcc.Dropdown(list(self.MEASURE_COUNT.keys()),
+                    ndash.LabeledDropdown(list(self.MEASURE_COUNT.keys()),
+                                          label="Measure: ",
                                           value='Position',
-                                          id="measure_dd",
-                                          style={
-                                              'padding-left': 5,
-                                              'color': '#000000'
-                                          })
-                    ]),
-                    dash.html.Pre(id=self.POINT_SEL)
+                                          id="measure_dd"),
+                    dash.html.Pre(id=self.MEASURE_INFO_LB)
                 ],
                         width=3),
                 dbc.Col(dash.dcc.Graph(figure={},
@@ -199,82 +200,62 @@ class App(dash.Dash):
         return filename, select_lb
 
     def measureData(self, data, mvalue):
+        """
+        Measure selected atoms.
+
+        :param data dict: newly selected point
+        :param mvalue str: measurement type including Position, Distance, Angle,
+            and Dihedral
+        :return str, `Figure`: measure information to display and figure to plot
+        """
         if data is None:
-            return '', self.frm_vw.fig
-        if dash.ctx.triggered[0]['prop_id'] == 'traj_fig.clickData':
+            count = self.MEASURE_COUNT[mvalue]
+            return f' Select {count} atoms to measure {mvalue.lower()}', self.frm_vw.fig
+        if dash.ctx.triggered[0]['prop_id'] == self.TRAJ_FIG_CLICKDATA:
             if len(self.points) == self.MEASURE_COUNT[mvalue]:
+                # Selection number exceeds and restart as a new collection
                 self.points = {}
-            point = data['points'][0]
-            idx = point['customdata']
-            ele = self.frm_vw.fig.data[point['curveNumber']]['name']
-            pnt = POINT(idx=idx,
-                        ele=ele,
-                        x=point['x'],
-                        y=point['y'],
-                        z=point['z'])
-            self.points[pnt.idx] = pnt
+            pnt = data[self.POINTS][0]
+            idx = pnt[self.CUSTOMDATA]
+            ele = self.frm_vw.fig.data[pnt[self.CURVENUMBER]][self.NAME]
+            point = POINT(idx=idx, ele=ele, x=pnt['x'], y=pnt['y'], z=pnt['z'])
+            self.points[point.idx] = point
         else:
+            # Measure type changed
             self.points = {}
-        self.updateAnnotations()
-        info = f"Information:\n" + self.getInfo(mvalue)
+        self.markAtoms()
+        info = f"Information:\n" + self.measure(mvalue)
         return info, self.frm_vw.fig
 
-    def getInfo(self, mvalue):
+    def measure(self, mvalue):
+        """
+        Measure atom position, distance, angle or dihedral.
+
+        :param mvalue str: measurement type including Position, Distance, Angle,
+            and Dihedral
+        :return str: the measurement information to display
+        """
         points = [x for x in self.points.values()]
+        count = self.MEASURE_COUNT[mvalue]
+        if len(points) == 0:
+            return f' Select {count} atoms to measure {mvalue.lower()}'
+        atom_ids = ', '.join(map(str, [x.idx for x in points]))
         if mvalue == self.POSITION:
             point = points[0]
             return f" index={point.idx}, element={point.ele},\n"\
                    f" x={point.x}, y={point.y}, z={point.z}"
-        if mvalue == self.DISTANCE:
-            if len(points) == 0:
-                return f' Select two atoms to measure a distance.'
-            if len(points) == 1:
-                return f' Atom {points[0].idx} has been selected.\n' \
-                       f' Select another atom to measure the distance'
-            if len(points) == 2:
-                xyzs = [np.array([x.x, x.y, x.z]) for x in points]
-                dist = np.linalg.norm(xyzs[0] - xyzs[1])
-                return f' Distance between Atom {points[0].idx} and ' \
-                       f'{points[1].idx}\n' \
-                       f' is {dist:.4f} angstrom.'
-        if mvalue == self.ANGLE:
-            if len(points) == 0:
-                return f' Please select three atoms to measure an angle.'
-            if len(points) < 3:
-                return f" Atom {', '.join([str(x.idx) for x in points])}" \
-                       f" have been selected.\n" \
-                       f' Select more atoms to measure the angle'
-            if len(points) == 3:
-                xyzs = [np.array([x.x, x.y, x.z]) for x in points]
-                v1 = xyzs[0] - xyzs[1]
-                v2 = xyzs[2] - xyzs[1]
-                angle = np.arccos(
-                    np.dot(v1, v2) / np.linalg.norm(v1) /
-                    np.linalg.norm(v2)) / np.pi * 180.
-                return f' Angle between Atom {points[0].idx}, {points[1].idx}' \
-                       f' and {points[2].idx}\n' \
-                       f' is {angle:.2f} degree.'
-        if mvalue == self.DIHEDRAL:
-            if len(points) == 0:
-                return f' Please select four atoms to measure a dihedral.'
-            if len(points) < 4:
-                return f" Atom {', '.join([str(x.idx) for x in points])}" \
-                       f" have been selected.\n" \
-                       f' Select more atoms to measure the dihedral'
-            if len(points) == 4:
-                xyzs = [np.array([x.x, x.y, x.z]) for x in points]
-                n1 = np.cross(xyzs[0] - xyzs[1], xyzs[1] - xyzs[2])
-                n2 = np.cross(xyzs[1] - xyzs[2], xyzs[2] - xyzs[3])
-                print(n1, n2)
-                dihe = np.arccos(
-                    np.dot(n1, n2) / np.linalg.norm(n1) /
-                    np.linalg.norm(n2)) / np.pi * 180.
-                return f' Dihedral between Atom {points[0].idx}, ' \
-                       f'{points[1].idx} and {points[2].idx}\n' \
-                       f' is {dihe:.2f} degree.'
-        return ''
+        if len(points) < count:
+            return f" Atom {atom_ids} been selected.\n" \
+                   f" Select more atoms to measure {mvalue.lower()}."
+        points = [np.array([x.x, x.y, x.z]) for x in points]
+        value = self.MEASURE_FUNC[mvalue](points)
+        unit = self.MEASURE_UNIT[mvalue]
+        return f' {mvalue} between Atom {atom_ids} is {value:.2f} {unit}'
 
-    def updateAnnotations(self):
+    def markAtoms(self):
+        """
+        Mark selected atoms with annotations.
+        """
         annotations = [
             dict(showarrow=False,
                  x=pnt.x,

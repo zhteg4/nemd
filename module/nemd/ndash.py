@@ -1,9 +1,38 @@
 import dash
 
+TEXTALIGN = 'textAlign'
+CENTER = 'center'
+COLOR = 'color'
+STYLE_KEY = 'style'
+PADDING_LEFT = 'padding-left'
+WHITE_HEX = '#000000'
 
-def callback(*arg, **kwargs):
-    # print(arg, kwargs)
-    return dash.callback(*arg, **kwargs)
+
+class H1(dash.html.H1):
+    """
+    Header of the website
+    """
+    BLUE_COLOR_HEX = '#7FDBFF'
+    STYLE = {TEXTALIGN: CENTER, COLOR: BLUE_COLOR_HEX}
+
+    def __init__(self, *args, **kwargs):
+        style = {**self.STYLE, **kwargs.pop(STYLE_KEY, {})}
+        kwargs[STYLE_KEY] = style
+        super().__init__(*args, **kwargs)
+
+
+class LabeledDropdown(dash.html.Div):
+    """
+    Dropdown list with label.
+    """
+    STYLE = {PADDING_LEFT: 5, COLOR: WHITE_HEX}
+
+    def __init__(self, *args, label=None, **kwargs):
+        self.label = dash.html.Div(children=label)
+        style = {**self.STYLE, **kwargs.pop(STYLE_KEY, {})}
+        kwargs[STYLE_KEY] = style
+        self.dropdown = dash.dcc.Dropdown(*args, **kwargs)
+        super().__init__(children=[self.label, self.dropdown])
 
 
 class Upload(dash.dcc.Upload):
@@ -11,13 +40,10 @@ class Upload(dash.dcc.Upload):
     Upload component with customized style.
     """
 
-    STYLE_KEY = 'style'
     BORDERWIDTH = 'borderWidth'
     BORDERSTYLE = 'borderStyle'
     DASHED = 'dashed'
     BORDERRADIUS = 'borderRadius'
-    TEXTALIGN = 'textAlign'
-    CENTER = 'center'
 
     STYLE = {
         BORDERWIDTH: '1px',
@@ -29,8 +55,9 @@ class Upload(dash.dcc.Upload):
     }
 
     def __init__(self, *args, **kwargs):
-        style = {**self.STYLE, **kwargs.pop(self.STYLE_KEY, {})}
-        kwargs[self.STYLE_KEY] = style
+        style = {**self.STYLE, **kwargs.pop(STYLE_KEY, {})}
+        kwargs[STYLE_KEY] = style
+
         super().__init__(*args, **kwargs)
 
 

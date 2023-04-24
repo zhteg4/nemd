@@ -6,6 +6,7 @@ import logging
 import contextlib
 from nemd import testutils
 import traj_viewer as viewer
+from selenium.webdriver.common.by import By
 
 DATA_FILE = testutils.test_file(os.path.join('trajs', 'c6.data'))
 DUMP_FILE = testutils.test_file(os.path.join('trajs', 'c6.custom'))
@@ -68,3 +69,25 @@ class TestApp:
         time.sleep(1)
         assert 23 == len(app.frm_vw.fig.data)
         assert 6 == len(app.frm_vw.fig.frames)
+
+    def testMeasureData(self, app, dash_duo):
+        with contextlib.redirect_stdout(io.StringIO()):
+            dash_duo.start_server(app)
+        self.loadFile(dash_duo, tag='datafile_input', afile=DATA_FILE)
+        options = self.getOptions(dash_duo)
+        options[2].click()
+        ele = self.getElement(dash_duo, tag='measure_info_lb')
+        assert ele.text.endswith('Select 3 atoms to measure angle')
+        options = self.getOptions(dash_duo)
+        options[0].click()
+        ele = self.getElement(dash_duo, tag='measure_info_lb')
+        assert ele.text.endswith('Select 1 atoms to measure position')
+        # dash_duo.click_at_coord_fractions(ele, 0.5, 0.6) triggers hovering
+        # event instead of data click event
+
+    def getOptions(self, dash_duo):
+        ele = self.getElement(dash_duo, tag='measure_dd')
+        ele.click()
+        menu = ele.find_element(by=By.CSS_SELECTOR, value="div.Select-menu-outer")
+        options = menu.find_elements(by=By.CSS_SELECTOR, value="div.VirtualizedSelectOption")
+        return options
