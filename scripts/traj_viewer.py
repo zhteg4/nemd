@@ -230,7 +230,7 @@ class App(dash.Dash):
                 return f' Select two atoms to measure a distance.'
             if len(points) == 1:
                 return f' Atom {points[0].idx} has been selected.\n' \
-                       f' Select another atom to measure a distance'
+                       f' Select another atom to measure the distance'
             if len(points) == 2:
                 xyzs = [np.array([x.x, x.y, x.z]) for x in points]
                 dist = np.linalg.norm(xyzs[0] - xyzs[1])
@@ -239,22 +239,39 @@ class App(dash.Dash):
                        f' is {dist:.4f} angstrom.'
         if mvalue == self.ANGLE:
             if len(points) == 0:
-                return f' Please select three atoms to measure the angle.'
+                return f' Please select three atoms to measure an angle.'
             if len(points) < 3:
                 return f" Atom {', '.join([str(x.idx) for x in points])}" \
-                       f" has been selected.\n" \
-                       f' Select more atoms to measure an angle'
+                       f" have been selected.\n" \
+                       f' Select more atoms to measure the angle'
             if len(points) == 3:
                 xyzs = [np.array([x.x, x.y, x.z]) for x in points]
                 v1 = xyzs[0] - xyzs[1]
                 v2 = xyzs[2] - xyzs[1]
                 angle = np.arccos(
-                    np.dot(v1, v2) / np.linalg.norm(v1) *
+                    np.dot(v1, v2) / np.linalg.norm(v1) /
                     np.linalg.norm(v2)) / np.pi * 180.
                 return f' Angle between Atom {points[0].idx}, {points[1].idx}' \
                        f' and {points[2].idx}\n' \
                        f' is {angle:.2f} degree.'
-
+        if mvalue == self.DIHEDRAL:
+            if len(points) == 0:
+                return f' Please select four atoms to measure a dihedral.'
+            if len(points) < 4:
+                return f" Atom {', '.join([str(x.idx) for x in points])}" \
+                       f" have been selected.\n" \
+                       f' Select more atoms to measure the dihedral'
+            if len(points) == 4:
+                xyzs = [np.array([x.x, x.y, x.z]) for x in points]
+                n1 = np.cross(xyzs[0] - xyzs[1], xyzs[1] - xyzs[2])
+                n2 = np.cross(xyzs[1] - xyzs[2], xyzs[2] - xyzs[3])
+                print(n1, n2)
+                dihe = np.arccos(
+                    np.dot(n1, n2) / np.linalg.norm(n1) /
+                    np.linalg.norm(n2)) / np.pi * 180.
+                return f' Dihedral between Atom {points[0].idx}, ' \
+                       f'{points[1].idx} and {points[2].idx}\n' \
+                       f' is {dihe:.2f} degree.'
         return ''
 
     def updateAnnotations(self):
