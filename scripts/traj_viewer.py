@@ -1,5 +1,7 @@
 import sys
 import dash
+import collections
+import numpy as np
 import dash_bootstrap_components as dbc
 from nemd import traj
 from nemd import ndash
@@ -8,6 +10,8 @@ from nemd import molview
 
 FlAG_CUSTOM_DUMP = traj.FlAG_CUSTOM_DUMP
 FlAG_DATA_FILE = traj.FlAG_DATA_FILE
+
+POINT = collections.namedtuple('POINT', ['idx', 'ele', 'x', 'y', 'z'])
 
 
 class App(dash.Dash):
@@ -20,13 +24,20 @@ class App(dash.Dash):
     DATAFILE_INPUT = 'datafile_input'
     DATAFILE_LB = 'datafile_lb'
     SELECT_DATA_LB = 'select_data_lb'
+    MEASURE_DD = 'measure_dd'
     POINT_SEL = 'point_sel'
     TRAJ_FIG = 'traj_fig'
     BLUE_COLOR_HEX = '#7FDBFF'
+    POSITION = 'Position'
+    DISTANCE = 'Distance'
+    ANGLE = 'Angle'
+    DIHEDRAL = 'Dihedral'
+    MEASURE_COUNT = {POSITION: 1, DISTANCE: 2, ANGLE: 3, DIHEDRAL: 4}
 
     def __init__(self, *arg, **kwarg):
         super().__init__(*arg, **kwarg)
         self.frm_vw = molview.FrameView()
+        self.points = {}
         self.setLayout()
         self.callback(
             dash.Output(component_id=self.TRAJ_FIG,
@@ -50,7 +61,8 @@ class App(dash.Dash):
                                   'figure',
                                   allow_duplicate=True),
                       dash.Input(self.TRAJ_FIG, 'clickData'),
-                      prevent_initial_call=True)(self.dataClicked)
+                      dash.Input(self.MEASURE_DD, 'value'),
+                      prevent_initial_call=True)(self.measureData)
 
     def setLayout(self):
         """
@@ -58,39 +70,40 @@ class App(dash.Dash):
         """
         self.layout = dash.html.Div([
             dbc.Row(
-            dash.html.H1(children='Molecular Trajectory Viewer',
-                         style={
-                             'textAlign': 'center',
-                             'color': self.BLUE_COLOR_HEX
-                         })),
+                dash.html.H1(children='Molecular Trajectory Viewer',
+                             style={
+                                 'textAlign': 'center',
+                                 'color': self.BLUE_COLOR_HEX
+                             })),
             dbc.Row(dash.html.Hr()),
             dbc.Row([
-            dbc.Col([
-                ndash.LabeledUpload(label='Data File:',
-                                    status_id=self.DATAFILE_LB,
-                                    button_id=self.DATAFILE_INPUT,
-                                    click_id=self.SELECT_DATA_LB),
-                ndash.LabeledUpload(label='Trajectory:',
-                                    status_id=self.TRAJ_LB,
-                                    button_id=self.TRAJ_INPUT,
-                                    click_id=self.SELECT_TRAJ_LB),
-                dash.html.Div([
-                    "Measure: ",
-                    dash.dcc.Dropdown(
-                        ['Position', 'Distance', 'Angle', 'Dihedral'],
-                        value='Position',
-                        id="measure_dd",
-                        style={
-                            'padding-left': 5,
-                            'color': '#000000'
-                        })
-                ]),
-                dash.html.Pre(id=self.POINT_SEL)
-            ], width=3),
-            dbc.Col(
-                dash.dcc.Graph(figure={},
-                               id=self.TRAJ_FIG,
-                               style={'height': '80vh'}), width=9)])
+                dbc.Col([
+                    ndash.LabeledUpload(label='Data File:',
+                                        status_id=self.DATAFILE_LB,
+                                        button_id=self.DATAFILE_INPUT,
+                                        click_id=self.SELECT_DATA_LB),
+                    ndash.LabeledUpload(label='Trajectory:',
+                                        status_id=self.TRAJ_LB,
+                                        button_id=self.TRAJ_INPUT,
+                                        click_id=self.SELECT_TRAJ_LB),
+                    dash.html.Div([
+                        "Measure: ",
+                        dash.dcc.Dropdown(list(self.MEASURE_COUNT.keys()),
+                                          value='Position',
+                                          id="measure_dd",
+                                          style={
+                                              'padding-left': 5,
+                                              'color': '#000000'
+                                          })
+                    ]),
+                    dash.html.Pre(id=self.POINT_SEL)
+                ],
+                        width=3),
+                dbc.Col(dash.dcc.Graph(figure={},
+                                       id=self.TRAJ_FIG,
+                                       style={'height': '80vh'}),
+                        width=9)
+            ])
         ])
 
     def inputChanged(self, data_contents, traj_contents):
@@ -132,8 +145,7 @@ class App(dash.Dash):
         try:
             data_reader.run()
         except ValueError:
-            print(contents)
-            # Triggered on reload without refreshed button clicked in debug mode
+            # Accidentally load xyz into the datafile holder
             return self.frm_vw.fig
         self.frm_vw.data_reader = data_reader
         self.frm_vw.setData()
@@ -186,26 +198,61 @@ class App(dash.Dash):
         select_lb = self.CANCEL_SYMBOL if filename else self.CLICK_TO_SELECT
         return filename, select_lb
 
-    def dataClicked(self, data):
+    def measureData(self, data, mvalue):
         if data is None:
-            return
-        point = data['points'][0]
-        curve = self.frm_vw.fig.data[point['curveNumber']]
-        info = f"Informaton:\n index={point['customdata']}, element={curve['name']}, " \
-               f"x={point['x']}, y={point['y']}, z={point['z']}"
-        self.frm_vw.fig.data[point['curveNumber']]
+            return '', self.frm_vw.fig
+        if dash.ctx.triggered[0]['prop_id'] == 'traj_fig.clickData':
+            if len(self.points) == self.MEASURE_COUNT[mvalue]:
+                self.points = {}
+            point = data['points'][0]
+            idx = point['customdata']
+            ele = self.frm_vw.fig.data[point['curveNumber']]['name']
+            pnt = POINT(idx=idx,
+                        ele=ele,
+                        x=point['x'],
+                        y=point['y'],
+                        z=point['z'])
+            self.points[pnt.idx] = pnt
+        else:
+            self.points = {}
+        self.updateAnnotations()
+        info = f"Information:\n" + self.getInfo(mvalue)
+        return info, self.frm_vw.fig
 
-        self.frm_vw.fig.update_layout(scene=dict(annotations=[
+    def getInfo(self, mvalue):
+        points = [x for x in self.points.values()]
+        if mvalue == self.POSITION:
+            point = points[0]
+            return f" index={point.idx}, element={point.ele},\n"\
+                   f" x={point.x}, y={point.y}, z={point.z}"
+        if mvalue == self.DISTANCE:
+            if len(points) == 0:
+                return f' Please select two atoms to measure the distance.'
+            if len(points) == 1:
+                return f' Atom {points[0].idx} has been selected.\n' \
+                       f' Please select another atom to measure the distance'
+            if len(points) == 2:
+                xyzs = [np.array([x.x, x.y, x.z]) for x in points]
+                dist = np.linalg.norm(xyzs[0] - xyzs[1])
+                return f' Distance between Atom {points[0].idx} and ' \
+                       f'{points[1].idx}\n' \
+                       f' is {dist:.4f}'
+
+        return ''
+
+    def updateAnnotations(self):
+        annotations = [
             dict(showarrow=False,
-                 x=point['x'],
-                 y=point['y'],
-                 z=point['z'],
-                 text="Point 1",
+                 x=pnt.x,
+                 y=pnt.y,
+                 z=pnt.z,
+                 text=f"Atom {i}",
                  xanchor="left",
                  xshift=10,
-                 opacity=0.7)
-        ]))
-        return info, self.frm_vw.fig
+                 opacity=0.7) for i, pnt in enumerate(self.points.values(), 1)
+        ]
+        self.frm_vw.fig.layout.scene.annotations = annotations
+        self.frm_vw.fig.update_layout(scene=dict(annotations=annotations))
 
 
 def main(argv):

@@ -24,10 +24,10 @@ class Upload(dash.dcc.Upload):
         BORDERSTYLE: DASHED,
         BORDERRADIUS: '5px',
         TEXTALIGN: CENTER,
-        'margin-left':5,
         'padding-left': 10,
         'padding-right': 10
     }
+
     def __init__(self, *args, **kwargs):
         style = {**self.STYLE, **kwargs.pop(self.STYLE_KEY, {})}
         kwargs[self.STYLE_KEY] = style
@@ -39,7 +39,7 @@ class LabeledUpload(dash.html.Div):
     Upload component with in-line labels.
     """
 
-    STYLE = {'display': 'inline-block'}
+    STYLE = {'display': 'inline-block', 'margin-left': 5}
 
     def __init__(
         self,
