@@ -259,9 +259,6 @@ class FrameView:
         """
         Update the figure layout.
         """
-        camera = dict(up=dict(x=0, y=0, z=1),
-                      center=dict(x=0, y=0, z=0),
-                      eye=dict(x=1.25, y=1.25, z=1.25))
         buttons = None
         if self.fig.frames:
             buttons = [
@@ -272,25 +269,22 @@ class FrameView:
                      method="animate",
                      args=[[None], dict(mode='immediate')])
             ]
-        self.fig.update_layout(
-            uirevision=True,
-            template='plotly_dark',
-            scene=self.getScene(),
-            scene_camera=camera,
-            sliders=self.getSliders(),
-            updatemenus=[
-                dict(type="buttons",
-                     buttons=buttons,
-                     showactive=False,
-                     font={'color': '#000000'},
-                     direction="left",
-                     pad=dict(r=10, t=87),
-                     xanchor="right",
-                     yanchor="top",
-                     x=0.1,
-                     y=0)
-            ],
-        )
+        updatemenu = dict(type="buttons",
+                          buttons=buttons,
+                          showactive=False,
+                          font={'color': '#000000'},
+                          direction="left",
+                          pad=dict(r=10, t=87),
+                          xanchor="right",
+                          yanchor="top",
+                          x=0.1,
+                          y=0)
+        self.fig.update_layout(template='plotly_dark',
+                               scene=self.getScene(),
+                               sliders=self.getSliders(),
+                               updatemenus=[updatemenu],
+                               overwrite=True,
+                               uirevision=True)
 
     def getSliders(self):
         """
@@ -299,7 +293,7 @@ class FrameView:
         :return list of dict: add the these slider bars to he menus.
         """
         if not self.fig.frames:
-            return
+            return []
         slider = dict(active=0,
                       yanchor="top",
                       xanchor="left",
@@ -307,6 +301,10 @@ class FrameView:
                       y=0,
                       pad=dict(b=10, t=50),
                       len=0.9,
+                      transition={
+                          "duration": 300,
+                          "easing": "cubic-in-out"
+                      },
                       currentvalue=dict(prefix='Frame:',
                                         visible=True,
                                         xanchor='right'))

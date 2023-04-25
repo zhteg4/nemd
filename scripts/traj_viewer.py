@@ -256,6 +256,7 @@ class App(dash.Dash):
         """
         Mark selected atoms with annotations.
         """
+
         annotations = [
             dict(showarrow=False,
                  x=pnt.x,
@@ -266,8 +267,9 @@ class App(dash.Dash):
                  xshift=10,
                  opacity=0.7) for i, pnt in enumerate(self.points.values(), 1)
         ]
-        self.frm_vw.fig.layout.scene.annotations = annotations
-        self.frm_vw.fig.update_layout(scene=dict(annotations=annotations))
+        self.frm_vw.fig.update_layout(scene=dict(annotations=annotations),
+                                      overwrite=True,
+                                      uirevision=True)
 
 
 def main(argv):
