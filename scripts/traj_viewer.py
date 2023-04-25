@@ -2,7 +2,9 @@ import sys
 import dash
 import collections
 import numpy as np
+import pandas as pd
 import dash_bootstrap_components as dbc
+from dash import html, dcc, Output, Input
 from nemd import traj
 from nemd import ndash
 from nemd import oplsua
@@ -12,7 +14,8 @@ from nemd import geometry
 FlAG_CUSTOM_DUMP = traj.FlAG_CUSTOM_DUMP
 FlAG_DATA_FILE = traj.FlAG_DATA_FILE
 
-POINT = collections.namedtuple('POINT', ['idx', 'ele', 'x', 'y', 'z'])
+POINT = collections.namedtuple('POINT',
+                               ['idx', 'ele', 'x', 'y', 'z', 'cn', 'pn'])
 
 
 class App(dash.Dash):
@@ -27,12 +30,15 @@ class App(dash.Dash):
     SELECT_DATA_LB = 'select_data_lb'
     MEASURE_DD = 'measure_dd'
     MEASURE_INFO_LB = 'measure_info_lb'
-    TRAJ_FIG = 'traj_fig'
+    MEASURE_BT = 'measure_bt'
+    ALL_FRAME_LB = 'all_frame_lb'
+    TRJ_FG = 'TRJ_FG'
     CLICKDATA = 'clickData'
-    TRAJ_FIG_CLICKDATA = f'{TRAJ_FIG}.{CLICKDATA}'
+    TRJ_FG_CLICKDATA = f'{TRJ_FG}.{CLICKDATA}'
     POINTS = 'points'
     CUSTOMDATA = 'customdata'
     CURVENUMBER = 'curveNumber'
+    POINTNUMBER = 'pointNumber'
     NAME = 'name'
     POSITION = 'Position'
     DISTANCE = 'Distance'
@@ -40,6 +46,7 @@ class App(dash.Dash):
     DIHEDRAL = 'Dihedral'
     MEASURE_COUNT = {POSITION: 1, DISTANCE: 2, ANGLE: 3, DIHEDRAL: 4}
     MEASURE_FUNC = {
+        POSITION: lambda x: x,
         DISTANCE: geometry.distace,
         ANGLE: geometry.angle,
         DIHEDRAL: geometry.dihedral
@@ -52,37 +59,36 @@ class App(dash.Dash):
         self.points = {}
         self.setLayout()
         self.callback(
-            dash.Output(component_id=self.TRAJ_FIG,
-                        component_property='figure'),
-            dash.Input(self.DATAFILE_INPUT, 'contents'),
-            dash.Input(self.TRAJ_INPUT, 'contents'))(self.inputChanged)
+            Output(component_id=self.TRJ_FG, component_property='figure'),
+            Input(self.DATAFILE_INPUT, 'contents'),
+            Input(self.TRAJ_INPUT, 'contents'))(self.inputChanged)
         self.callback(
-            dash.Output(component_id=self.DATAFILE_LB,
-                        component_property='children'),
-            dash.Output(component_id=self.SELECT_DATA_LB,
-                        component_property='children'),
-            dash.Input(self.DATAFILE_INPUT, 'filename'))(self.updateDataLabel)
+            Output(component_id=self.DATAFILE_LB,
+                   component_property='children'),
+            Output(component_id=self.SELECT_DATA_LB,
+                   component_property='children'),
+            Input(self.DATAFILE_INPUT, 'filename'))(self.updateDataLabel)
         self.callback(
-            dash.Output(component_id=self.TRAJ_LB,
-                        component_property='children'),
-            dash.Output(component_id=self.SELECT_TRAJ_LB,
-                        component_property='children'),
-            dash.Input(self.TRAJ_INPUT, 'filename'))(self.updateTrajLabel)
-        self.callback(dash.Output(self.MEASURE_INFO_LB, 'children'),
-                      dash.Output(self.TRAJ_FIG,
-                                  'figure',
-                                  allow_duplicate=True),
-                      dash.Input(self.TRAJ_FIG, 'clickData'),
-                      dash.Input(self.MEASURE_DD, 'value'),
+            Output(component_id=self.TRAJ_LB, component_property='children'),
+            Output(component_id=self.SELECT_TRAJ_LB,
+                   component_property='children'),
+            Input(self.TRAJ_INPUT, 'filename'))(self.updateTrajLabel)
+        self.callback(Output(self.MEASURE_INFO_LB, 'children'),
+                      Output(self.TRJ_FG, 'figure', allow_duplicate=True),
+                      Input(self.TRJ_FG, 'clickData'),
+                      Input(self.MEASURE_DD, 'value'),
                       prevent_initial_call=True)(self.measureData)
+        self.callback(Output(self.ALL_FRAME_LB, 'children'),
+                      Input(self.MEASURE_BT, 'n_clicks'),
+                      Input(self.MEASURE_DD, 'value'))(self.computeFrames)
 
     def setLayout(self):
         """
         Set the layout of the widget.
         """
-        self.layout = dash.html.Div([
+        self.layout = html.Div([
             dbc.Row(ndash.H1(children='Molecular Trajectory Viewer')),
-            dbc.Row(dash.html.Hr()),
+            dbc.Row(html.Hr()),
             dbc.Row([
                 dbc.Col([
                     ndash.LabeledUpload(label='Data File:',
@@ -97,12 +103,12 @@ class App(dash.Dash):
                                           label="Measure: ",
                                           value='Position',
                                           id="measure_dd"),
-                    dash.html.Pre(id=self.MEASURE_INFO_LB)
+                    html.Pre(id=self.MEASURE_INFO_LB),
+                    html.Button('All Frames', id=self.MEASURE_BT),
+                    html.Pre(id=self.ALL_FRAME_LB, style={'padding-left': 10})
                 ],
                         width=3),
-                dbc.Col(dash.dcc.Graph(figure={},
-                                       id=self.TRAJ_FIG,
-                                       style={'height': '80vh'}),
+                dbc.Col(dcc.Graph(id=self.TRJ_FG, style=dict(height='80vh')),
                         width=9)
             ])
         ])
@@ -211,14 +217,21 @@ class App(dash.Dash):
         if data is None:
             count = self.MEASURE_COUNT[mvalue]
             return f' Select {count} atoms to measure {mvalue.lower()}', self.frm_vw.fig
-        if dash.ctx.triggered[0]['prop_id'] == self.TRAJ_FIG_CLICKDATA:
+        if dash.ctx.triggered[0]['prop_id'] == self.TRJ_FG_CLICKDATA:
             if len(self.points) == self.MEASURE_COUNT[mvalue]:
                 # Selection number exceeds and restart as a new collection
                 self.points = {}
             pnt = data[self.POINTS][0]
             idx = pnt[self.CUSTOMDATA]
-            ele = self.frm_vw.fig.data[pnt[self.CURVENUMBER]][self.NAME]
-            point = POINT(idx=idx, ele=ele, x=pnt['x'], y=pnt['y'], z=pnt['z'])
+            cn, pn = pnt[self.CURVENUMBER], pnt[self.POINTNUMBER]
+            ele = self.frm_vw.fig.data[cn][self.NAME]
+            point = POINT(idx=idx,
+                          ele=ele,
+                          x=pnt['x'],
+                          y=pnt['y'],
+                          z=pnt['z'],
+                          cn=cn,
+                          pn=pn)
             self.points[point.idx] = point
         else:
             # Measure type changed
@@ -270,6 +283,33 @@ class App(dash.Dash):
         self.frm_vw.fig.update_layout(scene=dict(annotations=annotations),
                                       overwrite=True,
                                       uirevision=True)
+
+    def computeFrames(self, n_clicks, mvalue):
+        """
+        Compute the point, distance, angle or dihedral measurement for all frames.
+
+        :param n_clicks int: number of button clicks
+        :param mvalue str: measurement type including Position, Distance, Angle,
+            and Dihedral
+        :return str: the measured values for all frames
+        """
+        if len(self.points
+               ) != self.MEASURE_COUNT[mvalue] or not self.frm_vw.fig.frames:
+            return 'Select atoms and load trajectory'
+        values = []
+        for frm in self.frm_vw.fig.frames:
+            points = []
+            for pnt in self.points.values():
+                dat = frm.data[pnt.cn]
+                points.append(
+                    np.array(
+                        [dat['x'][pnt.pn], dat['y'][pnt.pn],
+                         dat['z'][pnt.pn]]))
+            value = self.MEASURE_FUNC[mvalue](points)
+            values.append(value)
+        data = pd.DataFrame(values)
+        data.index += 1
+        return data.to_string(header=False)
 
 
 def main(argv):
