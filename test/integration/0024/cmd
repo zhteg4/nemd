@@ -1,0 +1,2 @@
+# polymer builder on SPC water and CCCO
+run_nemd polymer_builder_driver.py O CCCO -force_field OPLSUA,SPCE -seed 123

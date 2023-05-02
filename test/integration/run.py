@@ -18,13 +18,13 @@ import glob
 import shutil
 import filecmp
 import datetime
+from flow import FlowProject
 from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
 from nemd import fileutils
 from nemd import parserutils
 from nemd import environutils
-from nemd.nflow import FlowProject
 
 ID = 'id'
 DIR = 'dir'
@@ -301,11 +301,11 @@ class Integration:
         self.test_dirs = [x for x in self.test_dirs if not self.isSLow(x)]
         log(f"{orig_num - len(self.test_dirs)} tests skipped.")
 
-    def setProject(self, workspace='workspace'):
+    def setProject(self):
         """
         Initiate the project.
         """
-        self.project = FlowProject.init_project(workspace=workspace)
+        self.project = FlowProject.init_project()
 
     def addJobs(self):
         """

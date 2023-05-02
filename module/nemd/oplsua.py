@@ -83,7 +83,7 @@ class OplsTyper:
 
     # yapf: disable
     UA_WATER_TIP3P = UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)')
-    SMILES = [
+    SMILES_TEMPLATE = [
         # Single Atom Particle
               UA(sml='[Li+]', mp=(197,), hs=None, dsc='Li+ Lithium Ion'),
               UA(sml='[Na+]', mp=(198,), hs=None, dsc='Na+ Sodium Ion'),
@@ -130,7 +130,7 @@ class OplsTyper:
               UA(sml='CN(C)C=O', mp=(156, 148, 156, 153, 151,), hs=None, dsc='N,N-Dimethylformamide')
     ]
 
-    SMILES = list(reversed(SMILES))
+    SMILES_TEMPLATE = list(reversed(SMILES_TEMPLATE))
     ATOM_TOTAL = {i: i for i in range(1, 216)}
     BOND_ATOM = ATOM_TOTAL.copy()
     # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
@@ -169,6 +169,7 @@ class OplsTyper:
         :param wmodel str: the model type for water
         """
         self.mol = mol
+        self.SMILES = self.SMILES_TEMPLATE.copy()
         if wmodel == self.TIP3P:
             return
         idx = [
@@ -813,6 +814,7 @@ class LammpsIn(fileutils.LammpsInput):
             self.readData()
             self.writeMinimize()
             self.writeTimestep()
+            self.writeFixShake()
             self.writeRun()
 
     def writeDescriptions(self):
@@ -832,6 +834,13 @@ class LammpsIn(fileutils.LammpsInput):
         if self.hasCharge():
             self.in_fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
         self.in_fh.write(f"log log.{self.jobname}\n")
+
+    def writeFixShake(self):
+        """
+        Write fix shake command to constrain bonds and angles. This method
+        should be overwritten when force field and structure are available.
+        """
+        return
 
     def hasCharge(self):
         """
@@ -902,7 +911,7 @@ class LammpsIn(fileutils.LammpsInput):
         if nve_only:
             # NVT on single molecule gives nan coords (guess due to translation)
             self.in_fh.write("fix 1 all nve\n")
-            self.in_fh.write("run 2000\n")
+            self.in_fh.write("run 10000\n")
             return
 
         self.in_fh.write(
@@ -1026,11 +1035,11 @@ class LammpsData(LammpsIn):
         self.dihedrals = {}
         self.impropers = {}
         self.symbol_impropers = {}
-        self.atm_types = []
-        self.bnd_types = []
-        self.ang_types = []
-        self.dihe_types = []
-        self.impr_types = []
+        self.atm_types = {}
+        self.bnd_types = {}
+        self.ang_types = {}
+        self.dihe_types = {}
+        self.impr_types = {}
         self.total_charge = 0.
         self.data_fh = None
 
@@ -1052,6 +1061,38 @@ class LammpsData(LammpsIn):
             atoms = [x for x in atoms if x.id in self.atm_types]
         smbs = ' '.join(map(str, [x.symbol for x in atoms]))
         self.in_fh.write(f"dump_modify 1 element {smbs}\n")
+
+    def writeFixShake(self):
+        """
+        Write the fix shake so that the bonds and angles associated with hydrogen
+        atoms keep constant.
+        """
+        fix_bonds = set()
+        for btype, btype_concise in self.bnd_types.items():
+            bond = self.ff.bonds[btype]
+            atoms = [self.ff.atoms[x] for x in [bond.id1, bond.id2]]
+            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
+            if has_h:
+                bond_type = btype_concise if self.concise else btype
+                fix_bonds.add(bond_type)
+
+        fix_angles = set()
+        for atype, atype_concise in self.ang_types.items():
+            angle = self.ff.angles[atype]
+            atoms = [
+                self.ff.atoms[x] for x in [angle.id1, angle.id2, angle.id3]
+            ]
+            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
+            if has_h:
+                angle_type = atype_concise if self.concise else atype
+                fix_angles.add(angle_type)
+        btype_ids = ' '.join(map(str, fix_bonds))
+        atype_ids = ' '.join(map(str, fix_angles))
+        if not any([btype_ids, atype_ids]):
+            return
+        self.in_fh.write(
+            f'fix rigid all shake 0.0001 10 10000 b {btype_ids} a {atype_ids}\n'
+        )
 
     def writeRun(self, *arg, **kwarg):
         """

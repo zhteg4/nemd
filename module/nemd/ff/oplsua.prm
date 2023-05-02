@@ -109,7 +109,13 @@ J. Chandrasekhar, D. C. Spellmeyer and W. L. Jorgensen, "Energy Component
 Analysis for Dilute Aqueous Solutions of Li+, Na+, F-, and Cl- Ions",
 J. Am. Chem. Soc., 106, 903-910 (1984)  [Halide Ions]
 
+# https://en.wikipedia.org/wiki/Water_model
 SPCE water model from: https://docs.lammps.org/Howto_spc.html
+SPC model was run with a 9 Angstrom cutoff for both LJ and Coulomb terms.
+It can also be used with long-range electrostatic solvers (e.g. Ewald or PPPM)
+SPC model assumes an ideal tetrahedral shape (109.47°) instead of the observed 104.5°.
+The SPC/E model results in a better density and diffusion constant than the SPC model
+Three-site model (TIP3P) has better performance in calculating specific heats.
 
 C Neopentane angle parameters from: oplsaa.prm (2022-12-17 11:31  337K)
 

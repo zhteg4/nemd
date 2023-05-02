@@ -1,4 +1,7 @@
 import os
+import re
+
+import numpy as np
 import pytest
 from rdkit import Chem
 from nemd import oplsua
@@ -14,7 +17,7 @@ BUTANE_DATA = testutils.test_file(os.path.join('polym_builder',
 
 class TestOplsTyper:
 
-    CCOOH_SML = [x for x in oplsua.OplsTyper.SMILES if x.sml == 'CC(=O)O'][0]
+    CCOOH_SML = [x for x in oplsua.OplsTyper.SMILES_TEMPLATE if x.sml == 'CC(=O)O'][0]
 
     @pytest.fixture
     def opls_typer(self):
@@ -98,6 +101,7 @@ class TestLammpsIn:
         return oplsua.LammpsIn('lmp')
 
     def testWriteLammpsIn(self, lmp_in, tmp_path):
+        # Write LAMMPS in script without molecule structure known
         with fileutils.chdir(tmp_path, rmtree=True):
             lmp_in.writeLammpsIn()
             assert os.path.exists('lmp.in')
@@ -123,6 +127,14 @@ class TestLammpsData:
             lmp_data.writeLammpsIn()
             assert os.path.exists('lmp.in')
 
+    def testWriteLammpsIn_withData(self, lmp_data, tmp_path):
+        with fileutils.chdir(tmp_path, rmtree=True):
+            lmp_data.writeData()
+            lmp_data.writeLammpsIn()
+            msg = 'fix rigid all shake 0.0001 10 10000 b 3 a 3'
+            matches = [re.search(msg, x) for x in open('lmp.in')]
+            assert any(matches)
+
     def testSetAtoms(self, lmp_data):
         lmp_data.setAtoms()
         assert 22 == len(set([x.GetIntProp('atom_id') for x in lmp_data.atom]))
@@ -144,7 +156,8 @@ class TestLammpsData:
         lmp_data.setBonds()
         lmp_data.adjustBondLength()
         conf = lmp_data.mols[1].GetConformer()
-        assert 1.526 == Chem.rdMolTransforms.GetBondLength(conf, 0, 1)
+        np.testing.assert_almost_equal(
+            1.526, Chem.rdMolTransforms.GetBondLength(conf, 0, 1))
 
     def testSetAngles(self, lmp_data):
         lmp_data.setAtoms()
