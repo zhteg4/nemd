@@ -26,6 +26,10 @@ dielectric              1.0
       ##                         ##
       #############################
 
+This file is originally obtained from https://dasher.wustl.edu/tinker/
+under 'Force Field Parameter Sets' dir as oplsua.prm (2022-12-17 11:31  146K),
+containing parameters from the following literatures and a bit manual
+editing to be compatible with nemd opslua.py parser.
 
 Most parameters distributed with Tinker are from "OPLS and OPLS-AA
 Parameters for Organic Molecules, Ions, and Nucleic Acids" as provided
@@ -104,6 +108,11 @@ Quadruplex: Free Energy Perturbation Studies", J. Am. Chem. Soc., 116,
 J. Chandrasekhar, D. C. Spellmeyer and W. L. Jorgensen, "Energy Component
 Analysis for Dilute Aqueous Solutions of Li+, Na+, F-, and Cl- Ions",
 J. Am. Chem. Soc., 106, 903-910 (1984)  [Halide Ions]
+
+SPCE water model from: https://docs.lammps.org/Howto_spc.html
+
+C Neopentane angle parameters from: oplsaa.prm (2022-12-17 11:31  337K)
+
 
 
       #############################
