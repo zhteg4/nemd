@@ -18,7 +18,7 @@ setup(
         'yapf', 'pytest', 'mendeleev', 'plotly', 'dash', 'flask>=2.2.2',
         'openpyxl', 'dash_bootstrap_components', 'dash-uploader',
         'dash[testing]', 'more_itertools', 'chromedriver-py', 'jupyterlab',
-        'notebook', 'snakeviz', 'pyqtwebengine', 'pyqt5', 'reviewboard', 'RBTools'
+        'notebook', 'snakeviz', 'pyqtwebengine', 'pyqt5', 'RBTools'
     ],
     classifiers=[
         'Development Status :: 1 - Planning',
