@@ -1,4 +1,16 @@
 from setuptools import setup
+from setuptools.command.install import install
+
+class post_install(install):
+    """
+    The run method will be executed as the last installation stage.
+    """
+    def run(self):
+        from webdriver_manager.chrome import ChromeDriverManager
+        ChromeDriverManager().install()
+        # install.run(self)
+        # from subprocess import call
+        # call(['python', 'scriptname.py'], cwd=self.install_lib + 'packagename')
 
 setup(
     name='nemd',
@@ -17,7 +29,7 @@ setup(
         'pandas', 'signac', 'signac-flow', 'lammps', 'pyside6', 'PyQt6',
         'yapf', 'pytest', 'mendeleev', 'plotly', 'dash', 'flask>=2.2.2',
         'openpyxl', 'dash_bootstrap_components', 'dash-uploader',
-        'dash[testing]', 'more_itertools', 'chromedriver-py', 'jupyterlab',
+        'dash[testing]', 'more_itertools', 'webdriver-manager', 'jupyterlab',
         'notebook', 'snakeviz', 'pyqtwebengine', 'pyqt5', 'RBTools'
     ],
     classifiers=[
@@ -27,4 +39,5 @@ setup(
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3.5',
     ],
+    cmdclass={'install': post_install}
 )

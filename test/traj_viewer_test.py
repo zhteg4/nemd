@@ -7,11 +7,34 @@ import contextlib
 from nemd import testutils
 import traj_viewer as viewer
 from selenium.webdriver.common.by import By
+from dash.testing.composite import DashComposite
+from webdriver_manager.chrome import ChromeDriverManager
 
 DATA_FILE = testutils.test_file(os.path.join('trajs', 'c6.data'))
 DUMP_FILE = testutils.test_file(os.path.join('trajs', 'c6.custom'))
 XYZ_FILE = testutils.test_file(os.path.join('trajs', 'c6.xyz'))
 
+
+@pytest.fixture
+def dash_duo(request, dash_thread_server, tmpdir, monkeypatch) -> DashComposite:
+    chrome_path = os.path.dirname(ChromeDriverManager().install())
+    if chrome_path not in os.environ['PATH']:
+        path = os.environ['PATH'] + ':' + chrome_path
+        monkeypatch.setenv('PATH', path)
+
+    with DashComposite(
+        dash_thread_server,
+        browser=request.config.getoption("webdriver"),
+        remote=request.config.getoption("remote"),
+        remote_url=request.config.getoption("remote_url"),
+        headless=request.config.getoption("headless"),
+        options=request.config.hook.pytest_setup_options(),
+        download_path=tmpdir.mkdir("download").strpath,
+        percy_assets_root=request.config.getoption("percy_assets"),
+        percy_finalize=request.config.getoption("nopercyfinalize"),
+        pause=request.config.getoption("pause"),
+    ) as dc:
+        yield dc
 
 class TestApp:
 
@@ -57,6 +80,7 @@ class TestApp:
         ele = self.loadFile(dash_duo, tag='traj_input', afile=DUMP_FILE)
         assert ele.text == ''
         traj_lb = dash_duo.wait_for_element("#traj_lb")
+        time.sleep(1)
         assert traj_lb.text == 'c6.custom'
         # assert 1 == len(app.frm_vw.fig.data)
         ele = self.loadFile(dash_duo, tag='datafile_input', afile=DATA_FILE)
