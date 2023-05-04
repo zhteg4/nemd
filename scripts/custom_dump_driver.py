@@ -7,6 +7,9 @@ This post molecular dynamics driver perform trajectory analysis.
 """
 import os
 import sys
+import math
+import pandas as pd
+from scipy import constants
 from nemd import traj
 from nemd import oplsua
 from nemd import jobutils
@@ -21,6 +24,7 @@ FlAG_TASK = '-task'
 CLASH = 'clash'
 VIEW = 'view'
 XYZ = 'xyz'
+DENSITY = 'density'
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 
@@ -74,7 +78,7 @@ def get_parser():
                         type=parserutils.type_file,
                         help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
-                        choices=[XYZ, CLASH, VIEW],
+                        choices=[XYZ, CLASH, VIEW, DENSITY],
                         default=[XYZ],
                         nargs='+',
                         help=f'{XYZ} writes out .xyz for VMD visualization;'
@@ -106,6 +110,7 @@ class CustomDump(object):
     """
 
     XYZ_EXT = '.xyz'
+    DENSITY_EXT = f'_{DENSITY}.txt'
 
     def __init__(self, options, jobname, diffusion=False):
         """
@@ -117,6 +122,7 @@ class CustomDump(object):
         self.jobname = jobname
         self.diffusion = diffusion
         self.outfile = self.jobname + self.XYZ_EXT
+        self.out_density = self.jobname + self.DENSITY_EXT
         self.data_reader = None
         self.radii = None
 
@@ -128,6 +134,7 @@ class CustomDump(object):
         self.checkClashes()
         self.writeXYZ()
         self.view()
+        self.density()
         log('Finished', timestamp=True)
 
     def setStruct(self):
@@ -216,6 +223,34 @@ class CustomDump(object):
         frm_vw.setFrames(frms)
         frm_vw.updateLayout()
         frm_vw.show()
+
+    def density(self, last_pct=0.2, pname='Density', unit='g/(cm^3)'):
+        """
+        Calculate the density of all frames.
+
+        :param last_pct float: average and std for the last frames of this percentage.
+        :param pname str: property name
+        :param unit str: unit of the property
+        """
+
+        if DENSITY not in self.options.task:
+            return
+
+        mass = self.data_reader.molecular_weight / constants.Avogadro
+        mass_scaled = mass / (constants.angstrom / constants.centi ) ** 3
+        frms = traj.get_frames(self.options.custom_dump)
+        data = [mass_scaled / x.getVolume() for x in frms]
+        label = f'{pname} {unit}'
+        data = pd.DataFrame({label: data})
+        data.to_csv(self.out_density, float_format='%.4f')
+        sfrm = math.floor(data.shape[0] * (1 - last_pct))
+        sel = data.loc[sfrm:]
+        ave = sel.mean()[label]
+        std = sel.std()[label]
+        msg = f'{ave:.4f} \u00B1 {std:.4f} {unit} starting from frame {sfrm} to the end.'
+        log(msg)
+        log(f'Density written into {self.out_density}')
+
 
 
 logger = None

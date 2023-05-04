@@ -906,7 +906,6 @@ class LammpsIn(fileutils.LammpsInput):
         :param nve_only bool: only run nve ensemble (one single small molecule)
         :param npt bool: run npt ensemble (molecule can fill the space)
         """
-
         self.in_fh.write(f"velocity all create {start_temp} 482748\n")
         if nve_only:
             # NVT on single molecule gives nan coords (guess due to translation)
@@ -1845,6 +1844,13 @@ class DataFileReader(LammpsData):
         self.setDihedrals()
         self.setImpropers()
         self.setMols()
+
+    @property
+    def molecular_weight(self):
+        type_ids = [x.type_id for x in self.atom]
+        return sum(self.masses[x].mass for x in type_ids)
+
+    mw = molecular_weight
 
     def setMinimumDist(self):
         for id in self.vdws.keys():

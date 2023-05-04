@@ -184,6 +184,14 @@ class Frame(pd.DataFrame):
         """
         return self.attrs[self.BOX]
 
+    def getVolume(self):
+        """
+        Get the volume of the frame.
+
+        :param float: the volume of the frame
+        """
+        return np.prod([x for x in self.attrs[self.SPAN].values()])
+
     def getEdges(self):
         """
         Get the edges of the box.
