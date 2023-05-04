@@ -8,6 +8,8 @@ This post molecular dynamics driver perform trajectory analysis.
 import os
 import sys
 import math
+import scipy
+import numpy as np
 import pandas as pd
 from scipy import constants
 from nemd import traj
@@ -25,6 +27,7 @@ CLASH = 'clash'
 VIEW = 'view'
 XYZ = 'xyz'
 DENSITY = 'density'
+DIFFUSION = 'diffusion'
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 
@@ -78,7 +81,7 @@ def get_parser():
                         type=parserutils.type_file,
                         help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
-                        choices=[XYZ, CLASH, VIEW, DENSITY],
+                        choices=[XYZ, CLASH, VIEW, DENSITY, DIFFUSION],
                         default=[XYZ],
                         nargs='+',
                         help=f'{XYZ} writes out .xyz for VMD visualization;'
@@ -111,6 +114,7 @@ class CustomDump(object):
 
     XYZ_EXT = '.xyz'
     DENSITY_EXT = f'_{DENSITY}.txt'
+    DIFFUSION_EXT = f'_{DIFFUSION}.txt'
 
     def __init__(self, options, jobname, diffusion=False):
         """
@@ -123,6 +127,7 @@ class CustomDump(object):
         self.diffusion = diffusion
         self.outfile = self.jobname + self.XYZ_EXT
         self.out_density = self.jobname + self.DENSITY_EXT
+        self.out_diffusion = self.jobname + self.DIFFUSION_EXT
         self.data_reader = None
         self.radii = None
 
@@ -135,6 +140,7 @@ class CustomDump(object):
         self.writeXYZ()
         self.view()
         self.density()
+        self.diffusionCoefficient()
         log('Finished', timestamp=True)
 
     def setStruct(self):
@@ -224,7 +230,7 @@ class CustomDump(object):
         frm_vw.updateLayout()
         frm_vw.show()
 
-    def density(self, last_pct=0.2, pname='Density', unit='g/(cm^3)'):
+    def density(self, last_pct=0.2, pname='Density', unit='g/cm^3'):
         """
         Calculate the density of all frames.
 
@@ -251,6 +257,40 @@ class CustomDump(object):
         log(msg)
         log(f'Density written into {self.out_density}')
 
+    def diffusionCoefficient(self, timestep=1, ex_pct= 0.1, pname='diffusion coefficient', unit='cm^2/s'):
+        """
+        Calculate the diffusion coefficient of all frames.
+
+        :param timestep float: the time step in fs
+        :param ex_pct float: fit for the frames of this percentage at head and tail
+        :param pname str: property name
+        :param unit str: unit of the diffusion coefficient
+        """
+
+        if DIFFUSION not in self.options.task:
+            return
+        masses = [self.data_reader.masses[x.type_id].mass for x in self.data_reader.atom]
+        frms = traj.get_frames(self.options.custom_dump)
+        frms = [x for x in frms]
+        num = len(frms)
+        msd = [0]
+        for index in range(1, num):
+            disp = [x - y for x, y in zip(frms[index:], frms[:-index])]
+            data = np.array([np.linalg.norm(x, axis=1) for x in disp])
+            sdata = np.square(data)
+            msd.append(np.average(sdata.mean(axis=0), weights=masses))
+        msd = [x* (constants.angstrom / constants.centi)**2 for x in msd]
+        times = [x.getStep() * constants.femto * timestep for x in frms]
+        sidx, eidx = math.floor(num * ex_pct), math.ceil(num * (1 - ex_pct))
+        sel_time, sel_msd = times[sidx: eidx], msd[sidx: eidx]
+        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(sel_time, sel_msd)
+        msg = f'{slope/6:.4g} \u00B1 {std_err:.4g} {unit} starting from frame {sidx} to {eidx}.'
+        log(msg)
+        label = f'{pname} ({unit})'
+        data = pd.DataFrame({label: msd}, index=times)
+        data.index.name = 'Time (s)'
+        data.to_csv(self.out_diffusion, float_format='%.4g')
+        log(f'Density written into {self.out_diffusion}')
 
 
 logger = None

@@ -48,6 +48,7 @@ class Frame(pd.DataFrame):
     """
 
     BOX = 'box'
+    STEP = 'step'
     SPAN = 'span'
     XU = 'xu'
     YU = 'yu'
@@ -58,12 +59,13 @@ class Frame(pd.DataFrame):
     COLOR = 'color'
     XYZU_ELE_SZ_CLR = XYZU + [ELEMENT, SIZE, COLOR]
 
-    def __init__(self, xyz=None, box=None, index=None, columns=None):
+    def __init__(self, xyz=None, box=None, index=None, columns=None, step=None):
         """
         :param xyz nx3 'numpy.ndarray' or 'DataFrame': xyz data
         :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
         :param index list: the atom indexes
         :param columns list: the data columns (e.g., xu, yu, zu, element)
+        :param step int: the number of simulation step that this frame is at
         """
         try:
             name = xyz.values.index.name
@@ -75,6 +77,7 @@ class Frame(pd.DataFrame):
             columns = self.XYZU
         super().__init__(data=xyz, index=index, columns=columns)
         self.setBox(box)
+        self.setStep(step)
 
     @classmethod
     def read(cls, filename=None, contents=None):
@@ -107,7 +110,7 @@ class Frame(pd.DataFrame):
                     float(y) for x in range(5, 8)
                     for y in lines[x].strip('\n').split()
                 ])
-                yield cls(frm, box=box)
+                yield cls(frm, box=box, step=int(lines[1].strip()))
 
     @classmethod
     def readXYZ(cls, filename=None, contents=None, box=None):
@@ -162,6 +165,24 @@ class Frame(pd.DataFrame):
         :return row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
         """
         return self.loc[atom_id]
+
+    def setStep(self, step):
+        """
+        Set the simulation step.
+
+        :param step int: the number of simulation step that this frame is at
+        """
+        if step is None:
+            return
+        self.attrs[self.STEP] = step
+
+    def getStep(self):
+        """
+        Get the simulation step.
+
+        :param int: the number of simulation step that this frame is at
+        """
+        return self.attrs[self.STEP]
 
     def setBox(self, box):
         """
