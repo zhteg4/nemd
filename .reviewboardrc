@@ -3,3 +3,4 @@ REPOSITORY = "master"
 REPOSITORY_TYPE = "git"
 BRANCH = "master"
 LAND_DEST_BRANCH = "master"
+EXCLUDE_PATTERNS = ['*.custom', '*.data', '*.lammps', '*.DS_Store', '*log.*']

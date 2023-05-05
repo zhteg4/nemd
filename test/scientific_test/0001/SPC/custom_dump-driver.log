@@ -1,0 +1,9 @@
+..........Command Options..........
+custom_dump: dump.custom
+data_file: polymer_builder.data
+task: ['rdf']
+interactive: False
+jobname: None
+debug: False
+JobStart: 2023-05-05 16:00
+...................................

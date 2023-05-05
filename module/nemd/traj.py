@@ -210,6 +210,14 @@ class Frame(pd.DataFrame):
         """
         return self.attrs[self.BOX]
 
+    def getSpan(self):
+        """
+        Set the span from box limits.
+
+        :param dict: {'xu': xxx, 'yu': xxx, 'zu': xxx} as the span
+        """
+        return self.attrs[self.SPAN]
+
     def getVolume(self):
         """
         Get the volume of the frame.
@@ -217,6 +225,14 @@ class Frame(pd.DataFrame):
         :param float: the volume of the frame
         """
         return np.prod([x for x in self.attrs[self.SPAN].values()])
+
+    def getDensity(self):
+        """
+        Get the number density of the frame.
+
+        :param float: the number density of the frame
+        """
+        return self.shape[0] / self.getVolume()
 
     def getEdges(self):
         """
@@ -249,6 +265,23 @@ class Frame(pd.DataFrame):
                 lambda x: math.remainder(x, self.attrs[self.SPAN][col]), 1,
                 1)(dists[:, id])
         return np.linalg.norm(dists, axis=1)
+
+    def pairDists(self, ids=None):
+        """
+        Get the distance between atom pair.
+
+        :param ids list: list of gids as the atom selection
+        :return `numpy.ndarray`: distances array
+        """
+        dists, eid = [], self.shape[0] + 1
+        if ids is None:
+            ids = [x for x in range(1, eid)]
+        else:
+            ids = sorted(ids)
+        for idx, (id, row) in enumerate(self.loc[ids].iterrows()):
+            dist = self.getDists(ids[idx + 1:], row)
+            dists.append(dist)
+        return np.concatenate(dists)
 
     def wrapCoords(self, broken_bonds=False, dreader=None):
         """
@@ -336,13 +369,6 @@ class Frame(pd.DataFrame):
                     sep=' ',
                     header=header,
                     quotechar=' ')
-
-    def pairDists(self):
-        dists, eid = [], self.shape[0] + 1
-        for id, row in self.iterrows():
-            dist = self.getDists(range(id + 1, eid), row)
-            dists.append(dist)
-        return np.concatenate(dists)
 
 
 class DistanceCell:

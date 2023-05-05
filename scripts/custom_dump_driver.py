@@ -28,6 +28,7 @@ VIEW = 'view'
 XYZ = 'xyz'
 DENSITY = 'density'
 MSD = 'msd'
+RDF = 'rdf'
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 
@@ -81,7 +82,7 @@ def get_parser():
                         type=parserutils.type_file,
                         help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
-                        choices=[XYZ, CLASH, VIEW, DENSITY, MSD],
+                        choices=[XYZ, CLASH, VIEW, DENSITY, MSD, RDF],
                         default=[XYZ],
                         nargs='+',
                         help=f'{XYZ} writes out .xyz for VMD visualization;'
@@ -115,6 +116,8 @@ class CustomDump(object):
     XYZ_EXT = '.xyz'
     DENSITY_EXT = f'_{DENSITY}.txt'
     MSD_EXT = f'_{MSD}.txt'
+    RDF_EXT = f'_{RDF}.txt'
+    RDF_PNG = f'_{RDF}.png'
 
     def __init__(self, options, jobname, diffusion=False):
         """
@@ -128,6 +131,8 @@ class CustomDump(object):
         self.outfile = self.jobname + self.XYZ_EXT
         self.out_density = self.jobname + self.DENSITY_EXT
         self.out_msd = self.jobname + self.MSD_EXT
+        self.out_rdf = self.jobname + self.RDF_EXT
+        self.rdf_png = self.jobname + self.RDF_PNG
         self.data_reader = None
         self.radii = None
 
@@ -141,6 +146,7 @@ class CustomDump(object):
         self.view()
         self.density()
         self.msd()
+        self.rdf()
         log('Finished', timestamp=True)
 
     def setStruct(self):
@@ -264,7 +270,7 @@ class CustomDump(object):
         :param timestep float: the time step in fs
         :param ex_pct float: fit the frames of this percentage at head and tail
         :param pname str: property name
-        :param unit str: unit of the diffusion coefficient
+        :param unit str: unit of the property
         """
 
         if MSD not in self.options.task:
@@ -297,6 +303,66 @@ class CustomDump(object):
         log(msg)
         data.to_csv(self.out_msd, float_format='%.4g')
         log(f'Density written into {self.out_msd}')
+
+    def rdf(self,
+            last_pct=0.2,
+            pname='g',
+            unit='r',
+            resolution=0.1,
+            elements='O'):
+        """
+        Calculate the radial distribution function.
+
+        :param last_pct float: the last frames of this percentage.
+        :param pname str: property name
+        :param unit str: unit of the property
+        :param resolution float: the rdf minimum step
+        :param elements str, set or list: the elements for atoms selection
+        """
+
+        if RDF not in self.options.task:
+            return
+
+        frms = [x for x in traj.get_frames(self.options.custom_dump)]
+        sel = frms[math.floor(len(frms) * (1 - last_pct)):]
+        span = np.array([[x for x in x.getSpan().values()] for x in sel])
+        mdist = span.min() * 0.5
+        bins = math.ceil(max([mdist / resolution, 20]))
+        samples, bstep = np.linspace(mdist / bins,
+                                     mdist,
+                                     num=bins - 1,
+                                     endpoint=False,
+                                     retstep=True)
+        mid = samples + bstep * 0.5
+        ids = None
+        if elements is not None:
+            ids = [x.id for x in self.data_reader.atom if x.ele in elements]
+        rdf = []
+        for frm in sel:
+            dists = frm.pairDists(ids=ids)
+            hist, edges = np.histogram(dists,
+                                       range=[bstep, mdist],
+                                       bins=bins - 1)
+            norm_factor = frm.getDensity() * 4 * np.pi * np.square(mid) * bstep
+            rdf.append(hist * frm.shape[0] / sum(hist) / norm_factor)
+        rdf = np.array(rdf).mean(axis=0)
+        label = f'{pname} ({unit})'
+        data = pd.DataFrame({label: rdf}, index=mid)
+        data.index.name = 'r (\u212B)'
+        data.to_csv(self.out_rdf, float_format='%.4f')
+        log(f'Radial distribution function written into {self.out_rdf}')
+
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+        ax.plot(mid, rdf)
+        ax.set_xlabel(data.index.name)
+        ax.set_ylabel(label)
+        ax.set_xlim([data[data > 0].iloc[0].name, data.iloc[-1].name])
+        fig.savefig(self.rdf_png)
+        log(f'Radial distribution function figure saved as {self.rdf_png}')
 
 
 logger = None
