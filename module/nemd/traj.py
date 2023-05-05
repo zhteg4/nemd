@@ -59,7 +59,12 @@ class Frame(pd.DataFrame):
     COLOR = 'color'
     XYZU_ELE_SZ_CLR = XYZU + [ELEMENT, SIZE, COLOR]
 
-    def __init__(self, xyz=None, box=None, index=None, columns=None, step=None):
+    def __init__(self,
+                 xyz=None,
+                 box=None,
+                 index=None,
+                 columns=None,
+                 step=None):
         """
         :param xyz nx3 'numpy.ndarray' or 'DataFrame': xyz data
         :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries

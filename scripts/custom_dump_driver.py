@@ -27,7 +27,7 @@ CLASH = 'clash'
 VIEW = 'view'
 XYZ = 'xyz'
 DENSITY = 'density'
-DIFFUSION = 'diffusion'
+MSD = 'msd'
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 
@@ -81,7 +81,7 @@ def get_parser():
                         type=parserutils.type_file,
                         help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
-                        choices=[XYZ, CLASH, VIEW, DENSITY, DIFFUSION],
+                        choices=[XYZ, CLASH, VIEW, DENSITY, MSD],
                         default=[XYZ],
                         nargs='+',
                         help=f'{XYZ} writes out .xyz for VMD visualization;'
@@ -114,7 +114,7 @@ class CustomDump(object):
 
     XYZ_EXT = '.xyz'
     DENSITY_EXT = f'_{DENSITY}.txt'
-    DIFFUSION_EXT = f'_{DIFFUSION}.txt'
+    MSD_EXT = f'_{MSD}.txt'
 
     def __init__(self, options, jobname, diffusion=False):
         """
@@ -127,7 +127,7 @@ class CustomDump(object):
         self.diffusion = diffusion
         self.outfile = self.jobname + self.XYZ_EXT
         self.out_density = self.jobname + self.DENSITY_EXT
-        self.out_diffusion = self.jobname + self.DIFFUSION_EXT
+        self.out_msd = self.jobname + self.MSD_EXT
         self.data_reader = None
         self.radii = None
 
@@ -140,7 +140,7 @@ class CustomDump(object):
         self.writeXYZ()
         self.view()
         self.density()
-        self.diffusionCoefficient()
+        self.msd()
         log('Finished', timestamp=True)
 
     def setStruct(self):
@@ -243,7 +243,7 @@ class CustomDump(object):
             return
 
         mass = self.data_reader.molecular_weight / constants.Avogadro
-        mass_scaled = mass / (constants.angstrom / constants.centi ) ** 3
+        mass_scaled = mass / (constants.angstrom / constants.centi)**3
         frms = traj.get_frames(self.options.custom_dump)
         data = [mass_scaled / x.getVolume() for x in frms]
         label = f'{pname} {unit}'
@@ -253,25 +253,27 @@ class CustomDump(object):
         sel = data.loc[sfrm:]
         ave = sel.mean()[label]
         std = sel.std()[label]
-        msg = f'{ave:.4f} \u00B1 {std:.4f} {unit} starting from frame {sfrm} to the end.'
+        msg = f'{ave:.4f} \u00B1 {std:.4f} {unit}  from frame {sfrm} to the end'
         log(msg)
         log(f'Density written into {self.out_density}')
 
-    def diffusionCoefficient(self, timestep=1, ex_pct= 0.1, pname='diffusion coefficient', unit='cm^2/s'):
+    def msd(self, timestep=1, ex_pct=0.1, pname='MSD', unit='cm^2'):
         """
-        Calculate the diffusion coefficient of all frames.
+        Calculate the mean squared displacement and diffusion coefficient.
 
         :param timestep float: the time step in fs
-        :param ex_pct float: fit for the frames of this percentage at head and tail
+        :param ex_pct float: fit the frames of this percentage at head and tail
         :param pname str: property name
         :param unit str: unit of the diffusion coefficient
         """
 
-        if DIFFUSION not in self.options.task:
+        if MSD not in self.options.task:
             return
-        masses = [self.data_reader.masses[x.type_id].mass for x in self.data_reader.atom]
-        frms = traj.get_frames(self.options.custom_dump)
-        frms = [x for x in frms]
+        masses = [
+            self.data_reader.masses[x.type_id].mass
+            for x in self.data_reader.atom
+        ]
+        frms = [x for x in traj.get_frames(self.options.custom_dump)]
         num = len(frms)
         msd = [0]
         for index in range(1, num):
@@ -279,18 +281,22 @@ class CustomDump(object):
             data = np.array([np.linalg.norm(x, axis=1) for x in disp])
             sdata = np.square(data)
             msd.append(np.average(sdata.mean(axis=0), weights=masses))
-        msd = [x* (constants.angstrom / constants.centi)**2 for x in msd]
-        times = [x.getStep() * constants.femto * timestep for x in frms]
-        sidx, eidx = math.floor(num * ex_pct), math.ceil(num * (1 - ex_pct))
-        sel_time, sel_msd = times[sidx: eidx], msd[sidx: eidx]
-        slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(sel_time, sel_msd)
-        msg = f'{slope/6:.4g} \u00B1 {std_err:.4g} {unit} starting from frame {sidx} to {eidx}.'
-        log(msg)
         label = f'{pname} ({unit})'
+        times = [x.getStep() for x in frms]
         data = pd.DataFrame({label: msd}, index=times)
+        data[label] *= (constants.angstrom / constants.centi)**2
+        data.index *= constants.femto * timestep
         data.index.name = 'Time (s)'
-        data.to_csv(self.out_diffusion, float_format='%.4g')
-        log(f'Density written into {self.out_diffusion}')
+        sidx, eidx = math.floor(num * ex_pct), math.ceil(num * (1 - ex_pct))
+        sel = data.iloc[sidx:eidx]
+        slope, intercept, rvalue, p_value, std_err = scipy.stats.linregress(
+            sel.index, sel[label])
+        msg = f'{slope/6:.4g} \u00B1 {std_err:.4g} {unit}' \
+              f' (R-squared: {rvalue**2:.4f})' \
+              f' from frame {sidx} to {eidx}'
+        log(msg)
+        data.to_csv(self.out_msd, float_format='%.4g')
+        log(f'Density written into {self.out_msd}')
 
 
 logger = None

@@ -17,7 +17,9 @@ BUTANE_DATA = testutils.test_file(os.path.join('polym_builder',
 
 class TestOplsTyper:
 
-    CCOOH_SML = [x for x in oplsua.OplsTyper.SMILES_TEMPLATE if x.sml == 'CC(=O)O'][0]
+    CCOOH_SML = [
+        x for x in oplsua.OplsTyper.SMILES_TEMPLATE if x.sml == 'CC(=O)O'
+    ][0]
 
     @pytest.fixture
     def opls_typer(self):

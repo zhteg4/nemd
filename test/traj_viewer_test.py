@@ -16,25 +16,27 @@ XYZ_FILE = testutils.test_file(os.path.join('trajs', 'c6.xyz'))
 
 
 @pytest.fixture
-def dash_duo(request, dash_thread_server, tmpdir, monkeypatch) -> DashComposite:
+def dash_duo(request, dash_thread_server, tmpdir,
+             monkeypatch) -> DashComposite:
     chrome_path = os.path.dirname(ChromeDriverManager().install())
     if chrome_path not in os.environ['PATH']:
         path = os.environ['PATH'] + ':' + chrome_path
         monkeypatch.setenv('PATH', path)
 
     with DashComposite(
-        dash_thread_server,
-        browser=request.config.getoption("webdriver"),
-        remote=request.config.getoption("remote"),
-        remote_url=request.config.getoption("remote_url"),
-        headless=request.config.getoption("headless"),
-        options=request.config.hook.pytest_setup_options(),
-        download_path=tmpdir.mkdir("download").strpath,
-        percy_assets_root=request.config.getoption("percy_assets"),
-        percy_finalize=request.config.getoption("nopercyfinalize"),
-        pause=request.config.getoption("pause"),
+            dash_thread_server,
+            browser=request.config.getoption("webdriver"),
+            remote=request.config.getoption("remote"),
+            remote_url=request.config.getoption("remote_url"),
+            headless=request.config.getoption("headless"),
+            options=request.config.hook.pytest_setup_options(),
+            download_path=tmpdir.mkdir("download").strpath,
+            percy_assets_root=request.config.getoption("percy_assets"),
+            percy_finalize=request.config.getoption("nopercyfinalize"),
+            pause=request.config.getoption("pause"),
     ) as dc:
         yield dc
+
 
 class TestApp:
 
