@@ -27,11 +27,11 @@ setup(name='nemd',
       scripts=['bash_scripts/run_nemd', 'scripts/polymer_builder_driver.py'],
       install_requires=[
           'matplotlib', 'numpy', 'chemparse', 'rdkit', 'networkx', 'scipy',
-          'pandas', 'signac', 'signac-flow', 'lammps', 'pyside6', 'PyQt6',
+          'pandas', 'signac', 'signac-flow', 'lammps', 'pyside6',
           'yapf', 'pytest', 'mendeleev', 'plotly', 'dash', 'flask>=2.2.2',
           'openpyxl', 'dash_bootstrap_components', 'dash-uploader',
           'dash[testing]', 'more_itertools', 'webdriver-manager', 'jupyterlab',
-          'notebook', 'snakeviz', 'pyqtwebengine', 'pyqt5', 'RBTools', 'git-lfs'
+          'notebook', 'snakeviz', 'pyqtwebengine', 'pyqt5==5.12.0', 'RBTools', 'git-lfs'
       ],
       classifiers=[
           'Development Status :: 1 - Planning',

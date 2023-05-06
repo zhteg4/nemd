@@ -1,0 +1,23 @@
+# git
+sudo apt-get update
+sudo apt install git
+
+ssh-keygen -o -t rsa -C “ssh@github.com”
+cat id_rsa.pub
+git clone git@github.com:zhteg4/nemd.git
+
+# pip
+sudo apt install python3-pip
+sudo add-apt-repository ppa:okirby/qt6-backports
+sudo apt update
+sudo apt install qt6-base-dev
+# Ubuntu 22.04
+sudo apt-get install build-essential libgl1-mesa-dev qt6-base-dev
+
+# The following may not be useful
+# https://www.jianshu.com/p/a87da7a75d6c
+# fatal: unable to access 'https://github.com/zhteg4/nemd.git/': GnuTLS recv error (-110): The TLS connection was non-properly terminated.
+sudo apt-get install gnutls-bin
+git config --global --unset http.https://github.com.proxy
+git clone https://github.com/zhteg4/nemd.git
+
