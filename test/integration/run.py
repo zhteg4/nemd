@@ -140,6 +140,7 @@ class CMP:
     """
     The class to perform file comparison.
     """
+
     def __init__(self, original, target, job=None):
         self.orignal = original.strip().strip('\'"')
         self.target = target.strip().strip('\'"')

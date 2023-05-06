@@ -27,6 +27,7 @@ def log_debug(msg):
 
 
 class Fragment:
+
     def __repr__(self):
         return f"{self.dihe}: {self.aids}"
 
@@ -206,6 +207,7 @@ class Fragment:
 
 
 class FragMixIn:
+
     def readData(self, include14=False):
         """
         Read data  file and set clash parameters.
@@ -489,6 +491,7 @@ class FragMol(FragMixIn):
 
 
 class FragMols(FragMixIn):
+
     def __init__(self, mols, data_file=None, box=None, logger=logger):
         self.mols = mols
         self.data_file = data_file

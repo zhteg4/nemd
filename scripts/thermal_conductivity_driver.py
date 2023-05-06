@@ -121,6 +121,7 @@ def validate_options(argv):
 
 
 class Nemd(object):
+
     def __init__(self, options, jobname):
         self.options = options
         self.jobname = jobname

@@ -21,3 +21,4 @@ sudo apt-get install gnutls-bin
 git config --global --unset http.https://github.com.proxy
 git clone https://github.com/zhteg4/nemd.git
 
+pip3 install -e

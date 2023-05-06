@@ -153,6 +153,7 @@ def get_parser():
 
 
 class Validator:
+
     def __init__(self, options):
         self.options = options
 
@@ -306,6 +307,7 @@ class GridCell:
     """
     Grid the space and place polymers into the sub-cells.
     """
+
     def __init__(self, polymers, polym_nums):
         """
         :param polymers 'Polymer': one polymer object for each type
@@ -902,6 +904,7 @@ class Conformer(object):
         :return 3x3 'numpy.ndarray': a vector is parallel with the backbone,
             b and c vectors are perpendicular with the backbone.
         """
+
         def get_norm(vect):
             """
             Get the normalized vector.
@@ -927,6 +930,7 @@ class Conformer(object):
         """
         Rotate the bond between the backbone and side group.
         """
+
         def get_other_atom(aid1, aid2):
             """
             Get one atom id that is bonded to aid1 beyond aid2.

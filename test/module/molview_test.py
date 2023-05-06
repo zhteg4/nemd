@@ -13,6 +13,7 @@ CC_CUSTOM = testutils.test_file(os.path.join('trajs', 'CC.custom'))
 
 
 class TestTransConformer(object):
+
     @pytest.fixture
     def frm_vw(self, datafile):
         data_reader = oplsua.DataFileReader(datafile)

@@ -6,6 +6,7 @@ class post_install(install):
     """
     The run method will be executed as the last installation stage.
     """
+
     def run(self):
         from webdriver_manager.chrome import ChromeDriverManager
         ChromeDriverManager().install()
@@ -27,11 +28,11 @@ setup(name='nemd',
       scripts=['bash_scripts/run_nemd', 'scripts/polymer_builder_driver.py'],
       install_requires=[
           'matplotlib', 'numpy', 'chemparse', 'rdkit', 'networkx', 'scipy',
-          'pandas', 'signac', 'signac-flow', 'lammps', 'pyside6',
-          'yapf', 'pytest', 'mendeleev', 'plotly', 'dash', 'flask>=2.2.2',
-          'openpyxl', 'dash_bootstrap_components', 'dash-uploader',
-          'dash[testing]', 'more_itertools', 'webdriver-manager', 'jupyterlab',
-          'notebook', 'snakeviz', 'pyqtwebengine', 'pyqt5==5.12.0', 'RBTools', 'git-lfs'
+          'pandas', 'signac', 'signac-flow', 'lammps', 'yapf', 'pytest',
+          'mendeleev', 'plotly', 'dash', 'flask>=2.2.2', 'openpyxl',
+          'dash_bootstrap_components', 'dash-uploader', 'dash[testing]',
+          'more_itertools', 'webdriver-manager', 'jupyterlab', 'notebook',
+          'snakeviz', 'pyqt5==5.12.0', 'RBTools'
       ],
       classifiers=[
           'Development Status :: 1 - Planning',

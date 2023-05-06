@@ -431,6 +431,7 @@ class DistanceCell:
         """
         Cells with separation distances less than the cutoff are set as neighbors.
         """
+
         def separation_dist(ijk):
             separation_ids = [y - 1 if y else y for y in ijk]
             return np.linalg.norm(self.grids * separation_ids)

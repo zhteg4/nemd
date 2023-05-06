@@ -11,6 +11,7 @@ from nemd import environutils
 
 
 class CapitalisedHelpFormatter(argparse.HelpFormatter):
+
     def add_usage(self, usage, actions, groups, prefix=None):
         if prefix is None:
             prefix = 'Usage: '

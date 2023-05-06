@@ -48,6 +48,7 @@ def get_mol_from_smiles(smiles_str, embeded=True):
 
 class CaptureLogger(logging.Handler):
     """Helper class that captures Python logger output"""
+
     def __init__(self):
         super(CaptureLogger, self).__init__(level=logging.DEBUG)
         self.logs = {}
