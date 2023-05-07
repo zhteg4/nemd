@@ -26,6 +26,7 @@ setopt no_nomatch
 setopt PROMPT_SUBST
 PROMPT='%n in ${PWD/#$HOME/~} ${vcs_info_msg_0_} %# '
 
-alias cdg='cd /Users/tzhang/git/nemd'
-alias cdw='cd /Users/tzhang/scr/work'
+alias cdg='cd ~/git/nemd'
+alias cdw='cd ~/scr/work'
 alias ls='ls --color'
+alias vim='pyvim'

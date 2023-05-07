@@ -1,4 +1,0 @@
-# https://linuxize.com/post/how-to-enable-ssh-on-ubuntu-20-04/
-sudo /etc/init.d/ssh start
-ssh ubuntu@192.168.3.204
-ssh -Y ubuntu@192.168.3.204
