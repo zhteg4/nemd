@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from scipy import constants
 from nemd import traj
+from nemd import symbols
 from nemd import oplsua
 from nemd import jobutils
 from nemd import logutils
@@ -114,25 +115,29 @@ class CustomDump(object):
     """
 
     XYZ_EXT = '.xyz'
-    DENSITY_EXT = f'_{DENSITY}.txt'
-    MSD_EXT = f'_{MSD}.txt'
-    RDF_EXT = f'_{RDF}.txt'
-    RDF_PNG = f'_{RDF}.png'
+    DATA_EXT = '_%s.csv'
+    PNG_EXT = '_%s.png'
+    NAME = {
+        CLASH: 'clash count',
+        DENSITY: 'density',
+        RDF: 'radial distribution function',
+        MSD: 'mean squared displacement'
+    }
+    TIME_LB = 'Time (ps)'
 
-    def __init__(self, options, jobname, diffusion=False):
+    def __init__(self, options, jobname, diffusion=False, timestep=1):
         """
         :param options 'argparse.ArgumentParser': Parsed command-line options
         :param jobname str: jobname of this task
         :param diffusion bool: particles passing PBCs continue traveling
+        :param timestep float: the time step in fs
         """
         self.options = options
         self.jobname = jobname
         self.diffusion = diffusion
+        self.timestep = timestep
         self.outfile = self.jobname + self.XYZ_EXT
-        self.out_density = self.jobname + self.DENSITY_EXT
-        self.out_msd = self.jobname + self.MSD_EXT
-        self.out_rdf = self.jobname + self.RDF_EXT
-        self.rdf_png = self.jobname + self.RDF_PNG
+        self.frms = None
         self.data_reader = None
         self.radii = None
 
@@ -141,13 +146,14 @@ class CustomDump(object):
         Main method to run the tasks.
         """
         self.setStruct()
+        self.setFrames()
         self.checkClashes()
         self.writeXYZ()
         self.view()
         self.density()
         self.msd()
         self.rdf()
-        log('Finished', timestamp=True)
+        log('Finished.', timestamp=True)
 
     def setStruct(self):
         """
@@ -161,17 +167,30 @@ class CustomDump(object):
             return
         self.data_reader.setClashParams()
 
-    def checkClashes(self):
+    def setFrames(self, last_pct=0.2):
+        """
+        Load trajectory frames and set range.
+
+        :param last_pct float: average and std for the last frames of this percentage.
+        """
+
+        self.frms = [x for x in traj.get_frames(self.options.custom_dump)
+                     ]  #[:10]
+        self.time = np.array([x.getStep() for x in self.frms
+                              ]) * constants.femto / constants.pico
+        self.time_idx = pd.Index(data=self.time, name=self.TIME_LB)
+        self.sidx = math.floor(len(self.frms) * (1 - last_pct))
+
+    def checkClashes(self, label='Clash (num)'):
         """
         Check clashes for reach frames.
         """
         if CLASH not in self.options.task:
             return
 
-        for idx, frm in enumerate(traj.Frame.read(self.options.custom_dump)):
-            clashes = self.getClashes(frm)
-            log(f"Frame {idx} has {len(clashes)} clashes.")
-        log('All frames are checked for clashes.')
+        data = [len(self.getClashes(frm)) for x in self.frms]
+        data = pd.DataFrame(data={label: data}, index=self.time_idx)
+        self.saveData(data, CLASH, float_format='%i')
 
     def getClashes(self, frm):
         """
@@ -231,91 +250,101 @@ class CustomDump(object):
         frm_vw.setLines()
         frm_vw.setEdges()
         frm_vw.addTraces()
-        frms = traj.get_frames(self.options.custom_dump)
-        frm_vw.setFrames(frms)
+        frm_vw.setFrames(self.frms)
         frm_vw.updateLayout()
         frm_vw.show()
 
-    def density(self, last_pct=0.2, pname='Density', unit='g/cm^3'):
+    def density(self):
         """
         Calculate the density of all frames.
-
-        :param last_pct float: average and std for the last frames of this percentage.
-        :param pname str: property name
-        :param unit str: unit of the property
         """
 
         if DENSITY not in self.options.task:
             return
 
+        data = self.getDensity()
+        self.saveData(data, DENSITY)
+        self.plot(data, DENSITY)
+
+    def getDensity(self, pname='Density', unit='g/cm^3'):
+        """
+        Get the density data.
+
+        :param pname str: property name
+        :param unit str: unit of the property
+        return 'pandas.core.frame.DataFrame': time and density
+        """
         mass = self.data_reader.molecular_weight / constants.Avogadro
         mass_scaled = mass / (constants.angstrom / constants.centi)**3
-        frms = traj.get_frames(self.options.custom_dump)
-        data = [mass_scaled / x.getVolume() for x in frms]
+        data = [mass_scaled / x.getVolume() for x in self.frms]
         label = f'{pname} {unit}'
-        data = pd.DataFrame({label: data})
-        data.to_csv(self.out_density, float_format='%.4f')
-        sfrm = math.floor(data.shape[0] * (1 - last_pct))
-        sel = data.loc[sfrm:]
+        data = pd.DataFrame({label: data}, index=self.time)
+        sel = data.loc[self.sidx:]
         ave = sel.mean()[label]
         std = sel.std()[label]
-        msg = f'{ave:.4f} \u00B1 {std:.4f} {unit}  from frame {sfrm} to the end'
-        log(msg)
-        log(f'Density written into {self.out_density}')
+        log(f'{ave:.4f} {symbols.PLUS_MIN} {std:.4f} {unit} '
+            f'{symbols.ELEMENT_OF} [{self.time[self.sidx]}, {self.time[-1]}] ps'
+            )
+        return data
 
     def msd(self, timestep=1, ex_pct=0.1, pname='MSD', unit='cm^2'):
         """
         Calculate the mean squared displacement and diffusion coefficient.
 
-        :param timestep float: the time step in fs
         :param ex_pct float: fit the frames of this percentage at head and tail
         :param pname str: property name
         :param unit str: unit of the property
         """
-
+        # NOTE MSD needs frame selection
         if MSD not in self.options.task:
             return
+        data = self.getMsd()
+        self.saveData(data, MSD, float_format='%.4g')
+        self.plot(data, MSD)
+
+    def getMsd(self, ex_pct=0.1, pname='MSD', unit=f'{symbols.ANGSTROM}^2'):
+        """
+        Get the mean squared displacement and diffusion coefficient.
+
+        :param ex_pct float: fit the frames of this percentage at head and tail
+        :param pname str: property name
+        :param unit str: unit of the property
+        :return 'pandas.core.frame.DataFrame': time and msd
+        """
+
         masses = [
             self.data_reader.masses[x.type_id].mass
             for x in self.data_reader.atom
         ]
-        frms = [x for x in traj.get_frames(self.options.custom_dump)]
-        num = len(frms)
-        msd = [0]
-        for index in range(1, num):
-            disp = [x - y for x, y in zip(frms[index:], frms[:-index])]
+        frms = self.frms[self.sidx:]
+        msd, num = [0], len(frms)
+        for idx in range(1, num):
+            disp = [x - y for x, y in zip(frms[idx:], frms[:-idx])]
             data = np.array([np.linalg.norm(x, axis=1) for x in disp])
             sdata = np.square(data)
             msd.append(np.average(sdata.mean(axis=0), weights=masses))
         label = f'{pname} ({unit})'
-        times = [x.getStep() for x in frms]
-        data = pd.DataFrame({label: msd}, index=times)
-        data[label] *= (constants.angstrom / constants.centi)**2
-        data.index *= constants.femto * timestep
-        data.index.name = 'Time (s)'
+        ps_time = self.time[self.sidx:][:num]
+        tau_idx = pd.Index(data=ps_time - ps_time[0], name='Tau (ps)')
+        data = pd.DataFrame({label: msd}, index=tau_idx)
         sidx, eidx = math.floor(num * ex_pct), math.ceil(num * (1 - ex_pct))
         sel = data.iloc[sidx:eidx]
+        # Standard error of the slope, under the assumption of residual normality
         slope, intercept, rvalue, p_value, std_err = scipy.stats.linregress(
-            sel.index, sel[label])
-        msg = f'{slope/6:.4g} \u00B1 {std_err:.4g} {unit}' \
-              f' (R-squared: {rvalue**2:.4f})' \
-              f' from frame {sidx} to {eidx}'
-        log(msg)
-        data.to_csv(self.out_msd, float_format='%.4g')
-        log(f'Density written into {self.out_msd}')
+            sel.index * constants.pico,
+            sel[label] * (constants.angstrom / constants.centi)**2)
+        # MSD=2nDt https://en.wikipedia.org/wiki/Mean_squared_displacement
+        log(f'{slope/6:.4g} {symbols.PLUS_MIN} {std_err/6:.4g} cm^2/s'
+            f' (R-squared: {rvalue**2:.4f}) linear fit of'
+            f' [{sel.index.values[0]:.4f} {sel.index.values[-1]:.4f}] ps '
+            f'{symbols.ELEMENT_OF} [{self.time[self.sidx]:.4f}, {self.time[-1]:.4f}] ps'
+            )
+        return data
 
-    def rdf(self,
-            last_pct=0.2,
-            pname='g',
-            unit='r',
-            resolution=0.1,
-            elements='O'):
+    def rdf(self, elements='O'):
         """
         Calculate the radial distribution function.
 
-        :param last_pct float: the last frames of this percentage.
-        :param pname str: property name
-        :param unit str: unit of the property
         :param resolution float: the rdf minimum step
         :param elements str, set or list: the elements for atoms selection
         """
@@ -323,46 +352,76 @@ class CustomDump(object):
         if RDF not in self.options.task:
             return
 
+        sel, ids = self.selectRdf(last_pct=0.2, elements=elements)
+        data = self.getRdf(sel, ids)
+        self.saveData(data, RDF)
+        self.plot(data, RDF, pos_x=True)
+
+    def selectRdf(self, last_pct=0.2, elements='O'):
+        """
+        Select the frame and element for rdf.
+
+        :param elements str, set or list: the elements for atoms selection
+        """
         frms = [x for x in traj.get_frames(self.options.custom_dump)]
         sel = frms[math.floor(len(frms) * (1 - last_pct)):]
-        span = np.array([[x for x in x.getSpan().values()] for x in sel])
-        mdist = span.min() * 0.5
-        bins = math.ceil(max([mdist / resolution, 20]))
-        samples, bstep = np.linspace(mdist / bins,
-                                     mdist,
-                                     num=bins - 1,
-                                     endpoint=False,
-                                     retstep=True)
-        mid = samples + bstep * 0.5
-        ids = None
-        if elements is not None:
-            ids = [x.id for x in self.data_reader.atom if x.ele in elements]
-        rdf = []
-        for frm in sel:
-            dists = frm.pairDists(ids=ids)
-            hist, edges = np.histogram(dists,
-                                       range=[bstep, mdist],
-                                       bins=bins - 1)
-            norm_factor = frm.getDensity() * 4 * np.pi * np.square(mid) * bstep
-            rdf.append(hist * frm.shape[0] / sum(hist) / norm_factor)
-        rdf = np.array(rdf).mean(axis=0)
-        label = f'{pname} ({unit})'
-        data = pd.DataFrame({label: rdf}, index=mid)
-        data.index.name = 'r (\u212B)'
-        data.to_csv(self.out_rdf, float_format='%.4f')
-        log(f'Radial distribution function written into {self.out_rdf}')
 
+        ids = [x.id for x in self.data_reader.atom if x.ele in elements
+               ] if elements else [x.id for x in self.data_reader.atom]
+        return sel, ids
+
+    def getRdf(self, frms, ids, resolution=0.02, pname='g', unit='r'):
+        """
+        :param pname str: property name
+        :param unit str: unit of the property
+        return 'pandas.core.frame.DataFrame': pos and rdf
+        """
+
+        span = np.array([[x for x in x.getSpan().values()] for x in frms])
+        mdist = span.min() * 0.5
+        res = min(resolution, mdist / 100)
+        bins = round(mdist / res)
+        hist_range = [res / 2, res * bins + res / 2]
+        rdf, num = [], len(ids)
+        for frm in frms:
+            dists = frm.pairDists(ids=ids)
+            hist, edge = np.histogram(dists, range=hist_range, bins=bins)
+            mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
+            # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
+            norm_factor = 4 * np.pi * mid**2 * res * num / frm.getVolume()
+            # Stands at every id but either (1->2) or (2->1) is computed
+            rdf.append(hist * 2 / num / norm_factor)
+        rdf = np.array(rdf).mean(axis=0)
+        iname, cname = f'r ({symbols.ANGSTROM})', f'{pname} ({unit})'
+        mid, rdf = np.concatenate(([0], mid)), np.concatenate(([0], rdf))
+        index = pd.Index(data=mid, name=iname)
+        return pd.DataFrame(data={cname: rdf}, index=index)
+
+    def saveData(self, data, task, float_format='%.4f'):
+        """
+        Save the data data.
+        """
+        outfile = self.jobname + self.DATA_EXT % task
+        data.to_csv(outfile, float_format=float_format)
+        log(f'{self.NAME[task].capitalize()} data written into {outfile}')
+
+    def plot(self, data, task, pos_x=False):
+        """
+        Plot the task data and save the figure.
+        """
         import matplotlib
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-        ax.plot(mid, rdf)
+        ax.plot(data.index, data)
+        if pos_x:
+            ax.set_xlim([data[data > 0].iloc[0].name, data.iloc[-1].name])
         ax.set_xlabel(data.index.name)
-        ax.set_ylabel(label)
-        ax.set_xlim([data[data > 0].iloc[0].name, data.iloc[-1].name])
-        fig.savefig(self.rdf_png)
-        log(f'Radial distribution function figure saved as {self.rdf_png}')
+        ax.set_ylabel(data.columns.values.tolist()[0])
+        fname = self.jobname + self.PNG_EXT % task
+        fig.savefig(fname)
+        log(f'{self.NAME[task].capitalize()} figure saved as {fname}')
 
 
 logger = None

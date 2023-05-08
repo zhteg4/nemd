@@ -24,7 +24,7 @@ zstyle ':vcs_info:git:*' formats 'on %b'
 setopt no_nomatch
 # Set up the prompt (with git branch name)
 setopt PROMPT_SUBST
-PROMPT='%n in ${PWD/#$HOME/~} ${vcs_info_msg_0_} %# '
+PROMPT='%F{green}%n%f %F{blue}%~%f %F{red}${vcs_info_msg_0_}%f$ '
 
 alias cdg='cd ~/git/nemd'
 alias cdw='cd ~/scr/work'
