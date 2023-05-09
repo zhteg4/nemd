@@ -526,12 +526,15 @@ class DistanceCell:
     def addGids(self, gids):
         self.extg_gids.update(gids)
 
-    def setGraph(self, gindex=10):
+    def setGraph(self, mol_num, min_num=1000):
         """
         Set graph using grid intersection as nodes and connect neighbor nodes.
+
+        :param mol_num int: molecule number.
+        :param min_num int: minimum number of sites.
         """
         self.graph = nx.Graph()
-        mgrid = self.span.min() / gindex
+        mgrid = pow(np.prod(self.span) / max([mol_num, min_num]), 1 / 3)
         self.gindexes = (self.span / mgrid).round().astype(int)
         self.ggrids = self.span / self.gindexes
         indexes = [range(x) for x in self.gindexes]
@@ -563,21 +566,25 @@ class DistanceCell:
         """
         mcc = max(nx.connected_components(self.graph), key=len)
         cut = min(max(self.gindexes) / 3, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
+        snum = num * 2 if len(mcc) > num * 2 else len(mcc)
         largest_cc = {
             x: len(nx.generators.ego_graph(self.graph, x, radius=cut))
-            for x in random.sample(list(mcc), num * 2)
+            for x in random.sample(list(mcc), snum)
         }
         largest_cc_rv = collections.defaultdict(list)
         for node, size in largest_cc.items():
             largest_cc_rv[size].append(node)
         sizes = sorted(set(largest_cc.values()), reverse=True)
         sel_nodes, sel_num = [], 0
-        while len(sel_nodes) < num:
+        while len(sel_nodes) < num and sizes:
             size = sizes.pop(0)
             sub_nodes = largest_cc_rv[size]
             np.random.shuffle(sub_nodes)
             sel_nodes += sub_nodes
-        return [self.ggrids * x for x in sel_nodes]
+        return [
+            self.ggrids * (np.random.uniform(-0.25, 0.25, 3) + x)
+            for x in sel_nodes
+        ]
 
     def getDistsWithIds(self, ids):
         dists = [

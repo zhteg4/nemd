@@ -573,7 +573,7 @@ class FragMols(FragMixIn):
                                        cut=self.cell_cut,
                                        resolution=traj.DistanceCell.AUTO)
         self.dcell.setUp()
-        self.dcell.setGraph()
+        self.dcell.setGraph(len(self.mols))
 
     def add(self, gids):
         """
@@ -645,7 +645,7 @@ class FragMols(FragMixIn):
                     self.failed_num += 1
                     frags[0].resetVals()
                     # The method backmove() deletes some extg_gids
-                    self.dcell.setGraph()
+                    self.dcell.setGraph(len(self.mols))
                     self.placeInitFrag(frags[0])
                     self.reportRelocation(frags[0])
             log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
@@ -711,7 +711,8 @@ class FragMols(FragMixIn):
                            dreader=self.data_reader,
                            visible=list(self.dcell.extg_gids),
                            points=points)
-        raise ValueError(f'Failed to relocate the dead molecule.')
+        raise ValueError(f'Failed to relocate the dead molecule. '
+                         f'({len(self.dcell.extg_gids)}/{len(self.mols)})')
 
     def reportRelocation(self, frag):
         """
