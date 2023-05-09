@@ -582,7 +582,7 @@ class DistanceCell:
             np.random.shuffle(sub_nodes)
             sel_nodes += sub_nodes
         return [
-            self.ggrids * (np.random.uniform(-0.25, 0.25, 3) + x)
+            self.ggrids * (np.random.normal(-0.5, 0.5, 3) + x)
             for x in sel_nodes
         ]
 
