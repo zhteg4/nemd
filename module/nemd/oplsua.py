@@ -7,6 +7,7 @@ This module handles opls-ua related typing, parameterization, assignment,
 datafile, and in-script.
 """
 import types
+import string
 import base64
 import chemparse
 import itertools
@@ -65,6 +66,131 @@ def get_opls_parser():
     opls_parser = OplsParser()
     opls_parser.read()
     return opls_parser
+
+
+class FixWriter:
+    """
+    This the wrapper for LAMMPS fix command writer. which usually includes a
+    unfix after the run command.
+    """
+
+    TEMP_BERENDSEN = 'temp/berendsen'
+    PRESS_BERENDSEN = 'press/berendsen'
+
+    RUN_STEP = "run %s\n"
+    UNFIX = "unfix %s\n"
+    FIX_NVE = "fix %s all nve\n"
+    FIX_NVT = "fix %s all nvt temp {stemp} {temp} {tdamp}\n"
+    FIX_TEMP_BERENDSEN = "fix %s all " + TEMP_BERENDSEN + " {stemp} {temp} {tdamp}\n"
+    FIX_PRESS_BERENDSEN = "fix %s all " + PRESS_BERENDSEN + " iso {press} {press} {pdamp}\n"
+
+    def __init__(self, fh, options=None, mols=None):
+        """
+        :param fh '_io.TextIOWrapper': file handdle to write fix commands
+        :param options 'argparse.Namespace': command line options
+        :param mols dict: id and rdkit.Chem.rdchem.Mol
+        """
+        self.fh = fh
+        self.options = options
+        self.mols = mols
+        self.cmd = []
+        self.mols = {} if mols is None else mols
+        self.mol_num = len(self.mols)
+        self.atom_num = sum([x.GetNumAtoms() for x in self.mols.values()])
+        self.testing = self.mol_num == 1 and self.atom_num < 10
+        self.stemp = self.options.stemp
+        self.temp = self.options.temp
+        self.tdamp = self.options.timestep * self.options.tdamp
+        self.press = self.options.press
+        self.pdamp = self.options.timestep * self.options.pdamp
+
+    def run(self):
+        """
+        Main method to run the writer.
+        """
+        self.test()
+        self.nvt(stemp=self.stemp, temp=self.stemp)
+        self.npt(stemp=self.stemp, temp=self.temp, press=self.press)
+        self.nvt(stemp=self.temp, temp=self.temp)
+        self.nve(nstep=50000)
+        self.write()
+
+    def test(self, nstep=10000):
+        """
+        Append command for testing and conformal search (more effect needed).
+
+        :nstep int: run this steps for time integration.
+        """
+        if not self.testing:
+            return
+        cmd = self.FIX_NVE + self.RUN_STEP % nstep + self.UNFIX
+        self.cmd.append(cmd)
+
+    def nve(self, nstep=10000):
+        """
+        Append command for constant energy and volume.
+
+        :nstep int: run this steps for time integration.
+        """
+        if self.testing:
+            return
+        # NVT on single molecule gives nan coords (guess due to translation)
+        cmd = self.FIX_NVE + self.RUN_STEP % nstep + self.UNFIX
+        self.cmd.append(cmd)
+
+    def nvt(self, nstep=20000, stemp=300, temp=300, style=TEMP_BERENDSEN):
+        """
+        Append command for constant volume and temperature.
+
+        :nstep int: run this steps for time integration
+        :stemp float: starting temperature
+        :temp float: target temperature
+        :style str: the style for the command
+        """
+        if self.testing:
+            return
+        if style == self.TEMP_BERENDSEN:
+            cmd = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
+                                                 temp=temp,
+                                                 tdamp=self.tdamp)
+        self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX)
+
+    def npt(self,
+            nstep=20000,
+            stemp=300,
+            temp=300,
+            press=1.,
+            style=PRESS_BERENDSEN):
+        """
+        Append command for constant pressure and temperature.
+
+        :nstep int: run this steps for time integration
+        :stemp int: starting temperature
+        :temp float: target temperature
+        :press float: target temperature
+        :style str: the style for the command
+        """
+        if self.testing:
+            return
+        if style == self.PRESS_BERENDSEN:
+            cmd1 = self.FIX_PRESS_BERENDSEN.format(press=press,
+                                                   pdamp=self.pdamp)
+            cmd2 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
+                                                  temp=temp,
+                                                  tdamp=self.tdamp)
+        self.cmd.append(cmd1 + cmd2 + self.RUN_STEP % nstep + self.UNFIX +
+                        self.UNFIX)
+
+    def write(self):
+        """
+        Write the command to the file.
+        """
+        for idx, cmd in enumerate(self.cmd, 1):
+            num = round(cmd.count('%s') / 2)
+            ids = [f'{idx}{string.ascii_lowercase[x]}' for x in range(num)]
+            ids += [x for x in reversed(ids)]
+            cmd_with_id = cmd % tuple(ids)
+            self.fh.write(cmd_with_id)
 
 
 class OplsTyper:
@@ -771,23 +897,14 @@ class LammpsIn(fileutils.LammpsInput):
     HARMONIC = 'harmonic'
     LJ_COUL = 'lj/coul'
 
-    def __init__(self,
-                 jobname,
-                 lj_cut=11.,
-                 coul_cut=11.,
-                 timestep=1,
-                 concise=True):
+    def __init__(self, jobname, options=None, concise=True):
         """
         :param jobname str: jobname based on which out filenames are defined
-        :param lj_cut float: cut off distance for Lennard-Jones potential
-        :param coul_cut float: cut off distance for Coulombic pairwise interaction
-        :param timestep float: timestep size for subsequent molecular dynamics
-            simulations
+        :param options 'argparse.Namespace': command line options
+        :param concise bool: don't write unused force field info to the datafile
         """
         self.jobname = jobname
-        self.lj_cut = lj_cut
-        self.coul_cut = coul_cut
-        self.timestep = timestep
+        self.options = options
         self.concise = concise
         self.lammps_in = self.jobname + self.IN_EXT
         self.lammps_data = self.jobname + self.DATA_EXT
@@ -797,10 +914,11 @@ class LammpsIn(fileutils.LammpsInput):
         self.angle_style = self.HARMONIC
         self.dihedral_style = self.OPLS
         self.improper_style = self.CVFF
+        lj_cut, coul_cut = self.options.lj_cut, self.options.coul_cut
+        lj_coul_cut = f"{lj_cut} {coul_cut}"
         self.pair_style = {
-            self.LJ_CUT_COUL_LONG:
-            f"{self.LJ_CUT_COUL_LONG} {self.lj_cut} {self.coul_cut}",
-            self.LJ_CUT: f"{self.LJ_CUT} {self.lj_cut}"
+            self.LJ_CUT: f"{self.LJ_CUT} {lj_cut}",
+            self.LJ_CUT_COUL_LONG: f"{self.LJ_CUT_COUL_LONG} {lj_coul_cut}"
         }
         self.in_fh = None
         self.is_debug = environutils.is_debug()
@@ -876,7 +994,7 @@ class LammpsIn(fileutils.LammpsInput):
         """
         Write commands related to timestep.
         """
-        self.in_fh.write(f'timestep {self.timestep}\n')
+        self.in_fh.write(f'timestep {self.options.timestep}\n')
         self.in_fh.write('thermo_modify flush yes\n')
         self.in_fh.write('thermo 1000\n')
 
@@ -889,59 +1007,16 @@ class LammpsIn(fileutils.LammpsInput):
         self.in_fh.write('compute 2 all improper/local chi\n')
         self.in_fh.write('dump 1i all local 1000 tmp.dump index c_1[1] c_2\n')
 
-    def writeRun(self,
-                 start_temp=10.,
-                 target_temp=None,
-                 tdamp=100,
-                 pdamp=1000,
-                 nve_only=False,
-                 npt=True):
+    def writeRun(self, mols=None, options=None):
         """
         Write command to further equilibrate the system.
 
-        :param start_temp float: the starting temperature for relaxation
-        :param target_temp float: the target temperature at the end of the relaxation
-        :param tdamp float: damping factor to control temperature
-        :param pdamp float: damping factor to control pressure
-        :param nve_only bool: only run nve ensemble (one single small molecule)
-        :param npt bool: run npt ensemble (molecule can fill the space)
+        :param mols dict: id and rdkit.Chem.rdchem.Mol
+        :param options 'argparse.Namespace': command line options
         """
-        self.in_fh.write(f"velocity all create {start_temp} 482748\n")
-        if nve_only:
-            # NVT on single molecule gives nan coords (guess due to translation)
-            self.in_fh.write("fix 1 all nve\n")
-            self.in_fh.write("run 10000\n")
-            return
-
-        self.in_fh.write(
-            f"fix 1 all nvt temp {start_temp} {start_temp} {self.timestep * tdamp}\n"
-        )
-        self.in_fh.write("run 20000\n")
-
-        if not npt:
-            return
-
-        # Run relaxation on systems of multiple molecules
-        self.in_fh.write("unfix 1\n")
-        self.in_fh.write(
-            f"fix 1 all npt temp {start_temp} {start_temp} {self.timestep * tdamp} "
-            f"iso 1 1 {self.timestep * pdamp}\n")
-        self.in_fh.write("run 10000\n")
-
-        if target_temp is None:
-            return
-
-        self.in_fh.write("unfix 1\n")
-        self.in_fh.write(
-            f"fix 1 all npt temp {start_temp} {target_temp} {self.timestep * tdamp} "
-            f"iso 1 1 {self.timestep * pdamp}\n")
-        self.in_fh.write("run 100000\n")
-
-        self.in_fh.write("unfix 1\n")
-        self.in_fh.write(
-            f"fix 1 all npt temp {target_temp} {target_temp} {self.timestep * tdamp} "
-            f"iso 1 1 {self.timestep * pdamp}\n")
-        self.in_fh.write("run 100000\n")
+        self.in_fh.write(f"velocity all create {self.options.stemp} 482748\n")
+        fwriter = FixWriter(self.in_fh, options=options, mols=mols)
+        fwriter.run()
 
 
 class LammpsData(LammpsIn):
@@ -1097,9 +1172,7 @@ class LammpsData(LammpsIn):
         """
         Write command to further equilibrate the system.
         """
-        nve_only = len(self.mols) == 1 and self.mols[1].GetNumAtoms() < 10
-        npt = len(self.mols) > 1
-        super().writeRun(*arg, nve_only=nve_only, npt=npt, **kwarg)
+        super().writeRun(*arg, mols=self.mols, options=self.options, **kwarg)
 
     def writeData(self, adjust_coords=True):
         """
@@ -1594,7 +1667,7 @@ class LammpsData(LammpsIn):
             # PBC should be 2x larger than the cutoff, otherwise one particle
             # can interact with another particle within its cutoff twice: within
             # the box and across the PBC.
-            cut_x2 = min([self.lj_cut, self.coul_cut]) * 2
+            cut_x2 = min([self.options.lj_cut, self.options.coul_cut]) * 2
             min_box = (cut_x2, cut_x2, cut_x2,)  # yapf: disable
         if buffer is None:
             buffer = self.BUFFER  # yapf: disable

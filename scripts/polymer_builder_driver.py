@@ -12,6 +12,7 @@ import math
 import copy
 import scipy
 import lammps
+import argparse
 import itertools
 import functools
 import collections
@@ -38,6 +39,14 @@ FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
 FlAG_MOL_NUM = '-mol_num'
 FlAG_DENSITY = '-density'
+FLAG_TIMESTEP = '-timestep'
+FLAG_STEMP = '-stemp'
+FLAG_TEMP = '-temp'
+FLAG_TDAMP = '-tdamp'
+FLAG_PRESS = '-press'
+FLAG_PDAMP = '-pdamp'
+FLAG_LJ_CUT = '-lj_cut'
+FLAG_COUL_CUT = '-coul_cut'
 FlAG_FORCE_FIELD = '-force_field'
 FlAG_CELL = '-cell'
 GRID = 'grid'
@@ -141,6 +150,56 @@ def get_parser():
         default=0.5,
         help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
     )
+    parser.add_argument(FLAG_TIMESTEP,
+                        metavar='fs',
+                        type=parserutils.type_positive_float,
+                        default=1,
+                        help=f'Timestep for the MD simulation.')
+    parser.add_argument(
+        FLAG_STEMP,
+        metavar='K',
+        type=parserutils.type_positive_float,
+        default=10,
+        # 'Initialize the atoms with this temperature.'
+        help=argparse.SUPPRESS)
+    parser.add_argument(FLAG_TEMP,
+                        metavar=FLAG_TEMP[1:].upper(),
+                        type=parserutils.type_positive_float,
+                        default=1,
+                        help=f'The equilibrium temperature target .')
+    parser.add_argument(
+        FLAG_TDAMP,
+        metavar=FLAG_TDAMP[1:].upper(),
+        type=parserutils.type_positive_float,
+        default=100,
+        # Temperature damping parameter (x timestep to get the param)
+        help=argparse.SUPPRESS)
+    parser.add_argument(FLAG_PRESS,
+                        metavar='at',
+                        type=float,
+                        default=1,
+                        help="The equilibrium pressure target.")
+    parser.add_argument(
+        FLAG_PDAMP,
+        metavar=FLAG_PDAMP[1:].upper(),
+        type=parserutils.type_positive_float,
+        default=1000,
+        # Pressure damping parameter (x timestep to get the param)
+        help=argparse.SUPPRESS)
+    parser.add_argument(
+        FLAG_LJ_CUT,
+        metavar=FLAG_LJ_CUT[1:].upper(),
+        type=parserutils.type_positive_float,
+        default=11.,
+        # Cut off for the lennard jones
+        help=argparse.SUPPRESS)
+    parser.add_argument(
+        FLAG_COUL_CUT,
+        metavar=FLAG_COUL_CUT[1:].upper(),
+        type=parserutils.type_positive_float,
+        default=11.,
+        # Cut off for the coulombic interaction
+        help=argparse.SUPPRESS)
     parser.add_argument(
         FlAG_FORCE_FIELD,
         metavar=FlAG_FORCE_FIELD[1:].upper(),
@@ -237,9 +296,7 @@ class AmorphousCell(object):
         Build polymer from monomers if provided.
         """
         for cru, cru_num, in zip(self.options.cru, self.options.cru_num):
-            polym = Polymer(cru,
-                            cru_num,
-                            wmodel=self.options.force_field.model)
+            polym = Polymer(cru, cru_num, options=self.options)
             polym.run()
             self.polymers.append(polym)
 
@@ -272,7 +329,7 @@ class AmorphousCell(object):
     def createCell(self, cell_type=PACK, mini_density=MINIMUM_DENSITY):
 
         cell_builder = PackedCell if cell_type == PACK else GrowedCell
-        cell = cell_builder(self.polymers, self.options.mol_num)
+        cell = cell_builder(self.polymers, self.options)
         cell.setMols()
         cell.setDataReader()
         cell.setAtomMapNum()
@@ -294,7 +351,11 @@ class AmorphousCell(object):
         """
         Write amorphous cell into data file
         """
-        lmw = oplsua.LammpsData(self.mols, self.ff, self.jobname, box=self.box)
+        lmw = oplsua.LammpsData(self.mols,
+                                self.ff,
+                                self.jobname,
+                                box=self.box,
+                                options=self.options)
         lmw.writeData(adjust_coords=False)
         if lmw.total_charge:
             log_warning(f'The system has a net charge of {lmw.total_charge}')
@@ -386,15 +447,13 @@ class PackedCell:
     MAX_TRIAL_PER_DENSITY = 100
     MAX_TRIAL_PER_MOL = 10000
 
-    def __init__(self, polymers, polym_nums, density=0.5):
+    def __init__(self, polymers, options):
         """
         :param polymers 'Polymer': one polymer object for each type
-        :param polym_nums list: number of polymers per polymer type
-        :param density float: density of the molecules in cell
+        :param options 'argparse.Namespace': command line options
         """
         self.polymers = polymers
-        self.polym_nums = polym_nums
-        self.density = density
+        self.options = options
         self.box = None
         self.mols = {}
 
@@ -430,7 +489,8 @@ class PackedCell:
         """
         Set periodic boundary box size.
         """
-        weight = sum(x.mw * y for x, y in zip(self.polymers, self.polym_nums))
+        weight = sum(x.mw * y
+                     for x, y in zip(self.polymers, self.options.mol_num))
         vol = weight / self.density / scipy.constants.Avogadro
         edge = math.pow(vol, 1 / 3)  # centimeter
         edge *= scipy.constants.centi / scipy.constants.angstrom
@@ -442,7 +502,8 @@ class PackedCell:
         Set molecules.
         """
         mols = [
-            copy.copy(x.polym) for x, y in zip(self.polymers, self.polym_nums)
+            copy.copy(x.polym)
+            for x, y in zip(self.polymers, self.options.mol_num)
             for _ in range(y)
         ]
         self.mols = {i: x for i, x in enumerate(mols, start=1)}
@@ -454,7 +515,10 @@ class PackedCell:
         Set data reader with clash parameters.
         """
 
-        lmw = oplsua.LammpsData(self.mols, self.polymers[0].ff, 'tmp')
+        lmw = oplsua.LammpsData(self.mols,
+                                self.polymers[0].ff,
+                                'tmp',
+                                options=self.options)
         lmw.writeData()
         self.df_reader = oplsua.DataFileReader('tmp.data')
         self.df_reader.run()
@@ -628,25 +692,22 @@ class Polymer(object):
     IS_MONO = prop_names.IS_MONO
     MONO_ID = prop_names.MONO_ID
 
-    def __init__(self, cru, cru_num, ff=None, wmodel=WATER_TIP3P):
+    def __init__(self, cru, cru_num, options=None):
         """
         :param cru str: the smiles string for monomer
         :param cru_num int: the number of monomers per polymer
-        :param ff str: the file path for the force field
-        :param wmodel str: the model type for water
+        :param options 'argparse.Namespace': command line options
         """
         self.cru = cru
         self.cru_num = cru_num
-        self.ff = ff
-        self.wmodel = wmodel
+        self.options = options
         self.polym = None
         self.polym_Hs = None
         self.box = None
         self.cru_mol = None
         self.molecules = []
         self.buffer = oplsua.LammpsData.BUFFER
-        if self.ff is None:
-            self.ff = oplsua.get_opls_parser()
+        self.ff = oplsua.get_opls_parser()
 
     def run(self):
         """
@@ -750,7 +811,8 @@ class Polymer(object):
         """
         Assign atom types to the structure.
         """
-        ff_typer = oplsua.OplsTyper(self.polym, wmodel=self.wmodel)
+        wmodel = self.options.force_field.model
+        ff_typer = oplsua.OplsTyper(self.polym, wmodel=wmodel)
         ff_typer.run()
 
     def embedMol(self, trans=False):
@@ -773,14 +835,6 @@ class Polymer(object):
 
         trans_conf = Conformer(self.polym, self.cru_mol, trans=trans)
         trans_conf.run()
-
-    def write(self):
-        """
-        Write lammps data file.
-        """
-        lmw = oplsua.LammpsData(self.ff, self.jobname, mols=self.mols)
-        lmw.writeData()
-        lmw.writeLammpsIn()
 
     @property
     def molecular_weight(self):
