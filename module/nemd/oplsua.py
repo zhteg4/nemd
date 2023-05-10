@@ -77,7 +77,7 @@ class FixWriter:
     TEMP_BERENDSEN = 'temp/berendsen'
     PRESS_BERENDSEN = 'press/berendsen'
 
-    RUN_STEP = "run %s\n"
+    RUN_STEP = "run %i\n"
     UNFIX = "unfix %s\n"
     FIX_NVE = "fix %s all nve\n"
     FIX_NVT = "fix %s all nvt temp {stemp} {temp} {tdamp}\n"
@@ -109,13 +109,14 @@ class FixWriter:
         Main method to run the writer.
         """
         self.test()
-        self.nvt(stemp=self.stemp, temp=self.stemp)
-        self.npt(stemp=self.stemp, temp=self.temp, press=self.press)
-        self.nvt(stemp=self.temp, temp=self.temp)
-        self.nve(nstep=50000)
+        self.nvt(nstep=1E3, stemp=self.stemp, temp=self.stemp)
+        self.npt(nstep=1E4, stemp=self.stemp, temp=self.temp, press=self.press)
+        self.npt(nstep=1E6, stemp=self.temp, temp=self.temp, press=self.press)
+        self.nvt(nstep=1E4, stemp=self.temp, temp=self.temp)
+        self.nve(nstep=1E6)
         self.write()
 
-    def test(self, nstep=10000):
+    def test(self, nstep=1E3):
         """
         Append command for testing and conformal search (more effect needed).
 
@@ -126,7 +127,7 @@ class FixWriter:
         cmd = self.FIX_NVE + self.RUN_STEP % nstep + self.UNFIX
         self.cmd.append(cmd)
 
-    def nve(self, nstep=10000):
+    def nve(self, nstep=1E3):
         """
         Append command for constant energy and volume.
 
@@ -138,7 +139,7 @@ class FixWriter:
         cmd = self.FIX_NVE + self.RUN_STEP % nstep + self.UNFIX
         self.cmd.append(cmd)
 
-    def nvt(self, nstep=20000, stemp=300, temp=300, style=TEMP_BERENDSEN):
+    def nvt(self, nstep=1E4, stemp=300, temp=300, style=TEMP_BERENDSEN):
         """
         Append command for constant volume and temperature.
 
@@ -150,10 +151,12 @@ class FixWriter:
         if self.testing:
             return
         if style == self.TEMP_BERENDSEN:
-            cmd = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
-                                                 temp=temp,
-                                                 tdamp=self.tdamp)
-        self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX)
+            cmd1 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
+                                                  temp=temp,
+                                                  tdamp=self.tdamp)
+            cmd2 = self.FIX_NVE
+        self.cmd.append(cmd1 + cmd2 + self.RUN_STEP % nstep + self.UNFIX +
+                        self.UNFIX)
 
     def npt(self,
             nstep=20000,
@@ -178,8 +181,9 @@ class FixWriter:
             cmd2 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
                                                   temp=temp,
                                                   tdamp=self.tdamp)
-        self.cmd.append(cmd1 + cmd2 + self.RUN_STEP % nstep + self.UNFIX +
-                        self.UNFIX)
+            cmd3 = self.FIX_NVE
+        self.cmd.append(cmd1 + cmd2 + cmd3 + self.RUN_STEP % nstep +
+                        self.UNFIX + self.UNFIX + self.UNFIX)
 
     def write(self):
         """

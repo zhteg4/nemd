@@ -5,6 +5,9 @@
 """
 This polymer driver builds polymers from constitutional repeat units and pack
 molecules into condensed phase amorphous cell.
+
+'mpirun -np 4 lmp_mpi -in polymer_builder.in' runs with 4 processors
+'lmp_serial < polymer_builder.in' runs with 1 processor
 """
 import os
 import sys

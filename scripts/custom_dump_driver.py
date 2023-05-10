@@ -87,7 +87,7 @@ def get_parser():
                         default=[XYZ],
                         nargs='+',
                         help=f'{XYZ} writes out .xyz for VMD visualization;'
-                        f'{CLASH} check clashes for each frame.')
+                        f' {CLASH} check clashes for each frame.')
 
     jobutils.add_job_arguments(parser)
     return parser
@@ -410,7 +410,9 @@ class CustomDump(object):
         Plot the task data and save the figure.
         """
         import matplotlib
-        matplotlib.use('Agg')
+        obackend = matplotlib.get_backend()
+        backend = obackend if self.options.interactive else 'Agg'
+        matplotlib.use(backend)
         import matplotlib.pyplot as plt
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
@@ -420,7 +422,12 @@ class CustomDump(object):
         ax.set_xlabel(data.index.name)
         ax.set_ylabel(data.columns.values.tolist()[0])
         fname = self.jobname + self.PNG_EXT % task
+        if self.options.interactive:
+            print(
+                f"Showing {task}. Click X to close the figure and continue..")
+            plt.show(block=True)
         fig.savefig(fname)
+        matplotlib.use(obackend)
         log(f'{self.NAME[task].capitalize()} figure saved as {fname}')
 
 
