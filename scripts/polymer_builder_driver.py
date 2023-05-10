@@ -12,7 +12,6 @@ import math
 import copy
 import scipy
 import lammps
-import argparse
 import itertools
 import functools
 import collections
@@ -39,15 +38,6 @@ FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
 FlAG_MOL_NUM = '-mol_num'
 FlAG_DENSITY = '-density'
-FLAG_TIMESTEP = '-timestep'
-FLAG_STEMP = '-stemp'
-FLAG_TEMP = '-temp'
-FLAG_TDAMP = '-tdamp'
-FLAG_PRESS = '-press'
-FLAG_PDAMP = '-pdamp'
-FLAG_LJ_CUT = '-lj_cut'
-FLAG_COUL_CUT = '-coul_cut'
-FlAG_FORCE_FIELD = '-force_field'
 FlAG_CELL = '-cell'
 GRID = 'grid'
 PACK = 'pack'
@@ -100,115 +90,6 @@ def log_error(msg):
     """
     log(msg + '\nAborting...', timestamp=True)
     sys.exit(1)
-
-
-def get_parser():
-    """
-    The user-friendly command-line parser.
-
-    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
-        out of sys.argv.
-    """
-    parser = parserutils.get_parser(description=__doc__)
-    parser.add_argument(
-        FlAG_CRU,
-        metavar=FlAG_CRU.upper(),
-        type=functools.partial(parserutils.type_monomer_smiles,
-                               allow_mol=True),
-        nargs='+',
-        help='SMILES of the constitutional repeat unit (monomer)')
-    parser.add_argument(
-        FlAG_CRU_NUM,
-        metavar=FlAG_CRU_NUM[1:].upper(),
-        type=parserutils.type_positive_int,
-        nargs='+',
-        help='Number of constitutional repeat unit per polymer')
-    parser.add_argument(FlAG_MOL_NUM,
-                        metavar=FlAG_MOL_NUM[1:].upper(),
-                        type=parserutils.type_positive_int,
-                        nargs='+',
-                        help='Number of molecules in the amorphous cell')
-    parser.add_argument(FlAG_SEED,
-                        metavar=FlAG_SEED[1:].upper(),
-                        type=parserutils.type_random_seed,
-                        help='Set random state using this seed.')
-    parser.add_argument(
-        FlAG_CELL,
-        metavar=FlAG_CELL[1:].upper(),
-        choices=[GRID, PACK, GROW],
-        default=GROW,
-        help=f'Amorphous cell type: \'{GRID}\' grids the space and '
-        f'put molecules into sub-cells; \'{PACK}\' randomly '
-        f'rotates and translates molecules; \'{GROW}\' grows '
-        f'molecules from the smallest rigid fragments.')
-    parser.add_argument(
-        FlAG_DENSITY,
-        metavar=FlAG_DENSITY[1:].upper(),
-        type=functools.partial(parserutils.type_ranged_float,
-                               bottom=AmorphousCell.MINIMUM_DENSITY,
-                               top=30),
-        default=0.5,
-        help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
-    )
-    parser.add_argument(FLAG_TIMESTEP,
-                        metavar='fs',
-                        type=parserutils.type_positive_float,
-                        default=1,
-                        help=f'Timestep for the MD simulation.')
-    parser.add_argument(
-        FLAG_STEMP,
-        metavar='K',
-        type=parserutils.type_positive_float,
-        default=10,
-        # 'Initialize the atoms with this temperature.'
-        help=argparse.SUPPRESS)
-    parser.add_argument(FLAG_TEMP,
-                        metavar=FLAG_TEMP[1:].upper(),
-                        type=parserutils.type_positive_float,
-                        default=1,
-                        help=f'The equilibrium temperature target .')
-    parser.add_argument(
-        FLAG_TDAMP,
-        metavar=FLAG_TDAMP[1:].upper(),
-        type=parserutils.type_positive_float,
-        default=100,
-        # Temperature damping parameter (x timestep to get the param)
-        help=argparse.SUPPRESS)
-    parser.add_argument(FLAG_PRESS,
-                        metavar='at',
-                        type=float,
-                        default=1,
-                        help="The equilibrium pressure target.")
-    parser.add_argument(
-        FLAG_PDAMP,
-        metavar=FLAG_PDAMP[1:].upper(),
-        type=parserutils.type_positive_float,
-        default=1000,
-        # Pressure damping parameter (x timestep to get the param)
-        help=argparse.SUPPRESS)
-    parser.add_argument(
-        FLAG_LJ_CUT,
-        metavar=FLAG_LJ_CUT[1:].upper(),
-        type=parserutils.type_positive_float,
-        default=11.,
-        # Cut off for the lennard jones
-        help=argparse.SUPPRESS)
-    parser.add_argument(
-        FLAG_COUL_CUT,
-        metavar=FLAG_COUL_CUT[1:].upper(),
-        type=parserutils.type_positive_float,
-        default=11.,
-        # Cut off for the coulombic interaction
-        help=argparse.SUPPRESS)
-    parser.add_argument(
-        FlAG_FORCE_FIELD,
-        metavar=FlAG_FORCE_FIELD[1:].upper(),
-        type=parserutils.type_force_field,
-        default=oplsua.OplsTyper.OPLSUA_TIP3P,
-        help='The force field type (and model for water separated with comma).'
-    )
-    jobutils.add_job_arguments(parser)
-    return parser
 
 
 class Validator:
@@ -357,8 +238,9 @@ class AmorphousCell(object):
                                 box=self.box,
                                 options=self.options)
         lmw.writeData(adjust_coords=False)
-        if lmw.total_charge:
-            log_warning(f'The system has a net charge of {lmw.total_charge}')
+        if round(lmw.total_charge, 4):
+            log_warning(
+                f'The system has a net charge of {lmw.total_charge:.4f}')
         lmw.writeLammpsIn()
         log(f'Data file written into {lmw.lammps_data}')
         log(f'In script written into {lmw.lammps_in}')
@@ -833,7 +715,10 @@ class Polymer(object):
             Chem.GetSymmSSSR(self.polym)
             return
 
-        trans_conf = Conformer(self.polym, self.cru_mol, trans=trans)
+        trans_conf = Conformer(self.polym,
+                               self.cru_mol,
+                               options=self.options,
+                               trans=trans)
         trans_conf.run()
 
     @property
@@ -857,7 +742,7 @@ class Conformer(object):
     def __init__(self,
                  polym,
                  original_cru_mol,
-                 ff=None,
+                 options=None,
                  trans=True,
                  jobname=None,
                  minimization=False):
@@ -865,19 +750,18 @@ class Conformer(object):
         :param polym 'rdkit.Chem.rdchem.Mol': the polymer to set conformer
         :param original_cru_mol 'rdkit.Chem.rdchem.Mol': the monomer mol
             constructing the polymer
-        :param ff 'OplsParser': force field information.
+        :param options 'argparse.Namespace': command line options.
         :param trans bool: Whether all-tran conformation is requested.
         :param jobname str: The jobname
         :param minimization bool: Whether LAMMPS minimization is performed.
         """
         self.polym = polym
         self.original_cru_mol = original_cru_mol
-        self.ff = ff
+        self.options = options
         self.trans = trans
         self.jobname = jobname
         self.minimization = minimization
-        if self.ff is None:
-            self.ff = oplsua.get_opls_parser()
+        self.ff = oplsua.get_opls_parser()
         if self.jobname is None:
             self.jobname = 'conf_search'
         self.relax_dir = '_relax'
@@ -1058,7 +942,10 @@ class Conformer(object):
         Adjust the conformer coordinates based on the force field.
         """
         mols = {1: self.polym}
-        self.lmw = oplsua.LammpsData(mols, self.ff, self.jobname)
+        self.lmw = oplsua.LammpsData(mols,
+                                     self.ff,
+                                     self.jobname,
+                                     options=self.options)
         if self.minimization:
             return
         self.lmw.adjustCoords()
@@ -1142,6 +1029,59 @@ class Conformer(object):
         for atom, mono_atom_idx in zip(mol.GetAtoms(), mono_atom_idxs):
             atom.SetProp(cls.MONO_ATOM_IDX, mono_atom_idx)
         return mol
+
+
+def get_parser():
+    """
+    The user-friendly command-line parser.
+
+    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
+        out of sys.argv.
+    """
+    parser = parserutils.get_parser(description=__doc__)
+    parser.add_argument(
+        FlAG_CRU,
+        metavar=FlAG_CRU.upper(),
+        type=functools.partial(parserutils.type_monomer_smiles,
+                               allow_mol=True),
+        nargs='+',
+        help='SMILES of the constitutional repeat unit (monomer)')
+    parser.add_argument(
+        FlAG_CRU_NUM,
+        metavar=FlAG_CRU_NUM[1:].upper(),
+        type=parserutils.type_positive_int,
+        nargs='+',
+        help='Number of constitutional repeat unit per polymer')
+    parser.add_argument(FlAG_MOL_NUM,
+                        metavar=FlAG_MOL_NUM[1:].upper(),
+                        type=parserutils.type_positive_int,
+                        nargs='+',
+                        help='Number of molecules in the amorphous cell')
+    parser.add_argument(FlAG_SEED,
+                        metavar=FlAG_SEED[1:].upper(),
+                        type=parserutils.type_random_seed,
+                        help='Set random state using this seed.')
+    parser.add_argument(
+        FlAG_CELL,
+        metavar=FlAG_CELL[1:].upper(),
+        choices=[GRID, PACK, GROW],
+        default=GROW,
+        help=f'Amorphous cell type: \'{GRID}\' grids the space and '
+        f'put molecules into sub-cells; \'{PACK}\' randomly '
+        f'rotates and translates molecules; \'{GROW}\' grows '
+        f'molecules from the smallest rigid fragments.')
+    parser.add_argument(
+        FlAG_DENSITY,
+        metavar=FlAG_DENSITY[1:].upper(),
+        type=functools.partial(parserutils.type_ranged_float,
+                               bottom=AmorphousCell.MINIMUM_DENSITY,
+                               top=30),
+        default=0.5,
+        help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
+    )
+    jobutils.add_md_arguments(parser)
+    jobutils.add_job_arguments(parser)
+    return parser
 
 
 logger = None

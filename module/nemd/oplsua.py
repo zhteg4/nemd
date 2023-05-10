@@ -97,7 +97,7 @@ class FixWriter:
         self.mols = {} if mols is None else mols
         self.mol_num = len(self.mols)
         self.atom_num = sum([x.GetNumAtoms() for x in self.mols.values()])
-        self.testing = self.mol_num == 1 and self.atom_num < 10
+        self.testing = self.mol_num < 2 and self.atom_num < 10
         self.stemp = self.options.stemp
         self.temp = self.options.temp
         self.tdamp = self.options.timestep * self.options.tdamp
@@ -1007,15 +1007,14 @@ class LammpsIn(fileutils.LammpsInput):
         self.in_fh.write('compute 2 all improper/local chi\n')
         self.in_fh.write('dump 1i all local 1000 tmp.dump index c_1[1] c_2\n')
 
-    def writeRun(self, mols=None, options=None):
+    def writeRun(self, mols=None):
         """
         Write command to further equilibrate the system.
 
         :param mols dict: id and rdkit.Chem.rdchem.Mol
-        :param options 'argparse.Namespace': command line options
         """
         self.in_fh.write(f"velocity all create {self.options.stemp} 482748\n")
-        fwriter = FixWriter(self.in_fh, options=options, mols=mols)
+        fwriter = FixWriter(self.in_fh, options=self.options, mols=mols)
         fwriter.run()
 
 
@@ -1172,7 +1171,7 @@ class LammpsData(LammpsIn):
         """
         Write command to further equilibrate the system.
         """
-        super().writeRun(*arg, mols=self.mols, options=self.options, **kwarg)
+        super().writeRun(*arg, mols=self.mols, **kwarg)
 
     def writeData(self, adjust_coords=True):
         """

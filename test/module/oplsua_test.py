@@ -1,18 +1,28 @@
 import os
 import re
-
-import numpy as np
 import pytest
+import numpy as np
 from rdkit import Chem
+
 from nemd import oplsua
+from nemd import jobutils
 from nemd import fileutils
 from nemd import testutils
 from nemd import rdkitutils
+from nemd import parserutils
 
 BUTANE = 'CCCC'
 CC3COOH = '[H]OC(=O)CCC(CC(C)C(=O)O[H])C(=O)O[H]'
 BUTANE_DATA = testutils.test_file(os.path.join('polym_builder',
                                                'cooh123.data'))
+
+
+def get_options(args=None):
+    if args is None:
+        args = []
+    parser = parserutils.get_parser()
+    jobutils.add_md_arguments(parser)
+    return parser.parse_args(args)
 
 
 class TestOplsTyper:
@@ -102,7 +112,8 @@ class TestLammpsIn:
 
     @pytest.fixture
     def lmp_in(self):
-        return oplsua.LammpsIn('lmp')
+        options = get_options()
+        return oplsua.LammpsIn('lmp', options=options)
 
     def testWriteLammpsIn(self, lmp_in, tmp_path):
         # Write LAMMPS in script without molecule structure known
@@ -117,10 +128,12 @@ class TestLammpsData:
     def lmp_data(self):
         mol1 = rdkitutils.get_mol_from_smiles(BUTANE)
         mol2 = rdkitutils.get_mol_from_smiles(CC3COOH)
+        mols = {1: mol1, 2: mol2}
         oplsua.OplsTyper(mol1).run()
         oplsua.OplsTyper(mol2).run()
         ff = oplsua.get_opls_parser()
-        return oplsua.LammpsData({1: mol1, 2: mol2}, ff, 'lmp')
+        options = get_options()
+        return oplsua.LammpsData(mols, ff, 'lmp', options=options)
 
     def testWriteData(self, lmp_data, tmp_path):
         with fileutils.chdir(tmp_path, rmtree=True):

@@ -12,9 +12,9 @@ LAMMPS Description
 0 dihedral types
 0 improper types
 
-0.00 3.91 xlo xhi
--1.56 2.35 ylo yhi
--1.56 2.35 zlo zhi
+-0.26 3.65 xlo xhi
+-1.81 2.10 ylo yhi
+-1.68 2.23 zlo zhi
 
 Masses
 
@@ -36,9 +36,9 @@ Angle Coeffs
 
 Atoms
 
-1 1 1 -0.8340 2.046 0.658 0.198
-2 1 2 0.4170 2.067 -0.241 -0.128
-3 1 2 0.4170 1.755 0.757 1.104
+1 1 1 -0.8340 1.495 0.262 0.524
+2 1 2 0.4170 2.273 0.738 0.236
+3 1 2 0.4170 1.320 -0.556 0.059
 
 Bonds
 
