@@ -14,12 +14,13 @@ import itertools
 import collections
 import numpy as np
 from rdkit import Chem
+from scipy import constants
 from collections import namedtuple
 
 from nemd import symbols
 from nemd import logutils
 from nemd import fileutils
-from nemd import constants
+from nemd import constants as nconstants
 from nemd import environutils
 
 BOND_ATM_ID = 'bond_atm_id'
@@ -28,7 +29,6 @@ DIHE_ATM_ID = 'dihe_atm_id'
 RES_NUM = 'res_num'
 IMPLICIT_H = 'implicit_h'
 TYPE_ID = 'type_id'
-LARGE_NUM = constants.LARGE_NUM
 
 ATOM_TYPE = namedtuple('ATOM_TYPE', [
     'id', 'formula', 'symbol', 'description', 'atomic_number', 'mass', 'conn'
@@ -98,22 +98,36 @@ class FixWriter:
         self.mol_num = len(self.mols)
         self.atom_num = sum([x.GetNumAtoms() for x in self.mols.values()])
         self.testing = self.mol_num < 2 and self.atom_num < 10
+        self.timestep = self.options.timestep
+        self.relax_time = self.options.relax_time
+        self.prod_time = self.options.prod_time
         self.stemp = self.options.stemp
         self.temp = self.options.temp
         self.tdamp = self.options.timestep * self.options.tdamp
         self.press = self.options.press
         self.pdamp = self.options.timestep * self.options.pdamp
+        nano_femto = constants.nano / constants.femto
+        self.relax_step = round(self.relax_time / self.timestep * nano_femto)
+        self.prod_step = round(self.prod_time / self.timestep * nano_femto)
 
     def run(self):
         """
         Main method to run the writer.
         """
         self.test()
-        self.nvt(nstep=1E3, stemp=self.stemp, temp=self.stemp)
-        self.npt(nstep=1E4, stemp=self.stemp, temp=self.temp, press=self.press)
-        self.npt(nstep=1E6, stemp=self.temp, temp=self.temp, press=self.press)
-        self.nvt(nstep=1E4, stemp=self.temp, temp=self.temp)
-        self.nve(nstep=1E6)
+        self.nvt(nstep=self.relax_step / 1E3,
+                 stemp=self.stemp,
+                 temp=self.stemp)
+        self.npt(nstep=self.relax_step / 1E2,
+                 stemp=self.stemp,
+                 temp=self.temp,
+                 press=self.press)
+        self.npt(nstep=self.relax_step,
+                 stemp=self.temp,
+                 temp=self.temp,
+                 press=self.press)
+        self.nvt(nstep=self.relax_step / 1E2, stemp=self.temp, temp=self.temp)
+        self.nve(nstep=self.prod_step)
         self.write()
 
     def test(self, nstep=1E3):
@@ -209,7 +223,7 @@ class OplsTyper:
     ANGLE_ATM_ID = ANGLE_ATM_ID
     DIHE_ATM_ID = DIHE_ATM_ID
     IMPLICIT_H = IMPLICIT_H
-    LARGE_NUM = constants.LARGE_NUM
+    LARGE_NUM = nconstants.LARGE_NUM
 
     # yapf: disable
     UA_WATER_TIP3P = UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)')

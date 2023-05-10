@@ -21,6 +21,8 @@ FLAG_PRESS = '-press'
 FLAG_PDAMP = '-pdamp'
 FLAG_LJ_CUT = '-lj_cut'
 FLAG_COUL_CUT = '-coul_cut'
+FLAG_RELAX_TIME = '-relax_time'
+FLAG_PROD_TIME = '-prod_time'
 FlAG_FORCE_FIELD = '-force_field'
 
 
@@ -95,10 +97,19 @@ def add_md_arguments(parser):
         default=11.,
         # Cut off for the coulombic interaction
         help=argparse.SUPPRESS)
+    parser.add_argument(FLAG_RELAX_TIME,
+                        metavar='ns',
+                        type=parserutils.type_positive_float,
+                        default=1,
+                        help='Relaxation simulation time.')
+    parser.add_argument(FLAG_PROD_TIME,
+                        metavar='ns',
+                        type=parserutils.type_positive_float,
+                        default=1,
+                        help='Production simulation time.')
     parser.add_argument(
         FlAG_FORCE_FIELD,
         metavar=FlAG_FORCE_FIELD[1:].upper(),
         type=parserutils.type_force_field,
         default=oplsua.OplsTyper.OPLSUA_TIP3P,
-        help='The force field type (and model for water separated with comma).'
-    )
+        help='The force field type (and water model separated with comma).')

@@ -12,6 +12,7 @@ import scipy
 import numpy as np
 import pandas as pd
 from scipy import constants
+
 from nemd import traj
 from nemd import symbols
 from nemd import oplsua
@@ -174,8 +175,7 @@ class CustomDump(object):
         :param last_pct float: average and std for the last frames of this percentage.
         """
 
-        self.frms = [x for x in traj.get_frames(self.options.custom_dump)
-                     ]  #[:10]
+        self.frms = [x for x in traj.get_frames(self.options.custom_dump)]
         self.time = np.array([x.getStep() for x in self.frms
                               ]) * constants.femto / constants.pico
         self.time_idx = pd.Index(data=self.time, name=self.TIME_LB)

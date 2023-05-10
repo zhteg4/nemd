@@ -73,12 +73,11 @@ def log(msg, timestamp=False):
     logutils.log(logger, msg, timestamp=timestamp)
 
 
-def log_warning(msg, timestamp=False):
+def log_warning(msg):
     """
     Print this warning message into log file.
 
     :param msg: the msg to print
-    :param timestamp bool: the msg to be printed
     """
     if not logger:
         return
