@@ -6,6 +6,7 @@
 This module handles opls-ua related typing, parameterization, assignment,
 datafile, and in-script.
 """
+import math
 import types
 import string
 import base64
@@ -84,6 +85,39 @@ class FixWriter:
     FIX_TEMP_BERENDSEN = "fix %s all " + TEMP_BERENDSEN + " {stemp} {temp} {tdamp}\n"
     FIX_PRESS_BERENDSEN = "fix %s all " + PRESS_BERENDSEN + " iso {press} {press} {pdamp}\n"
 
+    RECORD_BDRY = """
+    variable xl equal "xhi - xlo"
+    variable yl equal "yhi - ylo"
+    variable zl equal "zhi - zlo"
+    fix xl all ave/time 1 1 {every:d} v_xl start {start:d}
+    fix yl all ave/time 1 1 {every:d} v_yl start {start:d}
+    fix zl all ave/time 1 1 {every:d} v_zl start {start:d}
+    variable ave_xl equal f_xl
+    variable ave_yl equal f_yl
+    variable ave_zl equal f_zl
+    """
+
+    CHANGE_BDRY = """
+    print "Final Boundary: xl = ${xl}, yl = ${yl}, zl = ${zl}"
+    print "Averaged  xl = ${ave_xl} yl = ${ave_yl} zl = ${ave_zl}"
+    variable ave_xr equal "v_ave_xl / (xhi - xlo)"
+    variable ave_yr equal "v_ave_xl / (xhi - xlo)"
+    variable ave_zr equal "v_ave_xl / (xhi - xlo)"
+    change_box all x scale ${ave_xr} y scale ${ave_yr} z scale ${ave_zr} remap
+    variable ave_xr delete
+    variable ave_yr delete
+    variable ave_zr delete
+    variable ave_xl delete
+    variable ave_yl delete
+    variable ave_zl delete
+    unfix xl
+    unfix yl
+    unfix zl
+    variable xl delete
+    variable yl delete
+    variable zl delete
+    """
+
     def __init__(self, fh, options=None, mols=None):
         """
         :param fh '_io.TextIOWrapper': file handdle to write fix commands
@@ -122,10 +156,12 @@ class FixWriter:
                  stemp=self.stemp,
                  temp=self.temp,
                  press=self.press)
+        self.recordBdry()
         self.npt(nstep=self.relax_step,
                  stemp=self.temp,
                  temp=self.temp,
                  press=self.press)
+        self.cmd.append(self.CHANGE_BDRY)
         self.nvt(nstep=self.relax_step / 1E2, stemp=self.temp, temp=self.temp)
         self.nve(nstep=self.prod_step)
         self.write()
@@ -198,6 +234,15 @@ class FixWriter:
             cmd3 = self.FIX_NVE
         self.cmd.append(cmd1 + cmd2 + cmd3 + self.RUN_STEP % nstep +
                         self.UNFIX + self.UNFIX + self.UNFIX)
+
+    def recordBdry(self, start_pct=0.2):
+        """
+        Record the boundary during the time integration before unset.
+        :param start_pct float: exclude the first this percentage from average
+        """
+        start = math.floor(start_pct * self.relax_step)
+        every = self.relax_step - start
+        self.cmd.append(self.RECORD_BDRY.format(start=start, every=every))
 
     def write(self):
         """
