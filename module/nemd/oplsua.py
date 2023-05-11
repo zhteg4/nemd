@@ -24,6 +24,23 @@ from nemd import fileutils
 from nemd import constants as nconstants
 from nemd import environutils
 
+FLAG_TIMESTEP = '-timestep'
+FLAG_STEMP = '-stemp'
+FLAG_TEMP = '-temp'
+FLAG_TDAMP = '-tdamp'
+FLAG_PRESS = '-press'
+FLAG_PDAMP = '-pdamp'
+FLAG_LJ_CUT = '-lj_cut'
+FLAG_COUL_CUT = '-coul_cut'
+FLAG_RELAX_TIME = '-relax_time'
+FLAG_PROD_TIME = '-prod_time'
+FLAG_PROD_ENS = '-prod_ens'
+FlAG_FORCE_FIELD = '-force_field'
+NVT = 'NVT'
+NPT = 'NPT'
+NVE = 'NVE'
+ENSEMBLES = [NVE, NVT, NPT]
+
 BOND_ATM_ID = 'bond_atm_id'
 ANGLE_ATM_ID = 'angle_atm_id'
 DIHE_ATM_ID = 'dihe_atm_id'
@@ -96,6 +113,7 @@ class FixWriter:
     variable ave_yl equal f_yl
     variable ave_zl equal f_zl
     """
+    RECORD_BDRY = RECORD_BDRY.lstrip('\n')
 
     CHANGE_BDRY = """
     print "Final Boundary: xl = ${xl}, yl = ${yl}, zl = ${zl}"
@@ -117,6 +135,7 @@ class FixWriter:
     variable yl delete
     variable zl delete
     """
+    CHANGE_BDRY = CHANGE_BDRY.lstrip('\n')
 
     def __init__(self, fh, options=None, mols=None):
         """
@@ -149,21 +168,10 @@ class FixWriter:
         Main method to run the writer.
         """
         self.test()
-        self.nvt(nstep=self.relax_step / 1E3,
-                 stemp=self.stemp,
-                 temp=self.stemp)
-        self.npt(nstep=self.relax_step / 1E2,
-                 stemp=self.stemp,
-                 temp=self.temp,
-                 press=self.press)
-        self.recordBdry()
-        self.npt(nstep=self.relax_step,
-                 stemp=self.temp,
-                 temp=self.temp,
-                 press=self.press)
-        self.cmd.append(self.CHANGE_BDRY)
-        self.nvt(nstep=self.relax_step / 1E2, stemp=self.temp, temp=self.temp)
-        self.nve(nstep=self.prod_step)
+        self.startLow()
+        self.rampUp()
+        self.relaxAndDefrom()
+        self.production()
         self.write()
 
     def test(self, nstep=1E3):
@@ -177,14 +185,65 @@ class FixWriter:
         cmd = self.FIX_NVE + self.RUN_STEP % nstep + self.UNFIX
         self.cmd.append(cmd)
 
+    def startLow(self):
+        """
+        Start simulation from low temperature and constant volume.
+        """
+        if self.testing:
+            return
+        self.nvt(nstep=self.relax_step / 1E3,
+                 stemp=self.stemp,
+                 temp=self.stemp)
+
+    def rampUp(self):
+        """
+        Ramp up temperature to the targe value.
+        """
+        if self.testing:
+            return
+        self.npt(nstep=self.relax_step / 1E2,
+                 stemp=self.stemp,
+                 temp=self.temp,
+                 press=self.press)
+
+    def relaxAndDefrom(self):
+        """
+        Longer relaxation at constant temperature and deform to the mean size.
+        """
+        if self.testing:
+            return
+        self.recordBdry()
+        self.npt(nstep=self.relax_step,
+                 stemp=self.temp,
+                 temp=self.temp,
+                 press=self.press)
+        self.cmd.append(self.CHANGE_BDRY)
+        self.nvt(nstep=self.relax_step / 1E2, stemp=self.temp, temp=self.temp)
+
+    def production(self):
+        """
+        Production run. NVE is good for all, specially transport properties, but
+        requires for good energy conservation in time integration. NVT and NPT
+        may help for disturbance non-sensitive property.
+        """
+        if self.testing:
+            return
+        if self.options.prod_ens == NVE:
+            self.nve(nstep=self.prod_step)
+        elif self.options.prod_ens == NVT:
+            self.nvt(nstep=self.prod_step, stemp=self.temp, temp=self.temp)
+        else:
+            self.npt(nstep=self.prod_step,
+                     stemp=self.temp,
+                     temp=self.temp,
+                     press=self.press)
+
     def nve(self, nstep=1E3):
         """
         Append command for constant energy and volume.
 
         :nstep int: run this steps for time integration.
         """
-        if self.testing:
-            return
         # NVT on single molecule gives nan coords (guess due to translation)
         cmd = self.FIX_NVE + self.RUN_STEP % nstep + self.UNFIX
         self.cmd.append(cmd)
@@ -198,8 +257,6 @@ class FixWriter:
         :temp float: target temperature
         :style str: the style for the command
         """
-        if self.testing:
-            return
         if style == self.TEMP_BERENDSEN:
             cmd1 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
                                                   temp=temp,
@@ -223,8 +280,6 @@ class FixWriter:
         :press float: target temperature
         :style str: the style for the command
         """
-        if self.testing:
-            return
         if style == self.PRESS_BERENDSEN:
             cmd1 = self.FIX_PRESS_BERENDSEN.format(press=press,
                                                    pdamp=self.pdamp)
@@ -253,7 +308,7 @@ class FixWriter:
             ids = [f'{idx}{string.ascii_lowercase[x]}' for x in range(num)]
             ids += [x for x in reversed(ids)]
             cmd_with_id = cmd % tuple(ids)
-            self.fh.write(cmd_with_id)
+            self.fh.write(cmd_with_id + '\n')
 
 
 class OplsTyper:

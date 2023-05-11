@@ -89,7 +89,6 @@ def get_parser():
                         nargs='+',
                         help=f'{XYZ} writes out .xyz for VMD visualization;'
                         f' {CLASH} check clashes for each frame.')
-
     jobutils.add_job_arguments(parser)
     return parser
 

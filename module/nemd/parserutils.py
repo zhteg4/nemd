@@ -150,3 +150,77 @@ def type_force_field(arg, ff_model=oplsua.OplsTyper.FF_MODEL):
         msg = f"Only support {','.join(ff_model[ff_type])}, but found {wmodel}."
         raise argparse.ArgumentTypeError(msg)
     return FF_MODEL(ff=ff_type, model=wmodel)
+
+
+def add_md_arguments(parser):
+    parser.add_argument(oplsua.FLAG_TIMESTEP,
+                        metavar='fs',
+                        type=type_positive_float,
+                        default=1,
+                        help=f'Timestep for the MD simulation.')
+    parser.add_argument(
+        oplsua.FLAG_STEMP,
+        metavar='K',
+        type=type_positive_float,
+        default=10,
+        # 'Initialize the atoms with this temperature.'
+        help=argparse.SUPPRESS)
+    parser.add_argument(oplsua.FLAG_TEMP,
+                        metavar=oplsua.FLAG_TEMP[1:].upper(),
+                        type=type_positive_float,
+                        default=300,
+                        help=f'The equilibrium temperature target .')
+    parser.add_argument(
+        oplsua.FLAG_TDAMP,
+        metavar=oplsua.FLAG_TDAMP[1:].upper(),
+        type=type_positive_float,
+        default=100,
+        # Temperature damping parameter (x timestep to get the param)
+        help=argparse.SUPPRESS)
+    parser.add_argument(oplsua.FLAG_PRESS,
+                        metavar='at',
+                        type=float,
+                        default=1,
+                        help="The equilibrium pressure target.")
+    parser.add_argument(
+        oplsua.FLAG_PDAMP,
+        metavar=oplsua.FLAG_PDAMP[1:].upper(),
+        type=type_positive_float,
+        default=1000,
+        # Pressure damping parameter (x timestep to get the param)
+        help=argparse.SUPPRESS)
+    parser.add_argument(
+        oplsua.FLAG_LJ_CUT,
+        metavar=oplsua.FLAG_LJ_CUT[1:].upper(),
+        type=type_positive_float,
+        default=11.,
+        # Cut off for the lennard jones
+        help=argparse.SUPPRESS)
+    parser.add_argument(
+        oplsua.FLAG_COUL_CUT,
+        metavar=oplsua.FLAG_COUL_CUT[1:].upper(),
+        type=type_positive_float,
+        default=11.,
+        # Cut off for the coulombic interaction
+        help=argparse.SUPPRESS)
+    parser.add_argument(oplsua.FLAG_RELAX_TIME,
+                        metavar='ns',
+                        type=type_positive_float,
+                        default=1,
+                        help='Relaxation simulation time.')
+    parser.add_argument(oplsua.FLAG_PROD_TIME,
+                        metavar='ns',
+                        type=type_positive_float,
+                        default=1,
+                        help='Production simulation time.')
+    parser.add_argument(oplsua.FLAG_PROD_ENS,
+                        metavar=oplsua.FLAG_PROD_ENS[1:].upper(),
+                        choices=oplsua.ENSEMBLES,
+                        default=oplsua.NVE,
+                        help='Production ensemble.')
+    parser.add_argument(
+        oplsua.FlAG_FORCE_FIELD,
+        metavar=oplsua.FlAG_FORCE_FIELD[1:].upper(),
+        type=type_force_field,
+        default=oplsua.OplsTyper.OPLSUA_TIP3P,
+        help='The force field type (and water model separated with comma).')

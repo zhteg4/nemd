@@ -5,7 +5,6 @@ import numpy as np
 from rdkit import Chem
 
 from nemd import oplsua
-from nemd import jobutils
 from nemd import fileutils
 from nemd import testutils
 from nemd import rdkitutils
@@ -21,7 +20,7 @@ def get_options(args=None):
     if args is None:
         args = []
     parser = parserutils.get_parser()
-    jobutils.add_md_arguments(parser)
+    parserutils.add_md_arguments(parser)
     return parser.parse_args(args)
 
 

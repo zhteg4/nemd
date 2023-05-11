@@ -30,7 +30,7 @@ setup(name='nemd',
           'numpy', 'scipy', 'networkx', 'pandas', 'more_itertools',
           'chemparse', 'mendeleev', 'rdkit', 'signac', 'signac-flow', 'lammps',
           'matplotlib', 'plotly', 'dash', 'dash_bootstrap_components',
-          'pytest', 'dash[testing]', 'pyside6', 'webdriver-manager',
+          'pytest', 'dash[testing]', 'pyqt6', 'webdriver-manager',
           'flask>=2.2.2', 'openpyxl'
       ],
       extras_require={

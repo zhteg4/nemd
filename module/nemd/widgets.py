@@ -12,15 +12,13 @@ class PushButton(QtWidgets.QFrame):
 
     def __init__(self,
                  text,
-                 label='',
                  after_label='',
                  layout=None,
-                 readonly=False,
                  command=None,
                  *args,
                  **kwargs):
 
-        super().__init__()
+        super().__init__(*args, **kwargs)
         layout.addWidget(self)
         self.layout = QtWidgets.QHBoxLayout()
         self.setLayout(self.layout)

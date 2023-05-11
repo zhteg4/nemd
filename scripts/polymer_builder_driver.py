@@ -1081,7 +1081,7 @@ def get_parser():
         default=0.5,
         help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
     )
-    jobutils.add_md_arguments(parser)
+    parserutils.add_md_arguments(parser)
     jobutils.add_job_arguments(parser)
     return parser
 
