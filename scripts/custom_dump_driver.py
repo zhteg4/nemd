@@ -9,6 +9,7 @@ import os
 import sys
 import math
 import scipy
+import functools
 import numpy as np
 import pandas as pd
 from scipy import constants
@@ -25,12 +26,18 @@ from nemd import environutils
 FlAG_CUSTOM_DUMP = traj.FlAG_CUSTOM_DUMP
 FlAG_DATA_FILE = traj.FlAG_DATA_FILE
 FlAG_TASK = '-task'
+FlAG_SEL = '-sel'
+FLAG_LAST_PCT = '-last_pct'
+
 CLASH = 'clash'
 VIEW = 'view'
 XYZ = 'xyz'
 DENSITY = 'density'
 MSD = 'msd'
 RDF = 'rdf'
+
+ALL_FRM_TASKS = [CLASH, VIEW, XYZ, DENSITY]
+LAST_FRM_TASKS = [DENSITY, MSD, RDF]
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 
@@ -67,48 +74,6 @@ def log_error(msg):
     sys.exit(1)
 
 
-def get_parser():
-    """
-    The user-friendly command-line parser.
-
-    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
-        out of sys.argv.
-    """
-    parser = parserutils.get_parser(description=__doc__)
-    parser.add_argument(FlAG_CUSTOM_DUMP,
-                        metavar=FlAG_CUSTOM_DUMP.upper(),
-                        type=parserutils.type_file,
-                        help='Custom dump file to analyze')
-    parser.add_argument(FlAG_DATA_FILE,
-                        metavar=FlAG_DATA_FILE[1:].upper(),
-                        type=parserutils.type_file,
-                        help='Data file to get force field information')
-    parser.add_argument(FlAG_TASK,
-                        choices=[XYZ, CLASH, VIEW, DENSITY, MSD, RDF],
-                        default=[XYZ],
-                        nargs='+',
-                        help=f'{XYZ} writes out .xyz for VMD visualization;'
-                        f' {CLASH} check clashes for each frame.')
-    jobutils.add_job_arguments(parser)
-    return parser
-
-
-def validate_options(argv):
-    """
-    Parse and validate the command args
-
-    :param argv list: list of command input.
-    :return: 'argparse.ArgumentParser':  Parsed command-line options out of sys.argv
-    """
-    parser = get_parser()
-    options = parser.parse_args(argv)
-
-    if CLASH in options.task and not options.data_file:
-        parser.error(
-            f'Please specify {FlAG_DATA_FILE} to run {FlAG_TASK} {CLASH}')
-    return options
-
-
 class CustomDump(object):
     """
     Analyze a dump custom file.
@@ -138,6 +103,7 @@ class CustomDump(object):
         self.timestep = timestep
         self.outfile = self.jobname + self.XYZ_EXT
         self.frms = None
+        self.gids = None
         self.data_reader = None
         self.radii = None
 
@@ -146,13 +112,14 @@ class CustomDump(object):
         Main method to run the tasks.
         """
         self.setStruct()
+        self.setAtoms()
         self.setFrames()
         self.checkClashes()
-        self.writeXYZ()
         self.view()
         self.density()
         self.msd()
         self.rdf()
+        self.writeXYZ()
         log('Finished.', timestamp=True)
 
     def setStruct(self):
@@ -178,7 +145,18 @@ class CustomDump(object):
         self.time = np.array([x.getStep() for x in self.frms
                               ]) * constants.femto / constants.pico
         self.time_idx = pd.Index(data=self.time, name=self.TIME_LB)
-        self.sidx = math.floor(len(self.frms) * (1 - last_pct))
+        self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
+        log(f"{len(self.frms)} trajectory frames found.")
+        af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
+        if af_tasks:
+            log(f"{', '.join(af_tasks)} analyze all frames and save per frame "
+                f"results {symbols.ELEMENT_OF} [{self.time_idx[0]}, "
+                f"{self.time_idx[-1]}] ps")
+        lf_tasks = [x for x in self.options.task if x in LAST_FRM_TASKS]
+        if lf_tasks:
+            log(f"{', '.join(lf_tasks)} average results from "
+                f"{self.options.last_pct * 100}% frames {symbols.ELEMENT_OF} "
+                f"[{self.time_idx[self.sidx]}, {self.time_idx[-1]}] ps")
 
     def checkClashes(self, label='Clash (num)'):
         """
@@ -187,7 +165,7 @@ class CustomDump(object):
         if CLASH not in self.options.task:
             return
 
-        data = [len(self.getClashes(frm)) for x in self.frms]
+        data = [len(self.getClashes(x)) for x in self.frms]
         data = pd.DataFrame(data={label: data}, index=self.time_idx)
         self.saveData(data, CLASH, float_format='%i')
 
@@ -340,61 +318,66 @@ class CustomDump(object):
             )
         return data
 
-    def rdf(self, elements='O'):
+    def rdf(self):
         """
-        Calculate the radial distribution function.
-
-        :param resolution float: the rdf minimum step
-        :param elements str, set or list: the elements for atoms selection
+        Handle the radial distribution function.
         """
 
         if RDF not in self.options.task:
             return
 
-        sel, ids = self.selectRdf(last_pct=0.2, elements=elements)
-        data = self.getRdf(sel, ids)
+        data = self.getRdf()
         self.saveData(data, RDF)
         self.plot(data, RDF, pos_x=True)
 
-    def selectRdf(self, last_pct=0.2, elements='O'):
+    def setAtoms(self):
         """
-        Select the frame and element for rdf.
-
-        :param elements str, set or list: the elements for atoms selection
+        set the atom selection for analysis.
         """
-        frms = [x for x in traj.get_frames(self.options.custom_dump)]
-        sel = frms[math.floor(len(frms) * (1 - last_pct)):]
+        if self.options.sel is None:
+            self.gids = [x.id for x in self.data_reader.atom]
+        else:
+            self.gids = [
+                x.id for x in self.data_reader.atom
+                if x.ele in self.options.sel
+            ]
+        log(f"{len(self.gids)} atoms selected.")
 
-        ids = [x.id for x in self.data_reader.atom if x.ele in elements
-               ] if elements else [x.id for x in self.data_reader.atom]
-        return sel, ids
-
-    def getRdf(self, frms, ids, resolution=0.02, pname='g', unit='r'):
+    def getRdf(self, resolution=0.02, pname='g', unit='r'):
         """
+        Calculate and return the radial distribution function.
+
+        :param resolution float: the rdf minimum step
         :param pname str: property name
         :param unit str: unit of the property
-        return 'pandas.core.frame.DataFrame': pos and rdf
+        :return 'pandas.core.frame.DataFrame': pos and rdf
         """
-
+        frms = self.frms[self.sidx:]
         span = np.array([[x for x in x.getSpan().values()] for x in frms])
+        vol = np.prod(span, axis=1)
+        log(f'The volume fluctuate: [{vol.min():.2f} {vol.max():.2f}] {symbols.ANGSTROM}^3'
+            )
         mdist = span.min() * 0.5
         res = min(resolution, mdist / 100)
         bins = round(mdist / res)
         hist_range = [res / 2, res * bins + res / 2]
-        rdf, num = [], len(ids)
-        for frm in frms:
-            dists = frm.pairDists(ids=ids)
+
+        rdf, num = np.zeros((bins)), len(self.gids)
+        for idx, frm in enumerate(frms):
+            log_debug(f"Analyzing frame {idx} for RDF..")
+            dists = frm.pairDists(ids=self.gids)
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
             norm_factor = 4 * np.pi * mid**2 * res * num / frm.getVolume()
             # Stands at every id but either (1->2) or (2->1) is computed
-            rdf.append(hist * 2 / num / norm_factor)
-        rdf = np.array(rdf).mean(axis=0)
+            rdf += (hist * 2 / num / norm_factor)
+        rdf /= len(frms)
         iname, cname = f'r ({symbols.ANGSTROM})', f'{pname} ({unit})'
         mid, rdf = np.concatenate(([0], mid)), np.concatenate(([0], rdf))
         index = pd.Index(data=mid, name=iname)
-        return pd.DataFrame(data={cname: rdf}, index=index)
+        data = pd.DataFrame(data={cname: rdf}, index=index)
+        return data
 
     def saveData(self, data, task, float_format='%.4f'):
         """
@@ -428,6 +411,57 @@ class CustomDump(object):
         fig.savefig(fname)
         matplotlib.use(obackend)
         log(f'{self.NAME[task].capitalize()} figure saved as {fname}')
+
+
+def get_parser():
+    """
+    The user-friendly command-line parser.
+
+    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
+        out of sys.argv.
+    """
+    parser = parserutils.get_parser(description=__doc__)
+    parser.add_argument(FlAG_CUSTOM_DUMP,
+                        metavar=FlAG_CUSTOM_DUMP.upper(),
+                        type=parserutils.type_file,
+                        help='Custom dump file to analyze')
+    parser.add_argument(FlAG_DATA_FILE,
+                        metavar=FlAG_DATA_FILE[1:].upper(),
+                        type=parserutils.type_file,
+                        help='Data file to get force field information')
+    parser.add_argument(FlAG_TASK,
+                        choices=[XYZ, CLASH, VIEW, DENSITY, MSD, RDF],
+                        default=[XYZ],
+                        nargs='+',
+                        help=f'{XYZ} writes out .xyz for VMD visualization;'
+                        f' {CLASH} check clashes for each frame.')
+    parser.add_argument(FlAG_SEL, help=f'Elements for atom selection.')
+    parser.add_argument(
+        FLAG_LAST_PCT,
+        type=functools.partial(parserutils.type_ranged_float,
+                               include_top=False,
+                               top=1),
+        default=0.2,
+        help=f"{', '.join(LAST_FRM_TASKS)} average results from "
+        f"last frames of this percentage.")
+    jobutils.add_job_arguments(parser)
+    return parser
+
+
+def validate_options(argv):
+    """
+    Parse and validate the command args
+
+    :param argv list: list of command input.
+    :return: 'argparse.ArgumentParser':  Parsed command-line options out of sys.argv
+    """
+    parser = get_parser()
+    options = parser.parse_args(argv)
+
+    if CLASH in options.task and not options.data_file:
+        parser.error(
+            f'Please specify {FlAG_DATA_FILE} to run {FlAG_TASK} {CLASH}')
+    return options
 
 
 logger = None
