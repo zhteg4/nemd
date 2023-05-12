@@ -134,11 +134,9 @@ class CustomDump(object):
             return
         self.data_reader.setClashParams()
 
-    def setFrames(self, last_pct=0.2):
+    def setFrames(self):
         """
         Load trajectory frames and set range.
-
-        :param last_pct float: average and std for the last frames of this percentage.
         """
 
         self.frms = [x for x in traj.get_frames(self.options.custom_dump)]
@@ -150,13 +148,14 @@ class CustomDump(object):
         af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
         if af_tasks:
             log(f"{', '.join(af_tasks)} analyze all frames and save per frame "
-                f"results {symbols.ELEMENT_OF} [{self.time_idx[0]}, "
-                f"{self.time_idx[-1]}] ps")
+                f"results {symbols.ELEMENT_OF} [{self.time_idx[0]:.3f}, "
+                f"{self.time_idx[-1]:.3f}] ps")
         lf_tasks = [x for x in self.options.task if x in LAST_FRM_TASKS]
         if lf_tasks:
-            log(f"{', '.join(lf_tasks)} average results from "
+            log(f"{', '.join(lf_tasks)} average results from last "
                 f"{self.options.last_pct * 100}% frames {symbols.ELEMENT_OF} "
-                f"[{self.time_idx[self.sidx]}, {self.time_idx[-1]}] ps")
+                f"[{self.time_idx[self.sidx]: .3f}, {self.time_idx[-1]: .3f}] ps"
+                )
 
     def checkClashes(self, label='Clash (num)'):
         """
@@ -328,7 +327,7 @@ class CustomDump(object):
 
         data = self.getRdf()
         self.saveData(data, RDF)
-        self.plot(data, RDF, pos_x=True)
+        self.plot(data, RDF, pos_y=True)
 
     def setAtoms(self):
         """
@@ -365,7 +364,7 @@ class CustomDump(object):
         rdf, num = np.zeros((bins)), len(self.gids)
         for idx, frm in enumerate(frms):
             log_debug(f"Analyzing frame {idx} for RDF..")
-            dists = frm.pairDists(ids=self.gids)
+            dists = frm.pairDists(ids=self.gids) #, cut=6)
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
@@ -387,9 +386,13 @@ class CustomDump(object):
         data.to_csv(outfile, float_format=float_format)
         log(f'{self.NAME[task].capitalize()} data written into {outfile}')
 
-    def plot(self, data, task, pos_x=False):
+    def plot(self, data, task, pos_y=False):
         """
         Plot the task data and save the figure.
+
+        :param data 'DataFrame': data to plot
+        :param task str: the task type to get description and labels
+        :param pos_y bool: change the xlim to only show data positive y values
         """
         import matplotlib
         obackend = matplotlib.get_backend()
@@ -399,8 +402,18 @@ class CustomDump(object):
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
         ax.plot(data.index, data)
-        if pos_x:
+        if task in ALL_FRM_TASKS:
+            ax.plot(data.index[self.sidx:], data.iloc[self.sidx:], 'g')
+        if pos_y:
             ax.set_xlim([data[data > 0].iloc[0].name, data.iloc[-1].name])
+        # ldata = list(data.values.flatten())
+        # sidx = [x == ldata[0] for x in ldata].index(False)
+        # ldata = list(reversed(ldata[sidx:]))
+        # eidx = [x == ldata[0] for x in ldata].index(False)
+        # frms = self.frms[sidx:-eidx]
+        # frms = frms[round(len(frms) / 1.01*0.01):]
+        # span = np.array([[y for y in x.getSpan().values()] for x in frms[round(len(frms)*.2):]])
+        # print(span.mean(axis=0))
         ax.set_xlabel(data.index.name)
         ax.set_ylabel(data.columns.values.tolist()[0])
         fname = self.jobname + self.PNG_EXT % task

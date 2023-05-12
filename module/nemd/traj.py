@@ -266,20 +266,23 @@ class Frame(pd.DataFrame):
                 1)(dists[:, id])
         return np.linalg.norm(dists, axis=1)
 
-    def pairDists(self, ids=None):
+    def pairDists(self, ids=None, cut=None):
         """
         Get the distance between atom pair.
 
         :param ids list: list of gids as the atom selection
+        :param cut float: the cutoff distance to search neighbors
         :return `numpy.ndarray`: distances array
         """
-        dists, eid = [], self.shape[0] + 1
-        if ids is None:
-            ids = [x for x in range(1, eid)]
-        else:
-            ids = sorted(ids)
+        ids = sorted(ids) if ids else list(range(1, self.shape[0] + 1))
+        if cut:
+            dcell = DistanceCell(self, gids=ids, cut=cut)
+            dcell.setUp()
+        dists = []
         for idx, (id, row) in enumerate(self.loc[ids].iterrows()):
-            dist = self.getDists(ids[idx + 1:], row)
+            oids = [x for x in dcell.getNeighbors(row)
+                    if x > id] if cut else ids[idx + 1:]
+            dist = self.getDists(oids, row)
             dists.append(dist)
         return np.concatenate(dists)
 
@@ -383,24 +386,29 @@ class DistanceCell:
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
                      (0, 0, -1)]
 
-    def __init__(self, frm=None, cut=6., resolution=2.):
+    def __init__(self, frm=None, gids=None, cut=6., resolution=2.):
         """
-        :param frm 'Frame': coordinate frame
-        :param cut float:
-        :param resolution float:
+        :param frm 'Frame': trajectory frame
+        :param gids list: global atom ids to analyze
+        :param cut float: the cutoff distace to search neighbors
+        :param resolution float: the resolution of the grid step
         """
         self.frm = frm
         self.cut = cut
+        self.gids = gids
         self.resolution = resolution
         self.span = None
         self.neigh_ids = None
         self.atom_cell = None
         self.extg_gids = set()
+        if self.gids is None:
+            self.gids = list(range(1, self.shape[0] + 1))
 
     def setUp(self):
         self.setSpan()
         self.setgrids()
         self.setNeighborIds()
+        self.setNeighborMap()
         self.setAtomCell()
 
     def setSpan(self):
@@ -445,6 +453,18 @@ class DistanceCell:
         signs = [np.array(x) for x in signs]
         self.neigh_ids = set([tuple(y * x) for x in signs for y in neigh_ids])
 
+    def setNeighborMap(self):
+        """
+        Set map between node id to neighbor node ids.
+        """
+        self.neigh_map = np.zeros((*self.indexes, len(self.neigh_ids), 3),
+                                  dtype=int)
+        indexes = [range(x) for x in self.indexes]
+        nodes = list(itertools.product(*indexes))
+        neigh_ids = np.array(list(self.neigh_ids))
+        for node in nodes:
+            self.neigh_map[node] = (neigh_ids + node) % self.indexes
+
     def setAtomCell(self):
         """
         Put atom ids into the corresponding cells.
@@ -452,7 +472,7 @@ class DistanceCell:
         ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
         self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
                                   dtype=bool)
-        for row in ids.itertuples():
+        for row in ids.loc[self.gids].itertuples():
             self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
 
     def atomCellUpdate(self, gids):
@@ -476,9 +496,12 @@ class DistanceCell:
         :return list int: the atom ids of the neighbor atoms
         """
 
-        id = (xyz / self.grids).round().astype(int)
-        ids = [tuple((id + x) % self.indexes) for x in self.neigh_ids]
-        return [y for x in ids for y in self.atom_cell[x].nonzero()[0]]
+        id = (xyz / self.grids).round().astype(int) % self.indexes
+        ids = self.neigh_map[tuple(id)]
+        neighbors = [
+            y for x in ids for y in self.atom_cell[tuple(x)].nonzero()[0]
+        ]
+        return neighbors
 
     def getClashes(self,
                    row,
