@@ -402,7 +402,7 @@ class DistanceCell:
         self.atom_cell = None
         self.extg_gids = set()
         if self.gids is None:
-            self.gids = list(range(1, self.shape[0] + 1))
+            self.gids = list(range(1, self.frm.shape[0] + 1))
 
     def setUp(self):
         self.setSpan()
