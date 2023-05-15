@@ -1,0 +1,5 @@
+brew remove lammps
+brew edit lammps
+brew reinstall --build-from-source lammps
+
+
