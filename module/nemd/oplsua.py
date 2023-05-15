@@ -225,6 +225,13 @@ class FixWriter:
         """
         if self.testing:
             return
+        if self.options.prod_ens == NPT:
+            self.npt(nstep=self.relax_step,
+                     stemp=self.temp,
+                     temp=self.temp,
+                     press=self.press)
+            return
+        # NVE and NVT production runs use averaged cell
         self.recordBdry()
         self.npt(nstep=self.relax_step,
                  stemp=self.temp,

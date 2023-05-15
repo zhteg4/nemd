@@ -364,7 +364,7 @@ class CustomDump(object):
         rdf, num = np.zeros((bins)), len(self.gids)
         for idx, frm in enumerate(frms):
             log_debug(f"Analyzing frame {idx} for RDF..")
-            dists = frm.pairDists(ids=self.gids) #, cut=6)
+            dists = frm.pairDists(ids=self.gids)  #, cut=6)
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
@@ -412,7 +412,7 @@ class CustomDump(object):
         # eidx = [x == ldata[0] for x in ldata].index(False)
         # frms = self.frms[sidx:-eidx]
         # frms = frms[round(len(frms) / 1.01*0.01):]
-        # span = np.array([[y for y in x.getSpan().values()] for x in frms[round(len(frms)*.2):]])
+        # span = np.array([[y for y in x.getSpan().values()] for x in frms])
         # print(span.mean(axis=0))
         ax.set_xlabel(data.index.name)
         ax.set_ylabel(data.columns.values.tolist()[0])

@@ -1,11 +1,6 @@
 import os
-import sys
 import pytest
-from rdkit import Chem
-from nemd import fileutils
 from nemd import testutils
-
-from unittest import mock
 
 import polymer_builder_driver as driver
 
