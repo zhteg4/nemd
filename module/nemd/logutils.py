@@ -5,8 +5,10 @@ from datetime import datetime
 
 from nemd import environutils
 
+DRIVER_LOG = '-driver.log'
 
-def createLogger(basename, verbose=None, file_ext='-driver.log'):
+
+def createLogger(basename, verbose=None, file_ext=DRIVER_LOG):
     if verbose is None:
         verbose = environutils.is_debug()
     logger = logging.getLogger(basename)

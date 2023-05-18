@@ -426,22 +426,23 @@ class CustomDump(object):
         log(f'{self.NAME[task].capitalize()} figure saved as {fname}')
 
 
-def get_parser():
+def get_parser(parser=None):
     """
     The user-friendly command-line parser.
 
     :return 'argparse.ArgumentParser':  argparse figures out how to parse those
         out of sys.argv.
     """
-    parser = parserutils.get_parser(description=__doc__)
-    parser.add_argument(FlAG_CUSTOM_DUMP,
-                        metavar=FlAG_CUSTOM_DUMP.upper(),
-                        type=parserutils.type_file,
-                        help='Custom dump file to analyze')
-    parser.add_argument(FlAG_DATA_FILE,
-                        metavar=FlAG_DATA_FILE[1:].upper(),
-                        type=parserutils.type_file,
-                        help='Data file to get force field information')
+    if parser is None:
+        parser = parserutils.get_parser(description=__doc__)
+        parser.add_argument(FlAG_CUSTOM_DUMP,
+                            metavar=FlAG_CUSTOM_DUMP.upper(),
+                            type=parserutils.type_file,
+                            help='Custom dump file to analyze')
+        parser.add_argument(FlAG_DATA_FILE,
+                            metavar=FlAG_DATA_FILE[1:].upper(),
+                            type=parserutils.type_file,
+                            help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
                         choices=[XYZ, CLASH, VIEW, DENSITY, MSD, RDF],
                         default=[XYZ],
@@ -451,6 +452,7 @@ def get_parser():
     parser.add_argument(FlAG_SEL, help=f'Elements for atom selection.')
     parser.add_argument(
         FLAG_LAST_PCT,
+        metavar=FLAG_LAST_PCT.upper(),
         type=functools.partial(parserutils.type_ranged_float,
                                include_top=False,
                                top=1),

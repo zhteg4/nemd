@@ -1,40 +1,36 @@
 #!/bin/bash
 
-if [ -z "$1" ]; then
+COUNTER=0
+for var in "$@"
+do
+    COUNTER=$((COUNTER+1))
+    if [[ "$var" == *.py ]]; then
+      FILE_IDX=$COUNTER
+      break
+    fi
+done
+
+if [ -z $FILE_IDX ]; then
     echo "Please provide a python script name after "$0"."
     exit
 fi
 
-SCRIPT_DIR="$(dirname "$1")"
-if [ -d $SCRIPT_DIR ]; then
-    # Relative or absolute path is provided by users
-    SCRIPT_ABS_PATH="$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
-fi
-
-if [ -f $SCRIPT_ABS_PATH ]; then
-    SCRIPT_PATH=$SCRIPT_ABS_PATH
-fi
-
-if [ -z "$SCRIPT_PATH" ]; then
-    args=("$@")
-    SCRIPT_BASENAME=`basename ${args[0]}`
-    if [ -z "$NEMD_SCRIPTS" ]; then
-        SCRIPT_PATH=`which $SCRIPT_BASENAME`
-    else
-        SCRIPT_PATH=$NEMD_SCRIPTS/$SCRIPT_BASENAME
-    fi
-    if [ -z "$SCRIPT_PATH" ]; then
-        echo "Please install $SCRIPT_BASENAME, or source the premake file in the source code."
-        exit
-    fi
-fi
-
-if [ ! -f $SCRIPT_PATH ]; then
-    echo "Neither $SCRIPT_PATH or $SCRIPT_ABS_PATH exist."
+# Python filename found in the args
+FILE=${@:$FILE_IDX:1}
+DIR="$(dirname $FILE)"
+BASENAME=`basename $FILE`
+# Assume that the file come with absolute or relative path (curdir implicitly)
+SPATH="$(cd $DIR; pwd)/$BASENAME"
+[ ! -f $SPATH ] && [ -n "$NEMD_SCRIPTS" ] && SPATH=$NEMD_SCRIPTS/$BASENAME
+[ ! -f $SPATH ] && [ -n "$NEMD_WORKFLOWS" ] && SPATH=$NEMD_WORKFLOWS/$BASENAME
+[ ! -f $SPATH ] && SPATH=`which $BASENAME`
+if [ ! -f $SPATH ]; then
+    echo "Cannot find $BASENAME in $NEMD_SCRIPTS, $NEMD_WORKFLOWS or in $PATH"
+    echo "Please install $BASENAME, or source the premake file in the source code."
     exit
 fi
 
-SCRIPT_ARGS="$SCRIPT_PATH ${@:2}"
+SCRIPT_ARGS="${@:0:$FILE_IDX} $SPATH ${@:$FILE_IDX+1}"
 
 for ((i=0; i<=$#; i++)); do
 

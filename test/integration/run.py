@@ -91,7 +91,7 @@ def cmd_completed(job):
 
 
 @FlowProject.post(cmd_completed)
-@FlowProject.operation(cmd=True)
+@FlowProject.operation(cmd=True, with_job=True)
 def run_cmd(job):
     """
     The method to run the main command.
@@ -103,7 +103,7 @@ def run_cmd(job):
     with open(test_cmd_file) as fh:
         lines = [x.strip() for x in fh.readlines()]
     cmd = symbols.SEMICOLON.join([x for x in lines if not x.startswith('#')])
-    return f"cd {job.path}; {cmd}; cd -"
+    return cmd
 
 
 def checked(job):

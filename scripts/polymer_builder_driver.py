@@ -45,11 +45,10 @@ FlAG_CELL = '-cell'
 GRID = 'grid'
 PACK = 'pack'
 GROW = 'grow'
-FlAG_SEED = '-seed'
+FLAG_SEED = jobutils.FLAG_SEED
 
-MOLT_OUT_EXT = fileutils.MOLT_FF_EXT
-
-JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
+PATH = os.path.basename(__file__)
+JOBNAME = PATH.split('.')[0].replace('_driver', '')
 
 
 def log_debug(msg):
@@ -155,7 +154,6 @@ class AmorphousCell(object):
         """
         self.options = options
         self.jobname = jobname
-        self.outfile = self.jobname + MOLT_OUT_EXT
         self.polymers = []
         self.molecules = {}
         self.mols = {}
@@ -246,6 +244,8 @@ class AmorphousCell(object):
         lmw.writeLammpsIn()
         log(f'Data file written into {lmw.lammps_data}')
         log(f'In script written into {lmw.lammps_in}')
+        jobutils.add_outfile(lmw.lammps_data, jobname=self.jobname)
+        jobutils.add_outfile(lmw.lammps_in, jobname=self.jobname)
 
 
 class GridCell:
@@ -1033,14 +1033,15 @@ class Conformer(object):
         return mol
 
 
-def get_parser():
+def get_parser(parser=None):
     """
     The user-friendly command-line parser.
 
     :return 'argparse.ArgumentParser':  argparse figures out how to parse those
         out of sys.argv.
     """
-    parser = parserutils.get_parser(description=__doc__)
+    if parser is None:
+        parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(
         FlAG_CRU,
         metavar=FlAG_CRU.upper(),
@@ -1059,8 +1060,8 @@ def get_parser():
                         type=parserutils.type_positive_int,
                         nargs='+',
                         help='Number of molecules in the amorphous cell')
-    parser.add_argument(FlAG_SEED,
-                        metavar=FlAG_SEED[1:].upper(),
+    parser.add_argument(FLAG_SEED,
+                        metavar=FLAG_SEED[1:].upper(),
                         type=parserutils.type_random_seed,
                         help='Set random state using this seed.')
     parser.add_argument(

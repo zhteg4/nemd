@@ -600,7 +600,7 @@ class OplsParser:
     Parse force field file and map atomic details.
     """
 
-    FILE_PATH = fileutils.get_ff(name=fileutils.OPLSUA, ext=fileutils.RRM_EXT)
+    FILE_PATH = fileutils.get_ff(name=fileutils.OPLSUA)
 
     DEFINITION_MK = 'Force Field Definition'
     LITERATURE_MK = 'Literature References'

@@ -21,7 +21,6 @@ NEMD_SRC = 'NEMD_SRC'
 MODULE = 'module'
 OPLSAA = 'oplsaa'
 OPLSUA = 'oplsua'
-MOLT_FF_EXT = '.lt'
 RRM_EXT = '.prm'
 FF = 'ff'
 LOG = '.log'
@@ -37,7 +36,7 @@ def log_debug(msg):
     logger.debug(msg)
 
 
-def get_ff(fn=None, name=OPLSAA, ext=MOLT_FF_EXT):
+def get_ff(fn=None, name=OPLSAA, ext=RRM_EXT):
     if not fn:
         fn = f"{name}{ext}"
     return os.path.join(environutils.get_module_path(), FF, fn)
