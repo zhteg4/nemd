@@ -16,6 +16,9 @@ FLAG_JOBNAME = '-JOBNAME'
 FLAG_DEBUG = '-DEBUG'
 FLAG_SEED = '-seed'
 FINISHED = 'Finished.'
+ARGS = 'args'
+KNOWN_ARGS = 'known_args'
+UNKNOWN_ARGS = 'unknown_args'
 
 
 def add_job_arguments(parser, arg_flags=None):
@@ -58,7 +61,10 @@ def set_arg(args, flag, val):
     return args
 
 
-def add_outfile(outfile, jobname=None, default_jobname=None, document=job.Job.FN_DOCUMENT):
+def add_outfile(outfile,
+                jobname=None,
+                default_jobname=None,
+                document=job.Job.FN_DOCUMENT):
     if jobname is None:
         jobname = environutils.get_jobname(default_jobname)
     try:

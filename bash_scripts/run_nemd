@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# Set environment variables based on jobcontrol flags
+# This block has to be on top as debug flag debugs the shell as well
+for ((i=0; i<=$#; i++)); do
+  arg=${!i}
+  if [ $arg == '-JOBNAME' ]; then
+    j=$(( $i + 1 ))
+    export JOBNAME=${!j}
+    [[ -z "$JOBNAME" ]] && echo "Please provide a jobname after -JOBNAME" && exit
+  elif [ $arg == '-INTERACTIVE' ]; then
+    export INTERACTIVE='1'
+  elif [ $arg == '-DEBUG' ]; then
+    export DEBUG='1'
+  fi
+done
+
+# Locate the python script
 COUNTER=0
 for var in "$@"
 do
@@ -9,48 +25,30 @@ do
       break
     fi
 done
-
 if [ -z $FILE_IDX ]; then
     echo "Please provide a python script name after "$0"."
     exit
 fi
 
-# Python filename found in the args
-FILE=${@:$FILE_IDX:1}
-DIR="$(dirname $FILE)"
-BASENAME=`basename $FILE`
+# Search for python filename in the user, source, and installation folders
+FILE=${@:$FILE_IDX:1} && [[ -n "$DEBUG" ]] && echo "Python file: $FILE"
+DIR="$(dirname $FILE)" && [[ -n "$DEBUG" ]] && echo "File dir: $DIR"
+BASENAME=`basename $FILE` && [[ -n "$DEBUG" ]] && echo "Filename: $BASENAME"
 # Assume that the file come with absolute or relative path (curdir implicitly)
-SPATH="$(cd $DIR; pwd)/$BASENAME"
-[ ! -f $SPATH ] && [ -n "$NEMD_SCRIPTS" ] && SPATH=$NEMD_SCRIPTS/$BASENAME
-[ ! -f $SPATH ] && [ -n "$NEMD_WORKFLOWS" ] && SPATH=$NEMD_WORKFLOWS/$BASENAME
-[ ! -f $SPATH ] && SPATH=`which $BASENAME`
-if [ ! -f $SPATH ]; then
-    echo "Cannot find $BASENAME in $NEMD_SCRIPTS, $NEMD_WORKFLOWS or in $PATH"
-    echo "Please install $BASENAME, or source the premake file in the source code."
+SPATH="$(cd $DIR; pwd)/$BASENAME" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
+[ ! -f $SPATH ] && [ -n "$NEMD_SCRIPTS" ] && SPATH=$NEMD_SCRIPTS/$BASENAME && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
+[ ! -f $SPATH ] && [ -n "$NEMD_WORKFLOWS" ] && SPATH=$NEMD_WORKFLOWS/$BASENAME && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
+[ ! -f $SPATH ] && (SPATH=`which $BASENAME`; [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH")
+
+if [ -z $SPATH ]; then
+    echo "Cannot find $BASENAME in $NEMD_SCRIPTS, $NEMD_WORKFLOWS or $PATH"
+    echo "Please install $BASENAME, or source the premake in the source code."
     exit
 fi
 
-SCRIPT_ARGS="${@:0:$FILE_IDX} $SPATH ${@:$FILE_IDX+1}"
-
-for ((i=0; i<=$#; i++)); do
-
-  if [ ${!i} == '-JOBNAME' ]; then
-    j=$(( $i + 1 ))
-    export JOBNAME=${!j}
-    [[ -z "$JOBNAME" ]] && echo "Please provide a jobname after -JOBNAME flag" && exit
-    echo "$JOBNAME set as the JOBNAME"
-  fi
-
-  if [ ${!i} == '-INTERACTIVE' ]; then
-    export INTERACTIVE='1'
-  fi
-
-  if [ ${!i} == '-DEBUG' ]; then
-    export DEBUG='1'
-  fi
-
-done
-
+# Finalize the command so that Python script is of absolute path
+SCRIPT_ARGS="${@:0:$FILE_IDX-1} $SPATH ${@:$FILE_IDX+1}"
 echo "Running python3 $SCRIPT_ARGS"
 
+# Actually run the script
 env FOO=BAR python3 $SCRIPT_ARGS
