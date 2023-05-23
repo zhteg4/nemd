@@ -9,6 +9,18 @@ DRIVER_LOG = '-driver.log'
 
 
 def createLogger(basename, verbose=None, file_ext=DRIVER_LOG):
+    """
+    Create a logger.
+
+    :param basename: the basename of the job
+    :type basename: str
+    :param verbose: extra info printed out (e.g. debug level info) if True
+    :type verbose: bool
+    :param file_ext: the extension of the logger file
+    :type file_ext: str
+    :return: the logger
+    :rtype: 'logging.Logger'
+    """
     if verbose is None:
         verbose = environutils.is_debug()
     logger = logging.getLogger(basename)
@@ -30,6 +42,16 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG):
 
 
 def createDriverLogger(jobname, verbose=None):
+    """
+    Create a driver logger.
+
+    :param jobname: the jobname
+    :type jobname: str
+    :param verbose: extra info printed out (e.g. debug level info) if True
+    :type verbose: bool
+    :return: the logger
+    :rtype: 'logging.Logger'
+    """
     return createLogger(jobname, verbose=verbose)
 
 
@@ -37,6 +59,18 @@ def createModuleLogger(basename=None,
                        verbose=True,
                        file_path=None,
                        file_ext='.log'):
+    """
+    Create logger for module so that debug printing can be enabled.
+
+    :param basename: the basename of the job
+    :type basename: str
+    :param verbose: extra info printed out (e.g. debug level info) if True
+    :type verbose: bool
+    :param file_path: module file path based on which logger name is obtained
+    :type file_path: str
+    :param file_ext: the extension of the logger file
+    :type file_ext: str
+    """
     if not environutils.is_debug():
         return
 
@@ -59,6 +93,14 @@ def createModuleLogger(basename=None,
 
 
 def logOptions(logger, options):
+    """
+    Print description of the options.
+
+    :param logger:  print to this logger
+    :type logger: 'logging.Logger'
+    :param options: command-line options
+    :type options: 'argparse.Namespace'
+    """
     command_options = 'Command Options'
     logger.info(f"." * 10 + command_options + f"." * 10)
     for key, val in options.__dict__.items():
@@ -69,6 +111,16 @@ def logOptions(logger, options):
 
 
 def log(logger, msg, timestamp=False):
+    """
+    Log message to the logger.
+
+    :param logger:  print to this logger
+    :type logger: 'logging.Logger'
+    :param msg: the message to be printed out
+    :type msg: str
+    :param timestamp: append time information after the message
+    :type timestamp: bool
+    """
     logger.info(msg)
     if timestamp:
         time = datetime.now().isoformat(sep=' ', timespec='minutes')

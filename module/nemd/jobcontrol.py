@@ -1,3 +1,4 @@
+import collections
 import shutil
 from flow import FlowProject
 
@@ -15,11 +16,18 @@ class Runner:
     WORKSPACE = 'workspace'
     FLOW_PROJECT = 'flow.project'
     ARGS = jobutils.ARGS
+    PREREQ = jobutils.PREREQ
 
     def __init__(self, options, argv, jobname, logger=None):
         """
-        :param options 'argparse.Namespace': parsed commandline options.
-        :param jobname str: the jobname
+        :param options: parsed commandline options
+        :type options: 'argparse.Namespace'
+        :param argv: list of commandline arguments
+        :type argv: list
+        :param jobname: the jobname
+        :type jobname: str
+        :param logger: print to this logger if exists
+        :type logger: 'logging.Logger'
         """
         self.options = options
         self.argv = argv
@@ -30,6 +38,7 @@ class Runner:
         # flow/project.py gets logger from logging.getLogger(__name__)
         logutils.createModuleLogger(self.FLOW_PROJECT, file_ext=fileutils.LOG)
         self.status_fh = None
+        self.prereq = collections.defaultdict(list)
 
     def run(self):
         """
@@ -37,12 +46,24 @@ class Runner:
         """
         with open(self.status_file, 'w') as self.status_fh:
             self.clean()
+            # Decorators register functions to project (before init_project)
+            self.setTasks()
             self.setProject()
             self.addJobs()
             self.runProject()
             self.logStatus()
 
     def log(self, msg, timestamp=False):
+        """
+        Print message to the logger or screen.
+
+        :param msg: the message to print
+        :type msg: str
+        :param timestamp:
+        :type timestamp: bool
+        :return:
+        :rtype:
+        """
         if self.logger:
             logutils.log(self.logger, msg, timestamp=timestamp)
         else:
@@ -59,6 +80,26 @@ class Runner:
         except FileNotFoundError:
             pass
 
+    def setTasks(self):
+        """
+        Set the tasks for the job.
+
+        Must be over-written by subclass.
+        """
+        raise NotImplementedError('This method adds operators as job tasks. ')
+
+    def setPrereq(self, cur, pre):
+        """
+        Set the prerequisite of a job.
+
+        :param cur: the operation (function) who runs after the prerequisite job
+        :type cur: 'function'
+        :param pre: the operation (function) runs first
+        :type pre: 'function'
+        """
+        FlowProject.pre.after(pre)(cur)
+        self.prereq[cur.__name__].append(pre.__name__)
+
     def setProject(self):
         """
         Initiate the project.
@@ -72,33 +113,13 @@ class Runner:
         for id in range(self.options.state_num):
             job = self.project.open_job({self.STATE_ID: id})
             job.document[self.ARGS] = self.argv[:]
+            job.document.update({self.PREREQ: self.prereq})
             job.init()
 
     def runProject(self):
         """
-        Run all jobs registered in the project
+        Run all jobs registered in the project.
         """
-        # import pdb;pdb.set_trace()
-        # set_trace
-        # import numpy as np
-        # import networkx as nx
-        # from matplotlib import pyplot as plt
-        #
-        # project = self.project
-        # ops = project.operations.keys()
-        # adj = np.asarray(project.detect_operation_graph())
-        #
-        # plt.figure()
-        # g = nx.DiGraph(adj)
-        # pos = nx.spring_layout(g)
-        # nx.draw_networkx(g, pos)
-        # import pdb;pdb.set_trace()
-        # nx.draw_networkx_labels(
-        #     g, pos,
-        #     labels={key: name for (key, name) in
-        #             zip(range(len(ops)), [o for o in ops])})
-        #
-        # plt.show()
         self.project.run()
 
     def logStatus(self):
@@ -117,5 +138,3 @@ class Runner:
             for x in status
         ]
         self.log(f"{len(completed)} / {len(status)} completed.")
-        # [all([y['completed'] for y in x['operations'].values()]) for x in
-        #  status]

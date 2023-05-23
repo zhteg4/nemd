@@ -7,7 +7,7 @@ This polymer driver builds polymers from constitutional repeat units and pack
 molecules into condensed phase amorphous cell.
 
 'mpirun -np 4 lmp_mpi -in polymer_builder.in' runs with 4 processors
-'lmp_serial < polymer_builder.in' runs with 1 processor
+'lmp_serial -in polymer_builder.in' runs with 1 processor
 """
 import os
 import sys
@@ -65,7 +65,7 @@ def log(msg, timestamp=False):
     Print this message into log file in regular mode.
 
     :param msg: the msg to print
-    :param timestamp bool: the msg to be printed
+    :param timestamp bool: append time information after the message
     """
     if not logger:
         return
@@ -245,7 +245,9 @@ class AmorphousCell(object):
         log(f'Data file written into {lmw.lammps_data}')
         log(f'In script written into {lmw.lammps_in}')
         jobutils.add_outfile(lmw.lammps_data, jobname=self.jobname)
-        jobutils.add_outfile(lmw.lammps_in, jobname=self.jobname)
+        jobutils.add_outfile(lmw.lammps_in,
+                             jobname=self.jobname,
+                             set_file=True)
 
 
 class GridCell:
