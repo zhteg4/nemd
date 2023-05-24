@@ -1089,7 +1089,6 @@ class LammpsIn(fileutils.LammpsInput):
         self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5 \n")
         if self.hasCharge():
             self.in_fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
-        self.in_fh.write(f"log log.{self.jobname}\n")
 
     def writeFixShake(self):
         """

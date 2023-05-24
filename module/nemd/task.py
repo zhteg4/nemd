@@ -236,24 +236,29 @@ class Lammps_Driver:
     LMP_SERIAL = 'lmp_serial'
     PATH = LMP_SERIAL
     JOBNAME = 'lammps'
-    IN = '-in'
+    FLAG_IN = '-in'
+    FLAG_SCREEN = '-screen'
 
-    ARGS_TMPL = [IN, FILE]
+    ARGS_TMPL = [FLAG_IN, FILE, '-screen', 'none']
 
-    @staticmethod
-    def get_parser():
+    @classmethod
+    def get_parser(cls):
         """
+        Get the customized parser wrapper for lammps executable.
 
-        :return:
+        :return: the customized parser wrapper
         :rtype: 'argparse.ArgumentParser'
         """
         parser = parserutils.get_parser(
             description='This is a customized parser wrapper for lammps.')
-        parser.add_argument('-in',
+        parser.add_argument(cls.FLAG_IN,
                             metavar='IN_SCRIPT',
                             type=parserutils.type_file,
                             required=True,
                             help='Read input from this file.')
+        parser.add_argument(cls.FLAG_SCREEN,
+                            choices=['none', 'filename'],
+                            help='where to send screen output (-sc)')
         return parser
 
 
