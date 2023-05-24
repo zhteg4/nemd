@@ -14,7 +14,7 @@ from nemd import jobutils
 from nemd import parserutils
 from nemd import environutils
 from nemd import jobcontrol
-from nemd.task import Polymer_Builder, Lammps
+from nemd.task import Polymer_Builder, Lammps, Custom_Dump
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
@@ -68,9 +68,14 @@ def label(job):
 class Runner(jobcontrol.Runner):
 
     def setTasks(self):
+        """
+        Set polymer builder, lammps builder, and custom dump tasks.
+        """
         polymer_builder = Polymer_Builder.getOperator(name='polymer_builder')
         lammps_runner = Lammps.getOperator(name='lammps_runner')
         self.setPrereq(lammps_runner, polymer_builder)
+        custom_dump = Custom_Dump.getOperator(name='custom_dump')
+        self.setPrereq(custom_dump, lammps_runner)
 
 
 def get_parser():
@@ -82,6 +87,7 @@ def get_parser():
     """
     parser = parserutils.get_parser(description=__doc__)
     parser = Polymer_Builder.DRIVER.get_parser(parser)
+    parser = Custom_Dump.DRIVER.get_parser(parser)
     parser.add_argument(
         FLAG_STATE_NUM,
         default=1,

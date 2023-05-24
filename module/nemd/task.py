@@ -9,7 +9,16 @@ from nemd import logutils
 from nemd import jobutils
 from nemd import parserutils
 
-FILE = "$FILE"
+FILE = jobutils.FILE
+
+logger = logutils.createModuleLogger(file_path=__file__)
+
+
+def log_debug(msg):
+
+    if logger is None:
+        return
+    logger.debug(msg)
 
 
 class BaseTask:
@@ -121,9 +130,13 @@ class BaseTask:
             pre_jobs = job.doc[cls.PREREQ][name]
         except KeyError:
             # The job doesn't have any prerequisite jobs
+            log_debug(f'Pre-conditions: {name} (True): no pre-conditions')
             return True
         if not all(job.doc[cls.OUTFILE][x] for x in pre_jobs):
             # The job has incomplete prerequisite jobs and has to wait
+            log_debug(
+                f'Pre-conditions: {name} (False): {[f"{x} ({job.doc[cls.OUTFILE][x]})" for x in pre_jobs]}'
+            )
             return False
         args = cls.DRIVER.ARGS_TMPL[:]
         # Pass the outfiles of the prerequisite jobs to the current via cmd args
@@ -132,6 +145,7 @@ class BaseTask:
             index = args.index(FILE)
             args[index] = job.doc[cls.OUTFILE][pre]
         job.doc.setdefault(cls.TARGS, {})[name] = args
+        log_debug(f'Pre-conditions: {name} (True): {args}')
         return True
 
     @classmethod
@@ -149,6 +163,9 @@ class BaseTask:
         :return: True if the post-conditions are met
         :rtype: bool
         """
+        log_debug(
+            f'Post-conditions: {name}: {job.document.get(cls.OUTFILE, {}).get(name)}'
+        )
         return job.document.get(cls.OUTFILE, {}).get(name)
 
     @staticmethod
@@ -192,6 +209,7 @@ class BaseTask:
                                      name=name)(func)
         func = FlowProject.post(lambda x: cls.post(x, name))(func)
         func = FlowProject.pre(lambda x: cls.pre(x, name))(func)
+        log_debug(f'Operator: {func.__name__}: {func}')
         return func
 
 
@@ -225,7 +243,9 @@ class Polymer_Builder(BaseTask):
         """
         polymer_builder = Polymer_Builder(*arg, **kwargs)
         polymer_builder.run()
-        return polymer_builder.getCmd()
+        cmd = polymer_builder.getCmd()
+        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
+        return cmd
 
 
 class Lammps_Driver:
@@ -280,4 +300,24 @@ class Lammps(BaseTask):
         """
         lmp = Lammps(*arg, **kwargs)
         lmp.run()
-        return lmp.getCmd()
+        cmd = lmp.getCmd()
+        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
+        return cmd
+
+
+class Custom_Dump(BaseTask):
+
+    import custom_dump_driver as DRIVER
+
+    @staticmethod
+    def operator(*arg, **kwargs):
+        """
+        Get the polymer builder operation command.
+        """
+        import pdb
+        pdb.set_trace()
+        custom_dump = Custom_Dump(*arg, **kwargs)
+        custom_dump.run()
+        cmd = custom_dump.getCmd()
+        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
+        return cmd

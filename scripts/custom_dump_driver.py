@@ -41,6 +41,8 @@ LAST_FRM_TASKS = [DENSITY, MSD, RDF]
 
 JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
 
+ARGS_TMPL = [jobutils.FILE]
+
 
 def log_debug(msg):
     """

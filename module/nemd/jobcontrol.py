@@ -1,10 +1,13 @@
-import collections
 import shutil
+import collections
+import numpy as np
+import networkx as nx
 from flow import FlowProject
 
 from nemd import logutils
 from nemd import jobutils
 from nemd import fileutils
+from nemd import environutils
 
 
 class Runner:
@@ -120,6 +123,28 @@ class Runner:
         """
         Run all jobs registered in the project.
         """
+        if not self.options.debug:
+            self.project.run()
+            return
+
+        import matplotlib
+        obackend = matplotlib.get_backend()
+        backend = obackend if self.options.interactive else 'Agg'
+        matplotlib.use(backend)
+        import matplotlib.pyplot as plt
+        depn = np.asarray(self.project.detect_operation_graph())
+        graph = nx.DiGraph(depn)
+        pos = nx.spring_layout(graph)
+        names = [x for x in self.project.operations.keys()]
+        labels = {key: name for (key, name) in zip(range(len(names)), names)}
+        fig = plt.figure()
+        ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
+        nx.draw_networkx(graph, pos, ax=ax, labels=labels)
+        if self.options.interactive:
+            print("Showing task workflow graph. Click X to close the figure "
+                  "and continue..")
+            plt.show(block=True)
+        fig.savefig(self.jobname + '_nx.png')
         self.project.run()
 
     def logStatus(self):
@@ -130,11 +155,24 @@ class Runner:
         self.project.print_status(detailed=True,
                                   file=self.status_fh,
                                   err=self.status_fh)
-
         jobs = self.project.find_jobs()
         status = [self.project.get_job_status(x) for x in jobs]
-        completed = [
-            all([y['completed'] for y in x['operations'].values()])
-            for x in status
-        ]
-        self.log(f"{len(completed)} / {len(status)} completed.")
+        status = [[{
+            i: j['completed']
+        } for i, j in x['operations'].items()] for x in status]
+        completed = [all(z for y in x for z in y.values()) for x in status]
+        completed_job_num = collections.Counter(completed)[True]
+        self.log(f"{completed_job_num} / {len(status)} completed.")
+        if completed_job_num == len(status):
+            return
+        for job in self.project.find_jobs():
+            status = self.project.get_job_status(job)
+            if all(x['completed'] for x in status['operations'].values()):
+                continue
+            tasks = [
+                x for x, y in status['operations'].items()
+                if not y['completed']
+            ]
+            self.log(
+                f"Failed tasks for job {status['job_id']} are {', '.join(tasks)}"
+            )

@@ -20,6 +20,7 @@ FLAG_CLEAN = '-clean'
 PREREQ = 'prereq'
 
 FINISHED = 'Finished.'
+FILE = "$FILE"
 ARGS = 'args'
 KNOWN_ARGS = 'known_args'
 UNKNOWN_ARGS = 'unknown_args'
@@ -46,14 +47,16 @@ def add_job_arguments(parser, arg_flags=None):
                             action='store_true',
                             help='Enable interactive mode')
     if FLAG_JOBNAME in arg_flags:
-        parser.add_argument(FLAG_JOBNAME,
-                            dest=FLAG_JOBNAME[1:].lower(),
-                            help='The jobnamee based on which filenames are created.')
+        parser.add_argument(
+            FLAG_JOBNAME,
+            dest=FLAG_JOBNAME[1:].lower(),
+            help='The jobnamee based on which filenames are created.')
     if FLAG_DEBUG in arg_flags:
-        parser.add_argument(FLAG_DEBUG,
-                            action='store_true',
-                            dest=FLAG_DEBUG[1:].lower(),
-                            help='Enable debug mode (e.g. extra printing and files)')
+        parser.add_argument(
+            FLAG_DEBUG,
+            action='store_true',
+            dest=FLAG_DEBUG[1:].lower(),
+            help='Enable debug mode (e.g. extra printing and files)')
     if FLAG_CLEAN in arg_flags:
         parser.add_argument(
             FLAG_CLEAN,
