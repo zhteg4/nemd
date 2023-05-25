@@ -7,7 +7,6 @@ from flow import FlowProject
 from nemd import logutils
 from nemd import jobutils
 from nemd import fileutils
-from nemd import environutils
 
 
 class Runner:
@@ -67,8 +66,6 @@ class Runner:
         :type msg: str
         :param timestamp:
         :type timestamp: bool
-        :return:
-        :rtype:
         """
         if self.logger:
             logutils.log(self.logger, msg, timestamp=timestamp)

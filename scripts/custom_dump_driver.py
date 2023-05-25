@@ -39,7 +39,8 @@ RDF = 'rdf'
 ALL_FRM_TASKS = [CLASH, VIEW, XYZ, DENSITY]
 LAST_FRM_TASKS = [DENSITY, MSD, RDF]
 
-JOBNAME = os.path.basename(__file__).split('.')[0].replace('_driver', '')
+PATH = os.path.basename(__file__)
+JOBNAME = PATH.split('.')[0].replace('_driver', '')
 
 ARGS_TMPL = [jobutils.FILE]
 
@@ -493,6 +494,9 @@ def main(argv):
     logutils.logOptions(logger, options)
     cdump = CustomDump(options, jobname)
     cdump.run()
+    log_file = os.path.basename(logger.handlers[0].baseFilename)
+    jobutils.add_outfile(log_file, jobname, set_file=True)
+    log('Finished.', timestamp=True)
 
 
 if __name__ == "__main__":

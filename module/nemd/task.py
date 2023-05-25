@@ -5,6 +5,7 @@ import functools
 import ordered_set
 from flow import FlowProject
 
+from nemd import oplsua
 from nemd import logutils
 from nemd import jobutils
 from nemd import parserutils
@@ -330,7 +331,8 @@ class Lammps(BaseTask):
             return False
         if super().post(job, name):
             return True
-        if not sh.tail('-2', logfile).startswith('ERROR'):
+        if not sh.tail('-2', logfile).startswith('ERROR') and sh.tail(
+                '-1', logfile).startswith('Total'):
             basename = os.path.basename(logfile)
             document = job.fn(jobutils.FN_DOCUMENT)
             jobutils.add_outfile(basename,
@@ -344,16 +346,32 @@ class Lammps(BaseTask):
 class Custom_Dump(BaseTask):
 
     import custom_dump_driver as DRIVER
+    CUSTOM_EXT = oplsua.LammpsIn.CUSTOM_EXT
+    DUMP = oplsua.LammpsIn.DUMP
+    READ_DATA = oplsua.LammpsIn.READ_DATA
+    DATA_EXT = oplsua.LammpsIn.DATA_EXT
 
     @staticmethod
     def operator(*arg, **kwargs):
         """
         Get the polymer builder operation command.
         """
-        import pdb
-        pdb.set_trace()
         custom_dump = Custom_Dump(*arg, **kwargs)
         custom_dump.run()
         cmd = custom_dump.getCmd()
         log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
         return cmd
+
+    def setArgs(self):
+        """
+        Set the args for custom dump task.
+        """
+        super().setArgs()
+        log_file = self.doc[self.KNOWN_ARGS][0]
+        dump_cmd = sh.grep(self.DUMP, log_file).split()
+        dump_file = [x for x in dump_cmd if x.endswith(self.CUSTOM_EXT)][0]
+        data_cmd = sh.grep(self.READ_DATA, log_file).split()
+        data_file = [x for x in data_cmd if x.endswith(self.DATA_EXT)][0]
+        args = [dump_file, self.DRIVER.FlAG_DATA_FILE, data_file]
+        args += list(self.doc[self.KNOWN_ARGS])[1:]
+        self.doc[self.KNOWN_ARGS] = args

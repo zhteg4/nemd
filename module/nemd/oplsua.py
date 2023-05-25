@@ -1034,6 +1034,8 @@ class LammpsIn(fileutils.LammpsInput):
     MIN_STYLE = 'min_style'
     HARMONIC = 'harmonic'
     LJ_COUL = 'lj/coul'
+    CUSTOM_EXT = '.custom'
+    DUMP = 'dump'
 
     def __init__(self, jobname, options=None, concise=True):
         """
@@ -1122,7 +1124,8 @@ class LammpsIn(fileutils.LammpsInput):
         """
         if dump:
             self.in_fh.write(
-                "dump 1 all custom 1000 dump.custom id xu yu zu\n")
+                f"{self.DUMP} 1 all custom 1000 dump{self.CUSTOM_EXT} id xu yu zu\n"
+            )
             self.in_fh.write("dump_modify 1 sort id\n")
         self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
         self.in_fh.write("minimize 1.0e-6 1.0e-8 10000 100000\n")
