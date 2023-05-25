@@ -20,6 +20,9 @@ class Runner:
     FLOW_PROJECT = 'flow.project'
     ARGS = jobutils.ARGS
     PREREQ = jobutils.PREREQ
+    COMPLETED = 'completed'
+    OPERATIONS = 'operations'
+    JOB_ID = 'job_id'
 
     def __init__(self, options, argv, jobname, logger=None):
         """
@@ -157,22 +160,23 @@ class Runner:
                                   err=self.status_fh)
         jobs = self.project.find_jobs()
         status = [self.project.get_job_status(x) for x in jobs]
-        status = [[{
-            i: j['completed']
-        } for i, j in x['operations'].items()] for x in status]
-        completed = [all(z for y in x for z in y.values()) for x in status]
-        completed_job_num = collections.Counter(completed)[True]
-        self.log(f"{completed_job_num} / {len(status)} completed.")
+        ops = [x[self.OPERATIONS] for x in status]
+        completed = [[y[self.COMPLETED] for y in x.values()] for x in ops]
+        completed_job = [all(x) for x in completed]
+        completed_job_num = collections.Counter(completed_job)[True]
+        self.log(f"{completed_job_num} / {len(status)} completed jobs.")
         if completed_job_num == len(status):
             return
         for job in self.project.find_jobs():
-            status = self.project.get_job_status(job)
-            if all(x['completed'] for x in status['operations'].values()):
+            stat = self.project.get_job_status(job)
+            if all(x[self.COMPLETED] for x in stat[self.OPERATIONS].values()):
                 continue
-            tasks = [
-                x for x, y in status['operations'].items()
-                if not y['completed']
-            ]
-            self.log(
-                f"Failed tasks for job {status['job_id']} are {', '.join(tasks)}"
-            )
+            ops = stat[self.OPERATIONS]
+            succ_tasks = [x for x, y in ops.items() if y[self.COMPLETED]]
+            succ_tasks = ', '.join(reversed(succ_tasks))
+            failed_tasks = [x for x, y in ops.items() if not y[self.COMPLETED]]
+            failed_tasks = ', '.join(reversed(failed_tasks))
+            labels = ', '.join([x for x in self.project.labels(job)])
+            self.log(f"Failed tasks are {failed_tasks} while successful ones "
+                     f"are {succ_tasks} for the job with {labels} labels "
+                     f"and id {stat[self.JOB_ID]}")
