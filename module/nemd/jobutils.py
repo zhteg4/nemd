@@ -24,6 +24,7 @@ FILE = "$FILE"
 ARGS = 'args'
 KNOWN_ARGS = 'known_args'
 UNKNOWN_ARGS = 'unknown_args'
+FN_DOCUMENT = job.Job.FN_DOCUMENT
 
 
 def add_job_arguments(parser, arg_flags=None):
@@ -108,7 +109,8 @@ def set_arg(args, flag, val):
 def add_outfile(outfile,
                 jobname=None,
                 default_jobname=None,
-                document=job.Job.FN_DOCUMENT,
+                job=None,
+                document=FN_DOCUMENT,
                 set_file=False):
     """
     Register the outfile to the job control.
@@ -120,23 +122,31 @@ def add_outfile(outfile,
     :param default_jobname: use this jobname if jobname is undefined and cannot
         be found from the environment
     :type default_jobname: str
-    :param document: the job control information is saved in this file
+    :param job: register outfile to this job document
+    :type job: 'signac.contrib.job.Job'
+    :param document: the job control information is saved into this file if job
+        not provided
     :type document: str
     :param set_file: set this file as the single output file
     :type set_file: bool
     """
     if jobname is None:
         jobname = environutils.get_jobname(default_jobname)
-    try:
-        with open(document) as fh:
-            data = json.load(fh)
-    except FileNotFoundError:
-        data = {}
+    if job:
+        data = job.document
+    else:
+        try:
+            with open(document) as fh:
+                data = json.load(fh)
+        except FileNotFoundError:
+            data = {}
     data.setdefault(OUTFILES, {})
     data[OUTFILES].setdefault(jobname, [])
     data[OUTFILES][jobname].append(outfile)
     if set_file:
         data.setdefault(OUTFILE, {})
         data[OUTFILE].setdefault(jobname, outfile)
+    if job:
+        return
     with open(document, 'w') as fh:
         json.dump(data, fh)

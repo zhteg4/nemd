@@ -60,6 +60,7 @@ class BaseTask:
         The main method to run.
         """
         self.setArgs()
+        self.setName()
         self.setCmd()
 
     def setArgs(self):
@@ -258,6 +259,7 @@ class Lammps_Driver:
     JOBNAME = 'lammps'
     FLAG_IN = '-in'
     FLAG_SCREEN = '-screen'
+    DRIVER_LOG = '_lammps.log'
 
     ARGS_TMPL = [FLAG_IN, FILE, '-screen', 'none']
 
@@ -303,6 +305,40 @@ class Lammps(BaseTask):
         cmd = lmp.getCmd()
         log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
         return cmd
+
+    def setName(self):
+        """
+        Set the output log name based on jobname.
+        """
+        logfile = self.jobname + self.DRIVER.DRIVER_LOG
+        jobutils.set_arg(self.doc[self.KNOWN_ARGS], '-log', logfile)
+
+    @classmethod
+    def post(cls, job, name):
+        """
+        Set the output for the job.
+
+        :param job: the signac job instance
+        :type job: 'signac.contrib.job.Job'
+        :param name: the jobname
+        :type name: str
+        :return: True if the post-conditions are met
+        :rtype: bool
+        """
+        logfile = job.fn(name + cls.DRIVER.DRIVER_LOG)
+        if not os.path.exists(logfile):
+            return False
+        if super().post(job, name):
+            return True
+        if not sh.tail('-2', logfile).startswith('ERROR'):
+            basename = os.path.basename(logfile)
+            document = job.fn(jobutils.FN_DOCUMENT)
+            jobutils.add_outfile(basename,
+                                 jobname=name,
+                                 job=job,
+                                 document=document,
+                                 set_file=True)
+        return super().post(job, name)
 
 
 class Custom_Dump(BaseTask):
