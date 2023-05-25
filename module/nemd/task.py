@@ -2,7 +2,6 @@ import os
 import sh
 import types
 import functools
-import ordered_set
 from flow import FlowProject
 
 from nemd import oplsua
@@ -73,8 +72,19 @@ class BaseTask:
         args += list(self.doc[self.ARGS])
         _, unknown = parser.parse_known_args(args)
         self.doc[self.UNKNOWN_ARGS] = unknown
-        args = ordered_set.OrderedSet(args)
-        self.doc[self.KNOWN_ARGS] = list(args.difference(unknown))
+        flags = [x for x in unknown if x.startswith('-')]
+        for arg in unknown[:unknown.index(flags[0])]:
+            # Positional arguments without flags
+            args.remove(arg)
+        for sval, eval in zip(flags, flags[1:] + [None]):
+            if eval:
+                uargs = unknown[unknown.index(sval):unknown.index(eval)]
+            else:
+                uargs = unknown[unknown.index(sval):]
+            index = args.index(sval)
+            # Optional arguments with flags
+            args = args[:index] + args[index + len(uargs):]
+        self.doc[self.KNOWN_ARGS] = args
 
     def setName(self):
         """
