@@ -2,7 +2,7 @@ import os
 import sh
 import types
 import functools
-from flow import FlowProject
+from flow import FlowProject, aggregator
 
 from nemd import oplsua
 from nemd import logutils
@@ -38,18 +38,18 @@ class BaseTask:
     DRIVER_LOG = logutils.DRIVER_LOG
     PREREQ = jobutils.PREREQ
 
-    def __init__(self, job, pre_run=RUN_NEMD, jobname=None):
+    def __init__(self, job, pre_run=RUN_NEMD, name=None):
         """
         :param job: the signac job instance
         :type job: 'signac.contrib.job.Job'
         :param pre_run: append this str before the driver path
         :type pre_run: str
-        :param jobname: the jobname
-        :type jobname: str
+        :param name: the jobname
+        :type name: str
         """
         self.job = job
         self.pre_run = pre_run
-        self.jobname = jobname
+        self.name = name
         self.doc = self.job.document
         self.run_driver = [self.DRIVER.PATH]
         if self.pre_run:
@@ -68,7 +68,7 @@ class BaseTask:
         Set known and unknown arguments.
         """
         parser = self.DRIVER.get_parser()
-        args = list(self.doc.get(self.TARGS, {}).get(self.jobname, []))
+        args = list(self.doc.get(self.TARGS, {}).get(self.name, []))
         args += list(self.doc[self.ARGS])
         _, unknown = parser.parse_known_args(args)
         self.doc[self.UNKNOWN_ARGS] = unknown
@@ -91,7 +91,7 @@ class BaseTask:
         Set the jobname of the known args.
         """
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_JOBNAME,
-                         self.jobname)
+                         self.name)
 
     def setCmd(self):
         """
@@ -189,39 +189,87 @@ class BaseTask:
         pass
 
     @classmethod
-    def getOperator(cls, with_job=True, name=None):
+    def getOpr(cls,
+               cmd=True,
+               with_job=True,
+               name=None,
+               attr='operator',
+               pre=True,
+               post=True,
+               aggregator=None,
+               log=None,
+               tname=None):
         """
         Duplicate and return the operator with jobname and decorators.
 
+        :param cmd: Whether the aggregator function returns a command to run
+        :type cmd: bool
         :param with_job: perform the execution in job dir with context management
         :type with_job: bool
-        :param name: the jobname
+        :param name: the taskname
         :type name: str
+        :param attr: the class method that is a operator function
+        :type attr: str
+        :param pre: add pre-condition for the aggregator if True
+        :type pre: bool
+        :param post: add post-condition for the aggregator if True
+        :type post: bool
+        :param aggregator: the criteria to collect jobs
+        :type aggregator: 'flow.aggregates.aggregator'
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        :param tname: aggregate the job tasks of this name
+        :type tname: str
         :return: the operation to execute
         :rtype: 'function'
         """
-        # Duplicate the function
-        # Reference as http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)
-        origin_name = cls.operator.__name__
-        if name is None:
-            name = cls.operator.__name__
-        cls.operator.__name__ = name
-        func = types.FunctionType(cls.operator.__code__,
-                                  cls.operator.__globals__,
-                                  name=name,
-                                  argdefs=cls.operator.__defaults__,
-                                  closure=cls.operator.__closure__)
-        func = functools.update_wrapper(func, cls.operator)
-        func.__kwdefaults__ = cls.operator.__kwdefaults__
-        cls.operator.__name__ = origin_name
-        # Pass jobname and add FlowProject decorators
-        func = functools.update_wrapper(functools.partial(func, jobname=name),
-                                        func)
-        func = FlowProject.operation(cmd=True, with_job=with_job,
-                                     name=name)(func)
-        func = FlowProject.post(lambda x: cls.post(x, name))(func)
-        func = FlowProject.pre(lambda x: cls.pre(x, name))(func)
+
+        func = cls.DupeFunc(attr, name)
+        # Pass jobname, taskname, and logging function
+        kwarg = {'name': name}
+        if tname:
+            kwarg['tname'] = tname
+        if log:
+            kwarg['log'] = log
+        func = functools.update_wrapper(functools.partial(func, **kwarg), func)
+        func = FlowProject.operation(cmd=cmd,
+                                     with_job=with_job,
+                                     name=name,
+                                     aggregator=aggregator)(func)
+        # Add FlowProject decorators (pre / post conditions)
+        if post:
+            func = FlowProject.post(lambda x: cls.post(x, name))(func)
+        if pre:
+            func = FlowProject.pre(lambda x: cls.pre(x, name))(func)
         log_debug(f'Operator: {func.__name__}: {func}')
+        return func
+
+    @classmethod
+    def DupeFunc(cls, attr, name):
+        """
+        Duplicate a function or static method with new naming.
+        From http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)
+
+        :param attr: the class method that is a operator function
+        :type attr: str
+        :param name: the taskname
+        :type name: str
+        :return: the function to execute
+        :rtype: 'function'
+        """
+        ofunc = getattr(cls, attr)
+        origin_name = ofunc.__name__
+        if name is None:
+            name = ofunc.__name__
+        ofunc.__name__ = name
+        func = types.FunctionType(ofunc.__code__,
+                                  ofunc.__globals__,
+                                  name=name,
+                                  argdefs=ofunc.__defaults__,
+                                  closure=ofunc.__closure__)
+        func = functools.update_wrapper(func, ofunc)
+        func.__kwdefaults__ = cls.operator.__kwdefaults__
+        ofunc.__name__ = origin_name
         return func
 
 
@@ -252,6 +300,8 @@ class Polymer_Builder(BaseTask):
     def operator(*arg, **kwargs):
         """
         Get the polymer builder operation command.
+
+        :return str: the command to run a task.
         """
         polymer_builder = Polymer_Builder(*arg, **kwargs)
         polymer_builder.run()
@@ -321,7 +371,7 @@ class Lammps(BaseTask):
         """
         Set the output log name based on jobname.
         """
-        logfile = self.jobname + self.DRIVER.DRIVER_LOG
+        logfile = self.name + self.DRIVER.DRIVER_LOG
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], '-log', logfile)
 
     @classmethod
@@ -365,6 +415,8 @@ class Custom_Dump(BaseTask):
     def operator(*arg, **kwargs):
         """
         Get the polymer builder operation command.
+
+        :return str: the command to run a task.
         """
         custom_dump = Custom_Dump(*arg, **kwargs)
         custom_dump.run()
@@ -385,3 +437,68 @@ class Custom_Dump(BaseTask):
         args = [dump_file, self.DRIVER.FlAG_DATA_FILE, data_file]
         args += list(self.doc[self.KNOWN_ARGS])[1:]
         self.doc[self.KNOWN_ARGS] = args
+
+    @staticmethod
+    def aggregator(*jobs, log=None, name=None, tname=None):
+        """
+        The aggregator job task that combines the output files of a custom dump
+        task.
+
+        :param jobs: the task jobs the aggregator collected
+        :type jobs: list of 'signac.contrib.job.Job'
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        :param name: the jobname based on which output files are named
+        :type name: str
+        :param tname: aggregate the job tasks of this name
+        :type tname: str
+        """
+        log(f"{len(jobs)} jobs found for aggregation.")
+        job = jobs[0]
+        logfile = job.fn(job.document[jobutils.OUTFILE][tname])
+        outfiles = Custom_Dump.DRIVER.CustomDump.getOutfiles(logfile)
+        outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
+        Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, name)
+
+    @classmethod
+    def getAgg(cls,
+               cmd=False,
+               with_job=False,
+               name=None,
+               attr='aggregator',
+               pre=False,
+               post=False,
+               log=None,
+               tname=None):
+        """
+        Get and register a aggregator job task that collects custom dump task
+        outputs.
+
+        :param cmd: Whether the aggregator function returns a command to run
+        :type cmd: bool
+        :param with_job: Whether chdir to the job dir
+        :type with_job: bool
+        :param name: the name of this aggregator job task.
+        :type name: str
+        :param attr: the class method that is a aggregator function
+        :type attr: str
+        :param pre: add pre-condition for the aggregator if True
+        :type pre: bool
+        :param post: add post-condition for the aggregator if True
+        :type post: bool
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        :param tname: aggregate the job tasks of this name
+        :type tname: str
+        :return: the operation to execute
+        :rtype: 'function'
+        """
+        return Custom_Dump.getOpr(aggregator=aggregator(),
+                                  cmd=cmd,
+                                  with_job=with_job,
+                                  name=name,
+                                  attr=attr,
+                                  pre=pre,
+                                  post=post,
+                                  log=log,
+                                  tname=tname)

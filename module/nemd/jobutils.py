@@ -5,9 +5,11 @@
 """
 This module adds jobcontrol related command line flags and job utilities.
 """
+import os
 import json
-from nemd import environutils
 from signac.contrib import job
+from nemd import parserutils
+from nemd import environutils
 
 RUN_NEMD = 'run_nemd'
 OUTFILE = 'outfile'
@@ -17,6 +19,8 @@ FLAG_JOBNAME = '-JOBNAME'
 FLAG_DEBUG = '-DEBUG'
 FLAG_SEED = '-seed'
 FLAG_CLEAN = '-clean'
+FLAG_JTYPE = '-jtype'
+FLAG_PRJ_PATH = '-prj_path'
 PREREQ = 'prereq'
 
 FINISHED = 'Finished.'
@@ -25,6 +29,8 @@ ARGS = 'args'
 KNOWN_ARGS = 'known_args'
 UNKNOWN_ARGS = 'unknown_args'
 FN_DOCUMENT = job.Job.FN_DOCUMENT
+TASK = 'task'
+AGGREGATOR = 'aggregator'
 
 
 def add_job_arguments(parser, arg_flags=None):
@@ -58,11 +64,37 @@ def add_job_arguments(parser, arg_flags=None):
             action='store_true',
             dest=FLAG_DEBUG[1:].lower(),
             help='Enable debug mode (e.g. extra printing and files)')
+
+
+def add_workflow_arguments(parser, arg_flags=None):
+    """
+    Add workflow related flags.
+
+    :param parser: the parser to add arguments
+    :type parser: 'argparse.ArgumentParser'
+    :param arg_flags: specific workflow related flags to add
+    :type arg_flags: list
+    """
+    if arg_flags is None:
+        arg_flags = [FLAG_CLEAN, FLAG_JTYPE]
     if FLAG_CLEAN in arg_flags:
         parser.add_argument(
             FLAG_CLEAN,
             action='store_true',
             help='Clean previous workflow results (if any) and run new ones.')
+    if FLAG_JTYPE in arg_flags:
+        parser.add_argument(
+            FLAG_JTYPE,
+            choices=[TASK, AGGREGATOR],
+            default=[TASK, AGGREGATOR],
+            help=f'{TASK} jobs run tasks and each task has to register one '
+            f'outfile to be considered as completed; {AGGREGATOR} jobs '
+            f'run after the all task jobs finish.')
+        parser.add_argument(
+            FLAG_PRJ_PATH,
+            default=os.curdir,
+            type=parserutils.type_dir,
+            help=f'Project path if only {AGGREGATOR} jobs are requested.')
 
 
 def get_arg(args, flag, val=None):

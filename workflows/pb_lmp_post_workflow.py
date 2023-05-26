@@ -5,9 +5,13 @@
 """
 This workflow driver runs polymer builder, lammps, and custom dump jobs.
 """
+import functools
 import os
+import re
+import sh
 import sys
-from flow import FlowProject
+import pandas as pd
+from flow import FlowProject, aggregator
 
 from nemd import logutils
 from nemd import jobutils
@@ -71,11 +75,19 @@ class Runner(jobcontrol.Runner):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
         """
-        polymer_builder = Polymer_Builder.getOperator(name='polymer_builder')
-        lammps_runner = Lammps.getOperator(name='lammps_runner')
+        polymer_builder = Polymer_Builder.getOpr(name='polymer_builder')
+        lammps_runner = Lammps.getOpr(name='lammps_runner')
         self.setPrereq(lammps_runner, polymer_builder)
-        custom_dump = Custom_Dump.getOperator(name='custom_dump')
+        custom_dump = Custom_Dump.getOpr(name='custom_dump')
         self.setPrereq(custom_dump, lammps_runner)
+
+    def setAggregation(self):
+        """
+        Aggregate post analysis jobs.
+        """
+        Custom_Dump.getAgg(name=self.jobname, tname='custom_dump', log=log)
+        prj_path = self.project.path if self.project else self.options.prj_path
+        self.flow_project = FlowProject.get_project(prj_path)
 
 
 def get_parser():
@@ -94,8 +106,8 @@ def get_parser():
         metavar=FLAG_STATE_NUM.upper(),
         type=parserutils.type_positive_int,
         help='Number of states for the dynamical system via random seed')
-    aflags = [jobutils.FLAG_JOBNAME, jobutils.FLAG_DEBUG, jobutils.FLAG_CLEAN]
-    jobutils.add_job_arguments(parser, arg_flags=aflags)
+    jobutils.add_job_arguments(parser)
+    jobutils.add_workflow_arguments(parser)
     return parser
 
 
@@ -108,6 +120,11 @@ def validate_options(argv):
     """
     parser = get_parser()
     options = parser.parse_args(argv)
+    if options.clean and jobutils.TASK not in options.jtype:
+        parser.error(
+            f'{jobutils.FLAG_CLEAN} removes the previous project, but '
+            f'no new task jobs are found. ("{jobutils.FLAG_JTYPE} '
+            f'{jobutils.TASK}" runs task jobs)')
     return options
 
 

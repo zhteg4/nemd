@@ -48,15 +48,24 @@ class Runner:
     def run(self):
         """
         The main method to run the integration tests.
+
+        The linear pipline handles three things on request:
+        1) clean previous projects
+        2) run a project with task jobs
+        3) run a project with aggregator jobs
         """
         with open(self.status_file, 'w') as self.status_fh:
-            self.clean()
-            # Decorators register functions to project (before init_project)
-            self.setTasks()
-            self.setProject()
-            self.addJobs()
-            self.runProject()
-            self.logStatus()
+            if self.options.clean:
+                self.clean()
+            if jobutils.TASK in self.options.jtype:
+                self.setTasks()
+                self.setProject()
+                self.addJobs()
+                self.runProject()
+                self.logStatus()
+            if jobutils.AGGREGATOR in self.options.jtype:
+                self.setAggregation()
+                self.runAggregation()
 
     def log(self, msg, timestamp=False):
         """
@@ -76,8 +85,6 @@ class Runner:
         """
         Remove the previous results on request.
         """
-        if not self.options.clean:
-            return
         try:
             shutil.rmtree(self.WORKSPACE)
         except FileNotFoundError:
@@ -87,7 +94,8 @@ class Runner:
         """
         Set the tasks for the job.
 
-        Must be over-written by subclass.
+        Must be over-written by subclass and called before init_project()
+        so that functions can be registered via decoration.
         """
         raise NotImplementedError('This method adds operators as job tasks. ')
 
@@ -177,3 +185,16 @@ class Runner:
             self.log(f"Failed tasks are {failed_tasks} while successful ones "
                      f"are {succ_tasks} for the job with {labels} labels "
                      f"and id {stat[self.JOB_ID]}")
+
+    def setAggregation(self):
+        """
+        Collect jobs and analyze for statics, chemical space, and states.
+        """
+        pass
+
+    def runAggregation(self):
+        """
+        Run aggregation project.
+        """
+        if self.flow_project:
+            self.flow_project.run()
