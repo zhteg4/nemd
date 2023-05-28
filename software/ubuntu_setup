@@ -39,7 +39,14 @@ ssh ubuntu@192.168.3.204
 ssh -Y ubuntu@192.168.3.204
 
 # cmake lammps
-sudo apt-get install libblas-dev liblapack-dev ffmpeg libzstd-dev voro++ libceres-dev libfftw3-double3 fftw3
+sudo apt-get install libblas-dev liblapack-dev ffmpeg libzstd-dev voro++ libceres-dev libfftw3-double3 fftw3 clang-format
+# fftw3 http://fftw.org/download.html
+tar -zxvf fftw-3.3.10.tar.gz
+cd fftw-3.3.10
+./configure
+make
+sudo make install
+cd ..
 mkdir build
 cd build/
 cmake -C ../cmake/presets/basic.cmake -D FFT=KISS   ../cmake
