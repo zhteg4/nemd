@@ -20,8 +20,9 @@ sudo apt install python3-pip
 sudo add-apt-repository ppa:okirby/qt6-backports
 sudo apt update
 sudo apt install qt6-base-dev
-# Ubuntu 22.04
+# GUI Ubuntu 22.04
 sudo apt-get install build-essential libgl1-mesa-dev qt6-base-dev
+sudo apt install '^libxcb.*-dev' libx11-xcb-dev libglu1-mesa-dev libxrender-dev libxkbcommon-dev libxkbcommon-x11-dev
 
 # The following may not be useful
 # https://www.jianshu.com/p/a87da7a75d6c
@@ -29,5 +30,10 @@ sudo apt-get install build-essential libgl1-mesa-dev qt6-base-dev
 sudo apt-get install gnutls-bin
 git config --global --unset http.https://github.com.proxy
 git clone https://github.com/zhteg4/nemd.git
-#This may be duo to out-of-date setuptools
-pip3 install -e .
+pip3 install --upgrade pip
+pip install setuptools
+
+# https://linuxize.com/post/how-to-enable-ssh-on-ubuntu-20-04/
+sudo /etc/init.d/ssh start
+ssh ubuntu@192.168.3.204
+ssh -Y ubuntu@192.168.3.204
