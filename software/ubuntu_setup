@@ -37,3 +37,10 @@ pip install setuptools
 sudo /etc/init.d/ssh start
 ssh ubuntu@192.168.3.204
 ssh -Y ubuntu@192.168.3.204
+
+# cmake lammps
+sudo apt-get install libblas-dev liblapack-dev ffmpeg libzstd-dev voro++ libceres-dev libfftw3-double3 fftw3
+mkdir build
+cd build/
+cmake -C ../cmake/presets/basic.cmake -D FFT=KISS   ../cmake
+cmake --build .
