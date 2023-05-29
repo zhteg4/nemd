@@ -86,8 +86,6 @@ class Runner(jobcontrol.Runner):
         Aggregate post analysis jobs.
         """
         Custom_Dump.getAgg(name=self.jobname, tname='custom_dump', log=log)
-        prj_path = self.project.path if self.project else self.options.prj_path
-        self.flow_project = FlowProject.get_project(prj_path)
 
 
 def get_parser():

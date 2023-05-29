@@ -26,7 +26,10 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG):
     logger = logging.getLogger(basename)
     log_filename = basename + file_ext
     if os.path.isfile(log_filename):
-        os.remove(log_filename)
+        try:
+            os.remove(log_filename)
+        except FileNotFoundError:
+            pass
     hdlr = logging.FileHandler(log_filename)
     logger.addHandler(hdlr)
 

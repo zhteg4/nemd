@@ -15,6 +15,7 @@ import functools
 import numpy as np
 import pandas as pd
 from scipy import constants
+from scipy.signal import savgol_filter
 
 from nemd import traj
 from nemd import symbols
@@ -399,16 +400,58 @@ class CustomDump(object):
         :param task str: the task type to get description and labels
         :param pos_y bool: change the xlim to only show data positive y values
         """
+        fname = self.plotData(data,
+                              task,
+                              pos_y=pos_y,
+                              inav=self.options.interactive,
+                              sidx=self.sidx,
+                              name=self.jobname)
+        log(f'{self.NAME[task].capitalize()} figure saved as {fname}')
+
+    @classmethod
+    def plotData(cls,
+                 data,
+                 task,
+                 pos_y=False,
+                 inav=False,
+                 sidx=None,
+                 name=None):
+        """
+
+        :param data: data to plot
+        :type data: 'pandas.core.frame.DataFrame'
+        :param task: the task name
+        :type task: str
+        :param pos_y: set x lower limit to only include data with pos y value
+        :type pos_y: bool
+        :param inav: pop up window and show plot during code execution if
+            interactive mode is on
+        :type inav: bool
+        :param sidx: the starting index when selecting data
+        :type sidx: int
+        :param name: the taskname based on which output file is set
+        :type name: str
+        :return: output file name
+        :rtype: str
+        """
         import matplotlib
         obackend = matplotlib.get_backend()
-        backend = obackend if self.options.interactive else 'Agg'
+        backend = obackend if inav else 'Agg'
         matplotlib.use(backend)
         import matplotlib.pyplot as plt
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-        ax.plot(data.index, data)
-        if task in ALL_FRM_TASKS:
-            ax.plot(data.index[self.sidx:], data.iloc[self.sidx:], 'g')
+        ax.plot(data.index, data.iloc[:, 0], label='average')
+        if data.shape[-1] == 2:
+            vals, errors = data.iloc[:, 0], data.iloc[:, 1]
+            ax.fill_between(data.index,
+                            vals - errors,
+                            vals + errors,
+                            color='y',
+                            label='stdev')
+            ax.legend()
+        if sidx is not None and task in ALL_FRM_TASKS:
+            ax.plot(data.index[sidx:], data.iloc[sidx:], 'g')
         if pos_y:
             ax.set_xlim([data[data > 0].iloc[0].name, data.iloc[-1].name])
         # ldata = list(data.values.flatten())
@@ -421,14 +464,14 @@ class CustomDump(object):
         # print(span.mean(axis=0))
         ax.set_xlabel(data.index.name)
         ax.set_ylabel(data.columns.values.tolist()[0])
-        fname = self.jobname + self.PNG_EXT % task
-        if self.options.interactive:
+        fname = name + cls.PNG_EXT % task
+        if inav:
             print(
                 f"Showing {task}. Click X to close the figure and continue..")
             plt.show(block=True)
         fig.savefig(fname)
         matplotlib.use(obackend)
-        log(f'{self.NAME[task].capitalize()} figure saved as {fname}')
+        return fname
 
     @classmethod
     def getOutfiles(cls, logfile):
@@ -472,6 +515,12 @@ class CustomDump(object):
             filename = f"{name}" + cls.DATA_EXT % tname
             all_data.to_csv(filename)
             log(f"Results for {tname} saved to {filename}")
+            fname = cls.plotData(all_data, tname, name=name)
+            log(f'{cls.NAME[tname].capitalize()} figure saved as {fname}')
+        data = np.ravel(all_data[all_data.columns[0]])
+        idx = savgol_filter(data, window_length=31, polyorder=2).argmax()
+        row = all_data.iloc[idx]
+        log(f'Peak position: {row.name}; peak value: {row.values[0]: .2f}')
 
 
 def get_parser(parser=None):

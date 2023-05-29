@@ -20,6 +20,7 @@ FLAG_DEBUG = '-DEBUG'
 FLAG_SEED = '-seed'
 FLAG_CLEAN = '-clean'
 FLAG_JTYPE = '-jtype'
+FLAG_CPU = '-cpu'
 FLAG_PRJ_PATH = '-prj_path'
 PREREQ = 'prereq'
 
@@ -43,7 +44,7 @@ def add_job_arguments(parser, arg_flags=None):
     :type arg_flags: list
     """
     if arg_flags is None:
-        arg_flags = [FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG]
+        arg_flags = [FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG, FLAG_CPU]
     # Workflow drivers may add the job control options a few times
     arg_flags = [
         x for x in arg_flags if x not in parser._option_string_actions
@@ -64,6 +65,12 @@ def add_job_arguments(parser, arg_flags=None):
             action='store_true',
             dest=FLAG_DEBUG[1:].lower(),
             help='Enable debug mode (e.g. extra printing and files)')
+    if FLAG_CPU in arg_flags:
+        parser.add_argument(FLAG_CPU,
+                            type=parserutils.type_positive_int,
+                            dest=FLAG_CPU[1:].lower(),
+                            default=round(os.cpu_count() / 2),
+                            help='Number of CPU processors.')
 
 
 def add_workflow_arguments(parser, arg_flags=None):
@@ -76,7 +83,7 @@ def add_workflow_arguments(parser, arg_flags=None):
     :type arg_flags: list
     """
     if arg_flags is None:
-        arg_flags = [FLAG_CLEAN, FLAG_JTYPE]
+        arg_flags = [FLAG_CLEAN, FLAG_JTYPE, FLAG_CPU]
     if FLAG_CLEAN in arg_flags:
         parser.add_argument(
             FLAG_CLEAN,

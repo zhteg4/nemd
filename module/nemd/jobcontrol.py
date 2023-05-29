@@ -153,7 +153,7 @@ class Runner:
                   "and continue..")
             plt.show(block=True)
         fig.savefig(self.jobname + '_nx.png')
-        self.project.run()
+        self.project.run(np=self.options.cpu)
 
     def logStatus(self):
         """
@@ -196,5 +196,7 @@ class Runner:
         """
         Run aggregation project.
         """
-        if self.flow_project:
-            self.flow_project.run()
+
+        prj_path = self.project.path if self.project else self.options.prj_path
+        self.flow_project = FlowProject.get_project(prj_path)
+        self.flow_project.run()
