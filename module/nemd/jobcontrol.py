@@ -7,6 +7,7 @@ from flow import FlowProject
 from nemd import logutils
 from nemd import jobutils
 from nemd import fileutils
+from nemd.task import BaseTask
 
 
 class Runner:
@@ -123,6 +124,9 @@ class Runner:
         """
         for id in range(self.options.state_num):
             job = self.project.open_job({self.STATE_ID: id})
+            job.doc[jobutils.TIME] = {}
+            job.doc[jobutils.OUTFILE] = {}
+            job.doc[jobutils.OUTFILES] = {}
             job.document[self.ARGS] = self.argv[:]
             job.document.update({self.PREREQ: self.prereq})
             job.init()
@@ -190,7 +194,7 @@ class Runner:
         """
         Collect jobs and analyze for statics, chemical space, and states.
         """
-        pass
+        BaseTask.getAgg(log=self.log)
 
     def runAggregation(self):
         """

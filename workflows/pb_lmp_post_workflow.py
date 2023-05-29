@@ -5,13 +5,9 @@
 """
 This workflow driver runs polymer builder, lammps, and custom dump jobs.
 """
-import functools
 import os
-import re
-import sh
 import sys
-import pandas as pd
-from flow import FlowProject, aggregator
+from flow import FlowProject
 
 from nemd import logutils
 from nemd import jobutils
@@ -85,6 +81,7 @@ class Runner(jobcontrol.Runner):
         """
         Aggregate post analysis jobs.
         """
+        super().setAggregation()
         Custom_Dump.getAgg(name=self.jobname, tname='custom_dump', log=log)
 
 
@@ -104,8 +101,8 @@ def get_parser():
         metavar=FLAG_STATE_NUM.upper(),
         type=parserutils.type_positive_int,
         help='Number of states for the dynamical system via random seed')
-    jobutils.add_job_arguments(parser)
-    jobutils.add_workflow_arguments(parser)
+    parserutils.add_job_arguments(parser)
+    parserutils.add_workflow_arguments(parser)
     return parser
 
 

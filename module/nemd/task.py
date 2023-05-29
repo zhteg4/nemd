@@ -1,7 +1,11 @@
 import os
 import sh
 import types
+import logging
 import functools
+import collections
+import humanfriendly
+from datetime import timedelta
 from flow import FlowProject, aggregator
 
 from nemd import oplsua
@@ -27,7 +31,10 @@ class BaseTask:
     """
 
     ID = 'id'
-    TARGS = 'targs'
+    TIME = 'time'
+    STIME = 'stime'
+    ETIME = 'etime'
+    TARGS = jobutils.TARGS
     STATE_ID = 'state_id'
     ARGS = jobutils.ARGS
     KNOWN_ARGS = jobutils.KNOWN_ARGS
@@ -61,7 +68,6 @@ class BaseTask:
         """
         self.setArgs()
         self.setName()
-        self.setCmd()
 
     def setArgs(self):
         """
@@ -93,14 +99,6 @@ class BaseTask:
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_JOBNAME,
                          self.name)
 
-    def setCmd(self):
-        """
-        Set the command which the job will execute.
-        """
-        # self.doc[KNOWN_ARGS] is not a list but BufferedJSONAttrLists
-        args = list(self.doc[self.KNOWN_ARGS])
-        self.cmd = list(map(str, self.run_driver + args))
-
     def getCmd(self):
         """
         Get command line str.
@@ -108,7 +106,10 @@ class BaseTask:
         :return: the command as str
         :rtype: str
         """
-        return ' '.join(self.cmd)
+        # self.doc[KNOWN_ARGS] is not a list but BufferedJSONAttrLists
+        args = list(self.doc[self.KNOWN_ARGS])
+        cmd = list(map(str, self.run_driver + args))
+        return ' '.join(cmd)
 
     @classmethod
     def success(cls, job, name):
@@ -175,10 +176,11 @@ class BaseTask:
         :return: True if the post-conditions are met
         :rtype: bool
         """
-        log_debug(
-            f'Post-conditions: {name}: {job.document.get(cls.OUTFILE, {}).get(name)}'
-        )
-        return job.document.get(cls.OUTFILE, {}).get(name)
+        outfile = job.document.get(cls.OUTFILE, {}).get(name)
+        log_debug(f'Post-conditions: {name}: {outfile}')
+        if outfile:
+            return True
+        return False
 
     @staticmethod
     def operator(job):
@@ -272,6 +274,72 @@ class BaseTask:
         ofunc.__name__ = origin_name
         return func
 
+    @staticmethod
+    def aggregator(*jobs, log=None, **kwargs):
+        """
+        The aggregator job task that combines the output files of a custom dump
+        task.
+
+        :param jobs: the task jobs the aggregator collected
+        :type jobs: list of 'signac.contrib.job.Job'
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        """
+        delta_times = collections.defaultdict(list)
+        for job in jobs:
+            for tname, filename in job.doc[jobutils.LOGFILE].items():
+                delta = logutils.get_time(job.fn(filename))
+                delta_times[tname].append(delta)
+        log('Task timing breakdown:')
+        for tname, deltas in delta_times.items():
+            ave = sum(deltas, timedelta(0)) / len(deltas)
+            deltas = [humanfriendly.format_timespan(x) for x in deltas]
+            ave = humanfriendly.format_timespan(ave)
+            log(f"{tname}: {', '.join(deltas)}; {ave} (ave)")
+
+    @classmethod
+    def getAgg(cls,
+               cmd=False,
+               with_job=False,
+               name=None,
+               attr='aggregator',
+               pre=False,
+               post=False,
+               log=None,
+               tname=None):
+        """
+        Get and register a aggregator job task that collects custom dump task
+        outputs.
+
+        :param cmd: Whether the aggregator function returns a command to run
+        :type cmd: bool
+        :param with_job: Whether chdir to the job dir
+        :type with_job: bool
+        :param name: the name of this aggregator job task.
+        :type name: str
+        :param attr: the class method that is a aggregator function
+        :type attr: str
+        :param pre: add pre-condition for the aggregator if True
+        :type pre: bool
+        :param post: add post-condition for the aggregator if True
+        :type post: bool
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        :param tname: aggregate the job tasks of this name
+        :type tname: str
+        :return: the operation to execute
+        :rtype: 'function'
+        """
+        return cls.getOpr(aggregator=aggregator(),
+                          cmd=cmd,
+                          with_job=with_job,
+                          name=name,
+                          attr=attr,
+                          pre=pre,
+                          post=post,
+                          log=log,
+                          tname=tname)
+
 
 class Polymer_Builder(BaseTask):
 
@@ -320,6 +388,7 @@ class Lammps_Driver:
     JOBNAME = 'lammps'
     FLAG_IN = '-in'
     FLAG_SCREEN = '-screen'
+    FLAG_LOG = '-log'
     DRIVER_LOG = '_lammps.log'
 
     ARGS_TMPL = [FLAG_IN, FILE, '-screen', 'none']
@@ -342,6 +411,8 @@ class Lammps_Driver:
         parser.add_argument(cls.FLAG_SCREEN,
                             choices=['none', 'filename'],
                             help='where to send screen output (-sc)')
+        parser.add_argument(cls.FLAG_LOG,
+                            help='Print logging information into this file.')
         return parser
 
 
@@ -367,12 +438,33 @@ class Lammps(BaseTask):
         log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
         return cmd
 
+    def run(self):
+        """
+        The main method to run.
+        """
+        super().run()
+        self.setLammpsLog()
+        self.setDriverLog()
+
     def setName(self):
+        """
+        Overwrite the parent as lammps executable doesn't take jobname flag.
+        """
+        pass
+
+    def setLammpsLog(self):
         """
         Set the output log name based on jobname.
         """
         logfile = self.name + self.DRIVER.DRIVER_LOG
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], '-log', logfile)
+
+    def setDriverLog(self):
+        parser = self.DRIVER.get_parser()
+        options = parser.parse_args(self.doc[self.KNOWN_ARGS])
+        logger = logutils.createDriverLogger(jobname=self.name)
+        logutils.logOptions(logger, options)
+        logutils.log(logger, 'Running lammps simulations..')
 
     @classmethod
     def post(cls, job, name):
@@ -386,20 +478,22 @@ class Lammps(BaseTask):
         :return: True if the post-conditions are met
         :rtype: bool
         """
-        logfile = job.fn(name + cls.DRIVER.DRIVER_LOG)
+
+        basename = name + cls.DRIVER.DRIVER_LOG
+        logfile = job.fn(basename)
         if not os.path.exists(logfile):
             return False
         if super().post(job, name):
             return True
         if not sh.tail('-2', logfile).startswith('ERROR') and sh.tail(
                 '-1', logfile).startswith('Total'):
-            basename = os.path.basename(logfile)
-            document = job.fn(jobutils.FN_DOCUMENT)
             jobutils.add_outfile(basename,
                                  jobname=name,
                                  job=job,
-                                 document=document,
+                                 document=job.fn(jobutils.FN_DOCUMENT),
                                  set_file=True)
+            logger = logging.getLogger(name)
+            logutils.log(logger, logutils.FINISHED, timestamp=True)
         return super().post(job, name)
 
 
@@ -459,46 +553,3 @@ class Custom_Dump(BaseTask):
         outfiles = Custom_Dump.DRIVER.CustomDump.getOutfiles(logfile)
         outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
         Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, name)
-
-    @classmethod
-    def getAgg(cls,
-               cmd=False,
-               with_job=False,
-               name=None,
-               attr='aggregator',
-               pre=False,
-               post=False,
-               log=None,
-               tname=None):
-        """
-        Get and register a aggregator job task that collects custom dump task
-        outputs.
-
-        :param cmd: Whether the aggregator function returns a command to run
-        :type cmd: bool
-        :param with_job: Whether chdir to the job dir
-        :type with_job: bool
-        :param name: the name of this aggregator job task.
-        :type name: str
-        :param attr: the class method that is a aggregator function
-        :type attr: str
-        :param pre: add pre-condition for the aggregator if True
-        :type pre: bool
-        :param post: add post-condition for the aggregator if True
-        :type post: bool
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :param tname: aggregate the job tasks of this name
-        :type tname: str
-        :return: the operation to execute
-        :rtype: 'function'
-        """
-        return Custom_Dump.getOpr(aggregator=aggregator(),
-                                  cmd=cmd,
-                                  with_job=with_job,
-                                  name=name,
-                                  attr=attr,
-                                  pre=pre,
-                                  post=post,
-                                  log=log,
-                                  tname=tname)

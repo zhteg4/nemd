@@ -31,7 +31,7 @@ setup(name='nemd',
           'chemparse', 'mendeleev', 'rdkit', 'signac', 'signac-flow', 'lammps',
           'matplotlib', 'plotly', 'dash', 'dash_bootstrap_components',
           'pytest', 'dash[testing]', 'pyqt6', 'webdriver-manager',
-          'flask>=2.2.2', 'openpyxl', 'sh'
+          'flask>=2.2.2', 'openpyxl', 'sh', 'humanfriendly'
       ],
       extras_require={
           'dev': [

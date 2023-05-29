@@ -1,14 +1,21 @@
 import os
+import sh
 import logging
 import pathlib
-from datetime import datetime
 
 from nemd import environutils
+from nemd import timeutils
+from nemd import jobutils
 
 DRIVER_LOG = '-driver.log'
+JOBSTART = 'JobStart:'
+FINISHED = 'Finished.'
+START = 'start'
+END = 'end'
+DELTA = 'delta'
 
 
-def createLogger(basename, verbose=None, file_ext=DRIVER_LOG):
+def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):
     """
     Create a logger.
 
@@ -19,6 +26,8 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG):
     :param file_ext: the extension of the logger file
     :type file_ext: str
     :return: the logger
+    :param log_file: sets as the log file if True
+    :type log_file: bool
     :rtype: 'logging.Logger'
     """
     if verbose is None:
@@ -32,7 +41,8 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG):
             pass
     hdlr = logging.FileHandler(log_filename)
     logger.addHandler(hdlr)
-
+    if log_file:
+        jobutils.add_outfile(log_filename, jobname=basename, log_file=log_file)
     if verbose:
         formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     else:
@@ -44,7 +54,7 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG):
     return logger
 
 
-def createDriverLogger(jobname, verbose=None):
+def createDriverLogger(jobname, verbose=None, log_file=True):
     """
     Create a driver logger.
 
@@ -52,10 +62,12 @@ def createDriverLogger(jobname, verbose=None):
     :type jobname: str
     :param verbose: extra info printed out (e.g. debug level info) if True
     :type verbose: bool
+    :param log_file: sets as the log file if True
+    :type log_file: bool
     :return: the logger
     :rtype: 'logging.Logger'
     """
-    return createLogger(jobname, verbose=verbose)
+    return createLogger(jobname, verbose=verbose, log_file=log_file)
 
 
 def createModuleLogger(basename=None,
@@ -108,8 +120,7 @@ def logOptions(logger, options):
     logger.info(f"." * 10 + command_options + f"." * 10)
     for key, val in options.__dict__.items():
         logger.info(f"{key}: {val}")
-    time = datetime.now().isoformat(sep=' ', timespec='minutes')
-    logger.info(f"JobStart: {time}")
+    logger.info(f"{JOBSTART} {timeutils.ctime()}")
     logger.info(f"." * (20 + len(command_options)))
 
 
@@ -126,5 +137,28 @@ def log(logger, msg, timestamp=False):
     """
     logger.info(msg)
     if timestamp:
-        time = datetime.now().isoformat(sep=' ', timespec='minutes')
-        logger.info(time)
+        logger.info(timeutils.ctime())
+
+
+def get_time(filepath, dtype=DELTA):
+    """
+    Get the time information from log file.
+
+    :param filepath: the log filepath
+    :type filepath: str
+    :param dtype: START gets the starting time, END get the finishing time,
+        and DELTA gets the time span.
+    :type dtype: str
+    :return: the time information
+    :rtype: 'datetime.datetime' on START & END; 'datetime.timedelta' on DELTA
+    """
+    stime = sh.grep(JOBSTART, filepath).split(JOBSTART)[-1].strip()
+    stime = timeutils.dtime(stime)
+    if dtype == START:
+        return stime
+    dtime = sh.grep('-A', '1', FINISHED, filepath).split(FINISHED)[-1]
+    dtime = timeutils.dtime(' '.join(dtime.split()[-2:]))
+    if dtype == END:
+        return dtime
+    delta = dtime - stime
+    return delta

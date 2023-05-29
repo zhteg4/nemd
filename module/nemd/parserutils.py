@@ -8,6 +8,16 @@ from nemd import oplsua
 from nemd import symbols
 from nemd import constants
 from nemd import environutils
+from nemd import jobutils
+
+FLAG_CLEAN = jobutils.FLAG_CLEAN
+FLAG_JTYPE = jobutils.FLAG_JTYPE
+FLAG_CPU = jobutils.FLAG_CPU
+FLAG_INTERACTIVE = jobutils.FLAG_INTERACTIVE
+FLAG_JOBNAME = jobutils.FLAG_JOBNAME
+FLAG_DEBUG = jobutils.FLAG_DEBUG
+FLAG_CPU = jobutils.FLAG_CPU
+FLAG_PRJ_PATH = jobutils.FLAG_PRJ_PATH
 
 
 class CapitalisedHelpFormatter(argparse.HelpFormatter):
@@ -224,3 +234,75 @@ def add_md_arguments(parser):
         type=type_force_field,
         default=oplsua.OplsTyper.OPLSUA_TIP3P,
         help='The force field type (and water model separated with comma).')
+
+
+def add_job_arguments(parser, arg_flags=None):
+    """
+    Add job control related flags.
+
+    :param parser: the parser to add arguments
+    :type parser: 'argparse.ArgumentParser'
+    :param arg_flags: specific job control related flags to add
+    :type arg_flags: list
+    """
+    if arg_flags is None:
+        arg_flags = [FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG, FLAG_CPU]
+    # Workflow drivers may add the job control options a few times
+    arg_flags = [
+        x for x in arg_flags if x not in parser._option_string_actions
+    ]
+    if FLAG_INTERACTIVE in arg_flags:
+        parser.add_argument(FLAG_INTERACTIVE,
+                            dest=FLAG_INTERACTIVE[1:].lower(),
+                            action='store_true',
+                            help='Enable interactive mode')
+    if FLAG_JOBNAME in arg_flags:
+        parser.add_argument(
+            FLAG_JOBNAME,
+            dest=FLAG_JOBNAME[1:].lower(),
+            help='The jobnamee based on which filenames are created.')
+    if FLAG_DEBUG in arg_flags:
+        parser.add_argument(
+            FLAG_DEBUG,
+            action='store_true',
+            dest=FLAG_DEBUG[1:].lower(),
+            help='Enable debug mode (e.g. extra printing and files)')
+    if FLAG_CPU in arg_flags:
+        parser.add_argument(FLAG_CPU,
+                            type=type_positive_int,
+                            dest=FLAG_CPU[1:].lower(),
+                            default=round(os.cpu_count() / 2),
+                            help='Number of CPU processors.')
+
+
+def add_workflow_arguments(parser, arg_flags=None):
+    """
+    Add workflow related flags.
+
+    :param parser: the parser to add arguments
+    :type parser: 'argparse.ArgumentParser'
+    :param arg_flags: specific workflow related flags to add
+    :type arg_flags: list
+    """
+    if arg_flags is None:
+        arg_flags = [FLAG_CLEAN, FLAG_JTYPE, FLAG_CPU]
+    if FLAG_CLEAN in arg_flags:
+        parser.add_argument(
+            FLAG_CLEAN,
+            action='store_true',
+            help='Clean previous workflow results (if any) and run new ones.')
+    if FLAG_JTYPE in arg_flags:
+        parser.add_argument(
+            FLAG_JTYPE,
+            choices=[jobutils.TASK, jobutils.AGGREGATOR],
+            default=[jobutils.TASK, jobutils.AGGREGATOR],
+            help=f'{jobutils.TASK} jobs run tasks and each task has to register '
+            f'one outfile to be considered as completed; '
+            f'{jobutils.AGGREGATOR} jobs run after the all task jobs '
+            f'finish.')
+        parser.add_argument(
+            FLAG_PRJ_PATH,
+            default=os.curdir,
+            type=type_dir,
+            help=
+            f'Project path if only {jobutils.AGGREGATOR} jobs are requested.')

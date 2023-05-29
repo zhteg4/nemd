@@ -556,7 +556,7 @@ def get_parser(parser=None):
         default=0.2,
         help=f"{', '.join(LAST_FRM_TASKS)} average results from "
         f"last frames of this percentage.")
-    jobutils.add_job_arguments(parser)
+    parserutils.add_job_arguments(parser)
     return parser
 
 
