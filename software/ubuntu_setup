@@ -49,5 +49,5 @@ sudo make install
 cd ..
 mkdir build
 cd build/
-cmake -C ../cmake/presets/basic.cmake -D FFT=KISS   ../cmake
+cmake -C ../cmake/presets/most.cmake -DPKG_GPU=yes ../cmake
 cmake --build .
