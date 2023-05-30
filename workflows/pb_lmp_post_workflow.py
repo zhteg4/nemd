@@ -10,7 +10,6 @@ import sys
 from flow import FlowProject
 
 from nemd import logutils
-from nemd import jobutils
 from nemd import parserutils
 from nemd import environutils
 from nemd import jobcontrol
@@ -85,7 +84,10 @@ class Runner(jobcontrol.Runner):
         """
         super().setAggregation()
         name = f"{self.jobname}{self.SEP}{self.CUSTOM_DUMP}"
-        Custom_Dump.getAgg(name=name, tname=self.CUSTOM_DUMP, log=log)
+        Custom_Dump.getAgg(name=name,
+                           tname=self.CUSTOM_DUMP,
+                           log=log,
+                           clean=self.options.clean)
 
 
 def get_parser():
@@ -118,11 +120,6 @@ def validate_options(argv):
     """
     parser = get_parser()
     options = parser.parse_args(argv)
-    if options.clean and jobutils.TASK not in options.jtype:
-        parser.error(
-            f'{jobutils.FLAG_CLEAN} removes the previous project, but '
-            f'no new task jobs are found. ("{jobutils.FLAG_JTYPE} '
-            f'{jobutils.TASK}" runs task jobs)')
     return options
 
 

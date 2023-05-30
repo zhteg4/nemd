@@ -514,21 +514,29 @@ class CustomDump(object):
         :type name: str
         """
         for tname, tfiles in files.items():
-            data = pd.concat([pd.read_csv(x) for x in tfiles])
-            grouped, cname = data.groupby(data.columns[0]), data.columns[1]
-            all_data = grouped.agg(avg=(cname, 'mean'), std=(cname, 'std'))
-            num = len(tfiles)
-            all_data.columns = [f'{cname} (num={num})', f'std (num={num})']
+            if tname == XYZ:
+                continue
             filename = f"{name}" + cls.DATA_EXT % tname
-            all_data.to_csv(filename)
             dname = cls.NAME[tname]
-            log(f"{cls.RESULTS}{dname} saved to {filename}")
-            fname = cls.plotData(all_data, tname, name=name)
+            if os.path.exists(filename):
+                log(f"{cls.RESULTS}{dname} found as {filename}")
+                data = pd.read_csv(filename, index_col=0)
+            else:
+                data = pd.concat([pd.read_csv(x) for x in tfiles])
+                grouped, cname = data.groupby(data.columns[0]), data.columns[1]
+                data = grouped.agg(avg=(cname, 'mean'), std=(cname, 'std'))
+                num = len(tfiles)
+                data.columns = [f'{cname} (num={num})', f'std (num={num})']
+                data.to_csv(filename)
+                log(f"{cls.RESULTS}{dname} saved to {filename}")
+            fname = cls.plotData(data, tname, name=name)
             log(f'{dname.capitalize()} figure saved as {fname}')
             if tname == RDF:
-                data = np.ravel(all_data[all_data.columns[0]])
-                smoothed = savgol_filter(data, window_length=31, polyorder=2)
-                row = all_data.iloc[smoothed.argmax()]
+                raveled = np.ravel(data[data.columns[0]])
+                smoothed = savgol_filter(raveled,
+                                         window_length=31,
+                                         polyorder=2)
+                row = data.iloc[smoothed.argmax()]
                 log(f'Peak position: {row.name}; '
                     f'peak value: {row.values[0]: .2f}')
 

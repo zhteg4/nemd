@@ -58,7 +58,7 @@ class Runner:
         3) run a project with aggregator jobs
         """
         with open(self.status_file, 'w') as self.status_fh:
-            if self.options.clean:
+            if self.options.clean and jobutils.TASK in self.options.jtype:
                 self.clean()
             if jobutils.TASK in self.options.jtype:
                 self.setTasks()
@@ -86,7 +86,7 @@ class Runner:
 
     def clean(self):
         """
-        Remove the previous results on request.
+        Remove the previous task results on request.
         """
         try:
             shutil.rmtree(self.WORKSPACE)

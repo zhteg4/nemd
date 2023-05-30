@@ -204,7 +204,8 @@ class BaseTask:
                post=None,
                aggregator=None,
                log=None,
-               tname=None):
+               tname=None,
+               **kwargs):
         """
         Duplicate and return the operator with jobname and decorators.
 
@@ -236,12 +237,13 @@ class BaseTask:
 
         func = cls.DupeFunc(attr, name)
         # Pass jobname, taskname, and logging function
-        kwarg = {'name': name}
+        kwargs.update({'name': name})
         if tname:
-            kwarg['tname'] = tname
+            kwargs['tname'] = tname
         if log:
-            kwarg['log'] = log
-        func = functools.update_wrapper(functools.partial(func, **kwarg), func)
+            kwargs['log'] = log
+        func = functools.update_wrapper(functools.partial(func, **kwargs),
+                                        func)
         func = FlowProject.operation(cmd=cmd,
                                      with_job=with_job,
                                      name=name,
@@ -318,7 +320,8 @@ class BaseTask:
                pre=False,
                post=None,
                log=None,
-               tname=None):
+               tname=None,
+               **kwargs):
         """
         Get and register a aggregator job task that collects custom dump task
         outputs.
@@ -352,7 +355,8 @@ class BaseTask:
                           pre=pre,
                           post=post,
                           log=log,
-                          tname=tname)
+                          tname=tname,
+                          **kwargs)
 
     @classmethod
     def postAgg(cls, *jobs, name=None):
@@ -568,7 +572,7 @@ class Custom_Dump(BaseTask):
         self.doc[self.KNOWN_ARGS] = args
 
     @staticmethod
-    def aggregator(*jobs, log=None, name=None, tname=None):
+    def aggregator(*jobs, log=None, name=None, tname=None, **kwargs):
         """
         The aggregator job task that combines the output files of a custom dump
         task.
@@ -586,6 +590,13 @@ class Custom_Dump(BaseTask):
         job = jobs[0]
         logfile = job.fn(job.document[jobutils.OUTFILE][tname])
         outfiles = Custom_Dump.DRIVER.CustomDump.getOutfiles(logfile)
+        if kwargs.get(jobutils.FLAG_CLEAN[1:]):
+            jname = name.split(BaseTask.SEP)[0]
+            for filename in outfiles.values():
+                try:
+                    os.remove(filename.replace(tname, jname))
+                except FileNotFoundError:
+                    pass
         outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
         jname = name.split(BaseTask.SEP)[0]
         Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, jname)
