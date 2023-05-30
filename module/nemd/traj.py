@@ -7,6 +7,7 @@ This module read, parser, and analyze trajectories.
 """
 import io
 import math
+import gzip
 import random
 import base64
 import itertools
@@ -93,7 +94,7 @@ class Frame(pd.DataFrame):
         :param contents `bytes`: parse the contents if filename not provided
         :return iterator of 'Frame': each frame has coordinates and box info
         """
-        with open(filename, 'r') if filename else io.StringIO(contents) as fh:
+        with gzip.open(filename, 'rt') if filename else io.StringIO(contents) as fh:
             while True:
                 lines = [fh.readline() for _ in range(9)]
                 if not all(lines):
@@ -276,7 +277,7 @@ class Frame(pd.DataFrame):
         """
         ids = sorted(ids) if ids else list(range(1, self.shape[0] + 1))
         if cut:
-            dcell = DistanceCell(self, gids=ids, cut=cut)
+            dcell = DistanceCell(self, gids=ids, cut=cut, resolution=DistanceCell.AUTO)
             dcell.setUp()
         dists = []
         for idx, (id, row) in enumerate(self.loc[ids].iterrows()):
@@ -427,12 +428,8 @@ class DistanceCell:
         Indexes: the number of cells in three dimensions
         Grids: the length of the cell in each dimension
         """
-        if self.resolution == self.AUTO:
-            self.indexes = [math.floor(x / self.cut) for x in self.span]
-            self.grids = np.array(
-                [x / i for x, i in zip(self.span, self.indexes)])
-            return
-        self.indexes = [math.ceil(x / self.resolution) for x in self.span]
+        res = self.cut if self.resolution == self.AUTO else self.resolution
+        self.indexes = [math.ceil(x / res) for x in self.span]
         self.grids = np.array([x / i for x, i in zip(self.span, self.indexes)])
 
     def setNeighborIds(self):

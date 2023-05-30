@@ -124,7 +124,6 @@ class Runner:
         """
         for id in range(self.options.state_num):
             job = self.project.open_job({self.STATE_ID: id})
-            job.doc[jobutils.TIME] = {}
             job.doc[jobutils.OUTFILE] = {}
             job.doc[jobutils.OUTFILES] = {}
             job.document[self.ARGS] = self.argv[:]

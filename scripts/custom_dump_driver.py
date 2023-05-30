@@ -366,11 +366,11 @@ class CustomDump(object):
         res = min(resolution, mdist / 100)
         bins = round(mdist / res)
         hist_range = [res / 2, res * bins + res / 2]
-
+        cut = min([span.min() / 2, oplsua.LammpsIn.DEFAULT_CUT * 2])
         rdf, num = np.zeros((bins)), len(self.gids)
         for idx, frm in enumerate(frms):
             log_debug(f"Analyzing frame {idx} for RDF..")
-            dists = frm.pairDists(ids=self.gids)  #, cut=6)
+            dists = frm.pairDists(ids=self.gids, cut=cut)
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia

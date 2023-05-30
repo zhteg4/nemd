@@ -1034,8 +1034,11 @@ class LammpsIn(fileutils.LammpsInput):
     MIN_STYLE = 'min_style'
     HARMONIC = 'harmonic'
     LJ_COUL = 'lj/coul'
-    CUSTOM_EXT = '.custom'
+    CUSTOM_EXT = '.custom.gz'
     DUMP = 'dump'
+    DEFAULT_CUT = 11.
+    DEFAULT_LJ_CUT = DEFAULT_CUT
+    DEFAULT_COUL_CUT = DEFAULT_CUT
 
     def __init__(self, jobname, options=None, concise=True):
         """
