@@ -4,6 +4,7 @@ import numpy as np
 import networkx as nx
 from flow import FlowProject
 
+from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
 from nemd import fileutils
@@ -23,6 +24,7 @@ class Runner:
     COMPLETED = 'completed'
     OPERATIONS = 'operations'
     JOB_ID = 'job_id'
+    SEP = symbols.SEP
 
     def __init__(self, options, argv, jobname, logger=None):
         """
@@ -135,7 +137,7 @@ class Runner:
         Run all jobs registered in the project.
         """
         if not self.options.debug:
-            self.project.run()
+            self.project.run(np=self.options.cpu)
             return
 
         import matplotlib
@@ -193,7 +195,7 @@ class Runner:
         """
         Collect jobs and analyze for statics, chemical space, and states.
         """
-        BaseTask.getAgg(log=self.log)
+        BaseTask.getAgg(log=self.log, name=self.jobname)
 
     def runAggregation(self):
         """

@@ -415,9 +415,7 @@ class FragMol(FragMixIn):
         Set distance cell.
         """
         self.frm.loc[:] = self.conf.GetPositions()
-        self.dcell = traj.DistanceCell(frm=self.frm,
-                                       cut=self.cell_cut,
-                                       resolution='auto')
+        self.dcell = traj.DistanceCell(frm=self.frm, cut=self.cell_cut)
         self.dcell.setUp()
 
     def hasClashes(self, aids):
@@ -569,9 +567,7 @@ class FragMols(FragMixIn):
         Set distance cell for neighbor atom and graph for voids searching.
         """
         self.updateFrm()
-        self.dcell = traj.DistanceCell(frm=self.frm,
-                                       cut=self.cell_cut,
-                                       resolution=traj.DistanceCell.AUTO)
+        self.dcell = traj.DistanceCell(frm=self.frm, cut=self.cell_cut)
         self.dcell.setUp()
         self.dcell.setGraph(len(self.mols))
 

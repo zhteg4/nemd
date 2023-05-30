@@ -9,6 +9,7 @@ from datetime import timedelta
 from flow import FlowProject, aggregator
 
 from nemd import oplsua
+from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
 from nemd import parserutils
@@ -34,16 +35,19 @@ class BaseTask:
     TIME = 'time'
     STIME = 'stime'
     ETIME = 'etime'
-    TARGS = jobutils.TARGS
     STATE_ID = 'state_id'
+    TIME_REPORTED = 'time_reported'
+    TIME_BREAKDOWN = 'Task timing breakdown:'
+    SEP = symbols.SEP
     ARGS = jobutils.ARGS
-    KNOWN_ARGS = jobutils.KNOWN_ARGS
-    UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
+    TARGS = jobutils.TARGS
+    PREREQ = jobutils.PREREQ
+    OUTFILE = jobutils.OUTFILE
     RUN_NEMD = jobutils.RUN_NEMD
     FINISHED = jobutils.FINISHED
-    OUTFILE = jobutils.OUTFILE
     DRIVER_LOG = logutils.DRIVER_LOG
-    PREREQ = jobutils.PREREQ
+    KNOWN_ARGS = jobutils.KNOWN_ARGS
+    UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
 
     def __init__(self, job, pre_run=RUN_NEMD, name=None):
         """
@@ -128,7 +132,7 @@ class BaseTask:
             cls.FINISHED)
 
     @classmethod
-    def pre(cls, job, name):
+    def pre(cls, job, name=None):
         """
         Set and check pre-conditions before starting the job.
 
@@ -162,7 +166,7 @@ class BaseTask:
         return True
 
     @classmethod
-    def post(cls, job, name):
+    def post(cls, job, name=None):
         """
         Check post-conditions after the job has started (FIXME: I am not sure
         whether this runs during the execution. I guess that this runs after
@@ -196,8 +200,8 @@ class BaseTask:
                with_job=True,
                name=None,
                attr='operator',
-               pre=True,
-               post=True,
+               pre=None,
+               post=None,
                aggregator=None,
                log=None,
                tname=None):
@@ -225,6 +229,10 @@ class BaseTask:
         :return: the operation to execute
         :rtype: 'function'
         """
+        if post is None:
+            post = cls.post
+        if pre is None:
+            pre = cls.pre
 
         func = cls.DupeFunc(attr, name)
         # Pass jobname, taskname, and logging function
@@ -240,9 +248,13 @@ class BaseTask:
                                      aggregator=aggregator)(func)
         # Add FlowProject decorators (pre / post conditions)
         if post:
-            func = FlowProject.post(lambda x: cls.post(x, name))(func)
+            fp_post = functools.partial(post, name=name)
+            fp_post = functools.update_wrapper(fp_post, post)
+            func = FlowProject.post(lambda *x: fp_post(*x))(func)
         if pre:
-            func = FlowProject.pre(lambda x: cls.pre(x, name))(func)
+            fp_pre = functools.partial(pre, name=name)
+            fp_pre = functools.update_wrapper(fp_pre, pre)
+            func = FlowProject.pre(lambda *x: fp_pre(*x))(func)
         log_debug(f'Operator: {func.__name__}: {func}')
         return func
 
@@ -290,7 +302,7 @@ class BaseTask:
             for tname, filename in job.doc[jobutils.LOGFILE].items():
                 delta = logutils.get_time(job.fn(filename))
                 delta_times[tname].append(delta)
-        log('Task timing breakdown:')
+        log(BaseTask.TIME_BREAKDOWN)
         for tname, deltas in delta_times.items():
             ave = sum(deltas, timedelta(0)) / len(deltas)
             deltas = [humanfriendly.format_timespan(x) for x in deltas]
@@ -304,7 +316,7 @@ class BaseTask:
                name=None,
                attr='aggregator',
                pre=False,
-               post=False,
+               post=None,
                log=None,
                tname=None):
         """
@@ -330,6 +342,8 @@ class BaseTask:
         :return: the operation to execute
         :rtype: 'function'
         """
+        if post is None:
+            post = cls.postAgg
         return cls.getOpr(aggregator=aggregator(),
                           cmd=cmd,
                           with_job=with_job,
@@ -339,6 +353,25 @@ class BaseTask:
                           post=post,
                           log=log,
                           tname=tname)
+
+    @classmethod
+    def postAgg(cls, *jobs, name=None):
+        """
+        Post-condition for task time reporting.
+
+        :param jobs: the task jobs the aggregator collected
+        :type jobs: list of 'signac.contrib.job.Job'
+        :param name: jobname based on which log file is found
+        :type name: str
+        :return: the label after job completion
+        :rtype: str
+        """
+        log_file = name + logutils.DRIVER_LOG
+        try:
+            sh.grep(cls.TIME_BREAKDOWN, log_file)
+        except sh.ErrorReturnCode_1:
+            return False
+        return cls.TIME_REPORTED
 
 
 class Polymer_Builder(BaseTask):
@@ -467,7 +500,7 @@ class Lammps(BaseTask):
         logutils.log(logger, 'Running lammps simulations..')
 
     @classmethod
-    def post(cls, job, name):
+    def post(cls, job, name=None):
         """
         Set the output for the job.
 
@@ -504,6 +537,7 @@ class Custom_Dump(BaseTask):
     DUMP = oplsua.LammpsIn.DUMP
     READ_DATA = oplsua.LammpsIn.READ_DATA
     DATA_EXT = oplsua.LammpsIn.DATA_EXT
+    RESULTS = DRIVER.CustomDump.RESULTS
 
     @staticmethod
     def operator(*arg, **kwargs):
@@ -552,4 +586,31 @@ class Custom_Dump(BaseTask):
         logfile = job.fn(job.document[jobutils.OUTFILE][tname])
         outfiles = Custom_Dump.DRIVER.CustomDump.getOutfiles(logfile)
         outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
-        Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, name)
+        jname = name.split(BaseTask.SEP)[0]
+        Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, jname)
+
+    @classmethod
+    def postAgg(cls, *jobs, name=None):
+        """
+        Report the status of the aggregation over all custom dump task output
+        files.
+
+        :param jobs: the task jobs the aggregator collected
+        :type jobs: list of 'signac.contrib.job.Job'
+        :param name: jobname based on which log file is found
+        :type name: str
+        :return: the label after job completion
+        :rtype: str
+        """
+
+        jname = name.split(cls.SEP)[0]
+        logfile = jname + logutils.DRIVER_LOG
+        try:
+            line = sh.grep(cls.RESULTS, logfile)
+        except sh.ErrorReturnCode_1:
+            return False
+        line = line.strip().split('\n')
+        lines = [x.split(cls.RESULTS)[-1].strip() for x in line]
+        ext = '.' + cls.DRIVER.CustomDump.DATA_EXT.split('.')[-1]
+        filenames = [x for x in lines if x.split()[-1].endswith(ext)]
+        return f'{len(filenames)} files found'

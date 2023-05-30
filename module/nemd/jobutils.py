@@ -114,7 +114,8 @@ def add_outfile(outfile,
             data = {}
     data.setdefault(OUTFILES, {})
     data[OUTFILES].setdefault(jobname, [])
-    data[OUTFILES][jobname].append(outfile)
+    if outfile not in data[OUTFILES][jobname]:
+        data[OUTFILES][jobname].append(outfile)
     if set_file:
         data.setdefault(OUTFILE, {})
         data[OUTFILE].setdefault(jobname, outfile)

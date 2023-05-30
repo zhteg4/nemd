@@ -67,6 +67,8 @@ def label(job):
 
 class Runner(jobcontrol.Runner):
 
+    CUSTOM_DUMP = 'custom_dump'
+
     def setTasks(self):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
@@ -74,7 +76,7 @@ class Runner(jobcontrol.Runner):
         polymer_builder = Polymer_Builder.getOpr(name='polymer_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
         self.setPrereq(lammps_runner, polymer_builder)
-        custom_dump = Custom_Dump.getOpr(name='custom_dump')
+        custom_dump = Custom_Dump.getOpr(name=self.CUSTOM_DUMP)
         self.setPrereq(custom_dump, lammps_runner)
 
     def setAggregation(self):
@@ -82,7 +84,8 @@ class Runner(jobcontrol.Runner):
         Aggregate post analysis jobs.
         """
         super().setAggregation()
-        Custom_Dump.getAgg(name=self.jobname, tname='custom_dump', log=log)
+        name = f"{self.jobname}{self.SEP}{self.CUSTOM_DUMP}"
+        Custom_Dump.getAgg(name=name, tname=self.CUSTOM_DUMP, log=log)
 
 
 def get_parser():

@@ -94,7 +94,8 @@ class Frame(pd.DataFrame):
         :param contents `bytes`: parse the contents if filename not provided
         :return iterator of 'Frame': each frame has coordinates and box info
         """
-        with gzip.open(filename, 'rt') if filename else io.StringIO(contents) as fh:
+        with gzip.open(filename,
+                       'rt') if filename else io.StringIO(contents) as fh:
             while True:
                 lines = [fh.readline() for _ in range(9)]
                 if not all(lines):
@@ -267,17 +268,18 @@ class Frame(pd.DataFrame):
                 1)(dists[:, id])
         return np.linalg.norm(dists, axis=1)
 
-    def pairDists(self, ids=None, cut=None):
+    def pairDists(self, ids=None, cut=None, res=2.):
         """
         Get the distance between atom pair.
 
         :param ids list: list of gids as the atom selection
         :param cut float: the cutoff distance to search neighbors
+        :param res float: the res of the grid step
         :return `numpy.ndarray`: distances array
         """
         ids = sorted(ids) if ids else list(range(1, self.shape[0] + 1))
         if cut:
-            dcell = DistanceCell(self, gids=ids, cut=cut, resolution=DistanceCell.AUTO)
+            dcell = DistanceCell(self, gids=ids, cut=cut, res=res)
             dcell.setUp()
         dists = []
         for idx, (id, row) in enumerate(self.loc[ids].iterrows()):
@@ -387,17 +389,17 @@ class DistanceCell:
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
                      (0, 0, -1)]
 
-    def __init__(self, frm=None, gids=None, cut=6., resolution=2.):
+    def __init__(self, frm=None, gids=None, cut=6., res=AUTO):
         """
         :param frm 'Frame': trajectory frame
         :param gids list: global atom ids to analyze
         :param cut float: the cutoff distace to search neighbors
-        :param resolution float: the resolution of the grid step
+        :param res float: the res of the grid step
         """
         self.frm = frm
         self.cut = cut
         self.gids = gids
-        self.resolution = resolution
+        self.res = res
         self.span = None
         self.neigh_ids = None
         self.atom_cell = None
@@ -428,7 +430,7 @@ class DistanceCell:
         Indexes: the number of cells in three dimensions
         Grids: the length of the cell in each dimension
         """
-        res = self.cut if self.resolution == self.AUTO else self.resolution
+        res = self.cut if self.res == self.AUTO else self.res
         self.indexes = [math.ceil(x / res) for x in self.span]
         self.grids = np.array([x / i for x, i in zip(self.span, self.indexes)])
 

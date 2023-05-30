@@ -40,7 +40,7 @@ class TestDistanceCell:
     @pytest.fixture
     def dcell(self, filename):
         frm = next(traj.Frame.read(filename))
-        return traj.DistanceCell(frm, cut=3., resolution=1.)
+        return traj.DistanceCell(frm, cut=3., res=1.)
 
     @pytest.mark.parametrize(('filename'), [(CC3COOH)])
     def testSetSpan(self, dcell):
@@ -71,7 +71,7 @@ class TestDistanceCell:
     @pytest.mark.parametrize(('filename'), [(CC3COOH)])
     def testGetNeighbors(self, dcell):
         dcell.cut = 3
-        dcell.resolution = 1
+        dcell.res = 1
         dcell.setSpan()
         dcell.setgrids()
         dcell.setNeighborIds()
@@ -83,7 +83,7 @@ class TestDistanceCell:
     @pytest.mark.parametrize(('filename'), [(CC3COOH)])
     def testGetNeighbors(self, dcell):
         dcell.cut = 3
-        dcell.resolution = 1
+        dcell.res = 1
         dcell.setSpan()
         dcell.setgrids()
         dcell.setNeighborIds()

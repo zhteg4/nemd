@@ -95,6 +95,7 @@ class CustomDump(object):
         MSD: 'mean squared displacement'
     }
     TIME_LB = 'Time (ps)'
+    RESULTS = 'Results for '
 
     def __init__(self, options, jobname, diffusion=False, timestep=1):
         """
@@ -348,11 +349,11 @@ class CustomDump(object):
             ]
         log(f"{len(self.gids)} atoms selected.")
 
-    def getRdf(self, resolution=0.02, pname='g', unit='r'):
+    def getRdf(self, res=0.02, pname='g', unit='r'):
         """
         Calculate and return the radial distribution function.
 
-        :param resolution float: the rdf minimum step
+        :param res float: the rdf minimum step
         :param pname str: property name
         :param unit str: unit of the property
         :return 'pandas.core.frame.DataFrame': pos and rdf
@@ -363,7 +364,7 @@ class CustomDump(object):
         log(f'The volume fluctuate: [{vol.min():.2f} {vol.max():.2f}] {symbols.ANGSTROM}^3'
             )
         mdist = span.min() * 0.5
-        res = min(resolution, mdist / 100)
+        res = min(res, mdist / 100)
         bins = round(mdist / res)
         hist_range = [res / 2, res * bins + res / 2]
         cut = min([span.min() / 2, oplsua.LammpsIn.DEFAULT_CUT * 2])
@@ -514,13 +515,16 @@ class CustomDump(object):
             all_data.columns = [f'{cname} (num={num})', f'std (num={num})']
             filename = f"{name}" + cls.DATA_EXT % tname
             all_data.to_csv(filename)
-            log(f"Results for {tname} saved to {filename}")
+            dname = cls.NAME[tname]
+            log(f"{cls.RESULTS}{dname} saved to {filename}")
             fname = cls.plotData(all_data, tname, name=name)
-            log(f'{cls.NAME[tname].capitalize()} figure saved as {fname}')
-        data = np.ravel(all_data[all_data.columns[0]])
-        idx = savgol_filter(data, window_length=31, polyorder=2).argmax()
-        row = all_data.iloc[idx]
-        log(f'Peak position: {row.name}; peak value: {row.values[0]: .2f}')
+            log(f'{dname.capitalize()} figure saved as {fname}')
+            if tname == RDF:
+                data = np.ravel(all_data[all_data.columns[0]])
+                smoothed = savgol_filter(data, window_length=31, polyorder=2)
+                row = all_data.iloc[smoothed.argmax()]
+                log(f'Peak position: {row.name}; '
+                    f'peak value: {row.values[0]: .2f}')
 
 
 def get_parser(parser=None):
