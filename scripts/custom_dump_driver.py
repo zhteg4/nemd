@@ -89,6 +89,7 @@ class CustomDump(object):
     DATA_EXT = '_%s.csv'
     PNG_EXT = '_%s.png'
     NAME = {
+        XYZ: 'XYZ',
         CLASH: 'clash count',
         DENSITY: 'density',
         RDF: 'radial distribution function',
@@ -96,6 +97,7 @@ class CustomDump(object):
     }
     TIME_LB = 'Time (ps)'
     RESULTS = 'Results for '
+    DEFAULT_CUT = oplsua.LammpsIn.DEFAULT_CUT
 
     def __init__(self, options, jobname, diffusion=False, timestep=1):
         """
@@ -216,7 +218,7 @@ class CustomDump(object):
                 if glue:
                     frm.glue(dreader=self.data_reader)
                 frm.write(self.out_fh, dreader=self.data_reader)
-        log(f"Coordinates are written into {self.outfile}")
+        log(f"{self.NAME[XYZ]} coordinates are written into {self.outfile}")
 
     def view(self):
         """
@@ -367,7 +369,11 @@ class CustomDump(object):
         res = min(res, mdist / 100)
         bins = round(mdist / res)
         hist_range = [res / 2, res * bins + res / 2]
-        cut = min([span.min() / 2, oplsua.LammpsIn.DEFAULT_CUT * 2])
+        # The auto resolution based on cut grabs left, middle, and right boxes
+        cut = None if self.DEFAULT_CUT < span.min() / 3 else self.DEFAULT_CUT
+        if cut and cut > span.min() / 10:
+            # Grid the space up to 1000 boxes
+            cut = span.min() / 10
         rdf, num = np.zeros((bins)), len(self.gids)
         for idx, frm in enumerate(frms):
             log_debug(f"Analyzing frame {idx} for RDF..")

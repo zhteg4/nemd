@@ -518,8 +518,9 @@ class Lammps(BaseTask):
             return False
         if super().post(job, name):
             return True
-        if not sh.tail('-2', logfile).startswith('ERROR') and sh.tail(
-                '-1', logfile).startswith('Total'):
+        if not os.popen(f'tail -2 {logfile}').read().startswith(
+                'ERROR') and os.popen(f'tail -1 {logfile}').read().startswith(
+                    'Total'):
             jobutils.add_outfile(basename,
                                  jobname=name,
                                  job=job,
