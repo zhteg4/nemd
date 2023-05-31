@@ -381,8 +381,8 @@ class CustomDump(object):
         dres = None
         if cut:
             dres = cut / 2
-            # Grid the space up to 1000 boxes
-            dres = span.min() / min([math.floor(span.min() / dres), 10])
+            # Grid the space up to 8000 boxes
+            dres = span.min() / min([math.floor(span.min() / dres), 20])
             log(f"Only neighbors within {cut} are accurate. (res={dres:.2f})")
         rdf, num = np.zeros((bins)), len(self.gids)
         for idx, frm in enumerate(frms):

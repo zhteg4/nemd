@@ -47,7 +47,7 @@ if [ -z $SPATH ]; then
 fi
 
 # Finalize the command so that Python script is of absolute path
-SCRIPT_ARGS="${@:0:$FILE_IDX-1} $SPATH ${@:$FILE_IDX+1}"
+SCRIPT_ARGS="${@:1:$FILE_IDX-1} $SPATH ${@:$FILE_IDX+1}"
 echo "Running python3 $SCRIPT_ARGS"
 
 # Actually run the script
