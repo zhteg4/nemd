@@ -31,6 +31,7 @@ FlAG_DATA_FILE = traj.FlAG_DATA_FILE
 FlAG_TASK = '-task'
 FlAG_SEL = '-sel'
 FLAG_LAST_PCT = '-last_pct'
+FLAG_SLICE = '-slice'
 
 CLASH = 'clash'
 VIEW = 'view'
@@ -129,7 +130,6 @@ class CustomDump(object):
         self.msd()
         self.rdf()
         self.writeXYZ()
-        log('Finished.', timestamp=True)
 
     def setStruct(self):
         """
@@ -148,7 +148,14 @@ class CustomDump(object):
         Load trajectory frames and set range.
         """
 
-        self.frms = [x for x in traj.get_frames(self.options.custom_dump)]
+        if self.options.slice is None:
+            self.frms = [x for x in traj.get_frames(self.options.custom_dump)]
+        else:
+            frm_iter = traj.get_frames(self.options.custom_dump)
+            [next(frm_iter) for _ in range(self.options.slice[0])]
+            num = self.options.slice[1] - self.options.slice[0]
+            frms = [next(frm_iter) for _ in range(num)]
+            self.frms = frms[::self.options.slice[2]]
         self.time = np.array([x.getStep() for x in self.frms
                               ]) * constants.femto / constants.pico
         self.time_idx = pd.Index(data=self.time, name=self.TIME_LB)
@@ -272,7 +279,7 @@ class CustomDump(object):
             )
         return data
 
-    def msd(self, timestep=1, ex_pct=0.1, pname='MSD', unit='cm^2'):
+    def msd(self):
         """
         Calculate the mean squared displacement and diffusion coefficient.
 
@@ -370,14 +377,17 @@ class CustomDump(object):
         bins = round(mdist / res)
         hist_range = [res / 2, res * bins + res / 2]
         # The auto resolution based on cut grabs left, middle, and right boxes
-        cut = None if self.DEFAULT_CUT < span.min() / 3 else self.DEFAULT_CUT
-        if cut and cut > span.min() / 10:
+        cut = self.DEFAULT_CUT if self.DEFAULT_CUT < span.min() / 5 else None
+        dres = None
+        if cut:
+            dres = cut / 2
             # Grid the space up to 1000 boxes
-            cut = span.min() / 10
+            dres = span.min() / min([math.floor(span.min() / dres), 10])
+            log(f"Only neighbors within {cut} are accurate. (res={dres:.2f})")
         rdf, num = np.zeros((bins)), len(self.gids)
         for idx, frm in enumerate(frms):
             log_debug(f"Analyzing frame {idx} for RDF..")
-            dists = frm.pairDists(ids=self.gids, cut=cut)
+            dists = frm.pairDists(ids=self.gids, cut=cut, res=dres)
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
@@ -574,6 +584,10 @@ def get_parser(parser=None):
         default=0.2,
         help=f"{', '.join(LAST_FRM_TASKS)} average results from "
         f"last frames of this percentage.")
+    parser.add_argument(FLAG_SLICE,
+                        metavar='START:END:INTERVAL',
+                        type=parserutils.type_slice,
+                        help=f"Slice the trajectory frames for analysis.")
     parserutils.add_job_arguments(parser)
     return parser
 

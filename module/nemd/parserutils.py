@@ -162,6 +162,24 @@ def type_force_field(arg, ff_model=oplsua.OplsTyper.FF_MODEL):
     return FF_MODEL(ff=ff_type, model=wmodel)
 
 
+def type_slice(arg):
+    args = [int(x) if x else None for x in arg.split(':')]
+    if len(args) == 1:
+        args += [args[0] + 1]
+    if len(args) == 2:
+        args += [1]
+    if len(args) == 3:
+        if args[0] is None:
+            args[0] = 0
+        if args[1] is None:
+            args[1] = str(constants.LARGE_NUM)
+        if args[2] is None:
+            args[2] = 1
+        return args
+    raise argparse.ArgumentTypeError(
+        f"{arg} doesn't follow list slicing rules.")
+
+
 def add_md_arguments(parser):
     parser.add_argument(oplsua.FLAG_TIMESTEP,
                         metavar='fs',
