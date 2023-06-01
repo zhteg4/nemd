@@ -254,7 +254,7 @@ def add_md_arguments(parser):
         help='The force field type (and water model separated with comma).')
 
 
-def add_job_arguments(parser, arg_flags=None):
+def add_job_arguments(parser, arg_flags=None, jobname=None):
     """
     Add job control related flags.
 
@@ -262,6 +262,8 @@ def add_job_arguments(parser, arg_flags=None):
     :type parser: 'argparse.ArgumentParser'
     :param arg_flags: specific job control related flags to add
     :type arg_flags: list
+    :param jobname: the default jobname
+    :type jobname: str
     """
     if arg_flags is None:
         arg_flags = [FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG, FLAG_CPU]
@@ -278,6 +280,7 @@ def add_job_arguments(parser, arg_flags=None):
         parser.add_argument(
             FLAG_JOBNAME,
             dest=FLAG_JOBNAME[1:].lower(),
+            default=jobname,
             help='The jobnamee based on which filenames are created.')
     if FLAG_DEBUG in arg_flags:
         parser.add_argument(

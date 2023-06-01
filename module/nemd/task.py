@@ -13,6 +13,7 @@ from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
 from nemd import parserutils
+from nemd import environutils
 
 FILE = jobutils.FILE
 
@@ -600,7 +601,8 @@ class Custom_Dump(BaseTask):
                     pass
         outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
         jname = name.split(BaseTask.SEP)[0]
-        Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, jname)
+        inav = environutils.is_interactive()
+        Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, jname, inav=inav)
 
     @classmethod
     def postAgg(cls, *jobs, name=None):

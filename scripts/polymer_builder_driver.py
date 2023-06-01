@@ -145,15 +145,12 @@ class AmorphousCell(object):
 
     MINIMUM_DENSITY = 0.001
 
-    def __init__(self, options, jobname, ff=None):
+    def __init__(self, options, ff=None):
         """
         :param options 'argparse.ArgumentParser':  Parsed command-line options
-        :param jobname str: the jobname based on which out filenames are figured
-            out
         :param ff str: the force field filepath
         """
         self.options = options
-        self.jobname = jobname
         self.polymers = []
         self.molecules = {}
         self.mols = {}
@@ -234,7 +231,7 @@ class AmorphousCell(object):
         """
         lmw = oplsua.LammpsData(self.mols,
                                 self.ff,
-                                self.jobname,
+                                self.options.jobname,
                                 box=self.box,
                                 options=self.options)
         lmw.writeData(adjust_coords=False)
@@ -244,9 +241,9 @@ class AmorphousCell(object):
         lmw.writeLammpsIn()
         log(f'Data file written into {lmw.lammps_data}')
         log(f'In script written into {lmw.lammps_in}')
-        jobutils.add_outfile(lmw.lammps_data, jobname=self.jobname)
+        jobutils.add_outfile(lmw.lammps_data, jobname=self.options.jobname)
         jobutils.add_outfile(lmw.lammps_in,
-                             jobname=self.jobname,
+                             jobname=self.options.jobname,
                              set_file=True)
 
 
@@ -1085,7 +1082,8 @@ def get_parser(parser=None):
         help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
     )
     parserutils.add_md_arguments(parser)
-    parserutils.add_job_arguments(parser)
+    parserutils.add_job_arguments(parser,
+                                  jobname=environutils.get_jobname(JOBNAME))
     return parser
 
 
@@ -1096,10 +1094,9 @@ def main(argv):
     global logger
 
     options = validate_options(argv)
-    jobname = environutils.get_jobname(JOBNAME)
-    logger = logutils.createDriverLogger(jobname=jobname)
+    logger = logutils.createDriverLogger(jobname=options.jobname)
     logutils.logOptions(logger, options)
-    cell = AmorphousCell(options, jobname)
+    cell = AmorphousCell(options)
     cell.run()
     log('Finished.', timestamp=True)
 
