@@ -358,36 +358,40 @@ class CustomDump(object):
             ]
         log(f"{len(self.gids)} atoms selected.")
 
-    def getRdf(self, res=0.02, pname='g', unit='r'):
+    def getRdf(self, res=0.02, pname='g', unit='r', dcut=None):
         """
         Calculate and return the radial distribution function.
 
         :param res float: the rdf minimum step
         :param pname str: property name
         :param unit str: unit of the property
+        :param dcut float: the cutoff distance to look for neighbors. If None,
+            all the neighbors are counted when the cell is not significantly
+             larger than the LJ cutoff.
         :return 'pandas.core.frame.DataFrame': pos and rdf
         """
         frms = self.frms[self.sidx:]
         span = np.array([[x for x in x.getSpan().values()] for x in frms])
         vol = np.prod(span, axis=1)
-        log(f'The volume fluctuate: [{vol.min():.2f} {vol.max():.2f}] {symbols.ANGSTROM}^3'
-            )
-        mdist = span.min() * 0.5
+        log(f'The volume fluctuate: [{vol.min():.2f} {vol.max():.2f}] '
+            f'{symbols.ANGSTROM}^3')
+        # The auto resolution based on cut grabs left, middle, and right boxes
+        if dcut is None and span.min() > self.DEFAULT_CUT * 5:
+            # Cell is significant larger than LJ cut off, and thus use LJ cut
+            dcut = self.DEFAULT_CUT
+        if dcut:
+            dres = dcut / 2
+            # Grid the space up to 8000 boxes
+            dres = span.min() / min([math.floor(span.min() / dres), 20])
+            log(f"Only neighbors within {dcut} are accurate. (res={dres:.2f})")
+        mdist = max(dcut, dres) if dcut else span.min() * 0.5
         res = min(res, mdist / 100)
         bins = round(mdist / res)
         hist_range = [res / 2, res * bins + res / 2]
-        # The auto resolution based on cut grabs left, middle, and right boxes
-        cut = self.DEFAULT_CUT if self.DEFAULT_CUT < span.min() / 5 else None
-        dres = None
-        if cut:
-            dres = cut / 2
-            # Grid the space up to 8000 boxes
-            dres = span.min() / min([math.floor(span.min() / dres), 20])
-            log(f"Only neighbors within {cut} are accurate. (res={dres:.2f})")
         rdf, num = np.zeros((bins)), len(self.gids)
         for idx, frm in enumerate(frms):
             log_debug(f"Analyzing frame {idx} for RDF..")
-            dists = frm.pairDists(ids=self.gids, cut=cut, res=dres)
+            dists = frm.pairDists(ids=self.gids, cut=dcut, res=dres)
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
