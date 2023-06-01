@@ -172,7 +172,7 @@ def type_slice(arg):
         if args[0] is None:
             args[0] = 0
         if args[1] is None:
-            args[1] = str(constants.LARGE_NUM)
+            args[1] = constants.LARGE_NUM
         if args[2] is None:
             args[2] = 1
         return args

@@ -12,10 +12,12 @@ import sys
 import math
 import scipy
 import functools
+import itertools
 import numpy as np
 import pandas as pd
 from scipy import constants
 from scipy.signal import savgol_filter
+from scipy.stats import linregress
 
 from nemd import traj
 from nemd import symbols
@@ -149,10 +151,9 @@ class CustomDump(object):
             self.frms = [x for x in traj.get_frames(self.options.custom_dump)]
         else:
             frm_iter = traj.get_frames(self.options.custom_dump)
-            [next(frm_iter) for _ in range(self.options.slice[0])]
-            num = self.options.slice[1] - self.options.slice[0]
-            frms = [next(frm_iter) for _ in range(num)]
-            self.frms = frms[::self.options.slice[2]]
+            start, stop, step = [self.options.slice[i] for i in range(3)]
+            frms = itertools.islice(frm_iter, start, stop, step)
+            self.frms = [x for x in frms]
         self.time = np.array([x.getStep() for x in self.frms
                               ]) * constants.femto / constants.pico
         self.time_idx = pd.Index(data=self.time, name=self.TIME_LB)
@@ -287,18 +288,24 @@ class CustomDump(object):
         # NOTE MSD needs frame selection
         if MSD not in self.options.task:
             return
-        data = self.getMsd()
+        data, sidx, eidx = self.getMsd()
         self.saveData(data, MSD, float_format='%.4g')
-        self.plot(data, MSD)
+        self.plot(data, MSD, sidx=sidx, eidx=eidx)
 
-    def getMsd(self, ex_pct=0.1, pname='MSD', unit=f'{symbols.ANGSTROM}^2'):
+    def getMsd(self,
+               spct=0.1,
+               epct=0.2,
+               pname='MSD',
+               unit=f'{symbols.ANGSTROM}^2'):
         """
         Get the mean squared displacement and diffusion coefficient.
 
-        :param ex_pct float: fit the frames of this percentage at head and tail
+        :param spct float: exclude the frames of this percentage at head
+        :param epct float: exclude the frames of this percentage at tail
         :param pname str: property name
         :param unit str: unit of the property
-        :return 'pandas.core.frame.DataFrame': time and msd
+        :return 'pandas.core.frame.DataFrame', int, int: time vs msd, start index
+            end index
         """
 
         masses = [
@@ -316,19 +323,34 @@ class CustomDump(object):
         ps_time = self.time[self.sidx:][:num]
         tau_idx = pd.Index(data=ps_time - ps_time[0], name='Tau (ps)')
         data = pd.DataFrame({label: msd}, index=tau_idx)
-        sidx, eidx = math.floor(num * ex_pct), math.ceil(num * (1 - ex_pct))
+        sidx, eidx = self.fitMsd(data, spct=spct, epct=epct, log=log)
+        return data, sidx, eidx
+
+    @classmethod
+    def fitMsd(cls, data, spct=0.1, epct=0.2, log=None):
+        """
+        Get the mean squared displacement and diffusion coefficient.
+
+        :param data 'pandas.core.frame.DataFrame': time vs msd
+        :param spct float: exclude the frames of this percentage at head
+        :param epct float: exclude the frames of this percentage at tail
+        :param log 'function': the function to print user-facing information
+        :return float float: exclude the frames of this percentage at head and
+            at end
+        """
+        num = data.shape[0]
+        sidx = math.floor(num * spct)
+        eidx = math.ceil(num * (1 - epct))
         sel = data.iloc[sidx:eidx]
         # Standard error of the slope, under the assumption of residual normality
-        slope, intercept, rvalue, p_value, std_err = scipy.stats.linregress(
-            sel.index * constants.pico,
-            sel[label] * (constants.angstrom / constants.centi)**2)
+        xvals = sel.index * constants.pico
+        yvals = sel.iloc[:, 0] * (constants.angstrom / constants.centi)**2
+        slope, intercept, rvalue, p_value, std_err = linregress(xvals, yvals)
         # MSD=2nDt https://en.wikipedia.org/wiki/Mean_squared_displacement
         log(f'{slope/6:.4g} {symbols.PLUS_MIN} {std_err/6:.4g} cm^2/s'
             f' (R-squared: {rvalue**2:.4f}) linear fit of'
-            f' [{sel.index.values[0]:.4f} {sel.index.values[-1]:.4f}] ps '
-            f'{symbols.ELEMENT_OF} [{self.time[self.sidx]:.4f}, {self.time[-1]:.4f}] ps'
-            )
-        return data
+            f' [{sel.index.values[0]:.4f} {sel.index.values[-1]:.4f}] ps')
+        return sidx, eidx
 
     def rdf(self):
         """
@@ -400,7 +422,23 @@ class CustomDump(object):
         mid, rdf = np.concatenate(([0], mid)), np.concatenate(([0], rdf))
         index = pd.Index(data=mid, name=iname)
         data = pd.DataFrame(data={cname: rdf}, index=index)
+        self.fitRdf(data, log=log)
         return data
+
+    @classmethod
+    def fitRdf(cls, data, log=None):
+        """
+        Fit rdf data and report peaks.
+
+        :param data: distance vs count
+        :type data: 'pandas.core.frame.DataFrame'
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        """
+        raveled = np.ravel(data[data.columns[0]])
+        smoothed = savgol_filter(raveled, window_length=31, polyorder=2)
+        row = data.iloc[smoothed.argmax()]
+        log(f'Peak position: {row.name}; peak value: {row.values[0]: .2f}')
 
     def saveData(self, data, task, float_format='%.4f'):
         """
@@ -410,19 +448,24 @@ class CustomDump(object):
         data.to_csv(outfile, float_format=float_format)
         log(f'{self.NAME[task].capitalize()} data written into {outfile}')
 
-    def plot(self, data, task, pos_y=False):
+    def plot(self, data, task, pos_y=False, sidx=None, eidx=None):
         """
         Plot the task data and save the figure.
 
         :param data 'DataFrame': data to plot
         :param task str: the task type to get description and labels
         :param pos_y bool: change the xlim to only show data positive y values
+        :param sidx int: highlight data starting at this index
+        :param eidx int: highlight data before at this index
         """
+        if sidx is None:
+            sidx = self.sidx
         fname = self.plotData(data,
                               task,
                               pos_y=pos_y,
                               inav=self.options.interactive,
-                              sidx=self.sidx,
+                              sidx=sidx,
+                              eidx=eidx,
                               name=self.options.jobname)
         log(f'{self.NAME[task].capitalize()} figure saved as {fname}')
 
@@ -433,6 +476,7 @@ class CustomDump(object):
                  pos_y=False,
                  inav=False,
                  sidx=None,
+                 eidx=None,
                  name=None):
         """
         :param data: data to plot
@@ -446,6 +490,8 @@ class CustomDump(object):
         :type inav: bool
         :param sidx: the starting index when selecting data
         :type sidx: int
+        :param eidx: the ending index when selecting data
+        :type eidx: int
         :param name: the taskname based on which output file is set
         :type name: str
         :return: output file name
@@ -458,17 +504,25 @@ class CustomDump(object):
         import matplotlib.pyplot as plt
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-        ax.plot(data.index, data.iloc[:, 0], label='average')
+        line_style = '--' if any([sidx, eidx]) else '-'
+        ax.plot(data.index, data.iloc[:, 0], line_style, label='average')
         if data.shape[-1] == 2:
             vals, errors = data.iloc[:, 0], data.iloc[:, 1]
             ax.fill_between(data.index,
                             vals - errors,
                             vals + errors,
                             color='y',
-                            label='stdev')
+                            label='stdev',
+                            alpha=0.3)
             ax.legend()
-        if sidx is not None and task in ALL_FRM_TASKS:
-            ax.plot(data.index[sidx:], data.iloc[sidx:], 'g')
+        if any([sidx, eidx]):
+            if all([sidx, eidx]):
+                gdata = data.iloc[sidx:eidx]
+            elif sidx is not None:
+                gdata = data.iloc[sidx:]
+            else:
+                gdata = data.iloc[:eidx]
+            ax.plot(gdata.index, gdata.iloc[:, 0], 'g')
         if pos_y:
             ax.set_xlim([data[data > 0].iloc[0].name, data.iloc[-1].name])
         # ldata = list(data.values.flatten())
@@ -483,8 +537,7 @@ class CustomDump(object):
         ax.set_ylabel(data.columns.values.tolist()[0])
         fname = name + cls.PNG_EXT % task
         if inav:
-            print(
-                f"Showing {task}. Click X to close the figure and continue..")
+            print(f"Showing {task.upper()}. Click X to close and continue..")
             plt.show(block=True)
         fig.savefig(fname)
         matplotlib.use(obackend)
@@ -514,8 +567,8 @@ class CustomDump(object):
         :return: task name
         :rtype: list
         """
-        tasks = cls.getLogged(logfile, key=FlAG_TASK[1:])
-        return [x.strip("'[]") for x in tasks]
+        tasks = cls.getLogged(logfile, key=FlAG_TASK[1:])[0]
+        return [x.strip().strip("'") for x in tasks.strip('[]').split(',')]
 
     @classmethod
     def getLogged(cls, logfile, key=None):
@@ -575,16 +628,18 @@ class CustomDump(object):
                 data.to_csv(filename)
                 log(f"{cls.RESULTS}{dname} saved to {filename}")
 
-            fname = cls.plotData(data, tname, name=name, inav=inav)
-            log(f'{dname.capitalize()} figure saved as {fname}')
+            sidx, eidx = None, None
             if tname == RDF:
-                raveled = np.ravel(data[data.columns[0]])
-                smoothed = savgol_filter(raveled,
-                                         window_length=31,
-                                         polyorder=2)
-                row = data.iloc[smoothed.argmax()]
-                log(f'Peak position: {row.name}; '
-                    f'peak value: {row.values[0]: .2f}')
+                cls.fitRdf(data, log=log)
+            elif tname == MSD:
+                sidx, eidx = cls.fitMsd(data, log=log)
+            fname = cls.plotData(data,
+                                 tname,
+                                 name=name,
+                                 inav=inav,
+                                 sidx=sidx,
+                                 eidx=eidx)
+            log(f'{dname.capitalize()} figure saved as {fname}')
 
 
 def get_parser(parser=None):
