@@ -1,0 +1,23 @@
+..........Command Options..........
+custom_dump: dump.custom.gz
+data_file: polymer_builder.data
+task: ['rdf']
+sel: None
+last_pct: 0.4
+slice: None
+interactive: False
+jobname: custom_dump
+debug: False
+cpu: 8
+JobStart: 18:42:55 06/01/23
+...................................
+1000 atoms selected.
+20216 trajectory frames found.
+rdf average results from last 40.0% frames ∈ [ 12128.715,  20214.715] ps
+The volume fluctuate: [40820256.38 40820256.38] Å^3
+Only neighbors within 11.0 are accurate. (res=17.21)
+Peak position: 3.799999999999999; peak value:  1.37
+Radial distribution function data written into custom_dump_rdf.csv
+Radial distribution function figure saved as custom_dump_rdf.png
+Finished.
+20:17:24 06/01/23

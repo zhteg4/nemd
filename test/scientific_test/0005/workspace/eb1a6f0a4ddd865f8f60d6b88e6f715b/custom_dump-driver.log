@@ -1,0 +1,21 @@
+..........Command Options..........
+custom_dump: dump.custom.gz
+data_file: polymer_builder.data
+task: ['msd']
+sel: None
+last_pct: 0.4
+slice: [0, 1000000, 200]
+interactive: False
+jobname: custom_dump
+debug: False
+cpu: 4
+JobStart: 10:19:32 06/02/23
+...................................
+123 atoms selected.
+102 trajectory frames found.
+msd average results from last 40.0% frames ∈ [ 12199.148,  20199.148] ps
+0.1928 ± 0.0002617 cm^2/s (R-squared: 1.0000) linear fit of [800.0000 6400.0000] ps
+Mean squared displacement data written into custom_dump_msd.csv
+Mean squared displacement figure saved as custom_dump_msd.png
+Finished.
+10:19:54 06/02/23

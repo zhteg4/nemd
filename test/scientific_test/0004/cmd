@@ -1,1 +1,2 @@
-run_nemd pb_lmp_post_workflow.py [Ar] -mol_num 123 -last_pct 0.4 -task density -cpu 4 -state_num 4 -relax_time 10 -prod_time 10
+# rdf, 16 replica, 1000 Ar, last 40% pct, 10 ns relax and prod
+run_nemd pb_lmp_post_workflow.py [Ar] -mol_num 1000 -last_pct 0.4 -task rdf -cpu 8 -state_num 16 -relax_time 10 -prod_time 10
