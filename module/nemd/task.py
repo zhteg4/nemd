@@ -84,10 +84,10 @@ class BaseTask:
         _, unknown = parser.parse_known_args(args)
         self.doc[self.UNKNOWN_ARGS] = unknown
         flags = [x for x in unknown if x.startswith('-')]
-        if flags:
-            # Positional arguments without flags
-            for arg in unknown[:unknown.index(flags[0])]:
-                args.remove(arg)
+        # Positional arguments without flags
+        pos_unknown = unknown[:unknown.index(flags[0])] if flags else unknown
+        for arg in pos_unknown:
+            args.remove(arg)
         for sval, eval in zip(flags, flags[1:] + [None]):
             if eval:
                 uargs = unknown[unknown.index(sval):unknown.index(eval)]

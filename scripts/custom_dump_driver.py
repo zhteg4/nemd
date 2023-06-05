@@ -10,21 +10,16 @@ import sh
 import os
 import sys
 import math
-import scipy
 import functools
-import itertools
 import numpy as np
-import pandas as pd
 from scipy import constants
-from scipy.signal import savgol_filter
-from scipy.stats import linregress
 
 from nemd import traj
 from nemd import symbols
 from nemd import oplsua
 from nemd import jobutils
 from nemd import logutils
-from nemd import molview
+from nemd import analyzer
 from nemd import parserutils
 from nemd import environutils
 
@@ -35,19 +30,21 @@ FlAG_SEL = '-sel'
 FLAG_LAST_PCT = '-last_pct'
 FLAG_SLICE = '-slice'
 
-CLASH = 'clash'
-VIEW = 'view'
-XYZ = 'xyz'
-DENSITY = 'density'
-MSD = 'msd'
-RDF = 'rdf'
+CLASH = analyzer.Clash.NAME
+VIEW = analyzer.View.NAME
+XYZ = analyzer.XYZ.NAME
+DENSITY = analyzer.Density.NAME
+MSD = analyzer.MSD.NAME
+RDF = analyzer.RDF.NAME
 
 ALL_FRM_TASKS = [CLASH, VIEW, XYZ, DENSITY]
 LAST_FRM_TASKS = [DENSITY, MSD, RDF]
+DATA_RQD_TASKS = [CLASH, DENSITY, MSD, RDF]
+NO_COMBINE = [XYZ, VIEW]
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
-
+# Positional command-argument holders to take task input under jobcontrol
 ARGS_TMPL = [jobutils.FILE]
 
 
@@ -88,28 +85,23 @@ class CustomDump(object):
     Analyze a dump custom file.
     """
 
-    XYZ_EXT = '.xyz'
+    TASK = FlAG_TASK[1:]
     DATA_EXT = '_%s.csv'
     PNG_EXT = '_%s.png'
-    NAME = {
-        XYZ: 'XYZ',
-        CLASH: 'clash count',
-        DENSITY: 'density',
-        RDF: 'radial distribution function',
-        MSD: 'mean squared displacement'
-    }
-    TIME_LB = 'Time (ps)'
-    RESULTS = 'Results for '
-    DEFAULT_CUT = oplsua.LammpsIn.DEFAULT_CUT
+    RESULTS = analyzer.BaseAnalyzer.RESULTS
+    ANALYZER = [
+        analyzer.Density, analyzer.RDF, analyzer.MSD, analyzer.Clash,
+        analyzer.View, analyzer.XYZ
+    ]
+    ANALYZER = {getattr(x, 'NAME'): x for x in ANALYZER}
 
-    def __init__(self, options, diffusion=False, timestep=1):
+    def __init__(self, options, timestep=1):
         """
         :param options 'argparse.ArgumentParser': Parsed command-line options
-        :param diffusion bool: particles passing PBCs continue traveling
         :param timestep float: the time step in fs
         """
         self.options = options
-        self.diffusion = diffusion
+        # FIXME: should read in timestep to calculate the time
         self.timestep = timestep
         self.frms = None
         self.gids = None
@@ -123,12 +115,7 @@ class CustomDump(object):
         self.setStruct()
         self.setAtoms()
         self.setFrames()
-        self.checkClashes()
-        self.view()
-        self.density()
-        self.msd()
-        self.rdf()
-        self.writeXYZ()
+        self.analyze()
 
     def setStruct(self):
         """
@@ -138,236 +125,13 @@ class CustomDump(object):
             return
         self.data_reader = oplsua.DataFileReader(self.options.data_file)
         self.data_reader.run()
-        if CLASH not in self.options.task:
-            return
-        self.data_reader.setClashParams()
-
-    def setFrames(self):
-        """
-        Load trajectory frames and set range.
-        """
-
-        if self.options.slice is None:
-            self.frms = [x for x in traj.get_frames(self.options.custom_dump)]
-        else:
-            frm_iter = traj.get_frames(self.options.custom_dump)
-            start, stop, step = [self.options.slice[i] for i in range(3)]
-            frms = itertools.islice(frm_iter, start, stop, step)
-            self.frms = [x for x in frms]
-        self.time = np.array([x.getStep() for x in self.frms
-                              ]) * constants.femto / constants.pico
-        self.time_idx = pd.Index(data=self.time, name=self.TIME_LB)
-        self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
-        log(f"{len(self.frms)} trajectory frames found.")
-        af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
-        if af_tasks:
-            log(f"{', '.join(af_tasks)} analyze all frames and save per frame "
-                f"results {symbols.ELEMENT_OF} [{self.time_idx[0]:.3f}, "
-                f"{self.time_idx[-1]:.3f}] ps")
-        lf_tasks = [x for x in self.options.task if x in LAST_FRM_TASKS]
-        if lf_tasks:
-            log(f"{', '.join(lf_tasks)} average results from last "
-                f"{self.options.last_pct * 100}% frames {symbols.ELEMENT_OF} "
-                f"[{self.time_idx[self.sidx]: .3f}, {self.time_idx[-1]: .3f}] ps"
-                )
-
-    def checkClashes(self, label='Clash (num)'):
-        """
-        Check clashes for reach frames.
-        """
-        if CLASH not in self.options.task:
-            return
-
-        data = [len(self.getClashes(x)) for x in self.frms]
-        data = pd.DataFrame(data={label: data}, index=self.time_idx)
-        self.saveData(data, CLASH, float_format='%i')
-
-    def getClashes(self, frm):
-        """
-        Get the clashes between atom pair for this frame.
-
-        :param frm 'traj.Frame': traj frame to analyze clashes
-        :return list of tuples: each tuple has two atom ids, the distance, and
-            clash threshold
-        """
-        clashes = []
-        dcell = traj.DistanceCell(frm=frm)
-        dcell.setUp()
-        for _, row in frm.iterrows():
-            clashes += dcell.getClashes(row,
-                                        radii=self.data_reader.radii,
-                                        excluded=self.data_reader.excluded)
-        return clashes
-
-    def writeXYZ(self, wrapped=True, broken_bonds=False, glue=False):
-        """
-        Write the coordinates of the trajectory into XYZ format.
-
-        :param wrapped bool: coordinates are wrapped into the PBC box.
-        :param bond_across_pbc bool: allow bonds passing PBC boundaries.
-        :param glue bool: circular mean to compact the molecules.
-
-        NOTE: wrapped=False & glue=False is good for diffusion virtualization
-        wrapped True & broken_bonds=False is good for box fully filled with molecules
-        broken_bonds=False & glue=True is good for molecules droplets in vacuum
-        Not all combination make physical senses.
-        """
-
-        if XYZ not in self.options.task:
-            return
-
-        with open(self.outfile, 'w') as self.out_fh:
-            for frm in traj.Frame.read(self.options.custom_dump):
-                if wrapped:
-                    frm.wrapCoords(broken_bonds, dreader=self.data_reader)
-                if glue:
-                    frm.glue(dreader=self.data_reader)
-                frm.write(self.out_fh, dreader=self.data_reader)
-        log(f"{self.NAME[XYZ]} coordinates are written into {self.outfile}")
-
-    def view(self):
-        """
-        View the atom coordinates.
-        """
-
-        if VIEW not in self.options.task:
-            return
-
-        frm_vw = molview.FrameView(data_reader=self.data_reader)
-        frm_vw.setData()
-        frm_vw.setEleSz()
-        frm_vw.setScatters()
-        frm_vw.setLines()
-        frm_vw.setEdges()
-        frm_vw.addTraces()
-        frm_vw.setFrames(self.frms)
-        frm_vw.updateLayout()
-        frm_vw.show()
-
-    def density(self):
-        """
-        Calculate the density of all frames.
-        """
-
-        if DENSITY not in self.options.task:
-            return
-
-        data = self.getDensity()
-        self.saveData(data, DENSITY)
-        self.plot(data, DENSITY)
-
-    def getDensity(self, pname='Density', unit='g/cm^3'):
-        """
-        Get the density data.
-
-        :param pname str: property name
-        :param unit str: unit of the property
-        return 'pandas.core.frame.DataFrame': time and density
-        """
-        mass = self.data_reader.molecular_weight / constants.Avogadro
-        mass_scaled = mass / (constants.angstrom / constants.centi)**3
-        data = [mass_scaled / x.getVolume() for x in self.frms]
-        label = f'{pname} {unit}'
-        data = pd.DataFrame({label: data}, index=self.time)
-        sel = data.loc[self.sidx:]
-        ave = sel.mean()[label]
-        std = sel.std()[label]
-        log(f'{ave:.4f} {symbols.PLUS_MIN} {std:.4f} {unit} '
-            f'{symbols.ELEMENT_OF} [{self.time[self.sidx]:.4f}, {self.time[-1]:.4f}] ps'
-            )
-        return data
-
-    def msd(self):
-        """
-        Calculate the mean squared displacement and diffusion coefficient.
-
-        :param ex_pct float: fit the frames of this percentage at head and tail
-        :param pname str: property name
-        :param unit str: unit of the property
-        """
-        # NOTE MSD needs frame selection
-        if MSD not in self.options.task:
-            return
-        data, sidx, eidx = self.getMsd()
-        self.saveData(data, MSD, float_format='%.4g')
-        self.plot(data, MSD, sidx=sidx, eidx=eidx)
-
-    def getMsd(self,
-               spct=0.1,
-               epct=0.2,
-               pname='MSD',
-               unit=f'{symbols.ANGSTROM}^2'):
-        """
-        Get the mean squared displacement and diffusion coefficient.
-
-        :param spct float: exclude the frames of this percentage at head
-        :param epct float: exclude the frames of this percentage at tail
-        :param pname str: property name
-        :param unit str: unit of the property
-        :return 'pandas.core.frame.DataFrame', int, int: time vs msd, start index
-            end index
-        """
-
-        masses = [
-            self.data_reader.masses[x.type_id].mass
-            for x in self.data_reader.atom
-        ]
-        frms = self.frms[self.sidx:]
-        msd, num = [0], len(frms)
-        for idx in range(1, num):
-            disp = [x - y for x, y in zip(frms[idx:], frms[:-idx])]
-            data = np.array([np.linalg.norm(x, axis=1) for x in disp])
-            sdata = np.square(data)
-            msd.append(np.average(sdata.mean(axis=0), weights=masses))
-        label = f'{pname} ({unit})'
-        ps_time = self.time[self.sidx:][:num]
-        tau_idx = pd.Index(data=ps_time - ps_time[0], name='Tau (ps)')
-        data = pd.DataFrame({label: msd}, index=tau_idx)
-        sidx, eidx = self.fitMsd(data, spct=spct, epct=epct, log=log)
-        return data, sidx, eidx
-
-    @classmethod
-    def fitMsd(cls, data, spct=0.1, epct=0.2, log=None):
-        """
-        Get the mean squared displacement and diffusion coefficient.
-
-        :param data 'pandas.core.frame.DataFrame': time vs msd
-        :param spct float: exclude the frames of this percentage at head
-        :param epct float: exclude the frames of this percentage at tail
-        :param log 'function': the function to print user-facing information
-        :return float float: exclude the frames of this percentage at head and
-            at end
-        """
-        num = data.shape[0]
-        sidx = math.floor(num * spct)
-        eidx = math.ceil(num * (1 - epct))
-        sel = data.iloc[sidx:eidx]
-        # Standard error of the slope, under the assumption of residual normality
-        xvals = sel.index * constants.pico
-        yvals = sel.iloc[:, 0] * (constants.angstrom / constants.centi)**2
-        slope, intercept, rvalue, p_value, std_err = linregress(xvals, yvals)
-        # MSD=2nDt https://en.wikipedia.org/wiki/Mean_squared_displacement
-        log(f'{slope/6:.4g} {symbols.PLUS_MIN} {std_err/6:.4g} cm^2/s'
-            f' (R-squared: {rvalue**2:.4f}) linear fit of'
-            f' [{sel.index.values[0]:.4f} {sel.index.values[-1]:.4f}] ps')
-        return sidx, eidx
-
-    def rdf(self):
-        """
-        Handle the radial distribution function.
-        """
-
-        if RDF not in self.options.task:
-            return
-
-        data = self.getRdf()
-        self.saveData(data, RDF)
-        self.plot(data, RDF, pos_y=True)
 
     def setAtoms(self):
         """
         set the atom selection for analysis.
         """
+        if not self.data_reader:
+            return
         if self.options.sel is None:
             self.gids = [x.id for x in self.data_reader.atom]
         else:
@@ -377,171 +141,45 @@ class CustomDump(object):
             ]
         log(f"{len(self.gids)} atoms selected.")
 
-    def getRdf(self, res=0.02, pname='g', unit='r', dcut=None):
+    def setFrames(self):
         """
-        Calculate and return the radial distribution function.
+        Load trajectory frames and set range.
+        """
 
-        :param res float: the rdf minimum step
-        :param pname str: property name
-        :param unit str: unit of the property
-        :param dcut float: the cutoff distance to look for neighbors. If None,
-            all the neighbors are counted when the cell is not significantly
-             larger than the LJ cutoff.
-        :return 'pandas.core.frame.DataFrame': pos and rdf
-        """
-        frms = self.frms[self.sidx:]
-        span = np.array([[x for x in x.getSpan().values()] for x in frms])
-        vol = np.prod(span, axis=1)
-        log(f'The volume fluctuate: [{vol.min():.2f} {vol.max():.2f}] '
-            f'{symbols.ANGSTROM}^3')
-        # The auto resolution based on cut grabs left, middle, and right boxes
-        if dcut is None and span.min() > self.DEFAULT_CUT * 5:
-            # Cell is significant larger than LJ cut off, and thus use LJ cut
-            dcut = self.DEFAULT_CUT
-        if dcut:
-            dres = dcut / 2
-            # Grid the space up to 8000 boxes
-            dres = span.min() / min([math.floor(span.min() / dres), 20])
-            log(f"Only neighbors within {dcut} are accurate. (res={dres:.2f})")
-        mdist = max(dcut, dres) if dcut else span.min() * 0.5
-        res = min(res, mdist / 100)
-        bins = round(mdist / res)
-        hist_range = [res / 2, res * bins + res / 2]
-        rdf, num = np.zeros((bins)), len(self.gids)
-        for idx, frm in enumerate(frms):
-            log_debug(f"Analyzing frame {idx} for RDF..")
-            dists = frm.pairDists(ids=self.gids, cut=dcut, res=dres)
-            hist, edge = np.histogram(dists, range=hist_range, bins=bins)
-            mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
-            # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
-            norm_factor = 4 * np.pi * mid**2 * res * num / frm.getVolume()
-            # Stands at every id but either (1->2) or (2->1) is computed
-            rdf += (hist * 2 / num / norm_factor)
-        rdf /= len(frms)
-        iname, cname = f'r ({symbols.ANGSTROM})', f'{pname} ({unit})'
-        mid, rdf = np.concatenate(([0], mid)), np.concatenate(([0], rdf))
-        index = pd.Index(data=mid, name=iname)
-        data = pd.DataFrame(data={cname: rdf}, index=index)
-        self.fitRdf(data, log=log)
-        return data
+        frms = traj.slice_frames(self.options.custom_dump,
+                                 slice=self.options.slice)
+        self.frms = [x for x in frms]
+        self.time = np.array([x.getStep() * self.timestep for x in self.frms
+                              ]) * constants.femto / constants.pico
 
-    @classmethod
-    def fitRdf(cls, data, log=None):
-        """
-        Fit rdf data and report peaks.
+        self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
+        log(f"{len(self.frms)} trajectory frames found.")
+        af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
+        if af_tasks:
+            log(f"{', '.join(af_tasks)} analyze all frames and save per frame "
+                f"results {symbols.ELEMENT_OF} [{self.time[0]:.3f}, "
+                f"{self.time[-1]:.3f}] ps")
+        lf_tasks = [x for x in self.options.task if x in LAST_FRM_TASKS]
+        if lf_tasks:
+            log(f"{', '.join(lf_tasks)} average results from last "
+                f"{self.options.last_pct * 100}% frames {symbols.ELEMENT_OF} "
+                f"[{self.time[self.sidx]: .3f}, {self.time[-1]: .3f}] ps")
 
-        :param data: distance vs count
-        :type data: 'pandas.core.frame.DataFrame'
-        :param log: the function to print user-facing information
-        :type log: 'function'
+    def analyze(self):
         """
-        raveled = np.ravel(data[data.columns[0]])
-        smoothed = savgol_filter(raveled, window_length=31, polyorder=2)
-        row = data.iloc[smoothed.argmax()]
-        log(f'Peak position: {row.name}; peak value: {row.values[0]: .2f}')
+        Run analyzers.
+        """
 
-    def saveData(self, data, task, float_format='%.4f'):
-        """
-        Save the data data.
-        """
-        outfile = self.options.jobname + self.DATA_EXT % task
-        data.to_csv(outfile, float_format=float_format)
-        log(f'{self.NAME[task].capitalize()} data written into {outfile}')
-
-    def plot(self, data, task, pos_y=False, sidx=None, eidx=None):
-        """
-        Plot the task data and save the figure.
-
-        :param data 'DataFrame': data to plot
-        :param task str: the task type to get description and labels
-        :param pos_y bool: change the xlim to only show data positive y values
-        :param sidx int: highlight data starting at this index
-        :param eidx int: highlight data before at this index
-        """
-        if sidx is None:
-            sidx = self.sidx
-        fname = self.plotData(data,
-                              task,
-                              pos_y=pos_y,
-                              inav=self.options.interactive,
-                              sidx=sidx,
-                              eidx=eidx,
-                              name=self.options.jobname)
-        log(f'{self.NAME[task].capitalize()} figure saved as {fname}')
-
-    @classmethod
-    def plotData(cls,
-                 data,
-                 task,
-                 pos_y=False,
-                 inav=False,
-                 sidx=None,
-                 eidx=None,
-                 name=None):
-        """
-        :param data: data to plot
-        :type data: 'pandas.core.frame.DataFrame'
-        :param task: the task name
-        :type task: str
-        :param pos_y: set x lower limit to only include data with pos y value
-        :type pos_y: bool
-        :param inav: pop up window and show plot during code execution if
-            interactive mode is on
-        :type inav: bool
-        :param sidx: the starting index when selecting data
-        :type sidx: int
-        :param eidx: the ending index when selecting data
-        :type eidx: int
-        :param name: the taskname based on which output file is set
-        :type name: str
-        :return: output file name
-        :rtype: str
-        """
-        import matplotlib
-        obackend = matplotlib.get_backend()
-        backend = obackend if inav else 'Agg'
-        matplotlib.use(backend)
-        import matplotlib.pyplot as plt
-        fig = plt.figure()
-        ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-        line_style = '--' if any([sidx, eidx]) else '-'
-        ax.plot(data.index, data.iloc[:, 0], line_style, label='average')
-        if data.shape[-1] == 2:
-            vals, errors = data.iloc[:, 0], data.iloc[:, 1]
-            ax.fill_between(data.index,
-                            vals - errors,
-                            vals + errors,
-                            color='y',
-                            label='stdev',
-                            alpha=0.3)
-            ax.legend()
-        if any([sidx, eidx]):
-            if all([sidx, eidx]):
-                gdata = data.iloc[sidx:eidx]
-            elif sidx is not None:
-                gdata = data.iloc[sidx:]
-            else:
-                gdata = data.iloc[:eidx]
-            ax.plot(gdata.index, gdata.iloc[:, 0], 'g')
-        if pos_y:
-            ax.set_xlim([data[data > 0].iloc[0].name, data.iloc[-1].name])
-        # ldata = list(data.values.flatten())
-        # sidx = [x == ldata[0] for x in ldata].index(False)
-        # ldata = list(reversed(ldata[sidx:]))
-        # eidx = [x == ldata[0] for x in ldata].index(False)
-        # frms = self.frms[sidx:-eidx]
-        # frms = frms[round(len(frms) / 1.01*0.01):]
-        # span = np.array([[y for y in x.getSpan().values()] for x in frms])
-        # print(span.mean(axis=0))
-        ax.set_xlabel(data.index.name)
-        ax.set_ylabel(data.columns.values.tolist()[0])
-        fname = name + cls.PNG_EXT % task
-        if inav:
-            print(f"Showing {task.upper()}. Click X to close and continue..")
-            plt.show(block=True)
-        fig.savefig(fname)
-        matplotlib.use(obackend)
-        return fname
+        for name in self.options.task:
+            Analyzer = self.ANALYZER[name]
+            anl = Analyzer(self.time,
+                           self.frms,
+                           sidx=self.sidx,
+                           data_reader=self.data_reader,
+                           gids=self.gids,
+                           options=self.options,
+                           logger=logger)
+            anl.run()
 
     @classmethod
     def getOutfiles(cls, logfile):
@@ -554,24 +192,11 @@ class CustomDump(object):
         :rtype: dict
         """
         jobname = cls.getLogged(logfile)[0]
-        tasks = cls.getLoggedTasks(logfile)
-        return {x: jobname + cls.DATA_EXT % x for x in tasks}
+        tsks = cls.getLogged(logfile, key=cls.TASK, strip='[]', delimiter=', ')
+        return {x: jobname + cls.DATA_EXT % x for x in tsks}
 
     @classmethod
-    def getLoggedTasks(cls, logfile):
-        """
-        Get the task names in the log file.
-
-        :param logfile: the log file generated by this class
-        :type logfile: str
-        :return: task name
-        :rtype: list
-        """
-        tasks = cls.getLogged(logfile, key=FlAG_TASK[1:])[0]
-        return [x.strip().strip("'") for x in tasks.strip('[]').split(',')]
-
-    @classmethod
-    def getLogged(cls, logfile, key=None):
+    def getLogged(cls, logfile, key=None, strip=None, delimiter=None):
         """
         Get the values corresponding to the key in the log file.
 
@@ -579,13 +204,20 @@ class CustomDump(object):
         :type logfile: str
         :param key: the key based on which values are fetched
         :type key: str
+        :param delimiter: the chars to strip the string
+        :type delimiter: str
+        :param delimiter: the delimiter to split the string
+        :type delimiter: str
         :return: the matching values in the logfile
         :rtype: list
         """
         if key is None:
             key = jobutils.FLAG_JOBNAME.lower()[1:]
         block = sh.grep(f'{key}:', logfile)
-        return re.findall(f"(?<={key[1:]}: ).+(?=\n)", block)
+        matched = re.findall(f"(?<={key[1:]}: ).+(?=\n)", block)[0]
+        matched = matched.strip(strip)
+        matched = [x.strip() for x in matched.split(delimiter)]
+        return matched
 
     @classmethod
     def combine(cls, files, log, name, inav=False):
@@ -602,44 +234,13 @@ class CustomDump(object):
             interactive mode is on
         :type inav: bool
         """
-        for tname, tfiles in files.items():
-            if tname == XYZ:
+        for aname, afiles in files.items():
+            if aname in NO_COMBINE:
                 continue
-            filename = f"{name}" + cls.DATA_EXT % tname
-            dname = cls.NAME[tname]
-            if os.path.exists(filename):
-                log(f"{cls.RESULTS}{dname} found as {filename}")
-                data = pd.read_csv(filename, index_col=0)
-            else:
-                datas = [pd.read_csv(x) for x in tfiles]
-                frm_num = min([x.shape[0] for x in datas])
-                datas = [x.iloc[-frm_num:] for x in datas]
-                xvals = [x.iloc[:, 0].to_numpy().reshape(-1, 1) for x in datas]
-                xvals = np.concatenate(xvals, axis=1)
-                x_ave = xvals.mean(axis=1).reshape(-1, 1)
-                yvals = [x.iloc[:, 1].to_numpy().reshape(-1, 1) for x in datas]
-                yvals = np.concatenate(yvals, axis=1)
-                y_std = yvals.std(axis=1).reshape(-1, 1)
-                y_mean = yvals.mean(axis=1).reshape(-1, 1)
-                data = np.concatenate((x_ave, y_mean, y_std), axis=1)
-                data = pd.DataFrame(data[:, 1:], index=data[:, 0])
-                cname, num = datas[0].columns[1], len(datas)
-                data.columns = [f'{cname} (num={num})', f'std (num={num})']
-                data.to_csv(filename)
-                log(f"{cls.RESULTS}{dname} saved to {filename}")
-
-            sidx, eidx = None, None
-            if tname == RDF:
-                cls.fitRdf(data, log=log)
-            elif tname == MSD:
-                sidx, eidx = cls.fitMsd(data, log=log)
-            fname = cls.plotData(data,
-                                 tname,
-                                 name=name,
-                                 inav=inav,
-                                 sidx=sidx,
-                                 eidx=eidx)
-            log(f'{dname.capitalize()} figure saved as {fname}')
+            Analyzer = cls.ANALYZER[aname]
+            data = Analyzer.read(name, files=afiles, log=log)
+            sidx, eidx = Analyzer.fit(data, log=log)
+            Analyzer.plot(data, name, inav=inav, sidx=sidx, eidx=eidx, log=log)
 
 
 def get_parser(parser=None):
@@ -661,10 +262,14 @@ def get_parser(parser=None):
                             help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
                         choices=[XYZ, CLASH, VIEW, DENSITY, MSD, RDF],
-                        default=[XYZ],
+                        default=[DENSITY],
                         nargs='+',
                         help=f'{XYZ} writes out .xyz for VMD visualization;'
-                        f' {CLASH} check clashes for each frame.')
+                        f' {CLASH} checks clashes for each frame; {VIEW} '
+                        f'visualizes coordinates; {DENSITY} analyzes the cell '
+                        f'density; {MSD} computes mean squared displacement '
+                        f'and diffusion coefficient; {RDF} calculates the '
+                        f'radial distribution function. ')
     parser.add_argument(FlAG_SEL, help=f'Elements for atom selection.')
     parser.add_argument(
         FLAG_LAST_PCT,
@@ -693,10 +298,18 @@ def validate_options(argv):
     """
     parser = get_parser()
     options = parser.parse_args(argv)
+    data_rqd_tasks = set(options.task).intersection(DATA_RQD_TASKS)
+    if data_rqd_tasks and not options.data_file:
+        parser.error(f"Please specify {FlAG_DATA_FILE} to run {FlAG_TASK} "
+                     f"{', '.join(data_rqd_tasks)}")
 
-    if CLASH in options.task and not options.data_file:
-        parser.error(
-            f'Please specify {FlAG_DATA_FILE} to run {FlAG_TASK} {CLASH}')
+    try:
+        options.task.remove(analyzer.XYZ.NAME)
+    except ValueError:
+        pass
+    else:
+        # XYZ analyzer may change the coordinates
+        options.task.append(analyzer.XYZ.NAME)
     return options
 
 
@@ -704,8 +317,8 @@ logger = None
 
 
 def main(argv):
-    global logger
 
+    global logger
     options = validate_options(argv)
     logger = logutils.createDriverLogger(jobname=options.jobname)
     logutils.logOptions(logger, options)

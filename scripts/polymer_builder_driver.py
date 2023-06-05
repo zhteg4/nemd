@@ -99,10 +99,16 @@ class Validator:
         self.options = options
 
     def run(self):
+        """
+        Main method to run the validation.
+        """
         self.cruNum()
         self.molNum()
 
     def cruNum(self):
+        """
+        Validate (or set) the number of repeat units.
+        """
         if self.options.cru_num is None:
             self.options.cru_num = [1] * len(self.options.cru)
             return
@@ -112,8 +118,11 @@ class Validator:
                          f'{len(self.options.cru_num)} cru found.')
 
     def molNum(self):
+        """
+        Validate (or set) the number of molecules.
+        """
         if self.options.mol_num is None:
-            self.options.mol_num = [1] * len(self.options.cru_num)
+            self.options.mol_num = [3] * len(self.options.cru_num)
             return
         if len(self.options.cru_num) == len(self.options.mol_num):
             return
@@ -205,7 +214,14 @@ class AmorphousCell(object):
         self.createCell(cell_type=GROW, mini_density=mini_density)
 
     def createCell(self, cell_type=PACK, mini_density=MINIMUM_DENSITY):
+        """
+        Create amorphous cell.
 
+        :param cell_type: the algorithm type for amorphous cell.
+        :type cell_type: str
+        :param mini_density: the minium density when reducing it automatically.
+        :type mini_density: float
+        """
         cell_builder = PackedCell if cell_type == PACK else GrowedCell
         cell = cell_builder(self.polymers, self.options)
         cell.setMols()
@@ -345,7 +361,6 @@ class PackedCell:
         Create amorphous cell by randomly placing molecules with random
         orientations.
         """
-
         self.setBoxes()
         self.setMols()
         self.setDataReader()

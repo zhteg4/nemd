@@ -5,7 +5,30 @@
 """
 This module provides backend plotting for drivers.
 """
-import environutils
+from nemd import environutils
+from contextlib import contextmanager
+
+
+@contextmanager
+def get_pyplot(backend=None):
+    """
+    Get the pyplot with requested backend and restoration after usage.
+
+    :param backend: the backend to use
+    :type backend: str
+    :return: the pyplot with requested backend
+    :rtype: module 'matplotlib.pyplot'
+    """
+    import matplotlib
+    obackend = matplotlib.get_backend()
+    backend = backend if backend else obackend
+    matplotlib.use(backend)
+    import matplotlib.pyplot as plt
+    try:
+        yield plt
+    finally:
+        # Restore the backend
+        matplotlib.use(obackend)
 
 
 class TempEnePlotter(object):

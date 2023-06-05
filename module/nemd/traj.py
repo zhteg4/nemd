@@ -23,6 +23,21 @@ FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
 
 
+def slice_frames(filename=None, contents=None, slice=None):
+    """
+    Get and slice the trajectory frames.
+
+    :param filename str: the filename to read frames
+    :param contents `bytes`: parse the contents if filename not provided
+    :param slice list: start, stop, and interval
+    :return iterator of 'Frame': each frame has coordinates and box info
+    """
+    frm_iter = get_frames(filename=filename, contents=contents)
+    if not slice:
+        return frm_iter
+    return itertools.islice(frm_iter, *slice)
+
+
 def get_frames(filename=None, contents=None):
     """
     Get the trajectory frames based on file extension.
@@ -374,7 +389,8 @@ class Frame(pd.DataFrame):
                     index=True,
                     sep=' ',
                     header=header,
-                    quotechar=' ')
+                    quotechar=' ',
+                    float_format='%.3f')
 
 
 class DistanceCell:

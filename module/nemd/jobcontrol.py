@@ -1,3 +1,4 @@
+import sys
 import shutil
 import collections
 import numpy as np
@@ -69,20 +70,6 @@ class Runner:
             if jobutils.AGGREGATOR in self.options.jtype:
                 self.setAggregation()
                 self.runAggregation()
-
-    def log(self, msg, timestamp=False):
-        """
-        Print message to the logger or screen.
-
-        :param msg: the message to print
-        :type msg: str
-        :param timestamp:
-        :type timestamp: bool
-        """
-        if self.logger:
-            logutils.log(self.logger, msg, timestamp=timestamp)
-        else:
-            print(msg)
 
     def clean(self):
         """
@@ -203,5 +190,27 @@ class Runner:
         """
 
         prj_path = self.project.path if self.project else self.options.prj_path
-        self.flow_project = FlowProject.get_project(prj_path)
+        try:
+            self.flow_project = FlowProject.get_project(prj_path)
+        except LookupError as err:
+            self.log_error(str(err))
+
         self.flow_project.run()
+
+    def log(self, msg, timestamp=False):
+        """
+        Print message to the logger or screen.
+
+        :param msg: the message to print
+        :type msg: str
+        :param timestamp:
+        :type timestamp: bool
+        """
+        if self.logger:
+            logutils.log(self.logger, msg, timestamp=timestamp)
+        else:
+            print(msg)
+
+    def log_error(self, msg):
+        self.log(msg + '\nAborting...', timestamp=True)
+        sys.exit(1)

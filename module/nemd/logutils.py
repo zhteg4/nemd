@@ -119,6 +119,8 @@ def logOptions(logger, options):
     command_options = 'Command Options'
     logger.info(f"." * 10 + command_options + f"." * 10)
     for key, val in options.__dict__.items():
+        if type(val) is list:
+            val = ', '.join(map(str, val))
         logger.info(f"{key}: {val}")
     logger.info(f"{JOBSTART} {timeutils.ctime()}")
     logger.info(f"." * (20 + len(command_options)))
