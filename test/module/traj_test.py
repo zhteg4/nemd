@@ -75,6 +75,7 @@ class TestDistanceCell:
         dcell.setSpan()
         dcell.setgrids()
         dcell.setNeighborIds()
+        dcell.setNeighborMap()
         dcell.setAtomCell()
         xyzs = [dcell.frm.getXYZ(x) for x in dcell.getNeighbors((0, 0, 0))]
         dists = [np.linalg.norm(x) for x in xyzs]
@@ -87,6 +88,7 @@ class TestDistanceCell:
         dcell.setSpan()
         dcell.setgrids()
         dcell.setNeighborIds()
+        dcell.setNeighborMap()
         dcell.setAtomCell()
         row = dcell.frm.getXYZ(1)
         assert not dcell.getClashes(row)

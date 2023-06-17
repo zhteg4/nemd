@@ -414,7 +414,7 @@ def get_parser():
         type=parserutils.type_positive_float,
         metavar='SECOND',
         help='Skip tests marked with time longer than this criteria.')
-    jobutils.add_job_arguments(parser)
+    parserutils.add_job_arguments(parser)
     return parser
 
 

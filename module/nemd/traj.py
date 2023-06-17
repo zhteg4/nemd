@@ -6,6 +6,7 @@
 This module read, parser, and analyze trajectories.
 """
 import io
+import os
 import math
 import gzip
 import random
@@ -15,6 +16,7 @@ import collections
 import numpy as np
 import pandas as pd
 import networkx as nx
+from contextlib import contextmanager
 
 from nemd import oplsua
 from nemd import symbols
@@ -109,8 +111,7 @@ class Frame(pd.DataFrame):
         :param contents `bytes`: parse the contents if filename not provided
         :return iterator of 'Frame': each frame has coordinates and box info
         """
-        with gzip.open(filename,
-                       'rt') if filename else io.StringIO(contents) as fh:
+        with cls.open_traj(filename=filename, contents=contents) as fh:
             while True:
                 lines = [fh.readline() for _ in range(9)]
                 if not all(lines):
@@ -144,7 +145,7 @@ class Frame(pd.DataFrame):
         :param box list: box of the frame (overwritten by the file header)
         :return iterator of 'Frame': each frame has coordinates and box info
         """
-        with open(filename, 'r') if filename else io.StringIO(contents) as fh:
+        with cls.open_traj(filename=filename, contents=contents) as fh:
             while True:
                 line = fh.readline()
                 if not line:
@@ -164,6 +165,34 @@ class Frame(pd.DataFrame):
                                   engine='python')
                 frm.index = pd.RangeIndex(1, atom_num + 1)
                 yield cls(frm, columns=cls.XYZU + [cls.ELEMENT], box=box)
+
+    @staticmethod
+    @contextmanager
+    def open_traj(filename=None, contents=None):
+        """
+        Open trajectory file.
+
+        :param filename: the filename with path
+        :type filename: str
+        :param contents: the trajectory contents
+        :type contents: str
+        :return: the file handle
+        :rtype: '_io.TextIOWrapper'
+        """
+        if all([filename is None, contents is None]):
+            raise ValueError(f'Please specify either filename or contents.')
+        if filename:
+            if os.path.isfile(filename):
+                func = gzip.open if filename.endswith('.gz') else open
+                fh = func(filename, 'rt')
+            else:
+                raise FileNotFoundError(f'{filename} not found')
+        else:
+            fh = io.StringIO(contents)
+        try:
+            yield fh
+        finally:
+            fh.close()
 
     def getPoint(self):
         """

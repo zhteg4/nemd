@@ -12,7 +12,7 @@ import re
 import sys
 import numpy as np
 from types import SimpleNamespace
-from PyQt6 import QtWidgets
+from PyQt5 import QtWidgets
 from matplotlib import lines
 from matplotlib import colors
 from matplotlib.figure import Figure

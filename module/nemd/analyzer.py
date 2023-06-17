@@ -150,11 +150,11 @@ class BaseAnalyzer:
             ax.set_ylabel(data.columns.values.tolist()[0])
             fname = name + cls.FIG_EXT % cls.NAME
             if inav:
-                print(f"Showing {cls.NAME.upper()}. "
+                print(f"Showing {cls.DESCR.upper()}. "
                       "Click X to close and continue..")
                 plt.show(block=True)
             fig.savefig(fname)
-        log(f'{cls.NAME.capitalize()} figure saved as {fname}')
+        log(f'{cls.DESCR.capitalize()} figure saved as {fname}')
 
     @classmethod
     def read(cls, name, files=None, log=None):
