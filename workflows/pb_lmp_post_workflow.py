@@ -128,7 +128,6 @@ logger = None
 
 def main(argv):
     global logger
-
     options = validate_options(argv)
     jobname = environutils.get_jobname(JOBNAME)
     logger = logutils.createDriverLogger(jobname=jobname)

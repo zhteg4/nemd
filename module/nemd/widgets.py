@@ -40,7 +40,13 @@ class LabeledComboBox(Frame):
 
 class PushButton(Frame):
 
-    def __init__(self, text, *args, after_label='', alignment=None, command=None, **kwargs):
+    def __init__(self,
+                 text,
+                 *args,
+                 after_label='',
+                 alignment=None,
+                 command=None,
+                 **kwargs):
 
         super().__init__(*args, **kwargs)
         self.button = QtWidgets.QPushButton(text)
@@ -171,7 +177,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def addActionButtons(self):
         mylayout = self.centralWidget().layout()
-        self.reset_bn = PushButton('Reset', layout=mylayout, alignment=QtCore.Qt.AlignRight)
+        self.reset_bn = PushButton('Reset',
+                                   layout=mylayout,
+                                   alignment=QtCore.Qt.AlignRight)
         self.reset_bn.layout().addStretch(1000)
 
     def error(self, msg):

@@ -21,7 +21,6 @@ import datetime
 from flow import FlowProject
 from nemd import symbols
 from nemd import logutils
-from nemd import jobutils
 from nemd import fileutils
 from nemd import parserutils
 from nemd import environutils

@@ -52,7 +52,6 @@ class TrajPanel(widgets.MainWindow):
         mylayout.addStretch(1000)
         self.resize(1000, 800)
 
-
     def panel(self):
         self.show()
         sys.exit(self.app.exec())

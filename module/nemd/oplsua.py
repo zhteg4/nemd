@@ -951,8 +951,8 @@ class OplsParser:
             for x in partial_matches
         ]
         ff_symbols = {
-            x[0]: set([(self.atoms[y].symbol, self.atoms[y].conn)
-                       for y in x[1:]])
+            x[0]:
+            set([(self.atoms[y].symbol, self.atoms[y].conn) for y in x[1:]])
             for x in ff_atom_ids
         }
         # Both symbols and connectivities are matched
@@ -1553,8 +1553,7 @@ class LammpsData(LammpsIn):
         msg = "Impropers from the same symbols are of the same constants."
         # {1: 'CNCO', 2: 'CNCO', 3: 'CNCO' ...
         symbolss = {
-            z:
-            ''.join([str(self.ff.atoms[x.id3].conn)] + [
+            z: ''.join([str(self.ff.atoms[x.id3].conn)] + [
                 self.ff.atoms[y].symbol for y in [x.id1, x.id2, x.id3, x.id4]
             ])
             for z, x in self.ff.impropers.items()
@@ -2089,8 +2088,8 @@ class DataFileReader(LammpsData):
     def indexLines(self):
         self.mk_idxes = {
             x: i
-            for i, l in enumerate(self.lines)
-            for x in self.MARKERS if l.startswith(x)
+            for i, l in enumerate(self.lines) for x in self.MARKERS
+            if l.startswith(x)
         }
 
     def setDescription(self):
@@ -2101,20 +2100,20 @@ class DataFileReader(LammpsData):
         # {'atoms': 1620, 'bonds': 1593, 'angles': 1566, 'dihedrals': 2511}
         self.struct_dsp = {
             y: int(self.lines[x].split(y)[0])
-            for x in range(dsp_eidx)
-            for y in self.STRUCT_DSP if y in self.lines[x]
+            for x in range(dsp_eidx) for y in self.STRUCT_DSP
+            if y in self.lines[x]
         }
         # {'atom types': 7, 'bond types': 6, 'angle types': 5}
         self.dype_dsp = {
             y: int(self.lines[x].split(y)[0])
-            for x in range(dsp_eidx)
-            for y in self.TYPE_DSP if y in self.lines[x]
+            for x in range(dsp_eidx) for y in self.TYPE_DSP
+            if y in self.lines[x]
         }
         # {'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], 'zlo zhi': ..}
         self.box_dsp = {
             y: [float(z) for z in self.lines[x].split(y)[0].split()]
-            for x in range(dsp_eidx)
-            for y in self.BOX_DSP if y in self.lines[x]
+            for x in range(dsp_eidx) for y in self.BOX_DSP
+            if y in self.lines[x]
         }
 
     def setMasses(self):
