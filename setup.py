@@ -24,12 +24,19 @@ setup(name='nemd',
           'matplotlib == 3.7.1', 'plotly ==5.15.0',
           'dash_bootstrap_components', 'pytest == 7.3.2', 'dash[testing]',
           'pyqt6 == 6.5.1', 'webdriver-manager == 3.8.6', 'flask >= 2.2.5',
-          'openpyxl == 3.1.2', 'sh == 2.0.4', 'humanfriendly == 10.0'
+          'openpyxl == 3.1.2', 'sh == 2.0.4', 'humanfriendly == 10.0',
+          'Pillow == 9.4.0'
       ],
       extras_require={
           'dev': [
-              'ipdb', 'ipython', 'notebook', 'jupyterlab', 'yapf', 'RBTools',
-              'snakeviz', 'pyvim'
+              'ipdb',
+              'ipython',
+              'notebook',
+              'jupyterlab',
+              'yapf',
+              'RBTools == 4.1',
+              'snakeviz',
+              'pyvim',
           ]
       },
       classifiers=[
