@@ -1,4 +1,5 @@
 brew remove lammps
+brew tap homebrew/core
 brew edit lammps
 brew reinstall --build-from-source lammps
 
