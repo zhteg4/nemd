@@ -1,9 +1,46 @@
 """
-pip install setuptools
-pip3 install ".[dev]"
+pip3 install setuptools
+pip3 install ".[dev]" -v
 """
-
+import os.path
+import sys
+import subprocess
 from setuptools import setup
+from setuptools.command.install import install
+
+
+class CustomInstallCommand(install):
+    LMP_PY = 'lmp_mpi -h | grep PYTHON'
+    STD_CMAKE_ARGS = '*std_cmake_args\n'
+    DPKG_PYTHON = '"-DPKG_PYTHON=yes",\n'
+    PYTHON_STD = f'{DPKG_PYTHON} {STD_CMAKE_ARGS}'
+    DARWIN = 'darwin'
+    BUILD = 'build'
+    LAMMPS_RB = 'lammps.rb'
+    BUILD_LAMMPS_RB = os.path.join(BUILD, LAMMPS_RB)
+
+    def run(self):
+        install.run(self)
+        lmp_py = subprocess.run(self.LMP_PY, capture_output=True, shell=True)
+        if lmp_py.stdout:
+            print('Lammps executable with python package found.')
+            return
+        print('Lammps executable with python package not found. Installing...')
+        if sys.platform == self.DARWIN:
+            print(f"Platform: {self.DARWIN}")
+            subprocess.run('brew remove lammps', shell=True)
+            subprocess.run('brew tap homebrew/core', shell=True)
+            rb = subprocess.run('brew cat lammps',
+                                capture_output=True,
+                                shell=True).stdout.decode("utf-8")
+            if self.DPKG_PYTHON not in rb:
+                rb = rb.replace(self.STD_CMAKE_ARGS, self.PYTHON_STD)
+            with open(self.BUILD_LAMMPS_RB, 'w') as fh:
+                fh.write(rb)
+            subprocess.run(
+                f'brew reinstall --build-from-source {self.BUILD_LAMMPS_RB}',
+                shell=True)
+
 
 setup(name='nemd',
       version='0.1.0',
@@ -45,4 +82,5 @@ setup(name='nemd',
           'License :: OSI Approved :: BSD License',
           'Operating System :: POSIX :: Linux',
           'Programming Language :: Python :: 3.5',
-      ])
+      ],
+      cmdclass={'install': CustomInstallCommand})
