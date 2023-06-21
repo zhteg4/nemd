@@ -57,6 +57,8 @@ class CustomInstallCommand(install):
             subprocess.run(
                 f'brew reinstall --build-from-source {self.BUILD_LAMMPS_RB}',
                 shell=True)
+            subprocess.run('brew remove PyQt5', shell=True)
+            subprocess.run(f'brew reinstall PyQt5', shell=True)
 
     def installQt(self):
         """
