@@ -20,14 +20,31 @@ class CustomInstallCommand(install):
     BUILD_LAMMPS_RB = os.path.join(BUILD, LAMMPS_RB)
 
     def run(self):
+        """
+        Main method to run post installation.
+        """
         install.run(self)
+        self.setPlatform()
+        self.installQt()
+        self.installLammps()
+
+    def setPlatform(self):
+        """
+        Set the platform, such as win32, darwin, linux2 and so on.
+        """
+        self.platform = sys.platform
+        print(f"Platform: {self.platform}")
+
+    def installLammps(self):
+        """
+        Install the lammps with specific packages if not available.
+        """
         lmp_py = subprocess.run(self.LMP_PY, capture_output=True, shell=True)
         if lmp_py.stdout:
             print('Lammps executable with python package found.')
             return
         print('Lammps executable with python package not found. Installing...')
         if sys.platform == self.DARWIN:
-            print(f"Platform: {self.DARWIN}")
             subprocess.run('brew remove lammps', shell=True)
             subprocess.run('brew tap homebrew/core', shell=True)
             rb = subprocess.run('brew cat lammps',
@@ -40,6 +57,19 @@ class CustomInstallCommand(install):
             subprocess.run(
                 f'brew reinstall --build-from-source {self.BUILD_LAMMPS_RB}',
                 shell=True)
+
+    def installQt(self):
+        """
+        Install the qt, a C++framework for developing graphical user interfaces
+        and cross-platform applications, both desktop and embedded.
+        """
+        qt = subprocess.run('brew list qt5', capture_output=True, shell=True)
+        if qt.stdout:
+            print('qt installation found.')
+            return
+        print('qt installation not found. Installing...')
+        if sys.platform == self.DARWIN:
+            subprocess.run('brew install qt5', shell=True)
 
 
 setup(name='nemd',
@@ -60,7 +90,7 @@ setup(name='nemd',
           'signac-flow == 0.25.1', 'lammps == 2022.6.23.4.0',
           'matplotlib == 3.7.1', 'plotly ==5.15.0',
           'dash_bootstrap_components', 'pytest == 7.3.2', 'dash[testing]',
-          'pyqt6 == 6.5.1', 'webdriver-manager == 3.8.6', 'flask >= 2.2.5',
+          'pyqt5 == 5.15.9', 'webdriver-manager == 3.8.6', 'flask >= 2.2.5',
           'openpyxl == 3.1.2', 'sh == 2.0.4', 'humanfriendly == 10.0',
           'Pillow == 9.4.0'
       ],
