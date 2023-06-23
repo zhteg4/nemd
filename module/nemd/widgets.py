@@ -102,21 +102,19 @@ class LineEdit(Frame):
                  **kwargs):
 
         self.command = kwargs.pop('command', None)
-        super().__init__()
-        self.layout = QtWidgets.QHBoxLayout()
-        self.setLayout(self.layout)
+        super().__init__(layout=layout)
         if label:
             self.label = QtWidgets.QLabel(label)
-            self.layout.addWidget(self.label)
+            self.layout().addWidget(self.label)
         self.line_edit = QtWidgets.QLineEdit(text)
         self.line_edit.setFixedWidth(68)
         if readonly:
             self.line_edit.setReadOnly(True)
-        self.layout.addWidget(self.line_edit)
+        self.layout().addWidget(self.line_edit)
         if after_label:
             self.after_label = QtWidgets.QLabel(after_label)
-            self.layout.addWidget(self.after_label)
-        self.layout.addStretch(1000)
+            self.layout().addWidget(self.after_label)
+        self.layout().addStretch(1000)
         if self.command:
             self.line_edit.textChanged.connect(self.command)
 
@@ -130,7 +128,6 @@ class LineEdit(Frame):
 class FloatLineEdit(LineEdit):
 
     def __init__(self, *args, **kwargs):
-
         super().__init__(*args, **kwargs)
 
     def value(self):

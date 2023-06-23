@@ -5,6 +5,7 @@
 """
 This module handles molecular topology and structural editing.
 """
+import warnings
 import networkx as nx
 
 EDGES = 'edges'
@@ -54,10 +55,12 @@ def findPath(graph=None, mol=None, source=None, target=None, **kwarg):
 
     if graph is None:
         graph = getGraph(mol)
-    shortest_path = nx.shortest_path(graph,
-                                     source=source,
-                                     target=target,
-                                     **kwarg)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        shortest_path = nx.shortest_path(graph,
+                                         source=source,
+                                         target=target,
+                                         **kwarg)
 
     if target is not None:
         shortest_path = {target: shortest_path}
