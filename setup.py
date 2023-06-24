@@ -93,7 +93,7 @@ setup(name='nemd',
           'signac-flow == 0.25.1', 'lammps == 2022.6.23.4.0',
           'matplotlib == 3.7.1', 'plotly ==5.15.0',
           'dash_bootstrap_components', 'pytest == 7.3.2', 'dash[testing]',
-          'pyqt5 == 5.15.9', 'webdriver-manager == 3.8.6', 'flask >= 2.2.5',
+          'pyqt5 == 5.15.7', 'webdriver-manager == 3.8.6', 'flask >= 2.2.5',
           'openpyxl == 3.1.2', 'sh == 2.0.4', 'humanfriendly == 10.0',
           'Pillow == 9.4.0'
       ],
