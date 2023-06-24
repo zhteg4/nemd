@@ -40,9 +40,6 @@ class CustomInstallCommand(install):
         Install the lammps with specific packages if not available.
         """
         lmp_py = subprocess.run(self.LMP_PY, capture_output=True, shell=True)
-        if sys.platform == self.DARWIN:
-            subprocess.run('brew remove PyQt5', shell=True)
-            subprocess.run(f'brew reinstall PyQt5', shell=True)
         if lmp_py.stdout:
             print('Lammps executable with python package found.')
             return
