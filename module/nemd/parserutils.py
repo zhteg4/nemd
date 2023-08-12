@@ -20,18 +20,17 @@ FLAG_CPU = jobutils.FLAG_CPU
 FLAG_PRJ_PATH = jobutils.FLAG_PRJ_PATH
 
 
-class CapitalisedHelpFormatter(argparse.HelpFormatter):
+class ArgumentDefaultsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 
     def add_usage(self, usage, actions, groups, prefix=None):
         if prefix is None:
             prefix = 'Usage: '
-        return super(CapitalisedHelpFormatter,
-                     self).add_usage(usage, actions, groups, prefix)
+        return super().add_usage(usage, actions, groups, prefix)
 
 
 def get_parser(**kwargs):
-    return argparse.ArgumentParser(formatter_class=CapitalisedHelpFormatter,
-                                   **kwargs)
+    return argparse.ArgumentParser(
+        formatter_class=ArgumentDefaultsHelpFormatter, **kwargs)
 
 
 def type_file(arg):
