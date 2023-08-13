@@ -2,6 +2,7 @@ BASH_SCRIPTS=bash_scripts
 WORKFLOWS=workflows
 SCRIPTS=scripts
 MODULE=module
+export GIT_EDITOR=vim
 
 # Source code dir
 export NEMD_SRC="$(cd "$(dirname "$0")" && pwd)"
