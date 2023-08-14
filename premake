@@ -4,8 +4,8 @@ SCRIPTS=scripts
 MODULE=module
 export GIT_EDITOR=vim
 
-# Source code dir
-export NEMD_SRC="$(cd "$(dirname "$0")" && pwd)"
+# Source code dir while "$(cd "$(dirname "$0")" && pwd)" yields "bin" install of the abs path
+export NEMD_SRC="$(readlink -f premake | xargs dirname)"
 echo \$NEMD_SRC=$NEMD_SRC
 
 # Bash scripts dir to PATH and $PYTHONPATH

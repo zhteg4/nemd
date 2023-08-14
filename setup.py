@@ -2,8 +2,9 @@
 pip3 install setuptools
 pip3 install ".[dev]" -v
 """
-import os.path
+import os
 import sys
+import shutil
 import subprocess
 from setuptools import setup
 from setuptools.command.install import install
@@ -15,6 +16,7 @@ class CustomInstallCommand(install):
     DPKG_PYTHON = '"-DPKG_PYTHON=yes",\n'
     PYTHON_STD = f'{DPKG_PYTHON} {STD_CMAKE_ARGS}'
     DARWIN = 'darwin'
+    LINUX = 'linux'
     BUILD = 'build'
     LAMMPS_RB = 'lammps.rb'
     BUILD_LAMMPS_RB = os.path.join(BUILD, LAMMPS_RB)
@@ -27,13 +29,14 @@ class CustomInstallCommand(install):
         self.setPlatform()
         self.installQt()
         self.installLammps()
+        self.installTerm()
 
     def setPlatform(self):
         """
         Set the platform, such as win32, darwin, linux2 and so on.
         """
         self.platform = sys.platform
-        print(f"Platform: {self.platform}")
+        print(f"***** Platform: {self.platform} *****")
 
     def installLammps(self):
         """
@@ -57,19 +60,39 @@ class CustomInstallCommand(install):
             subprocess.run(
                 f'brew reinstall --build-from-source {self.BUILD_LAMMPS_RB}',
                 shell=True)
+        if sys.platform == self.LINUX:
+            subprocess.run('sudo apt-get install gcc openmpi-bin', shell=True)
+            subprocess.run('sudo apt-get install openmpi-common libopenmpi-dev libgtk2.0-dev', shell=True)
+            subprocess.run('cd build; git clone -b stable https://github.com/lammps/lammps.git mylammps; '
+                           'cd mylammps; cd cmake; rm -f CMakeFiles CMakeCache.txt; mkdir build; cd build; '
+                           'cmake .. -DPKG_PYTHON=yes -DPKG_MOLECULE=yes; cmake --build .', shell=True)
+            lmp_path = os.path.join('build', 'mylammps',  'cmake', 'build', 'lmp')
+            # To be consistent with class Lammps_Driver.PATH in task.py
+            subprocess.run(shutil.move(lmp_path, os.path.join(self.install_scripts, 'lmp_serial')), shell=True)
 
     def installQt(self):
         """
         Install the qt, a C++framework for developing graphical user interfaces
         and cross-platform applications, both desktop and embedded.
         """
-        qt = subprocess.run('brew list qt5', capture_output=True, shell=True)
-        if qt.stdout:
-            print('qt installation found.')
-            return
-        print('qt installation not found. Installing...')
         if sys.platform == self.DARWIN:
+            qt = subprocess.run('brew list qt5', capture_output=True, shell=True)
+            if qt.stdout:
+                print('qt installation found.')
+                return
+            print('qt installation not found. Installing...')
             subprocess.run('brew install qt5', shell=True)
+        if sys.platform == self.LINUX:
+            subprocess.run('sudo apt-get install build-essential libgl1-mesa-dev qt6-base-dev -y', shell=True)
+            subprocess.run("sudo apt-get install '^libxcb.*-dev' libx11-xcb-dev libglu1-mesa-dev -y", shell=True)
+
+
+    def installTerm(self):
+        """
+        Install terminal supporting split view.
+        """
+        if sys.platform == self.LINUX:
+            subprocess.run('sudo apt install tilix -y', shell=True)
 
 
 setup(name='nemd',
