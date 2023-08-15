@@ -61,10 +61,10 @@ class CustomInstallCommand(install):
                 f'brew reinstall --build-from-source {self.BUILD_LAMMPS_RB}',
                 shell=True)
         if sys.platform == self.LINUX:
-            subprocess.run('sudo apt-get install gcc openmpi-bin', shell=True)
+            subprocess.run('sudo apt-get install gcc openmpi-bin cmake', shell=True)
             subprocess.run('sudo apt-get install openmpi-common libopenmpi-dev libgtk2.0-dev', shell=True)
             subprocess.run('cd build; git clone -b stable https://github.com/lammps/lammps.git mylammps; '
-                           'cd mylammps; cd cmake; rm -f CMakeFiles CMakeCache.txt; mkdir build; cd build; '
+                           'cd mylammps; cd cmake; rm -f CMakeFiles CMakeCache.txt; rm -rf build ; mkdir build; cd build; '
                            'cmake .. -DPKG_PYTHON=yes -DPKG_MOLECULE=yes; cmake --build .', shell=True)
             lmp_path = os.path.join('build', 'mylammps',  'cmake', 'build', 'lmp')
             # To be consistent with class Lammps_Driver.PATH in task.py
