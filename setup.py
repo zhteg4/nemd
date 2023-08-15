@@ -61,7 +61,7 @@ class CustomInstallCommand(install):
                 f'brew reinstall --build-from-source {self.BUILD_LAMMPS_RB}',
                 shell=True)
         if sys.platform == self.LINUX:
-            subprocess.run('sudo apt-get install gcc openmpi-bin cmake', shell=True)
+            subprocess.run('sudo apt-get install gcc openmpi-bin cmake python3-apt python3-setuptools', shell=True)
             subprocess.run('sudo apt-get install openmpi-common libopenmpi-dev libgtk2.0-dev', shell=True)
             subprocess.run('cd build; git clone -b stable https://github.com/lammps/lammps.git mylammps; '
                            'cd mylammps; cd cmake; rm -f CMakeFiles CMakeCache.txt; rm -rf build ; mkdir build; cd build; '
