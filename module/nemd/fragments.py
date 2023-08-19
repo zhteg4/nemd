@@ -491,6 +491,7 @@ class FragMol(FragMixIn):
 class FragMols(FragMixIn):
 
     def __init__(self, mols, data_file=None, box=None, logger=logger):
+
         self.mols = mols
         self.data_file = data_file
         self.box = box

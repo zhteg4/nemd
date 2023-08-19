@@ -601,7 +601,8 @@ class DistanceCell:
         :param min_num int: minimum number of sites.
         """
         self.graph = nx.Graph()
-        mgrid = pow(np.prod(self.span) / max([mol_num, min_num]), 1 / 3)
+        # getVoids() doesn't generate enough voids with scaling down the grid
+        mgrid = pow(np.prod(self.span) / max([mol_num, min_num]), 1 / 3) * 0.8
         self.gindexes = (self.span / mgrid).round().astype(int)
         self.ggrids = self.span / self.gindexes
         indexes = [range(x) for x in self.gindexes]
@@ -624,7 +625,7 @@ class DistanceCell:
             rnodes.append(rnode)
         self.graph.remove_nodes_from(nodes)
 
-    def getVoids(self, num=27):
+    def getVoids(self, num=50):
         """
         Get the points from the voids.
 

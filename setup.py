@@ -61,14 +61,23 @@ class CustomInstallCommand(install):
                 f'brew reinstall --build-from-source {self.BUILD_LAMMPS_RB}',
                 shell=True)
         if sys.platform == self.LINUX:
-            subprocess.run('sudo apt-get install gcc openmpi-bin cmake python3-apt python3-setuptools', shell=True)
-            subprocess.run('sudo apt-get install openmpi-common libopenmpi-dev libgtk2.0-dev', shell=True)
-            subprocess.run('cd build; git clone -b stable https://github.com/lammps/lammps.git mylammps; '
-                           'cd mylammps; cd cmake; rm -f CMakeFiles CMakeCache.txt; rm -rf build ; mkdir build; cd build; '
-                           'cmake .. -DPKG_PYTHON=yes -DPKG_MOLECULE=yes; cmake --build .', shell=True)
-            lmp_path = os.path.join('build', 'mylammps',  'cmake', 'build', 'lmp')
+            subprocess.run(
+                'sudo apt-get install lsb-release gcc openmpi-bin cmake python3-apt python3-setuptools',
+                shell=True)
+            subprocess.run(
+                'sudo apt-get install openmpi-common libopenmpi-dev libgtk2.0-dev',
+                shell=True)
+            subprocess.run(
+                'cd build; git clone -b stable https://github.com/lammps/lammps.git mylammps; '
+                'cd mylammps; cd cmake; rm -f CMakeFiles CMakeCache.txt; rm -rf build ; mkdir build; cd build; '
+                'cmake .. -DPKG_PYTHON=yes -DPKG_MOLECULE=yes -DPKG_KSPACE=yes -DPKG_RIGID=yes; cmake --build .',
+                shell=True)
+            lmp_path = os.path.join('build', 'mylammps', 'cmake', 'build',
+                                    'lmp')
             # To be consistent with class Lammps_Driver.PATH in task.py
-            subprocess.run(shutil.move(lmp_path, os.path.join(self.install_scripts, 'lmp_serial')), shell=True)
+            subprocess.run(shutil.move(
+                lmp_path, os.path.join(self.install_scripts, 'lmp_serial')),
+                           shell=True)
 
     def installQt(self):
         """
@@ -76,16 +85,21 @@ class CustomInstallCommand(install):
         and cross-platform applications, both desktop and embedded.
         """
         if sys.platform == self.DARWIN:
-            qt = subprocess.run('brew list qt5', capture_output=True, shell=True)
+            qt = subprocess.run('brew list qt5',
+                                capture_output=True,
+                                shell=True)
             if qt.stdout:
                 print('qt installation found.')
                 return
             print('qt installation not found. Installing...')
             subprocess.run('brew install qt5', shell=True)
         if sys.platform == self.LINUX:
-            subprocess.run('sudo apt-get install build-essential libgl1-mesa-dev qt6-base-dev -y', shell=True)
-            subprocess.run("sudo apt-get install '^libxcb.*-dev' libx11-xcb-dev libglu1-mesa-dev -y", shell=True)
-
+            subprocess.run(
+                'sudo apt-get install build-essential libgl1-mesa-dev qt6-base-dev -y',
+                shell=True)
+            subprocess.run(
+                "sudo apt-get install '^libxcb.*-dev' libx11-xcb-dev libglu1-mesa-dev -y",
+                shell=True)
 
     def installTerm(self):
         """
