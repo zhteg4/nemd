@@ -1,0 +1,5 @@
+sudo apt update build-essential git vim gh
+gh auth login
+git config --global user.email zhteg4@gmail.com
+git config --global user.name 'Tony Zhang'
+git config --global core.editor "vim"
