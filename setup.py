@@ -64,6 +64,7 @@ class CustomInstallCommand(install):
             subprocess.run(
                 'sudo apt-get install lsb-release gcc openmpi-bin cmake python3-apt python3-setuptools',
                 shell=True)
+            subprocess.run('sudo apt  install cmake', shell=True)
             subprocess.run(
                 'sudo apt-get install openmpi-common libopenmpi-dev libgtk2.0-dev',
                 shell=True)
