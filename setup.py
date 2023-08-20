@@ -62,11 +62,7 @@ class CustomInstallCommand(install):
                 shell=True)
         if sys.platform == self.LINUX:
             subprocess.run(
-                'sudo apt-get install lsb-release gcc openmpi-bin cmake python3-apt python3-setuptools',
-                shell=True)
-            subprocess.run('sudo apt  install cmake', shell=True)
-            subprocess.run(
-                'sudo apt-get install openmpi-common libopenmpi-dev libgtk2.0-dev',
+                'sudo apt-get install lsb-release gcc openmpi-bin cmake python3-apt python3-setuptools openmpi-common libopenmpi-dev libgtk2.0-dev -y',
                 shell=True)
             subprocess.run(
                 'cd build; git clone -b stable https://github.com/lammps/lammps.git mylammps; '
