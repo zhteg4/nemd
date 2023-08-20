@@ -4,3 +4,5 @@ gh auth login --hostname GitHub.com --web
 git config --global user.email zhteg4@gmail.com
 git config --global user.name 'Tony Zhang'
 git config --global core.editor "vim"
+mkdir -p ~/git; cd ~/git
+gh repo clone zhteg4/nemd
