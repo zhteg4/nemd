@@ -1,0 +1,5 @@
+https://www.youtube.com/watch?v=ED-WUk440qc
+CMake Tutorial EP 3 | Git Submodules (adding glfw windowing library example)
+
+# please execute the following command before ./configure.sh; ./build.sh; ./run.sh
+git clone https://github.com/glfw/glfw.git

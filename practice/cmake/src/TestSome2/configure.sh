@@ -1,3 +1,3 @@
 #! /bin/sh
 
-cmake -S . -B out/build
+cmake -DGLFW_BUILD_DOCS=off -S . -B out/build
