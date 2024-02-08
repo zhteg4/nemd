@@ -1,7 +1,0 @@
-/Users/tzhang/git/nemd/practice/cmake/src/SomeLibDemo2/cpp/build/CMakeFiles/mearlymath.dir
-/Users/tzhang/git/nemd/practice/cmake/src/SomeLibDemo2/cpp/build/CMakeFiles/edit_cache.dir
-/Users/tzhang/git/nemd/practice/cmake/src/SomeLibDemo2/cpp/build/CMakeFiles/rebuild_cache.dir
-/Users/tzhang/git/nemd/practice/cmake/src/SomeLibDemo2/cpp/build/CMakeFiles/list_install_components.dir
-/Users/tzhang/git/nemd/practice/cmake/src/SomeLibDemo2/cpp/build/CMakeFiles/install.dir
-/Users/tzhang/git/nemd/practice/cmake/src/SomeLibDemo2/cpp/build/CMakeFiles/install/local.dir
-/Users/tzhang/git/nemd/practice/cmake/src/SomeLibDemo2/cpp/build/CMakeFiles/install/strip.dir
