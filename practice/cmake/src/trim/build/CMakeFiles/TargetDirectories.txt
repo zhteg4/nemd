@@ -1,0 +1,7 @@
+/Users/tzhang/git/nemd/practice/cmake/cpp/build/CMakeFiles/trim.dir
+/Users/tzhang/git/nemd/practice/cmake/cpp/build/CMakeFiles/edit_cache.dir
+/Users/tzhang/git/nemd/practice/cmake/cpp/build/CMakeFiles/rebuild_cache.dir
+/Users/tzhang/git/nemd/practice/cmake/cpp/build/CMakeFiles/list_install_components.dir
+/Users/tzhang/git/nemd/practice/cmake/cpp/build/CMakeFiles/install.dir
+/Users/tzhang/git/nemd/practice/cmake/cpp/build/CMakeFiles/install/local.dir
+/Users/tzhang/git/nemd/practice/cmake/cpp/build/CMakeFiles/install/strip.dir

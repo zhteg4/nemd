@@ -1,0 +1,3 @@
+/Users/tzhang/git/nemd/practice/cmake/src/libdemo/build/CMakeFiles/mearlymath.dir
+/Users/tzhang/git/nemd/practice/cmake/src/libdemo/build/CMakeFiles/edit_cache.dir
+/Users/tzhang/git/nemd/practice/cmake/src/libdemo/build/CMakeFiles/rebuild_cache.dir
