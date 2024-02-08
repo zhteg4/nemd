@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/Users/tzhang/git/nemd/practice/cmake/cpp/main.cpp" "CMakeFiles/trim.dir/main.cpp.o" "gcc" "CMakeFiles/trim.dir/main.cpp.o.d"
+  "/Users/tzhang/git/nemd/practice/cmake/src/trim/main.cpp" "CMakeFiles/trim.dir/main.cpp.o" "gcc" "CMakeFiles/trim.dir/main.cpp.o.d"
   )
 
 # Targets to which this target links.

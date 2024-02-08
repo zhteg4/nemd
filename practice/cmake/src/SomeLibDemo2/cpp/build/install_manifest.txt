@@ -1,0 +1,2 @@
+/usr/local/lib/libmearlymath.a
+/usr/local/include/adder.h

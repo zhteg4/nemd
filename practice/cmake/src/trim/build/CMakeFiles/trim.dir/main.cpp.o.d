@@ -1,5 +1,5 @@
 CMakeFiles/trim.dir/main.cpp.o: \
-  /Users/tzhang/git/nemd/practice/cmake/cpp/main.cpp \
+  /Users/tzhang/git/nemd/practice/cmake/src/trim/main.cpp \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.3.sdk/usr/include/c++/v1/string \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.3.sdk/usr/include/c++/v1/__config \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX12.3.sdk/usr/include/c++/v1/__config_site \
