@@ -4,5 +4,11 @@ CMake Tutorial EP 3 | Git Submodules (adding glfw windowing library example)
 https://youtu.be/K3bx7NYSXVk?si=aLZKMY0RPLAdu2FZ
 CMake Tutorial EP 4 | Versioning Source Code
 
+https://youtu.be/BCgnr6Frmmo?si=psnWJQEEWtn4wA1P
+CMake Tutorial EP 5 | Making Libs Optional
+
+https://www.youtube.com/watch?v=x7l31sbQDGk
+CMake Tutorial EP 6 | Installing Your Software
+
 # please execute the following command before ./configure.sh; ./build.sh; ./run.sh
 git submodule add https://github.com/glfw/glfw.git

@@ -1,16 +1,18 @@
 cmake_minimum_required(VERSION 3.13)
 project(testsome VERSION 1.0)
 configure_file(testsomeConfig.h.in testsomeConfig.h)
-add_executable(testsome main.cpp)
-target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_BINARY_DIR})
+
 option(USE_GLFW "graphic" ON)
 if(USE_GLFW)
     add_subdirectory(glfw)
     list(APPEND EXTRA_LIB_DIRS glfw/src)
     list(APPEND EXTRA_INCLUDE_DIRS glfw/include/GLFW)
     list(APPEND EXTRA_LINKS glfw)
-
 endif()
-target_include_directories(${PROJECT_NAME} PUBLIC ${EXTRA_INCLUDE_DIRS})
+add_executable(testsome main.cpp)
+target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_BINARY_DIR} ${EXTRA_INCLUDE_DIRS})
 target_link_directories(testsome PUBLIC /usr/local/lib ${EXTRA_LIB_DIRS})
 target_link_libraries(testsome mearlymath ${EXTRA_LINKS})
+
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+install(FILES "${PROJECT_BINARY_DIR}/testsomeConfig.h" DESTINATION include)
