@@ -16,3 +16,9 @@ target_link_libraries(testsome mearlymath ${EXTRA_LINKS})
 
 install(TARGETS ${PROJECT_NAME} DESTINATION bin)
 install(FILES "${PROJECT_BINARY_DIR}/testsomeConfig.h" DESTINATION include)
+
+include(InstallRequiredSystemLibraries)
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/license.txt")
+set(CPACK_PACKAget_VERSION_MAJOR "$(Tutorial_VERSION_MAJOR)")
+set(CPACK_PACKAget_VERSION_MAJOR "$(Tutorial_VERSION_MINOR)")
+include(CPack)
