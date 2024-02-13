@@ -38,6 +38,7 @@ BASENAME=`basename $FILE` && [[ -n "$DEBUG" ]] && echo "Filename: $BASENAME"
 SPATH="$(cd $DIR; pwd)/$BASENAME" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
 [ ! -f $SPATH ] && [ -n "$NEMD_SCRIPTS" ] && SPATH=$NEMD_SCRIPTS/$BASENAME && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
 [ ! -f $SPATH ] && [ -n "$NEMD_WORKFLOWS" ] && SPATH=$NEMD_WORKFLOWS/$BASENAME && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
+[ ! -f $SPATH ] && [ -n "$ALAMODE_PTOOLS" ] && SPATH=$ALAMODE_PTOOLS/$BASENAME && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
 [ ! -f $SPATH ] && (SPATH=`which $BASENAME`; [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH")
 
 if [ -z $SPATH ]; then

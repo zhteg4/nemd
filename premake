@@ -5,7 +5,7 @@ MODULE=module
 export GIT_EDITOR=vim
 
 # Source code dir while "$(cd "$(dirname "$0")" && pwd)" yields "bin" install of the abs path
-export NEMD_SRC="$(readlink -f premake | xargs dirname)"
+export NEMD_SRC="$(readlink -f $0 | xargs dirname)"
 echo \$NEMD_SRC=$NEMD_SRC
 
 # Bash scripts dir to PATH and $PYTHONPATH
@@ -15,7 +15,9 @@ echo \$NEMD_BASH=$NEMD_BASH
 [[ ":$PYTHONPATH:" != *":$NEMD_BASH:"* ]] && export PYTHONPATH="$NEMD_BASH${PYTHONPATH:+":$PYTHONPATH"}"
 
 # Bash submodule dir
-ALAMODE_BUILD=$NEMD_SRC/submodule/alamode/build
+ALAMODE=$NEMD_SRC/submodule/alamode
+export ALAMODE_PTOOLS=$ALAMODE/alamode/tools && echo "\$ALAMODE_PTOOLS=$ALAMODE/alamode/tools"
+ALAMODE_BUILD=$ALAMODE/build
 ALAMODE_ALM=$ALAMODE_BUILD/alm
 [ -d $ALAMODE_ALM ] && echo \$ALAMODE_ALM=$ALAMODE_ALM &&
   [[ ":$PATH:" != *":$ALAMODE_ALM:"* ]] && PATH="$ALAMODE_ALM${PATH:+":$PATH"}"
