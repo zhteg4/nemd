@@ -2,5 +2,5 @@
 	path = practice/cmake/src/TestSome2/glfw
 	url = https://github.com/glfw/glfw.git
 [submodule "practice/alamode/alamode"]
-	path = practice/alamode/alamode
+	path = submodule/alamode/alamode
 	url = https://github.com/ttadano/alamode.git
