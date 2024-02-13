@@ -4,3 +4,7 @@
 [submodule "practice/alamode/alamode"]
 	path = submodule/alamode/alamode
 	url = https://github.com/ttadano/alamode.git
+[submodule "submodule/lammps/lammps"]
+	path = submodule/lammps/lammps
+	url = https://github.com/lammps/lammps.git
+	branch = develop
