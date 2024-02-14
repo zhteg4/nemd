@@ -107,8 +107,8 @@ alm si_alm0.in > alm.log
 # Generate structure files of LAMMPS
 mkdir displace; cd displace/
 
-run_nemd displace.py --LAMMPS ${Si_LAMMPS}/Si222.lammps --prefix harm --mag 0.01 -pf ${Si_LAMMPS}/si222.pattern_HARMONIC >> run.log
-run_nemd displace.py --LAMMPS ${Si_LAMMPS}/Si222.lammps --prefix cubic --mag 0.04 -pf ${Si_LAMMPS}/si222.pattern_ANHARM3 >> run.log
+run_nemd displace.py --LAMMPS ${Si_LAMMPS}/Si222.lammps --prefix harm --mag 0.01 -pf ../si222.pattern_HARMONIC >> run.log
+run_nemd displace.py --LAMMPS ${Si_LAMMPS}/Si222.lammps --prefix cubic --mag 0.04 -pf ../si222.pattern_ANHARM3 >> run.log
 
 cp ${Si_LAMMPS}/Si.sw .
 cp ${Si_LAMMPS}/in.sw .

@@ -1,0 +1,1218 @@
+Running python3  /Users/tzhang/git/nemd/submodule/alamode/alamode/tools/displace.py --LAMMPS /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si222.lammps --prefix harm --mag 0.01 -pf ../si222.pattern_HARMONIC
+*****************************************************************
+    displace.py --  Generator of displaced configurations        
+                      Version. 1.2.1                             
+*****************************************************************
+
+ Output format                  : LAMMPS structure format
+ Structure before displacements : /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si222.lammps
+ Output file names              : harm{counter}.lammps
+ Magnitude of displacements     : 0.01 Angstrom
+ Number of atoms                : 64
+
+ Displacement mode              : Finite displacement
+
+ 1 displacement pattern are generated from
+ the given *.pattern_* files
+
+ Number of displacements        : 1
+-----------------------------------------------------------------
+
+All input files are created.
+Running python3  /Users/tzhang/git/nemd/submodule/alamode/alamode/tools/displace.py --LAMMPS /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si222.lammps --prefix cubic --mag 0.04 -pf ../si222.pattern_ANHARM3
+*****************************************************************
+    displace.py --  Generator of displaced configurations        
+                      Version. 1.2.1                             
+*****************************************************************
+
+ Output format                  : LAMMPS structure format
+ Structure before displacements : /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si222.lammps
+ Output file names              : cubic{counter}.lammps
+ Magnitude of displacements     : 0.04 Angstrom
+ Number of atoms                : 64
+
+ Displacement mode              : Finite displacement
+
+ 20 displacement pattern are generated from
+ the given *.pattern_* files
+
+ Number of displacements        : 20
+-----------------------------------------------------------------
+
+All input files are created.
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.006 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.42162      0             -277.42162      17832.263    
+Loop time of 1.357e-06 on 1 procs for 0 steps with 64 atoms
+
+147.4% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.357e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.40798      0             -277.40798      17847.815    
+Loop time of 1.093e-06 on 1 procs for 0 steps with 64 atoms
+
+91.5% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.093e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39343      0             -277.39343      17864.452    
+Loop time of 2.125e-06 on 1 procs for 0 steps with 64 atoms
+
+94.1% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 2.125e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39292      0             -277.39292      17865.58     
+Loop time of 1.116e-06 on 1 procs for 0 steps with 64 atoms
+
+89.6% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.116e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.002 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39391      0             -277.39391      17863.258    
+Loop time of 2.063e-06 on 1 procs for 0 steps with 64 atoms
+
+96.9% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 2.063e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39301      0             -277.39301      17865.519    
+Loop time of 1.787e-06 on 1 procs for 0 steps with 64 atoms
+
+111.9% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.787e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39321      0             -277.39321      17864.966    
+Loop time of 1.437e-06 on 1 procs for 0 steps with 64 atoms
+
+69.6% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.437e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39368      0             -277.39368      17863.816    
+Loop time of 1.602e-06 on 1 procs for 0 steps with 64 atoms
+
+124.8% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.602e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39366      0             -277.39366      17863.845    
+Loop time of 1.182e-06 on 1 procs for 0 steps with 64 atoms
+
+84.6% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.182e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39319      0             -277.39319      17864.989    
+Loop time of 2.155e-06 on 1 procs for 0 steps with 64 atoms
+
+92.8% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 2.155e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.40095      0             -277.40095      17855.538    
+Loop time of 1.929e-06 on 1 procs for 0 steps with 64 atoms
+
+103.7% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.929e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.38561      0             -277.38561      17873.432    
+Loop time of 2.149e-06 on 1 procs for 0 steps with 64 atoms
+
+93.1% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 2.149e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.002 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.38626      0             -277.38626      17873.082    
+Loop time of 2.261e-06 on 1 procs for 0 steps with 64 atoms
+
+88.5% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 2.261e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.002 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39821      0             -277.39821      17855.228    
+Loop time of 2.142e-06 on 1 procs for 0 steps with 64 atoms
+
+93.4% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 2.142e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.38837      0             -277.38837      17874.029    
+Loop time of 1.156e-06 on 1 procs for 0 steps with 64 atoms
+
+86.5% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.156e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.38895      0             -277.38895      17873.182    
+Loop time of 2.194e-06 on 1 procs for 0 steps with 64 atoms
+
+136.7% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 2.194e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39821      0             -277.39821      17855.228    
+Loop time of 1.082e-06 on 1 procs for 0 steps with 64 atoms
+
+92.4% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.082e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39355      0             -277.39355      17864.118    
+Loop time of 1.119e-06 on 1 procs for 0 steps with 64 atoms
+
+89.4% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.119e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.3933       0             -277.3933       17864.721    
+Loop time of 1.497e-06 on 1 procs for 0 steps with 64 atoms
+
+66.8% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.497e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39334      0             -277.39334      17864.663    
+Loop time of 1.477e-06 on 1 procs for 0 steps with 64 atoms
+
+135.4% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.477e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+Reading data file ...
+  triclinic box = (0 0 0) to (10.8 10.8 10.8) with tilt (0 0 0)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.001 seconds
+Reading sw potential file Si.sw with DATE: 2007-06-11
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.77118
+  ghost atom cutoff = 5.77118
+  binsize = 2.88559, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair sw, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Setting up Verlet run ...
+  Unit style    : metal
+  Current step  : 0
+  Time step     : 0.001
+Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -277.39355      0             -277.39355      17864.118    
+Loop time of 2.109e-06 on 1 procs for 0 steps with 64 atoms
+
+94.8% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 2.109e-06  |            |       |100.00
+
+Nlocal:             64 ave          64 max          64 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:            557 ave         557 max         557 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:         2176 ave        2176 max        2176 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 2176
+Ave neighs/atom = 34
+Neighbor list builds = 0
+Dangerous builds = 0
+Total wall time: 0:00:00
