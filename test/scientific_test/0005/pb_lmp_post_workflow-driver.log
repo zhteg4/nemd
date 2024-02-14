@@ -1,7 +1,7 @@
 ..........Command Options..........
-cru: ['[Ar]']
+cru: [Ar]
 cru_num: None
-mol_num: [123]
+mol_num: 123
 seed: None
 cell: grow
 density: 0.5
@@ -21,24 +21,24 @@ interactive: False
 jobname: polymer_builder
 debug: False
 cpu: 4
-task: ['msd']
+task: msd
 sel: None
 last_pct: 0.4
-slice: [0, 1000000, 200]
+slice: 0, 1000000, 200
 state_num: 4
 clean: False
-jtype: ['task', 'aggregator']
+jtype: task, aggregator
 prj_path: .
-JobStart: 10:17:36 06/02/23
+JobStart: 23:01:07 02/13/24
 ...................................
 4 / 4 completed jobs.
 Task timing breakdown:
-polymer_builder: 8 seconds, 9 seconds, 9 seconds, 9 seconds; 8.75 seconds (ave)
-lammps_runner: 1 minute and 32 seconds, 1 minute and 32 seconds, 1 minute and 32 seconds, 1 minute and 32 seconds; 1 minute and 32 seconds (ave)
-custom_dump: 21 seconds, 22 seconds, 21 seconds, 21 seconds; 21.25 seconds (ave)
+polymer_builder: 1 minute and 19 seconds, 1 minute and 20 seconds, 1 minute and 19 seconds, 1 minute and 19 seconds; 1 minute and 19.25 seconds (ave)
+lammps_runner: 3 minutes and 4 seconds, 3 minutes and 4 seconds, 3 minutes and 4 seconds, 3 minutes and 4 seconds; 3 minutes and 4 seconds (ave)
+custom_dump: 38 seconds, 37 seconds, 37 seconds, 38 seconds; 37.5 seconds (ave)
 4 jobs found for aggregation.
 Results for mean squared displacement saved to pb_lmp_post_workflow_msd.csv
-0.1894 ± 0.0005208 cm^2/s (R-squared: 0.9998) linear fit of [800.0000 6400.0000] ps
+0.1911 ± 0.0005617 cm^2/s (R-squared: 0.9998) linear fit of [800.0000 6400.0000] ps
 Mean squared displacement figure saved as pb_lmp_post_workflow_msd.png
 finished.
-10:19:54 06/02/23
+23:06:28 02/13/24

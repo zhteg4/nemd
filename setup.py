@@ -11,7 +11,7 @@ from setuptools.command.install import install
 
 
 class CustomInstallCommand(install):
-    LMP_PY = 'lmp_mpi -h | grep PYTHON'
+    LMP_PY = 'lmp_serial -h | grep PYTHON'
     STD_CMAKE_ARGS = '*std_cmake_args\n'
     DPKG_PYTHON = '"-DPKG_PYTHON=yes",\n'
     PYTHON_STD = f'{DPKG_PYTHON} {STD_CMAKE_ARGS}'
