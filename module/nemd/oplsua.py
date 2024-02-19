@@ -519,8 +519,8 @@ class OplsTyper:
         ]
         polm_cnnt = [self.mol.GetAtomWithIdx(x).GetDegree() for x in match]
         match = [
-                x if y == z else None
-                for x, y, z in zip(match, frag_cnnt, polm_cnnt)
+            x if y == z else None
+            for x, y, z in zip(match, frag_cnnt, polm_cnnt)
         ]
         return match
 
@@ -1057,10 +1057,12 @@ class LammpsIn(fileutils.LammpsInput):
         self.angle_style = self.HARMONIC
         self.dihedral_style = self.OPLS
         self.improper_style = self.CVFF
-        lj_cut, coul_cut = self.options.lj_cut, self.options.coul_cut
-        lj_coul_cut = f"{lj_cut} {coul_cut}"
+        self.lj_cut = getattr(self.options, 'lj_cut', self.DEFAULT_LJ_CUT)
+        self.coul_cut = getattr(self.options, 'coul_cut',
+                                self.DEFAULT_COUL_CUT)
+        lj_coul_cut = f"{self.lj_cut} {self.coul_cut}"
         self.pair_style = {
-            self.LJ_CUT: f"{self.LJ_CUT} {lj_cut}",
+            self.LJ_CUT: f"{self.LJ_CUT} {self.lj_cut}",
             self.LJ_CUT_COUL_LONG: f"{self.LJ_CUT_COUL_LONG} {lj_coul_cut}"
         }
         self.in_fh = None
@@ -1809,7 +1811,7 @@ class LammpsData(LammpsIn):
             # PBC should be 2x larger than the cutoff, otherwise one particle
             # can interact with another particle within its cutoff twice: within
             # the box and across the PBC.
-            cut_x2 = min([self.options.lj_cut, self.options.coul_cut]) * 2
+            cut_x2 = min([self.lj_cut, self.coul_cut]) * 2
             min_box = (cut_x2, cut_x2, cut_x2,)  # yapf: disable
         if buffer is None:
             buffer = self.BUFFER  # yapf: disable

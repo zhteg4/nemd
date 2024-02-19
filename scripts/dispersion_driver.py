@@ -9,10 +9,13 @@ import scipy
 import crystals
 import itertools
 
+import numpy as np
+from rdkit import Chem
 from scipy import constants
 from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
+from nemd import oplsua
 from nemd import parserutils
 from nemd import environutils
 
@@ -65,8 +68,10 @@ class AlaWriter(object):
     NKD = 'NKD'
     KD = 'KD'
 
-    SUGGEST = 'suggest'
+    OPTIMIZE = 'optimize'
+    DFSET = 'DFSET'
 
+    SUGGEST = 'suggest'
     INTERACTION = 'interaction'
     NORDER = 'NORDER'
 
@@ -92,7 +97,7 @@ class AlaWriter(object):
         self.setCell()
         self.setCutoff()
         self.setPosition()
-        self.writeDspIn()
+        self.write()
 
     def setSuperCell(self):
         ucell_xtal = crystals.Crystal.from_database('Si')
@@ -109,6 +114,11 @@ class AlaWriter(object):
             f"{self.NAT} = {nat}", f"{self.NKD} = {nkd}", f"{self.KD} = {kd}"
         ]
         self.data[self.GENERAL] = general
+
+    def setOptimize(self):
+        if self.mode != self.OPTIMIZE:
+            return
+        self.data[self.DFSET] = f"{self.DFSET}_harmonic"
 
     def setInteraction(self):
         norder = 1  # 1: harmonic, 2: cubic, ..
@@ -130,10 +140,7 @@ class AlaWriter(object):
         return ' '.join(map('{:.8f}'.format, numbers))
 
     def setCutoff(self):
-        pairs = [
-            x
-            for x in itertools.combinations_with_replacement(self.elements, 2)
-        ]
+        pairs = itertools.combinations_with_replacement(self.elements, 2)
         self.data[self.CUTOFF] = [f"{x}-{y} 7.3" for x, y in pairs]
 
     def setPosition(self):
@@ -146,7 +153,7 @@ class AlaWriter(object):
         ]
         self.data[self.POSITION] = pos
 
-    def writeDspIn(self):
+    def write(self):
         with open(self.filename, 'w') as fh:
             for key, val in self.data.items():
                 if not val:
@@ -157,11 +164,134 @@ class AlaWriter(object):
                 fh.write(f"{self.FORWARDSLASH}\n")
                 fh.write("\n")
 
+    def getMol(self):
+        atoms = [x for x in self.scell.atoms]
+        atoms = sorted(atoms, key=lambda x: tuple(x.coords_fractional))
+        mol = Chem.Mol()
+        emol = Chem.EditableMol(mol)
+        idxs = [emol.AddAtom(Chem.rdchem.Atom(x.atomic_number)) for x in atoms]
+        mol = emol.GetMol()
+        cfm = Chem.rdchem.Conformer(mol.GetNumAtoms())
+        [cfm.SetAtomPosition(x, atoms[x].coords_cartesian) for x in idxs]
+        mol.AddConformer(cfm)
+        return Mol(mol,
+                   lattice_parameters=self.scell.lattice_parameters,
+                   dimensions=self.scell.dimensions)
+
+
+class LammpsData(oplsua.LammpsData):
+
+    def writeData(self, adjust_coords=False):
+
+        with open(self.lammps_data, 'w') as self.data_fh:
+            self.setAtoms()
+            self.writeDescription()
+            self.writeTopoType()
+            self.writeBox()
+            self.writeMasses()
+            self.writeAtoms()
+
+    def setAtoms(self):
+        super().setAtoms()
+        elements = [
+            y.GetAtomicNum() for x in self.mols.values() for y in x.GetAtoms()
+        ]
+        self.elements = list(set(elements))
+
+    def writeDescription(self):
+        """
+        Write the lammps description section, including the number of atom, bond,
+        angle etc.
+        """
+        if self.mols is None:
+            raise ValueError(f"Mols are not set.")
+
+        self.data_fh.write(f"{self.LAMMPS_DESCRIPTION}\n\n")
+        atom_nums = [len(x.GetAtoms()) for x in self.mols.values()]
+        self.data_fh.write(f"{sum(atom_nums)} {self.ATOMS}\n\n")
+
+    def writeTopoType(self):
+        """
+        Write topologic data. e.g. number of atoms, angles...
+        """
+        self.data_fh.write(f"{len(self.elements)} {self.ATOM_TYPES}\n\n")
+
+    def writeBox(self, min_box=None, buffer=None):
+        """
+        Write box information.
+
+        :param min_box list: minimum box size
+        :param buffer list: buffer in three dimensions
+        """
+
+        if self.mols and bool(self.mols[1].lattice_parameters):
+            param = self.mols[1].lattice_parameters[:3]
+            boxes = np.array(param) * self.mols[1].dimensions
+            for dim in range(3):
+                self.data_fh.write(
+                    f"{0:.4f} {boxes[dim]:.4f} {self.LO_HI[dim]}\n")
+            # FIXME https://docs.lammps.org/Howto_triclinic.html
+            self.data_fh.write("0.0000 0.0000 0.0000 xy xz yz\n")
+            self.data_fh.write("\n")
+            return
+        super().writeBox()
+
+    def writeMasses(self):
+        """
+        Write out mass information.
+        """
+        self.data_fh.write(f"{self.MASSES}\n\n")
+        masses = list(
+            set([
+                y.GetMass() for x in self.mols.values() for y in x.GetAtoms()
+            ]))
+        for id, mass in enumerate(masses, 1):
+            self.data_fh.write(f"{id} {mass}\n")
+        self.data_fh.write(f"\n")
+
+    def writeAtoms(self):
+        """
+        Write atom coefficients.
+
+        :param comments bool: If True, additional descriptions including element
+            sysmbol are written after each atom line
+        """
+
+        self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
+        for mol_id, mol in self.mols.items():
+            data = np.zeros((mol.GetNumAtoms(), 5))
+            conformer = mol.GetConformer()
+            data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]
+            data[:, 1] = mol_id
+            data[:, 2:] = conformer.GetPositions()
+            np.savetxt(self.data_fh, data, fmt='%i %i %.3f %.3f %.3f')
+        self.data_fh.write(f"\n")
+
+
+class Mol(Chem.rdchem.Mol):
+
+    LATTICE_PARAMETERS = 'lattice_parameters'
+    DIMENSIONS = 'dimensions'
+
+    def __init__(self, *args, **kwargs):
+        self.lattice_parameters = kwargs.pop(self.LATTICE_PARAMETERS, None)
+        self.dimensions = kwargs.pop(self.DIMENSIONS, (
+            1,
+            1,
+            1,
+        ))
+        super().__init__(*args, **kwargs)
+
 
 class Dispersion(object):
 
     IN = '.in'
     DSP_IN = f'_dsp{IN}'
+
+    SUBMODULE_PATH = environutils.get_submodule_path()
+    ALAMODE = environutils.ALAMODE
+    ALAMODE_SRC = os.path.join(SUBMODULE_PATH, ALAMODE, ALAMODE)
+    Si_LAMMPS = os.path.join(ALAMODE_SRC, 'example', 'Si_LAMMPS')
 
     def __init__(self, options):
         """
@@ -174,6 +304,8 @@ class Dispersion(object):
     def run(self):
         ala_writer = AlaWriter(self.dsp_in)
         ala_writer.run()
+        mol = ala_writer.getMol()
+        LammpsData({1: mol}, oplsua.get_opls_parser(), 'wa').writeData()
 
     @classmethod
     def getOutfiles(cls, logfile):
