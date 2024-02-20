@@ -1,0 +1,20 @@
+..........Command Options..........
+scaled_range: (0.9, 1.1, 0.05)
+name: Si
+dimension: (1, 1, 1)
+scale_factor: (1, 1, 1)
+interactive: False
+jobname: crystal_builder
+debug: False
+cpu: 4
+clean: True
+jtype: task, aggregator
+prj_path: .
+JobStart: 16:42:09 02/20/24
+...................................
+5 / 5 completed jobs.
+Task timing breakdown:
+crystal_builder: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
+lammps_runner: 8 seconds, 8 seconds, 8 seconds, 8 seconds, 8 seconds; 8 seconds (ave)
+finished.
+16:42:26 02/20/24

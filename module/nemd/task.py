@@ -431,20 +431,21 @@ class Crystal_Builder(BaseTask):
 
     def setScaledFactor(self):
         """
-        Set the random seed based on state id so that each task starts from a
-        different state in phase space and the task collection can better
-        approach the ergodicity.
+        Set the scaled factor so that each cell starts from different vectors.
         """
-        # scaled_factor = self.job._statepoint[self.STATE_ID]
-        scaled_factor = jobutils.get_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SCALED_FACTOR, 1)
+
+        scaled_factor = jobutils.get_arg(self.doc[self.KNOWN_ARGS],
+                                         self.FLAG_SCALED_FACTOR, 1)
         state = self.job.statepoint()
-        scaled_factor = float(scaled_factor) * float(state.get(self.STATE_ID, state.get(self.ID)))
-        jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SCALED_FACTOR, scaled_factor)
+        scaled_factor = float(scaled_factor) * float(
+            state.get(self.STATE_ID, state.get(self.ID)))
+        jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SCALED_FACTOR,
+                         scaled_factor)
 
     @staticmethod
     def operator(*arg, **kwargs):
         """
-        Get the polymer builder operation command.
+        Get the crystal builder operation command.
 
         :return str: the command to run a task.
         """

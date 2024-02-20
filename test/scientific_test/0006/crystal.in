@@ -1,0 +1,7 @@
+units metal
+atom_style atomic
+boundary p p p
+read_data crystal.data
+pair_style sw
+pair_coeff * * /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si.sw Si
+run 0

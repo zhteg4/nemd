@@ -1,9 +1,7 @@
-# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
-# All rights reserved.
 # This software is licensed under the BSD 3-Clause License.
-# Authors: Teng Zhang (2022010236@hust.edu.cn)
+# Authors: Teng Zhang (zhteg4@gmail.com)
 """
-This workflow driver runs crystal builder, lammps, and xxx.
+This workflow driver runs crystal builder, lammps, and log analyser.
 """
 import os
 import sys
@@ -92,17 +90,6 @@ class Runner(jobcontrol.Runner):
             job.document[self.ARGS] = self.argv[:]
             job.document.update({self.PREREQ: self.prereq})
             job.init()
-
-    # def setAggregation(self):
-    #     """
-    #     Aggregate post analysis jobs.
-    #     """
-    #     super().setAggregation()
-    #     name = f"{self.jobname}{self.SEP}{self.CUSTOM_DUMP}"
-    #     Custom_Dump.getAgg(name=name,
-    #                        tname=self.CUSTOM_DUMP,
-    #                        log=log,
-    #                        clean=self.options.clean)
 
 
 def get_parser():
