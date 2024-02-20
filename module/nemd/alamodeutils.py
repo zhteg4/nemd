@@ -8,6 +8,7 @@ import itertools
 from nemd import symbols
 from scipy import constants
 
+
 class AlaWriter(object):
     """
     """

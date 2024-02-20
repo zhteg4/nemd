@@ -1,6 +1,7 @@
 import numpy as np
 from nemd import oplsua
 
+
 class LammpsData(oplsua.LammpsData):
 
     METAL = 'metal'
@@ -36,7 +37,6 @@ class LammpsData(oplsua.LammpsData):
 
     def writeEnergy(self):
         self.in_fh.write("run 0\n")
-
 
     def writeData(self, adjust_coords=False):
 

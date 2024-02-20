@@ -8,18 +8,25 @@ from rdkit import Chem
 from nemd import rdkitutils
 from nemd import constants as nconstants
 
+
 class CrystalBuilder(object):
 
-    def __init__(self, name, dim=nconstants.ONE_ONE_ONE):
+    def __init__(self,
+                 name,
+                 dim=nconstants.ONE_ONE_ONE,
+                 scale_factor=nconstants.ONE_ONE_ONE):
         self.name = name
         self.dim = dim
+        self.scale_factor = scale_factor
         self.scell = None
 
     def run(self):
         self.setSuperCell()
 
     def setSuperCell(self):
-        ucell_xtal = crystals.Crystal.from_database(self.name)
+        cell = crystals.Crystal.from_database(self.name)
+        vect = [x * y for x, y in zip(cell.lattice_vectors, self.scale_factor)]
+        ucell_xtal = crystals.Crystal(cell, vect)
         self.scell = ucell_xtal.supercell(*self.dim)
 
     def getMol(self):
@@ -33,6 +40,5 @@ class CrystalBuilder(object):
         [cfm.SetAtomPosition(x, atoms[x].coords_cartesian) for x in idxs]
         mol.AddConformer(cfm)
         return rdkitutils.Mol(mol,
-                   lattice_parameters=self.scell.lattice_parameters,
-                   dimensions=self.scell.dimensions)
-
+                              lattice_parameters=self.scell.lattice_parameters,
+                              dimensions=self.scell.dimensions)

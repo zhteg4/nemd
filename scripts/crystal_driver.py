@@ -1,26 +1,27 @@
 # This software is licensed under the BSD 3-Clause License.
 # Authors: Teng Zhang (zhteg4@gmail.com)
 """
-This driver to perform phonon calculations.
+This driver to build crystal.
 """
 import os
 import sys
 
+from nemd import xtal
 from nemd import jobutils
 from nemd import logutils
+from nemd import constants
+from nemd import stillinger
 from nemd import parserutils
 from nemd import environutils
-from nemd import stillinger
-from nemd import xtal
-from nemd import alamodeutils
-from nemd import constants
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
 
-
 FlAG_NAME = '-name'
 FlAG_DIMENSION = '-dimension'
+FlAG_DELTA = '-delta'
+FlAG_NAME = '-name'
+FLAG_SCALED_FACTOR = '-scale_factor'
 
 
 def log_debug(msg):
@@ -55,8 +56,7 @@ def log_error(msg):
     sys.exit(1)
 
 
-
-class Dispersion(object):
+class CrystalBuilder(object):
 
     SUBMODULE_PATH = environutils.get_submodule_path()
     ALAMODE = environutils.ALAMODE
@@ -71,14 +71,19 @@ class Dispersion(object):
         self.options = options
 
     def run(self):
-        xbuild = xtal.CrystalBuilder(self.options.name, dim=self.options.dimension)
+        xbuild = xtal.CrystalBuilder(self.options.name,
+                                     dim=self.options.dimension,
+                                     scale_factor=self.options.scale_factor)
         xbuild.run()
-        ala_writer = alamodeutils.AlaWriter(xbuild.scell, self.options.jobname)
-        ala_writer.run()
+        # ala_writer = alamodeutils.AlaWriter(xbuild.scell, self.options.jobname)
+        # ala_writer.run()
         mol = xbuild.getMol()
-        lmp_dat = stillinger.LammpsData({1: mol}, self.SI_FF, self.options.jobname)
+        lmp_dat = stillinger.LammpsData({1: mol}, self.SI_FF,
+                                        self.options.jobname)
         lmp_dat.writeData()
+        log(f"LAMMPS data file written as {lmp_dat.lammps_data}")
         lmp_dat.writeLammpsIn()
+        log(f"LAMMPS input script written as {lmp_dat.lammps_in}")
 
     @classmethod
     def getOutfiles(cls, logfile):
@@ -144,6 +149,10 @@ def get_parser(parser=None):
     # crystals.Crystal.builtins
     parser.add_argument(FlAG_NAME, default='Si', choices=['Si'])
     parser.add_argument(FlAG_DIMENSION, default=constants.ONE_ONE_ONE)
+    parser.add_argument(FLAG_SCALED_FACTOR,
+                        nargs='+',
+                        default=constants.ONE_ONE_ONE,
+                        type=parserutils.type_positive_float)
     return parser
 
 
@@ -156,6 +165,12 @@ def validate_options(argv):
     """
     parser = get_parser()
     options = parser.parse_args(argv)
+    if len(options.scale_factor) == 2:
+        parser.error(f"{FLAG_SCALED_FACTOR} is three floats for each lattice "
+                     f"vector. ({options.scale_factor} found)")
+    options.scale_factor = options.scale_factor[:3]
+    if len(options.scale_factor) == 1:
+        options.scale_factor = options.scale_factor * 3
     return options
 
 
@@ -168,8 +183,8 @@ def main(argv):
     options = validate_options(argv)
     logger = logutils.createDriverLogger(jobname=options.jobname)
     logutils.logOptions(logger, options)
-    dispersion = Dispersion(options)
-    dispersion.run()
+    xtal_builder = CrystalBuilder(options)
+    xtal_builder.run()
     log_file = os.path.basename(logger.handlers[0].baseFilename)
     jobutils.add_outfile(log_file, options.jobname, set_file=True)
     log('Finished.', timestamp=True)

@@ -54,6 +54,7 @@ class Mol(Chem.rdchem.Mol):
         param = self.lattice_parameters[:3]
         return np.array(param) * self.dimensions
 
+
 def get_mol_from_smiles(smiles_str, embeded=True):
     with rdkit_preserve_hs() as ps:
         mol = Chem.MolFromSmiles(smiles_str, ps)
