@@ -9,11 +9,13 @@ import os
 import sys
 import rdkit
 import logging
+import numpy as np
 from rdkit import Chem
 from rdkit import rdBase
 from rdkit import RDLogger
 from rdkit.Chem import AllChem
 from contextlib import contextmanager
+from nemd import constants
 
 
 @contextmanager
@@ -35,6 +37,22 @@ def rdkit_warnings_ignored():
     finally:
         lg.setLevel(RDLogger.WARNING)
 
+
+class Mol(Chem.rdchem.Mol):
+
+    LATTICE_PARAMETERS = 'lattice_parameters'
+    DIMENSIONS = 'dimensions'
+
+    def __init__(self, *args, **kwargs):
+        self.lattice_parameters = kwargs.pop(self.LATTICE_PARAMETERS, None)
+        self.dimensions = kwargs.pop(self.DIMENSIONS, constants.ONE_ONE_ONE) # yapf: disable
+        super().__init__(*args, **kwargs)
+
+    def getBox(self):
+        if self.lattice_parameters is None:
+            return
+        param = self.lattice_parameters[:3]
+        return np.array(param) * self.dimensions
 
 def get_mol_from_smiles(smiles_str, embeded=True):
     with rdkit_preserve_hs() as ps:

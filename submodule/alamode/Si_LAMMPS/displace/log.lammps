@@ -34,9 +34,9 @@ Neighbor list info ...
 Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
    Step          Temp          E_pair         E_mol          TotEng         Press     
          0   0             -277.39355      0             -277.39355      17864.118    
-Loop time of 2.109e-06 on 1 procs for 0 steps with 64 atoms
+Loop time of 1.925e-06 on 1 procs for 0 steps with 64 atoms
 
-94.8% CPU use with 1 MPI tasks x no OpenMP threads
+103.9% CPU use with 1 MPI tasks x no OpenMP threads
 
 MPI task timing breakdown:
 Section |  min time  |  avg time  |  max time  |%varavg| %total
@@ -46,7 +46,7 @@ Neigh   | 0          | 0          | 0          |   0.0 |  0.00
 Comm    | 0          | 0          | 0          |   0.0 |  0.00
 Output  | 0          | 0          | 0          |   0.0 |  0.00
 Modify  | 0          | 0          | 0          |   0.0 |  0.00
-Other   |            | 2.109e-06  |            |       |100.00
+Other   |            | 1.925e-06  |            |       |100.00
 
 Nlocal:             64 ave          64 max          64 min
 Histogram: 1 0 0 0 0 0 0 0 0 0

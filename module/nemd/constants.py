@@ -6,3 +6,4 @@
 This module contains shared numerical constants.
 """
 LARGE_NUM = 1000000
+ONE_ONE_ONE = (1, 1, 1,) # yapf: disable

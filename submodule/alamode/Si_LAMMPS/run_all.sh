@@ -103,7 +103,6 @@ EOF
 
 alm si_alm0.in > alm.log
 
-
 # Generate structure files of LAMMPS
 mkdir displace; cd displace/
 
@@ -362,7 +361,7 @@ cat << EOF > phband.in
 EOF
 
 anphon phband.in > phband.log
-
+exit 1
 # Thermal conductivity
 cat << EOF > RTA.in
 &general

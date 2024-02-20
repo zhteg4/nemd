@@ -5,7 +5,7 @@
 
  Number of OpenMP threads = 8
 
- Job started at Wed Feb 14 12:19:54 2024
+ Job started at Wed Feb 14 15:48:38 2024
 
 
  Input variables:
@@ -118,7 +118,7 @@
     64   8.750000e-01   8.750000e-01   6.250000e-01    1
 
 
-  Time Elapsed: 0.00321 sec.
+  Time Elapsed: 0.088051 sec.
 
  -------------------------------------------------------------------
 
@@ -167,7 +167,7 @@
     31 |    55   63
     32 |    56   64
 
-  Time Elapsed: 0.211771 sec.
+  Time Elapsed: 0.309982 sec.
 
  -------------------------------------------------------------------
 
@@ -221,7 +221,7 @@
                8   14.4292 (  3) -  14( Si)  42( Si)  45( Si)
                9   17.6721 (  1) -  46( Si)
 
-  Time Elapsed: 0.282589 sec.
+  Time Elapsed: 0.377777 sec.
 
  -------------------------------------------------------------------
 
@@ -233,7 +233,7 @@
   Number of  HARMONIC FCs : 7
   Number of   ANHARM3 FCs : 36
 
-  Time Elapsed: 0.350485 sec.
+  Time Elapsed: 0.440798 sec.
 
  -------------------------------------------------------------------
 
@@ -253,7 +253,7 @@
   ANHARM3 : si222.pattern_ANHARM3
 
 
- Job finished at Wed Feb 14 12:19:55 2024
+ Job finished at Wed Feb 14 15:48:38 2024
 
  +-----------------------------------------------------------------+
  +                         Program ALM                             +
@@ -262,7 +262,7 @@
 
  Number of OpenMP threads = 8
 
- Job started at Wed Feb 14 12:20:00 2024
+ Job started at Wed Feb 14 15:48:43 2024
 
 
  Input variables:
@@ -389,7 +389,7 @@
     64   8.750000e-01   8.750000e-01   6.250000e-01    1
 
 
-  Time Elapsed: 0.003803 sec.
+  Time Elapsed: 0.003868 sec.
 
  -------------------------------------------------------------------
 
@@ -438,7 +438,7 @@
     31 |    55   63
     32 |    56   64
 
-  Time Elapsed: 0.215973 sec.
+  Time Elapsed: 0.213865 sec.
 
  -------------------------------------------------------------------
 
@@ -489,7 +489,7 @@
                8   14.4292 (  3) -  14( Si)  42( Si)  45( Si)
                9   17.6721 (  1) -  46( Si)
 
-  Time Elapsed: 0.278688 sec.
+  Time Elapsed: 0.275253 sec.
 
  -------------------------------------------------------------------
 
@@ -500,7 +500,7 @@
 
   Number of  HARMONIC FCs : 7
 
-  Time Elapsed: 0.284755 sec.
+  Time Elapsed: 0.281442 sec.
 
  -------------------------------------------------------------------
 
@@ -527,7 +527,7 @@
 
   Number of free HARMONIC FCs : 6
 
-  Time Elapsed: 0.288003 sec.
+  Time Elapsed: 0.284638 sec.
 
  -------------------------------------------------------------------
 
@@ -552,7 +552,7 @@
   Residual sum of squares for the solution: 3.19165e-05
   Fitting error (%) : 0.370372
 
-  Time Elapsed: 0.297862 sec.
+  Time Elapsed: 0.294959 sec.
 
  -------------------------------------------------------------------
 
@@ -561,7 +561,7 @@
  Force constants in a human-readable format : si222_harm.fcs
  Input data for the phonon code ANPHON      : si222_harm.xml
 
- Job finished at Wed Feb 14 12:20:00 2024
+ Job finished at Wed Feb 14 15:48:43 2024
 
  +-----------------------------------------------------------------+
  +                         Program ALM                             +
@@ -570,7 +570,7 @@
 
  Number of OpenMP threads = 8
 
- Job started at Wed Feb 14 12:20:00 2024
+ Job started at Wed Feb 14 15:48:43 2024
 
 
  Input variables:
@@ -697,7 +697,7 @@
     64   8.750000e-01   8.750000e-01   6.250000e-01    1
 
 
-  Time Elapsed: 0.014773 sec.
+  Time Elapsed: 0.014852 sec.
 
  -------------------------------------------------------------------
 
@@ -746,7 +746,7 @@
     31 |    55   63
     32 |    56   64
 
-  Time Elapsed: 0.235011 sec.
+  Time Elapsed: 0.230347 sec.
 
  -------------------------------------------------------------------
 
@@ -800,7 +800,7 @@
                8   14.4292 (  3) -  14( Si)  42( Si)  45( Si)
                9   17.6721 (  1) -  46( Si)
 
-  Time Elapsed: 0.304518 sec.
+  Time Elapsed: 0.299692 sec.
 
  -------------------------------------------------------------------
 
@@ -812,7 +812,7 @@
   Number of  HARMONIC FCs : 7
   Number of   ANHARM3 FCs : 36
 
-  Time Elapsed: 0.367988 sec.
+  Time Elapsed: 0.364398 sec.
 
  -------------------------------------------------------------------
 
@@ -846,7 +846,7 @@
   Number of free HARMONIC FCs : 0
   Number of free  ANHARM3 FCs : 27
 
-  Time Elapsed: 0.436941 sec.
+  Time Elapsed: 0.4333 sec.
 
  -------------------------------------------------------------------
 
@@ -871,7 +871,7 @@
   Residual sum of squares for the solution: 0.000134755
   Fitting error (%) : 0.0619962
 
-  Time Elapsed: 0.834031 sec.
+  Time Elapsed: 0.836174 sec.
 
  -------------------------------------------------------------------
 
@@ -880,5 +880,5 @@
  Force constants in a human-readable format : si222_cubic.fcs
  Input data for the phonon code ANPHON      : si222_cubic.xml
 
- Job finished at Wed Feb 14 12:20:01 2024
+ Job finished at Wed Feb 14 15:48:44 2024
 
