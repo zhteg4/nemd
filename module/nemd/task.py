@@ -417,6 +417,44 @@ class Polymer_Builder(BaseTask):
         return cmd
 
 
+class Crystal_Builder(BaseTask):
+
+    import crystal_builder_driver as DRIVER
+    FLAG_SCALED_FACTOR = DRIVER.FLAG_SCALED_FACTOR
+
+    def run(self):
+        """
+        The main method to run.
+        """
+        super().run()
+        self.setScaledFactor()
+
+    def setScaledFactor(self):
+        """
+        Set the random seed based on state id so that each task starts from a
+        different state in phase space and the task collection can better
+        approach the ergodicity.
+        """
+        # scaled_factor = self.job._statepoint[self.STATE_ID]
+        scaled_factor = jobutils.get_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SCALED_FACTOR, 1)
+        state = self.job.statepoint()
+        scaled_factor = float(scaled_factor) * float(state.get(self.STATE_ID, state.get(self.ID)))
+        jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SCALED_FACTOR, scaled_factor)
+
+    @staticmethod
+    def operator(*arg, **kwargs):
+        """
+        Get the polymer builder operation command.
+
+        :return str: the command to run a task.
+        """
+        xtal_builder = Crystal_Builder(*arg, **kwargs)
+        xtal_builder.run()
+        cmd = xtal_builder.getCmd()
+        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
+        return cmd
+
+
 class Lammps_Driver:
     """
     LAMMPS wrapper to package the imported software as a nemd driver.

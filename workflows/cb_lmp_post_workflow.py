@@ -3,22 +3,24 @@
 # This software is licensed under the BSD 3-Clause License.
 # Authors: Teng Zhang (2022010236@hust.edu.cn)
 """
-This workflow driver runs polymer builder, lammps, and custom dump jobs.
+This workflow driver runs crystal builder, lammps, and xxx.
 """
 import os
 import sys
+import numpy as np
 from flow import FlowProject
 
 from nemd import logutils
+from nemd import jobutils
 from nemd import parserutils
 from nemd import environutils
 from nemd import jobcontrol
-from nemd.task import Polymer_Builder, Lammps, Custom_Dump
+from nemd.task import Crystal_Builder, Lammps
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
 
-FLAG_STATE_NUM = '-state_num'
+FLAG_SCALED_RANGE = '-scaled_range'
 
 
 def log_debug(msg):
@@ -72,22 +74,35 @@ class Runner(jobcontrol.Runner):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
         """
-        polymer_builder = Polymer_Builder.getOpr(name='polymer_builder')
+        polymer_builder = Crystal_Builder.getOpr(name='crystal_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
         self.setPrereq(lammps_runner, polymer_builder)
-        custom_dump = Custom_Dump.getOpr(name=self.CUSTOM_DUMP)
-        self.setPrereq(custom_dump, lammps_runner)
+        # custom_dump = Custom_Dump.getOpr(name=self.CUSTOM_DUMP)
+        # self.setPrereq(custom_dump, lammps_runner)
 
-    def setAggregation(self):
+    def addJobs(self):
         """
-        Aggregate post analysis jobs.
+        Add jobs to the project.
         """
-        super().setAggregation()
-        name = f"{self.jobname}{self.SEP}{self.CUSTOM_DUMP}"
-        Custom_Dump.getAgg(name=name,
-                           tname=self.CUSTOM_DUMP,
-                           log=log,
-                           clean=self.options.clean)
+
+        for scaled_range in np.arange(*self.options.scaled_range):
+            job = self.project.open_job({self.STATE_ID: scaled_range})
+            job.doc[jobutils.OUTFILE] = {}
+            job.doc[jobutils.OUTFILES] = {}
+            job.document[self.ARGS] = self.argv[:]
+            job.document.update({self.PREREQ: self.prereq})
+            job.init()
+
+    # def setAggregation(self):
+    #     """
+    #     Aggregate post analysis jobs.
+    #     """
+    #     super().setAggregation()
+    #     name = f"{self.jobname}{self.SEP}{self.CUSTOM_DUMP}"
+    #     Custom_Dump.getAgg(name=name,
+    #                        tname=self.CUSTOM_DUMP,
+    #                        log=log,
+    #                        clean=self.options.clean)
 
 
 def get_parser():
@@ -99,13 +114,14 @@ def get_parser():
     """
     parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(
-        FLAG_STATE_NUM,
-        default=1,
-        metavar=FLAG_STATE_NUM.upper(),
-        type=parserutils.type_positive_int,
+        FLAG_SCALED_RANGE,
+        default=(0.9, 1.1, 0.05),  # yapf: disable
+        nargs='+',
+        metavar=FLAG_SCALED_RANGE.upper()[1:],
+        type=parserutils.type_positive_float,
         help='Number of states for the dynamical system via random seed')
-    parser = Polymer_Builder.DRIVER.get_parser(parser)
-    parser = Custom_Dump.DRIVER.get_parser(parser)
+    parser = Crystal_Builder.DRIVER.get_parser(parser)
+
     parserutils.add_job_arguments(parser)
     parserutils.add_workflow_arguments(parser)
     return parser
