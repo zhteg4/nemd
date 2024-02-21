@@ -2,7 +2,9 @@ import os
 import math
 import shutil
 import numpy as np
+import pandas as pd
 from io import StringIO
+from scipy import constants
 from dataclasses import dataclass
 from collections import namedtuple
 from matplotlib import pyplot as plt
@@ -81,8 +83,7 @@ class Processors:
         self.z = try_int(self.z)
 
 
-class LammpsInput(object):
-
+class LammpsBase(object):
     HASH = '#'
     # SUPPORTED COMMANDS
     PAIR_MODIFY = 'pair_modify'
@@ -135,6 +136,7 @@ class LammpsInput(object):
     # ]
 
     REAL = 'real'
+    METAL = 'metal'
     FULL = 'full'
 
     INITIALIZATION_ITEMS = {
@@ -165,6 +167,9 @@ class LammpsInput(object):
     ALL_ITEMS.update(INITIALIZATION_ITEMS)
     ALL_ITEMS.update(SYSTEM_DEFINITION_ITEMS)
     ALL_ITEMS.update(SIMULATION_SETTINGS_KEYS_ITEMS)
+
+
+class LammpsInput(LammpsBase):
 
     def __init__(self, input_file):
         self.input_file = input_file
@@ -270,7 +275,64 @@ class LammpsInput(object):
         return self.cmd_items[self.TIMESTEP]
 
 
+class LammpsLog(LammpsBase):
+
+    LJ = 'LJ'
+    REAL = LammpsBase.REAL
+    METAL = LammpsBase.METAL
+    DEFAULT_UNIT = LJ
+    DEFAULT_TIMESTEP = {LJ: 0.005, REAL: 1., METAL: 0.001}
+    TIME_UNITS = {REAL: constants.femto, METAL: constants.pico}
+    TIME_TO_PS = {x: y / constants.pico for x, y in TIME_UNITS.items()}
+
+    TIME = 'time'
+    STEP = 'Step'
+
+    def __init__(self, filename):
+        self.filename = filename
+        self.unit = self.DEFAULT_UNIT
+        self.timestep = None
+
+    def run(self):
+        self.parse()
+
+    def parse(self):
+        blocks = []
+        with open(self.filename) as fh:
+            line, in_block = True, False
+            while (line):
+                line = fh.readline().strip()
+                # Thermo block
+                if line.startswith('Loop time of'):
+                    data = [x.strip('\n').split() for x in block]
+                    block = pd.DataFrame(data, columns=header, dtype=float)
+                    blocks.append(block)
+                    in_block = False
+                if in_block:
+                    block.append(line)
+                    continue
+                if line.startswith('Per MPI rank memory allocation'):
+                    header = fh.readline().split()
+                    block = []
+                    in_block = True
+                # other information
+                if line.startswith(self.UNITS):
+                    self.unit = line.strip(self.UNITS).strip()
+                if line.startswith(self.TIMESTEP):
+                    self.timestep = line.strip(self.TIMESTEP).strip()
+        if self.timestep is None:
+            self.timestep = self.DEFAULT_TIMESTEP[self.unit]
+        self.thermo = pd.concat(blocks)
+        time = self.thermo[self.STEP] * self.timestep * self.TIME_TO_PS[
+            self.unit]
+        self.thermo.set_index(time)
+        self.thermo.index.name = self.TIME
+
+
 class EnergyReader(object):
+    """
+    Parse file to get heatflux.
+    """
 
     THERMO = 'thermo'
     THERMO_SPACE = THERMO + ' '

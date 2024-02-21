@@ -13,7 +13,7 @@ from nemd import jobutils
 from nemd import parserutils
 from nemd import environutils
 from nemd import jobcontrol
-from nemd.task import Crystal_Builder, Lammps
+from nemd.task import Crystal_Builder, Lammps, Lmp_Log
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
@@ -66,8 +66,6 @@ def label(job):
 
 class Runner(jobcontrol.Runner):
 
-    CUSTOM_DUMP = 'custom_dump'
-
     def setTasks(self):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
@@ -75,8 +73,8 @@ class Runner(jobcontrol.Runner):
         polymer_builder = Crystal_Builder.getOpr(name='crystal_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
         self.setPrereq(lammps_runner, polymer_builder)
-        # custom_dump = Custom_Dump.getOpr(name=self.CUSTOM_DUMP)
-        # self.setPrereq(custom_dump, lammps_runner)
+        lmp_log = Lmp_Log.getOpr(name='lmp_log')
+        self.setPrereq(lmp_log, lammps_runner)
 
     def addJobs(self):
         """

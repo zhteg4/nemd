@@ -668,3 +668,94 @@ class Custom_Dump(BaseTask):
         ext = '.' + cls.DRIVER.CustomDump.DATA_EXT.split('.')[-1]
         filenames = [x for x in lines if x.split()[-1].endswith(ext)]
         return f'{len(filenames)} files found'
+
+
+class Lmp_Log(BaseTask):
+
+    import lmp_log_driver as DRIVER
+    CUSTOM_EXT = oplsua.LammpsIn.CUSTOM_EXT
+    DUMP = oplsua.LammpsIn.DUMP
+    READ_DATA = oplsua.LammpsIn.READ_DATA
+    DATA_EXT = oplsua.LammpsIn.DATA_EXT
+
+    @staticmethod
+    def operator(*arg, **kwargs):
+        """
+        Get the polymer builder operation command.
+
+        :return str: the command to run a task.
+        """
+        lmp_Log = Lmp_Log(*arg, **kwargs)
+        lmp_Log.run()
+        cmd = lmp_Log.getCmd()
+        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
+        return cmd
+
+    def setArgs(self):
+        """
+        Set the args for custom dump task.
+        """
+        super().setArgs()
+        log_file = self.doc[self.KNOWN_ARGS][0]
+        data_cmd = sh.grep(self.READ_DATA, log_file).split()
+        data_file = [x for x in data_cmd if x.endswith(self.DATA_EXT)][0]
+        args = [log_file, self.DRIVER.FlAG_DATA_FILE, data_file]
+        args += list(self.doc[self.KNOWN_ARGS])[1:]
+        self.doc[self.KNOWN_ARGS] = args
+
+    @staticmethod
+    def aggregator(*jobs, log=None, name=None, tname=None, **kwargs):
+        """
+        The aggregator job task that combines the output files of a custom dump
+        task.
+
+        :param jobs: the task jobs the aggregator collected
+        :type jobs: list of 'signac.contrib.job.Job'
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        :param name: the jobname based on which output files are named
+        :type name: str
+        :param tname: aggregate the job tasks of this name
+        :type tname: str
+        """
+        log(f"{len(jobs)} jobs found for aggregation.")
+        job = jobs[0]
+        logfile = job.fn(job.document[jobutils.OUTFILE][tname])
+        outfiles = Custom_Dump.DRIVER.CustomDump.getOutfiles(logfile)
+        if kwargs.get(jobutils.FLAG_CLEAN[1:]):
+            jname = name.split(BaseTask.SEP)[0]
+            for filename in outfiles.values():
+                try:
+                    os.remove(filename.replace(tname, jname))
+                except FileNotFoundError:
+                    pass
+        outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
+        jname = name.split(BaseTask.SEP)[0]
+        inav = environutils.is_interactive()
+        Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, jname, inav=inav)
+
+    @classmethod
+    def postAgg(cls, *jobs, name=None):
+        """
+        Report the status of the aggregation over all custom dump task output
+        files.
+
+        :param jobs: the task jobs the aggregator collected
+        :type jobs: list of 'signac.contrib.job.Job'
+        :param name: jobname based on which log file is found
+        :type name: str
+        :return: the label after job completion
+        :rtype: str
+        """
+
+        jname = name.split(cls.SEP)[0]
+        logfile = jname + logutils.DRIVER_LOG
+        try:
+            line = sh.grep(cls.RESULTS, logfile)
+        except sh.ErrorReturnCode_1:
+            return False
+        line = line.strip().split('\n')
+        lines = [x.split(cls.RESULTS)[-1].strip() for x in line]
+        ext = '.' + cls.DRIVER.CustomDump.DATA_EXT.split('.')[-1]
+        filenames = [x for x in lines if x.split()[-1].endswith(ext)]
+        return f'{len(filenames)} files found'

@@ -2182,7 +2182,17 @@ class DataFileReader(LammpsData):
         """
         sidx = self.mk_idxes[self.ATOMS_CAP] + 2
         for lid in range(sidx, sidx + self.struct_dsp[self.ATOMS]):
-            id, mol_id, type_id, charge, x, y, z = self.lines[lid].split()[:7]
+            splitted = self.lines[lid].split()
+            if len(splitted) == 5:
+                # atom_style atomic
+                id, type_id, x, y, z = splitted
+                self.atoms[int(id)] = types.SimpleNamespace(
+                    id=int(id),
+                    type_id=int(type_id),
+                    xyz=(float(x), float(y), float(z)),
+                    ele=self.masses[int(type_id)].ele)
+                return
+            id, mol_id, type_id, charge, x, y, z = splitted[:7]
             self.atoms[int(id)] = types.SimpleNamespace(
                 id=int(id),
                 mol_id=int(mol_id),
@@ -2226,7 +2236,11 @@ class DataFileReader(LammpsData):
         """
         mols = collections.defaultdict(list)
         for atom in self.atoms.values():
-            mols[atom.mol_id].append(atom.id)
+            try:
+                mols[atom.mol_id].append(atom.id)
+            except AttributeError:
+                # atomic style has no molecule ids
+                return
         self.mols = dict(mols)
 
     def setBonds(self):
@@ -2337,6 +2351,8 @@ class DataFileReader(LammpsData):
         """
         Paser the pair coefficient section.
         """
+        if self.PAIR_COEFFS not in self.mk_idxes:
+            return
         sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
         for lid in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
             id, ene, dist = self.lines[lid].split()
