@@ -285,8 +285,35 @@ class LammpsLog(LammpsBase):
     TIME_UNITS = {REAL: constants.femto, METAL: constants.pico}
     TIME_TO_PS = {x: y / constants.pico for x, y in TIME_UNITS.items()}
 
+    FS = 'fs'
+    PS = 'ps'
+    N_STEP = 'n'
+    KELVIN = 'K'
+    ATMOSPHERES = 'atmospheres'
+    BARS = 'bars'
+    KCAL_MOL = 'kcal/mol'
+    EV = 'eV'
     TIME = 'time'
     STEP = 'Step'
+    TEMP = 'Temp'
+    E_PAIR = 'E_pair'
+    E_MOL = 'E_mol'
+    TOTENG = 'TotEng'
+    PRESS = 'Press'
+    TIME_UNITS = {REAL: FS, METAL: PS}
+    STEP_UNITS = {REAL: N_STEP, METAL: N_STEP}
+    TEMP_UNITS = {REAL: KELVIN, METAL: KELVIN}
+    ENG_UNITS = {REAL: KCAL_MOL, METAL: EV}
+    PRESS_UNITS = {REAL: ATMOSPHERES, METAL: BARS}
+    THERMO_UNITS = {
+        TIME: TIME_UNITS,
+        STEP: STEP_UNITS,
+        TEMP: TEMP_UNITS,
+        E_PAIR: ENG_UNITS,
+        E_MOL: ENG_UNITS,
+        TOTENG: ENG_UNITS,
+        PRESS: PRESS_UNITS
+    }
 
     def __init__(self, filename):
         self.filename = filename
@@ -295,6 +322,7 @@ class LammpsLog(LammpsBase):
 
     def run(self):
         self.parse()
+        self.setUnits()
 
     def parse(self):
         blocks = []
@@ -320,13 +348,18 @@ class LammpsLog(LammpsBase):
                     self.unit = line.strip(self.UNITS).strip()
                 if line.startswith(self.TIMESTEP):
                     self.timestep = line.strip(self.TIMESTEP).strip()
+        self.thermo = pd.concat(blocks)
+
+    def setUnits(self):
         if self.timestep is None:
             self.timestep = self.DEFAULT_TIMESTEP[self.unit]
-        self.thermo = pd.concat(blocks)
-        time = self.thermo[self.STEP] * self.timestep * self.TIME_TO_PS[
-            self.unit]
+        time = self.thermo[self.STEP] * self.timestep
         self.thermo.set_index(time)
-        self.thermo.index.name = self.TIME
+        self.thermo.index.name = f"{self.TIME} ({self.TIME_UNITS[self.unit]})"
+        self.thermo.columns = [
+            f"{x} ({self.THERMO_UNITS[x][self.unit]})"
+            for x in self.thermo.columns
+        ]
 
 
 class EnergyReader(object):

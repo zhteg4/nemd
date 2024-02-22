@@ -148,7 +148,7 @@ class LmpLog(object):
                 log(self.thermo[self.sidx:].mean(axis=0).to_string())
                 filename = self.options.jobname + self.DATA_EXT % task
                 self.thermo.to_csv(filename)
-                log(f'thermodynamic info written into {filename}')
+                log(f'Thermodynamic info written into {filename}')
 
     @classmethod
     def getOutfiles(cls, logfile):
