@@ -27,18 +27,17 @@ sel: None
 last_pct: 0.4
 slice: 0, 1000000, 200
 clean: False
-jtype: task, aggregator
+jtype: aggregator
 prj_path: .
-JobStart: 20:13:27 02/21/24
+JobStart: 16:03:55 02/22/24
 ...................................
-4 / 4 completed jobs.
 4 jobs found for aggregation.
-Results for mean squared displacement saved to pb_lmp_post_workflow_msd.csv
+Results for mean squared displacement found as pb_lmp_post_workflow_msd.csv
 0.1911 ± 0.0005617 cm^2/s (R-squared: 0.9998) linear fit of [800.0000 6400.0000] ps
 Mean squared displacement figure saved as pb_lmp_post_workflow_msd.png
 Task timing breakdown:
-polymer_builder: 1 minute and 19 seconds, 1 minute and 19 seconds, 1 minute and 19 seconds, 1 minute and 19 seconds; 1 minute and 19 seconds (ave)
+polymer_builder: 1 minute and 29 seconds, 1 minute and 29 seconds, 1 minute and 18 seconds, 1 minute and 5 seconds; 1 minute and 20.25 seconds (ave)
 lammps_runner: 2 minutes and 54 seconds, 2 minutes and 54 seconds, 2 minutes and 54 seconds, 2 minutes and 54 seconds; 2 minutes and 54 seconds (ave)
-custom_dump: 36 seconds, 36 seconds, 36 seconds, 36 seconds; 36 seconds (ave)
+custom_dump: 46 seconds, 45 seconds, 45 seconds, 37 seconds; 43.25 seconds (ave)
 finished.
-20:18:37 02/21/24
+16:04:10 02/22/24

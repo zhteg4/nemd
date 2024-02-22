@@ -120,23 +120,22 @@ class LmpLog(object):
         Grep thermo output information.
         """
 
-        lmp_log = fileutils.LammpsLog(self.options.lmp_log)
-        lmp_log.run()
-        self.thermo = lmp_log.thermo
-        self.sidx = math.floor(self.thermo.shape[0] *
-                               (1 - self.options.last_pct))
-        log(f"{self.thermo.shape[0]} trajectory frames found.")
+        self.lmp_log = fileutils.LammpsLog(self.options.lmp_log,
+                                           last_pct=self.options.last_pct)
+        self.lmp_log.run()
+
+        log(f"{self.lmp_log.thermo.shape[0]} steps of thermo data found.")
         af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
         if af_tasks:
-            log(f"{', '.join(af_tasks)} collects and saves "
-                f"results {symbols.ELEMENT_OF} [{self.thermo.index[0]:.3f}, "
-                f"{self.thermo.index[0]:.3f}] ps")
+            log(f"{', '.join(af_tasks)} collects and saves results "
+                f"{symbols.ELEMENT_OF} [{self.lmp_log.thermo.index[0]:.3f}, "
+                f"{self.lmp_log.thermo.index[0]:.3f}] ps")
         lf_tasks = [x for x in self.options.task if x in LAST_FRM_TASKS]
         if lf_tasks:
             log(f"{', '.join(lf_tasks)} averages results from last "
                 f"{self.options.last_pct * 100}% frames {symbols.ELEMENT_OF} "
-                f"[{self.thermo.index[self.sidx]: .3f}, {self.thermo.index[-1]: .3f}] ps"
-                )
+                f"[{self.lmp_log.thermo.index[self.sidx]: .3f}, "
+                f"{self.lmp_log.thermo.index[-1]: .3f}] ps")
 
     def analyze(self):
         """
@@ -203,6 +202,8 @@ class LmpLog(object):
             interactive mode is on
         :type inav: bool
         """
+        import pdb
+        pdb.set_trace()
         for aname, afiles in files.items():
             if aname in NO_COMBINE:
                 continue

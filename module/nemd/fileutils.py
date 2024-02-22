@@ -315,14 +315,17 @@ class LammpsLog(LammpsBase):
         PRESS: PRESS_UNITS
     }
 
-    def __init__(self, filename):
+    def __init__(self, filename, last_pct=0.2):
         self.filename = filename
+        self.last_pct = last_pct
         self.unit = self.DEFAULT_UNIT
         self.timestep = None
+        self.sidx = None
 
     def run(self):
         self.parse()
         self.setUnits()
+        self.setSidx()
 
     def parse(self):
         blocks = []
@@ -360,6 +363,9 @@ class LammpsLog(LammpsBase):
             f"{x} ({self.THERMO_UNITS[x][self.unit]})"
             for x in self.thermo.columns
         ]
+
+    def setSidx(self):
+        self.sidx = math.floor(self.thermo.shape[0] * (1 - self.last_pct))
 
 
 class EnergyReader(object):

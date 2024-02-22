@@ -1,30 +1,0 @@
-Fetching status:   0%|          | 0/15 [00:00<?, ?it/s]Fetching status: 100%|██████████| 15/15 [00:00<00:00, 2453.00it/s]
-Fetching labels:   0%|          | 0/5 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 5/5 [00:00<00:00, 57614.07it/s]
-
-Overview: 5 jobs/aggregates, 0 jobs/aggregates with eligible operations.
-
-label                             ratio
---------------------------------  -------------------------------------------------------
-{'state_id': 0.9500000000000001}  |████████                                | 1/5 (20.00%)
-{'state_id': 0.9}                 |████████                                | 1/5 (20.00%)
-{'state_id': 1.0500000000000003}  |████████                                | 1/5 (20.00%)
-{'state_id': 1.0}                 |████████                                | 1/5 (20.00%)
-{'state_id': 1.1}                 |████████                                | 1/5 (20.00%)
-
-operation/group
------------------
-
-
-Detailed View:
-
-job id                            operation/group    labels
---------------------------------  -----------------  --------------------------------
-0d42624863ad8c136fe8938ac60d80b2  [ ]                {'state_id': 1.1}
-15d7b368ecb345edae1fe6f7e1bf3d10  [ ]                {'state_id': 0.9500000000000001}
-1bbaf217ec9309f8de6eb2d3233eb1cb  [ ]                {'state_id': 1.0}
-903dc0bd62cd44986da5e3e94d82b7ce  [ ]                {'state_id': 1.0500000000000003}
-bbf04abbc0322bb420967ef1ec3b8ffb  [ ]                {'state_id': 0.9}
-
-[U]:unknown [R]:registered [I]:inactive [S]:submitted [H]:held [Q]:queued [A]:active [E]:error [GR]:group_registered [GI]:group_inactive [GS]:group_submitted [GH]:group_held [GQ]:group_queued [GA]:group_active [GE]:group_error
-
-

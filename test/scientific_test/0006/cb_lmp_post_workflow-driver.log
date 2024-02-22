@@ -1,21 +1,19 @@
-2024-02-22 09:02:33,190 INFO ..........Command Options..........
-2024-02-22 09:02:33,190 INFO scaled_range: (0.9, 1.1, 0.05)
-2024-02-22 09:02:33,190 INFO name: Si
-2024-02-22 09:02:33,190 INFO dimension: (1, 1, 1)
-2024-02-22 09:02:33,190 INFO scale_factor: (1, 1, 1)
-2024-02-22 09:02:33,190 INFO interactive: False
-2024-02-22 09:02:33,190 INFO jobname: crystal_builder
-2024-02-22 09:02:33,190 INFO debug: True
-2024-02-22 09:02:33,190 INFO cpu: 4
-2024-02-22 09:02:33,190 INFO clean: True
-2024-02-22 09:02:33,190 INFO jtype: task, aggregator
-2024-02-22 09:02:33,190 INFO prj_path: .
-2024-02-22 09:02:33,190 INFO JobStart: 09:02:33 02/22/24
-2024-02-22 09:02:33,190 INFO ...................................
-2024-02-22 09:03:16,500 INFO 5 / 5 completed jobs.
-2024-02-22 09:03:17,034 INFO Task timing breakdown:
-2024-02-22 09:03:17,035 INFO crystal_builder: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
-2024-02-22 09:03:17,035 INFO lammps_runner: 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds; 7 seconds (ave)
-2024-02-22 09:03:17,035 INFO lmp_log: 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0.2 seconds (ave)
-2024-02-22 09:03:17,070 INFO finished.
-2024-02-22 09:03:17,070 INFO 09:03:17 02/22/24
+..........Command Options..........
+scaled_range: (0.9, 1.1, 0.05)
+name: Si
+dimension: (1, 1, 1)
+scale_factor: (1, 1, 1)
+interactive: False
+jobname: crystal_builder
+debug: False
+cpu: 4
+clean: False
+jtype: aggregator
+prj_path: .
+JobStart: 16:19:06 02/22/24
+...................................
+Task timing breakdown:
+crystal_builder: 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second; 0.4 seconds (ave)
+lammps_runner: 6 seconds, 6 seconds, 6 seconds, 6 seconds, 6 seconds; 6 seconds (ave)
+lmp_log: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
+5 jobs found for aggregation.

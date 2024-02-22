@@ -66,6 +66,8 @@ def label(job):
 
 class Runner(jobcontrol.Runner):
 
+    LMP_LOG = 'lmp_log'
+
     def setTasks(self):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
@@ -89,6 +91,17 @@ class Runner(jobcontrol.Runner):
             job.document.update({self.PREREQ: self.prereq})
             job.init()
 
+    def setAggregation(self):
+        """
+        Aggregate post analysis jobs.
+        """
+        super().setAggregation()
+        name = f"{self.jobname}{self.SEP}{self.LMP_LOG}"
+        Lmp_Log.getAgg(name=name,
+                       tname=self.LMP_LOG,
+                       log=log,
+                       clean=self.options.clean)
+
 
 def get_parser():
     """
@@ -106,7 +119,7 @@ def get_parser():
         type=parserutils.type_positive_float,
         help='Number of states for the dynamical system via random seed')
     parser = Crystal_Builder.DRIVER.get_parser(parser)
-
+    parser = Lmp_Log.DRIVER.get_parser(parser)
     parserutils.add_job_arguments(parser)
     parserutils.add_workflow_arguments(parser)
     return parser

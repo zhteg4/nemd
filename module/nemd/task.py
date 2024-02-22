@@ -296,14 +296,14 @@ class BaseTask:
     @staticmethod
     def aggregator(*jobs, log=None, **kwargs):
         """
-        The aggregator job task that combines the output files of a custom dump
-        task.
+        The aggregator job task to report the time cost of each task.
 
         :param jobs: the task jobs the aggregator collected
         :type jobs: list of 'signac.contrib.job.Job'
         :param log: the function to print user-facing information
         :type log: 'function'
         """
+
         delta_times = collections.defaultdict(list)
         for job in jobs:
             for tname, filename in job.doc[jobutils.LOGFILE].items():
@@ -328,7 +328,7 @@ class BaseTask:
                tname=None,
                **kwargs):
         """
-        Get and register a aggregator job task that collects custom dump task
+        Get and register an aggregator job task that collects custom dump task
         outputs.
 
         :param cmd: Whether the aggregator function returns a command to run
@@ -672,6 +672,7 @@ class Lmp_Log(BaseTask):
     DUMP = oplsua.LammpsIn.DUMP
     READ_DATA = oplsua.LammpsIn.READ_DATA
     DATA_EXT = oplsua.LammpsIn.DATA_EXT
+    RESULTS = DRIVER.LmpLog.RESULTS
 
     @staticmethod
     def operator(*arg, **kwargs):
@@ -714,7 +715,7 @@ class Lmp_Log(BaseTask):
         log(f"{len(jobs)} jobs found for aggregation.")
         job = jobs[0]
         logfile = job.fn(job.document[jobutils.OUTFILE][tname])
-        outfiles = Custom_Dump.DRIVER.CustomDump.getOutfiles(logfile)
+        outfiles = Lmp_Log.DRIVER.LmpLog.getOutfiles(logfile)
         if kwargs.get(jobutils.FLAG_CLEAN[1:]):
             jname = name.split(BaseTask.SEP)[0]
             for filename in outfiles.values():
@@ -725,13 +726,16 @@ class Lmp_Log(BaseTask):
         outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
         jname = name.split(BaseTask.SEP)[0]
         inav = environutils.is_interactive()
-        Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, jname, inav=inav)
+        Lmp_Log.DRIVER.LmpLog.combine(outfiles, log, jname, inav=inav)
 
     @classmethod
     def postAgg(cls, *jobs, name=None):
         """
-        Report the status of the aggregation over all custom dump task output
+        Report the status of the aggregation over all lmp log task output
         files.
+
+        Main driver log should report results found the csv saved on the success
+        of aggregation.
 
         :param jobs: the task jobs the aggregator collected
         :type jobs: list of 'signac.contrib.job.Job'
@@ -740,7 +744,6 @@ class Lmp_Log(BaseTask):
         :return: the label after job completion
         :rtype: str
         """
-
         jname = name.split(cls.SEP)[0]
         logfile = jname + logutils.DRIVER_LOG
         try:
