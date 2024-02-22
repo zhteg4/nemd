@@ -1,11 +1,11 @@
+import sh
+import types
 import numpy as np
 from nemd import oplsua
+from nemd import symbols
 
 
-class LammpsData(oplsua.LammpsData):
-
-    METAL = 'metal'
-    ATOMIC = 'atomic'
+class LammpsData(oplsua.LammpsDataBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -17,6 +17,7 @@ class LammpsData(oplsua.LammpsData):
         Write out LAMMPS in script.
         """
         with open(self.lammps_in, 'w') as self.in_fh:
+            self.setAtoms()
             self.writeDescriptions()
             self.readData()
             self.writePairStyle()
@@ -63,7 +64,8 @@ class LammpsData(oplsua.LammpsData):
         if self.mols is None:
             raise ValueError(f"Mols are not set.")
 
-        self.data_fh.write(f"{self.LAMMPS_DESCRIPTION}\n\n")
+        lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
+        self.data_fh.write(f"{lmp_dsp}\n\n")
         atom_nums = [len(x.GetAtoms()) for x in self.mols.values()]
         self.data_fh.write(f"{sum(atom_nums)} {self.ATOMS}\n\n")
 
@@ -73,27 +75,21 @@ class LammpsData(oplsua.LammpsData):
         """
         self.data_fh.write(f"{len(self.elements)} {self.ATOM_TYPES}\n\n")
 
-    def writeBox(self, min_box=None, buffer=None):
+    def writeBox(self):
         """
         Write box information.
-
-        :param min_box list: minimum box size
-        :param buffer list: buffer in three dimensions
         """
 
         boxes = [x.getBox() for x in self.mols.values()]
-        if all([x is not None for x in boxes]):
-            box = boxes[0]
-            repeated = np.repeat(box.reshape(1, -1), len(boxes), axis=0)
-            if (repeated == boxes).all():
-                for dim in range(3):
-                    self.data_fh.write(
-                        f"{0:.4f} {box[dim]:.4f} {self.LO_HI[dim]}\n")
-                # FIXME https://docs.lammps.org/Howto_triclinic.html
-                self.data_fh.write("0.0000 0.0000 0.0000 xy xz yz\n")
-                self.data_fh.write("\n")
-                return
-        super().writeBox()
+        box = boxes[0]
+        repeated = np.repeat(box.reshape(1, -1), len(boxes), axis=0)
+        if not (repeated == boxes).all():
+            raise ValueError("Unit cells have different PBCs.")
+        for dim in range(3):
+            self.data_fh.write(f"{0:.4f} {box[dim]:.4f} {self.LO_HI[dim]}\n")
+        # FIXME https://docs.lammps.org/Howto_triclinic.html
+        self.data_fh.write("0.0000 0.0000 0.0000 xy xz yz\n")
+        self.data_fh.write("\n")
 
     def writeMasses(self):
         """
@@ -125,3 +121,26 @@ class LammpsData(oplsua.LammpsData):
             data[:, 2:] = conformer.GetPositions()
             np.savetxt(self.data_fh, data, fmt='%i %i %.3f %.3f %.3f')
         self.data_fh.write(f"\n")
+
+
+class DataFileReader(oplsua.DataFileReader):
+
+    def setAtoms(self):
+        """
+        Parse the atom section for atom id and molecule id.
+        """
+        sidx = self.mk_idxes[self.ATOMS_CAP] + 2
+        for lid in range(sidx, sidx + self.struct_dsp[self.ATOMS]):
+            id, type_id, x, y, z = self.lines[lid].split()[:5]
+            self.atoms[int(id)] = types.SimpleNamespace(
+                id=int(id),
+                type_id=int(type_id),
+                xyz=(float(x), float(y), float(z)),
+                ele=self.masses[int(type_id)].ele)
+
+
+def get_data_Reader(data_file):
+    line = sh.grep(oplsua.LammpsDataBase.LAMMPS_DESCRIPTION[:-2], data_file)
+    if line.split(symbols.POUND)[1].strip() == oplsua.LammpsDataBase.ATOMIC:
+        return DataFileReader(data_file)
+    return oplsua.DataFileReader(data_file)

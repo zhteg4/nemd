@@ -1163,35 +1163,15 @@ class LammpsIn(fileutils.LammpsInput):
         fwriter.run()
 
 
-class LammpsData(LammpsIn):
-    """
-    Class to write out LAMMPS data file.
-    """
+class LammpsDataBase(LammpsIn):
 
-    LAMMPS_DESCRIPTION = 'LAMMPS Description'
+    LAMMPS_DESCRIPTION = 'LAMMPS Description # %s'
 
-    TYPE_ID = TYPE_ID
-    IMPLICIT_H = IMPLICIT_H
-    ATOM_ID = 'atom_id'
-    RES_NUM = RES_NUM
-    NEIGHBOR_CHARGE = 'neighbor_charge'
-    BOND_ATM_ID = OplsTyper.BOND_ATM_ID
+    METAL = 'metal'
+    ATOMIC = 'atomic'
 
     ATOMS = 'atoms'
-    BONDS = 'bonds'
-    ANGLES = 'angles'
-    DIHEDRALS = 'dihedrals'
-    IMPROPERS = 'impropers'
-    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
-
     ATOM_TYPES = 'atom types'
-    BOND_TYPES = 'bond types'
-    ANGLE_TYPES = 'angle types'
-    DIHEDRAL_TYPES = 'dihedral types'
-    IMPROPER_TYPES = 'improper types'
-    TYPE_DSP = [
-        ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHEDRAL_TYPES, IMPROPER_TYPES
-    ]
 
     XLO_XHI = 'xlo xhi'
     YLO_YHI = 'ylo yhi'
@@ -1201,6 +1181,79 @@ class LammpsData(LammpsIn):
     BUFFER = [4., 4., 4.] # yapf: disable
 
     MASSES = 'Masses'
+
+    ATOM_ID = 'atom_id'
+
+    def __init__(self, mols, ff, jobname, *arg, **kwarg):
+        """
+        :param mols dict: keys are the molecule ids, and values are
+            'rdkit.Chem.rdchem.Mol'
+        :param ff 'oplsua.OplsParser': the force field information
+        :param jobname str: jobname based on which out filenames are defined
+        """
+        super().__init__(jobname, *arg, **kwarg)
+        self.ff = ff
+        self.mols = mols
+        self.jobname = jobname
+        self.atoms = {}
+
+    def setAtoms(self):
+        """
+        Set atom property.
+        """
+
+        # atom id is stored as per atom property instead of global dict
+        for atom_id, atom in enumerate(self.atom, start=1):
+            atom.SetIntProp(self.ATOM_ID, atom_id)
+
+    @property
+    def molecule(self):
+        """
+        Handy way to get all molecules.
+
+        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
+        """
+
+        return [mol for mol in self.mols.values()]
+
+    @property
+    def atom(self):
+        """
+        Handy way to get all atoms.
+
+        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
+        """
+
+        return (atom for mol in self.molecule for atom in mol.GetAtoms())
+
+
+class LammpsData(LammpsDataBase):
+    """
+    Class to write out LAMMPS data file.
+    """
+    TYPE_ID = TYPE_ID
+    IMPLICIT_H = IMPLICIT_H
+    RES_NUM = RES_NUM
+    NEIGHBOR_CHARGE = 'neighbor_charge'
+    BOND_ATM_ID = OplsTyper.BOND_ATM_ID
+
+    ATOMS = LammpsDataBase.ATOMS
+    BONDS = 'bonds'
+    ANGLES = 'angles'
+    DIHEDRALS = 'dihedrals'
+    IMPROPERS = 'impropers'
+    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
+
+    ATOM_TYPES = LammpsDataBase.ATOM_TYPES
+    BOND_TYPES = 'bond types'
+    ANGLE_TYPES = 'angle types'
+    DIHEDRAL_TYPES = 'dihedral types'
+    IMPROPER_TYPES = 'improper types'
+    TYPE_DSP = [
+        ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHEDRAL_TYPES, IMPROPER_TYPES
+    ]
+
+    MASSES = LammpsDataBase.MASSES
     PAIR_COEFFS = 'Pair Coeffs'
     BOND_COEFFS = 'Bond Coeffs'
     ANGLE_COEFFS = 'Angle Coeffs'
@@ -1236,16 +1289,11 @@ class LammpsData(LammpsIn):
         :param concise bool: If False, all the atoms in the force field file
             shows up in the force field section of the data file. If True, only
             the present ones are writen into the data file.
-        :param concise bool: the force field information
         :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
         """
-        super().__init__(jobname, *arg, **kwarg)
-        self.ff = ff
-        self.mols = mols
-        self.jobname = jobname
+        super().__init__(mols, ff, jobname, *arg, **kwarg)
         self.concise = concise
         self.box = box
-        self.atoms = {}
         self.bonds = {}
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
@@ -1352,35 +1400,6 @@ class LammpsData(LammpsIn):
             self.writeAngles()
             self.writeDihedrals()
             self.writeImpropers()
-
-    def setAtoms(self):
-        """
-        Set atom property.
-        """
-
-        # atom id is stored as per atom property instead of global dict
-        for atom_id, atom in enumerate(self.atom, start=1):
-            atom.SetIntProp(self.ATOM_ID, atom_id)
-
-    @property
-    def atom(self):
-        """
-        Handy way to get all atoms.
-
-        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
-        """
-
-        return (atom for mol in self.molecule for atom in mol.GetAtoms())
-
-    @property
-    def molecule(self):
-        """
-        Handy way to get all molecules.
-
-        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
-        """
-
-        return [mol for mol in self.mols.values()]
 
     def balanceCharge(self):
         """
@@ -1754,8 +1773,8 @@ class LammpsData(LammpsIn):
         """
         if self.mols is None:
             raise ValueError(f"Mols are not set.")
-
-        self.data_fh.write(f"{self.LAMMPS_DESCRIPTION}\n\n")
+        lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
+        self.data_fh.write(f"{lmp_dsp}\n\n")
         atom_nums = [len(x.GetAtoms()) for x in self.mols.values()]
         self.data_fh.write(f"{sum(atom_nums)} {self.ATOMS}\n")
         self.data_fh.write(f"{len(self.bonds)} {self.BONDS}\n")
@@ -2182,17 +2201,7 @@ class DataFileReader(LammpsData):
         """
         sidx = self.mk_idxes[self.ATOMS_CAP] + 2
         for lid in range(sidx, sidx + self.struct_dsp[self.ATOMS]):
-            splitted = self.lines[lid].split()
-            if len(splitted) == 5:
-                # atom_style atomic
-                id, type_id, x, y, z = splitted
-                self.atoms[int(id)] = types.SimpleNamespace(
-                    id=int(id),
-                    type_id=int(type_id),
-                    xyz=(float(x), float(y), float(z)),
-                    ele=self.masses[int(type_id)].ele)
-                return
-            id, mol_id, type_id, charge, x, y, z = splitted[:7]
+            id, mol_id, type_id, charge, x, y, z = self.lines[lid].split()[:7]
             self.atoms[int(id)] = types.SimpleNamespace(
                 id=int(id),
                 mol_id=int(mol_id),
@@ -2247,10 +2256,11 @@ class DataFileReader(LammpsData):
         """
         Parse the atom section for atom id and molecule id.
         """
-        if self.BONDS_CAP not in self.mk_idxes:
+        try:
+            sidx = self.mk_idxes[self.BONDS_CAP] + 2
+        except KeyError:
             return
 
-        sidx = self.mk_idxes[self.BONDS_CAP] + 2
         for lid in range(sidx, sidx + self.struct_dsp[self.BONDS]):
             id, type_id, id1, id2 = self.lines[lid].split()
             self.bonds[int(id)] = types.SimpleNamespace(id=int(id),

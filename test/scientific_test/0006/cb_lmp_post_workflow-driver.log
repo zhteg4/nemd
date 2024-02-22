@@ -10,12 +10,12 @@ cpu: 4
 clean: True
 jtype: task, aggregator
 prj_path: .
-JobStart: 16:47:00 02/21/24
+JobStart: 20:05:51 02/21/24
 ...................................
 5 / 5 completed jobs.
 Task timing breakdown:
 crystal_builder: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
-lammps_runner: 6 seconds, 6 seconds, 6 seconds, 6 seconds, 6 seconds; 6 seconds (ave)
+lammps_runner: 8 seconds, 8 seconds, 8 seconds, 8 seconds, 8 seconds; 8 seconds (ave)
 lmp_log: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
 finished.
-16:47:33 02/21/24
+20:06:28 02/21/24

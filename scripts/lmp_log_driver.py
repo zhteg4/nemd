@@ -9,13 +9,10 @@ import os
 import sys
 import math
 import functools
-import numpy as np
-import pandas as pd
-from scipy import constants
 
 from nemd import traj
 from nemd import symbols
-from nemd import oplsua
+from nemd import stillinger
 from nemd import fileutils
 from nemd import jobutils
 from nemd import logutils
@@ -114,7 +111,8 @@ class LmpLog(object):
         """
         if not self.options.data_file:
             return
-        self.data_reader = oplsua.DataFileReader(self.options.data_file)
+
+        self.data_reader = stillinger.get_data_Reader(self.options.data_file)
         self.data_reader.run()
 
     def setThermo(self):
