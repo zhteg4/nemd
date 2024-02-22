@@ -105,7 +105,7 @@ class BaseTask:
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_JOBNAME,
                          self.name)
 
-    def getCmd(self):
+    def getCmd(self, write=True):
         """
         Get command line str.
 
@@ -114,8 +114,11 @@ class BaseTask:
         """
         # self.doc[KNOWN_ARGS] is not a list but BufferedJSONAttrLists
         args = list(self.doc[self.KNOWN_ARGS])
-        cmd = list(map(str, self.run_driver + args))
-        return ' '.join(cmd)
+        cmd = ' '.join(list(map(str, self.run_driver + args)))
+        if write:
+            with open(f"{self.name}_cmd", 'w') as fh:
+                fh.write(cmd)
+        return cmd
 
     @classmethod
     def success(cls, job, name):
@@ -412,9 +415,7 @@ class Polymer_Builder(BaseTask):
         """
         polymer_builder = Polymer_Builder(*arg, **kwargs)
         polymer_builder.run()
-        cmd = polymer_builder.getCmd()
-        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
-        return cmd
+        return polymer_builder.getCmd()
 
 
 class Crystal_Builder(BaseTask):
@@ -451,9 +452,7 @@ class Crystal_Builder(BaseTask):
         """
         xtal_builder = Crystal_Builder(*arg, **kwargs)
         xtal_builder.run()
-        cmd = xtal_builder.getCmd()
-        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
-        return cmd
+        return xtal_builder.getCmd()
 
 
 class Lammps_Driver:
@@ -512,9 +511,7 @@ class Lammps(BaseTask):
         """
         lmp = Lammps(*arg, **kwargs)
         lmp.run()
-        cmd = lmp.getCmd()
-        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
-        return cmd
+        return lmp.getCmd()
 
     def run(self):
         """
@@ -594,9 +591,7 @@ class Custom_Dump(BaseTask):
         """
         custom_dump = Custom_Dump(*arg, **kwargs)
         custom_dump.run()
-        cmd = custom_dump.getCmd()
-        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
-        return cmd
+        return custom_dump.getCmd()
 
     def setArgs(self):
         """
@@ -687,9 +682,7 @@ class Lmp_Log(BaseTask):
         """
         lmp_Log = Lmp_Log(*arg, **kwargs)
         lmp_Log.run()
-        cmd = lmp_Log.getCmd()
-        log_debug(f"Running {kwargs.get('jobname')}: {cmd}")
-        return cmd
+        return lmp_Log.getCmd()
 
     def setArgs(self):
         """
