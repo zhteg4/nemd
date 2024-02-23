@@ -7,13 +7,13 @@ interactive: False
 jobname: crystal_builder
 debug: False
 cpu: 4
-clean: False
-jtype: aggregator
+task: Temp, E_pair, E_pair, TotEng, Press
+last_pct: 0.2
+slice: None
+clean: True
+jtype: task, aggregator
 prj_path: .
-JobStart: 16:19:06 02/22/24
+JobStart: 23:12:44 02/22/24
 ...................................
-Task timing breakdown:
-crystal_builder: 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second; 0.4 seconds (ave)
-lammps_runner: 6 seconds, 6 seconds, 6 seconds, 6 seconds, 6 seconds; 6 seconds (ave)
-lmp_log: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
+5 / 5 completed jobs.
 5 jobs found for aggregation.

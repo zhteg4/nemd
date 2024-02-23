@@ -668,8 +668,6 @@ class Custom_Dump(BaseTask):
 class Lmp_Log(BaseTask):
 
     import lmp_log_driver as DRIVER
-    CUSTOM_EXT = oplsua.LammpsIn.CUSTOM_EXT
-    DUMP = oplsua.LammpsIn.DUMP
     READ_DATA = oplsua.LammpsIn.READ_DATA
     DATA_EXT = oplsua.LammpsIn.DATA_EXT
     RESULTS = DRIVER.LmpLog.RESULTS

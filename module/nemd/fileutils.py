@@ -367,6 +367,15 @@ class LammpsLog(LammpsBase):
     def setSidx(self):
         self.sidx = math.floor(self.thermo.shape[0] * (1 - self.last_pct))
 
+    def write(self, tasks, filename):
+        sel_cols = [
+            x for x in self.thermo.columns if x.split('(')[0].strip() in tasks
+        ]
+        dat = self.thermo[sel_cols]
+        averaged = dat[self.sidx:].mean(axis=0)
+        dat = pd.concat([dat, pd.DataFrame(averaged).T])
+        dat.to_csv(filename)
+
 
 class EnergyReader(object):
     """

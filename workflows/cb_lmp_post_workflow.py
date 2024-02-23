@@ -100,7 +100,8 @@ class Runner(jobcontrol.Runner):
         Lmp_Log.getAgg(name=name,
                        tname=self.LMP_LOG,
                        log=log,
-                       clean=self.options.clean)
+                       clean=self.options.clean,
+                       method='concat')
 
 
 def get_parser():

@@ -7,7 +7,6 @@ import re
 import sh
 import os
 import sys
-import math
 import functools
 
 from nemd import traj
@@ -27,9 +26,16 @@ FLAG_LAST_PCT = '-last_pct'
 FLAG_SLICE = '-slice'
 
 THERMO = 'thermo'
+TEMP = 'Temp'
+EPAIR = 'E_pair'
+E_MOL = 'E_mol'
+TOTENG = 'TotEng'
+PRESS = 'Press'
+THERMO_TASKS = [TEMP, EPAIR, EPAIR, TOTENG, PRESS]
 
-ALL_FRM_TASKS = [THERMO]
-LAST_FRM_TASKS = [THERMO]
+ALL_FRM_TASKS = THERMO_TASKS
+LAST_FRM_TASKS = ALL_FRM_TASKS
+AVE_FRM_TASKS = LAST_FRM_TASKS
 DATA_RQD_TASKS = []
 NO_COMBINE = []
 
@@ -86,16 +92,12 @@ class LmpLog(object):
     ]
     ANALYZER = {getattr(x, 'NAME'): x for x in ANALYZER}
 
-    def __init__(self, options, timestep=1):
+    def __init__(self, options):
         """
         :param options 'argparse.ArgumentParser': Parsed command-line options
-        :param timestep float: the time step in fs
         """
         self.options = options
-        # FIXME: should read in timestep to calculate the time
         self.data_reader = None
-        self.thermo = None
-        self.sdix = None
 
     def run(self):
         """
@@ -134,7 +136,7 @@ class LmpLog(object):
         if lf_tasks:
             log(f"{', '.join(lf_tasks)} averages results from last "
                 f"{self.options.last_pct * 100}% frames {symbols.ELEMENT_OF} "
-                f"[{self.lmp_log.thermo.index[self.sidx]: .3f}, "
+                f"[{self.lmp_log.thermo.index[self.lmp_log.sidx]: .3f}, "
                 f"{self.lmp_log.thermo.index[-1]: .3f}] ps")
 
     def analyze(self):
@@ -142,12 +144,11 @@ class LmpLog(object):
         Run analyzers.
         """
 
-        for task in self.options.task:
-            if task == THERMO:
-                log(self.thermo[self.sidx:].mean(axis=0).to_string())
-                filename = self.options.jobname + self.DATA_EXT % task
-                self.thermo.to_csv(filename)
-                log(f'Thermodynamic info written into {filename}')
+        thermo_tasks = [x for x in THERMO_TASKS if x in self.options.task]
+        if thermo_tasks:
+            filename = self.options.jobname + self.DATA_EXT % THERMO
+            self.lmp_log.write(thermo_tasks, filename)
+            log(f'{thermo_tasks} info written into {filename}')
 
     @classmethod
     def getOutfiles(cls, logfile):
@@ -161,7 +162,12 @@ class LmpLog(object):
         """
         jobname = cls.getLogged(logfile)[0]
         tsks = cls.getLogged(logfile, key=cls.TASK, strip='[]', delimiter=', ')
-        return {x: jobname + cls.DATA_EXT % x for x in tsks}
+        thermo_filename = jobname + cls.DATA_EXT % THERMO
+        return {
+            x: thermo_filename if x in THERMO_TASKS else jobname +
+            cls.DATA_EXT % x
+            for x in tsks
+        }
 
     @classmethod
     def getLogged(cls, logfile, key=None, strip=None, delimiter=None):
@@ -190,7 +196,7 @@ class LmpLog(object):
     @classmethod
     def combine(cls, files, log, name, inav=False):
         """
-        Combine multiple outfiles from the same task into one.
+        Concatenate multiple outfiles from the same task into one.
 
         :param files: task name and the related outfile
         :type files: dict
@@ -202,11 +208,15 @@ class LmpLog(object):
             interactive mode is on
         :type inav: bool
         """
-        import pdb
-        pdb.set_trace()
+
         for aname, afiles in files.items():
+            if aname in THERMO_TASKS:
+                continue
             if aname in NO_COMBINE:
                 continue
+            import pdb
+            pdb.set_trace()
+
             Analyzer = cls.ANALYZER[aname]
             data = Analyzer.read(name, files=afiles, log=log)
             sidx, eidx = Analyzer.fit(data, log=log)
@@ -231,8 +241,8 @@ def get_parser(parser=None):
                             type=parserutils.type_file,
                             help='Data file to get force field information')
     parser.add_argument(FlAG_TASK,
-                        choices=[THERMO],
-                        default=[THERMO],
+                        choices=THERMO_TASKS,
+                        default=THERMO_TASKS,
                         nargs='+',
                         help=f'{THERMO} searches, combines and averages '
                         f'thermodynamic info. ')
