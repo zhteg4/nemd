@@ -209,13 +209,13 @@ class LmpLog(object):
         :type inav: bool
         """
 
+        import pdb
+        pdb.set_trace()
         for aname, afiles in files.items():
             if aname in THERMO_TASKS:
                 continue
             if aname in NO_COMBINE:
                 continue
-            import pdb
-            pdb.set_trace()
 
             Analyzer = cls.ANALYZER[aname]
             data = Analyzer.read(name, files=afiles, log=log)

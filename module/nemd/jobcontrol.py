@@ -58,6 +58,7 @@ class Runner:
         2) run a project with task jobs
         3) run a project with aggregator jobs
         """
+
         with open(self.status_file, 'w') as self.status_fh:
             if self.options.clean and jobutils.TASK in self.options.jtype:
                 self.clean()
@@ -113,8 +114,8 @@ class Runner:
         """
         for id in range(self.options.state_num):
             job = self.project.open_job({self.STATE_ID: id})
-            job.doc[jobutils.OUTFILE] = {}
-            job.doc[jobutils.OUTFILES] = {}
+            job.doc[jobutils.OUTFILE] = job.doc.get(jobutils.OUTFILE, {})
+            job.doc[jobutils.OUTFILES] = job.doc.get(jobutils.OUTFILES, {})
             job.document[self.ARGS] = self.argv[:]
             job.document.update({self.PREREQ: self.prereq})
             job.init()

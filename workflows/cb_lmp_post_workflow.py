@@ -85,8 +85,8 @@ class Runner(jobcontrol.Runner):
 
         for scaled_range in np.arange(*self.options.scaled_range):
             job = self.project.open_job({self.STATE_ID: scaled_range})
-            job.doc[jobutils.OUTFILE] = {}
-            job.doc[jobutils.OUTFILES] = {}
+            job.doc[jobutils.OUTFILE] = job.doc.get(jobutils.OUTFILE, {})
+            job.doc[jobutils.OUTFILES] = job.doc.get(jobutils.OUTFILES, {})
             job.document[self.ARGS] = self.argv[:]
             job.document.update({self.PREREQ: self.prereq})
             job.init()
@@ -100,8 +100,7 @@ class Runner(jobcontrol.Runner):
         Lmp_Log.getAgg(name=name,
                        tname=self.LMP_LOG,
                        log=log,
-                       clean=self.options.clean,
-                       method='concat')
+                       clean=self.options.clean)
 
 
 def get_parser():

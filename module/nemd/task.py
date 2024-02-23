@@ -507,7 +507,7 @@ class Lammps(BaseTask):
     @staticmethod
     def operator(*arg, **kwargs):
         """
-        Get the polymer builder operation command.
+        Get the lammps operation command.
         """
         lmp = Lammps(*arg, **kwargs)
         lmp.run()
