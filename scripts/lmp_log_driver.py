@@ -8,6 +8,7 @@ import sh
 import os
 import sys
 import functools
+import pandas as pd
 
 from nemd import traj
 from nemd import symbols
@@ -86,11 +87,6 @@ class LmpLog(object):
     DATA_EXT = '_%s.csv'
     PNG_EXT = '_%s.png'
     RESULTS = analyzer.BaseAnalyzer.RESULTS
-    ANALYZER = [
-        analyzer.Density, analyzer.RDF, analyzer.MSD, analyzer.Clash,
-        analyzer.View, analyzer.XYZ
-    ]
-    ANALYZER = {getattr(x, 'NAME'): x for x in ANALYZER}
 
     def __init__(self, options):
         """
@@ -194,23 +190,35 @@ class LmpLog(object):
         return matched
 
     @classmethod
-    def combine(cls, files, log, name, inav=False):
+    def combine(cls, files, log, name, inav=False, jobs=None):
         """
         Concatenate multiple outfiles from the same task into one.
 
-        :param files: task name and the related outfile
-        :type files: dict
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :param name: output files are named based on this name
-        :type name: str
-        :param inav: pop up window and show plot during code execution if
+        :param files dict: task name and the related outfile
+        :param log 'function': the function to print user-facing information
+        :param name str: output files are named based on this name
+        :param inav bool: pop up window and show plot during code execution if
             interactive mode is on
-        :type inav: bool
+        :type jobs dict: keys are the state points and values are jobs.
         """
 
-        import pdb
-        pdb.set_trace()
+        thermo_tasks = [x for x in THERMO_TASKS if x in files.keys()]
+        if thermo_tasks:
+            thermo_files = files[thermo_tasks[0]]
+            dat = [pd.read_csv(x, index_col=0) for x in thermo_files]
+            labels = [
+                x for x in dat[0].columns
+                if x.split('(')[0].strip() in thermo_tasks
+            ]
+            dat = [x[labels] for x in dat]
+            ave = pd.concat([x.iloc[[-1]] for x in dat])
+            ave.index = jobs.keys()
+            filename = name + cls.DATA_EXT % THERMO
+            ave.to_csv(filename)
+            log(f"{cls.RESULTS} {','.join(thermo_tasks)} written into {filename}"
+                )
+            return
+
         for aname, afiles in files.items():
             if aname in THERMO_TASKS:
                 continue

@@ -373,7 +373,10 @@ class LammpsLog(LammpsBase):
         ]
         dat = self.thermo[sel_cols]
         averaged = dat[self.sidx:].mean(axis=0)
-        dat = pd.concat([dat, pd.DataFrame(averaged).T])
+        ave_index = pd.Index([np.average(dat[self.sidx:].index)])
+        ave_row = pd.DataFrame([averaged], index=ave_index)
+        dat = pd.concat([dat, ave_row])
+        dat.index.name = self.thermo.index.name
         dat.to_csv(filename)
 
 

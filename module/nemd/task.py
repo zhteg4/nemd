@@ -721,10 +721,16 @@ class Lmp_Log(BaseTask):
                     os.remove(filename.replace(tname, jname))
                 except FileNotFoundError:
                     pass
+        jobs = sorted(jobs, key=lambda x: x.statepoint[BaseTask.STATE_ID])
         outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
         jname = name.split(BaseTask.SEP)[0]
         inav = environutils.is_interactive()
-        Lmp_Log.DRIVER.LmpLog.combine(outfiles, log, jname, inav=inav)
+        jobs = {x.statepoint[BaseTask.STATE_ID]: job for x in jobs}
+        Lmp_Log.DRIVER.LmpLog.combine(outfiles,
+                                      log,
+                                      jname,
+                                      inav=inav,
+                                      jobs=jobs)
 
     @classmethod
     def postAgg(cls, *jobs, name=None):
@@ -750,6 +756,6 @@ class Lmp_Log(BaseTask):
             return False
         line = line.strip().split('\n')
         lines = [x.split(cls.RESULTS)[-1].strip() for x in line]
-        ext = '.' + cls.DRIVER.CustomDump.DATA_EXT.split('.')[-1]
+        ext = '.' + cls.DRIVER.LmpLog.DATA_EXT.split('.')[-1]
         filenames = [x for x in lines if x.split()[-1].endswith(ext)]
         return f'{len(filenames)} files found'

@@ -1,17 +1,26 @@
-2024-02-23 11:40:00,092 INFO ..........Command Options..........
-2024-02-23 11:40:00,092 INFO scaled_range: (0.9, 1.1, 0.05)
-2024-02-23 11:40:00,092 INFO name: Si
-2024-02-23 11:40:00,092 INFO dimension: (1, 1, 1)
-2024-02-23 11:40:00,092 INFO scale_factor: (1, 1, 1)
-2024-02-23 11:40:00,092 INFO interactive: False
-2024-02-23 11:40:00,092 INFO jobname: crystal_builder
-2024-02-23 11:40:00,092 INFO debug: True
-2024-02-23 11:40:00,092 INFO cpu: 2
-2024-02-23 11:40:00,092 INFO task: Temp, E_pair, E_pair, TotEng, Press
-2024-02-23 11:40:00,092 INFO last_pct: 0.2
-2024-02-23 11:40:00,092 INFO slice: None
-2024-02-23 11:40:00,092 INFO clean: True
-2024-02-23 11:40:00,092 INFO jtype: task, aggregator
-2024-02-23 11:40:00,092 INFO prj_path: .
-2024-02-23 11:40:00,092 INFO JobStart: 11:40:00 02/23/24
-2024-02-23 11:40:00,092 INFO ...................................
+..........Command Options..........
+scaled_range: (0.95, 1.05, 0.01)
+name: Si
+dimension: (1, 1, 1)
+scale_factor: (1, 1, 1)
+interactive: False
+jobname: crystal_builder
+debug: False
+cpu: 4
+task: Temp, E_pair, E_pair, TotEng, Press
+last_pct: 0.2
+slice: None
+clean: True
+jtype: task, aggregator
+prj_path: .
+JobStart: 17:29:50 02/26/24
+...................................
+11 / 11 completed jobs.
+11 jobs found for aggregation.
+Results for  Temp,E_pair,E_pair,TotEng,Press written into cb_lmp_post_workflow_thermo.csv
+Task timing breakdown:
+crystal_builder: 1 second, 1 second, 1 second, 1 second, 1 second, 1 second, 1 second, 1 second, 1 second, 1 second, 1 second; 1 second (ave)
+lammps_runner: 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds; 7 seconds (ave)
+lmp_log: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
+finished.
+17:30:33 02/26/24

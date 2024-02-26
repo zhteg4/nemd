@@ -9,10 +9,9 @@ import numpy as np
 from flow import FlowProject
 
 from nemd import logutils
-from nemd import jobutils
+from nemd import jobcontrol
 from nemd import parserutils
 from nemd import environutils
-from nemd import jobcontrol
 from nemd.task import Crystal_Builder, Lammps, Lmp_Log
 
 PATH = os.path.basename(__file__)
@@ -82,14 +81,8 @@ class Runner(jobcontrol.Runner):
         """
         Add jobs to the project.
         """
-
-        for scaled_range in np.arange(*self.options.scaled_range):
-            job = self.project.open_job({self.STATE_ID: scaled_range})
-            job.doc[jobutils.OUTFILE] = job.doc.get(jobutils.OUTFILE, {})
-            job.doc[jobutils.OUTFILES] = job.doc.get(jobutils.OUTFILES, {})
-            job.document[self.ARGS] = self.argv[:]
-            job.document.update({self.PREREQ: self.prereq})
-            job.init()
+        ids = np.arange(*self.options.scaled_range)
+        super().addJobs(ids=ids)
 
     def setAggregation(self):
         """
@@ -107,13 +100,13 @@ def get_parser():
     """
     The user-friendly command-line parser.
 
-    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
+    :return 'argparse.ArgumentParser': argparse figures out how to parse those
         out of sys.argv.
     """
     parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(
         FLAG_SCALED_RANGE,
-        default=(0.9, 1.1, 0.05),  # yapf: disable
+        default=(0.95, 1.05, 0.01),  # yapf: disable
         nargs='+',
         metavar=FLAG_SCALED_RANGE.upper()[1:],
         type=parserutils.type_positive_float,

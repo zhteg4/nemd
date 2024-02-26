@@ -108,11 +108,14 @@ class Runner:
         """
         self.project = FlowProject.init_project()
 
-    def addJobs(self):
+    def addJobs(self, ids=None):
         """
         Add jobs to the project.
+
+        :param ids list: the job ids based on which state points are set.
         """
-        for id in range(self.options.state_num):
+        ids = range(self.options.state_num) if ids is None else ids
+        for id in ids:
             job = self.project.open_job({self.STATE_ID: id})
             job.doc[jobutils.OUTFILE] = job.doc.get(jobutils.OUTFILE, {})
             job.doc[jobutils.OUTFILES] = job.doc.get(jobutils.OUTFILES, {})
