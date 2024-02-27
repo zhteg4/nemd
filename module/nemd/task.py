@@ -1,12 +1,11 @@
 import os
-
-import pandas as pd
 import sh
 import types
 import logging
 import functools
 import collections
 import humanfriendly
+import pandas as pd
 from datetime import timedelta
 from flow import FlowProject, aggregator
 
@@ -14,7 +13,6 @@ from nemd import oplsua
 from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
-from nemd import analyzer
 from nemd import parserutils
 from nemd import environutils
 
