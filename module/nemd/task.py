@@ -1,4 +1,6 @@
 import os
+
+import pandas as pd
 import sh
 import types
 import logging
@@ -12,6 +14,7 @@ from nemd import oplsua
 from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
+from nemd import analyzer
 from nemd import parserutils
 from nemd import environutils
 
@@ -725,12 +728,14 @@ class Lmp_Log(BaseTask):
         outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
         jname = name.split(BaseTask.SEP)[0]
         inav = environutils.is_interactive()
-        jobs = {x.statepoint[BaseTask.STATE_ID]: job for x in jobs}
+        state_ids = [x.statepoint[BaseTask.STATE_ID] for x in jobs]
+        state_label = kwargs.get('state_label')
+        iname = pd.Index(state_ids, name=state_label) if state_label else None
         Lmp_Log.DRIVER.LmpLog.combine(outfiles,
                                       log,
                                       jname,
                                       inav=inav,
-                                      jobs=jobs)
+                                      iname=iname)
 
     @classmethod
     def postAgg(cls, *jobs, name=None):

@@ -454,6 +454,27 @@ class XYZ(BaseAnalyzer):
         self.log(f"{self.DESCR} coordinates are written into {outfile}")
 
 
+class Thermo(BaseAnalyzer):
+
+    NAME = 'thermo'
+    DESCR = 'Thermodynamic information'
+
+    @classmethod
+    def plot(cls, data, name, *args, **kwargs):
+        """
+        Plot and save the data (interactively).
+
+        :param data: data to plot
+        :type data: 'pandas.core.frame.DataFrame'
+        :param name: the taskname based on which output file is set
+        :type name: str
+        """
+        for column in data.columns:
+            dat = data[[column]]
+            aname = f"{name}_{column.split('(')[0].strip().lower()}"
+            super().plot(dat, aname, *args, **kwargs)
+
+
 class View(BaseAnalyzer):
     """
     The coordinate visualizer.

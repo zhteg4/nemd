@@ -85,8 +85,9 @@ class LmpLog(object):
 
     TASK = FlAG_TASK[1:]
     DATA_EXT = '_%s.csv'
+    AVE_DATA_EXT = '_ave' + DATA_EXT
     PNG_EXT = '_%s.png'
-    RESULTS = analyzer.BaseAnalyzer.RESULTS
+    RESULTS = analyzer.Thermo.RESULTS
 
     def __init__(self, options):
         """
@@ -190,35 +191,20 @@ class LmpLog(object):
         return matched
 
     @classmethod
-    def combine(cls, files, log, name, inav=False, jobs=None):
+    def combine(cls, files, log, name, iname=None, inav=False):
         """
         Concatenate multiple outfiles from the same task into one.
 
         :param files dict: task name and the related outfile
         :param log 'function': the function to print user-facing information
         :param name str: output files are named based on this name
+        :type iname pandas.Index: values are the state ids and name indicates
+            the index type.
         :param inav bool: pop up window and show plot during code execution if
             interactive mode is on
-        :type jobs dict: keys are the state points and values are jobs.
         """
 
-        thermo_tasks = [x for x in THERMO_TASKS if x in files.keys()]
-        if thermo_tasks:
-            thermo_files = files[thermo_tasks[0]]
-            dat = [pd.read_csv(x, index_col=0) for x in thermo_files]
-            labels = [
-                x for x in dat[0].columns
-                if x.split('(')[0].strip() in thermo_tasks
-            ]
-            dat = [x[labels] for x in dat]
-            ave = pd.concat([x.iloc[[-1]] for x in dat])
-            ave.index = jobs.keys()
-            filename = name + cls.DATA_EXT % THERMO
-            ave.to_csv(filename)
-            log(f"{cls.RESULTS} {','.join(thermo_tasks)} written into {filename}"
-                )
-            return
-
+        cls.combineThermo(files, log, name, iname=iname, inav=inav)
         for aname, afiles in files.items():
             if aname in THERMO_TASKS:
                 continue
@@ -229,6 +215,37 @@ class LmpLog(object):
             data = Analyzer.read(name, files=afiles, log=log)
             sidx, eidx = Analyzer.fit(data, log=log)
             Analyzer.plot(data, name, inav=inav, sidx=sidx, eidx=eidx, log=log)
+
+    @classmethod
+    def combineThermo(cls, files, log, name, iname=None, inav=False):
+        """
+        Concatenate multiple thermodynamic outfiles from the same task into one.
+
+        :param files dict: task name and the related outfile
+        :param log 'function': the function to print user-facing information
+        :param name str: output files are named based on this name
+        :type iname pandas.Index: values are the state ids and name indicates
+            the index type.
+        :param inav bool: pop up window and show plot during code execution if
+            interactive mode is on
+        :return:
+        """
+        tasks = [x for x in THERMO_TASKS if x in files.keys()]
+        if not tasks:
+            return
+
+        # All thermo task results of one job saved into one file
+        thermo_files = files[tasks[0]]
+        dat = [pd.read_csv(x, index_col=0) for x in thermo_files]
+        sel = [x for x in dat[0].columns if x.split('(')[0].strip() in tasks]
+        dat = [x[sel] for x in dat]
+        if iname is not None:
+            ave = pd.concat([x.iloc[[-1]] for x in dat])
+            ave.index = iname
+            filename = name + cls.AVE_DATA_EXT % THERMO
+            ave.to_csv(filename)
+            log(f"{cls.RESULTS}{','.join(tasks)} written into {filename}")
+            analyzer.Thermo.plot(ave, name, log=log, inav=inav)
 
 
 def get_parser(parser=None):
