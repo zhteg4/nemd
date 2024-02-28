@@ -4,11 +4,14 @@
 This workflow driver runs crystal builder, lammps, and log analyser.
 """
 import os
+import sh
 import sys
 import numpy as np
+import pandas as pd
 from flow import FlowProject
 
 from nemd import logutils
+from nemd import stillinger
 from nemd import jobutils
 from nemd import jobcontrol
 from nemd import parserutils
@@ -66,15 +69,16 @@ def label(job):
 
 class Runner(jobcontrol.Runner):
 
+    MINIMUM_ENERGY = "yields the minimum energy of"
     LMP_LOG = 'lmp_log'
 
     def setTasks(self):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
         """
-        polymer_builder = Crystal_Builder.getOpr(name='crystal_builder')
+        crystal_builder = Crystal_Builder.getOpr(name='crystal_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
-        self.setPrereq(lammps_runner, polymer_builder)
+        self.setPrereq(lammps_runner, crystal_builder)
         lmp_log = Lmp_Log.getOpr(name='lmp_log')
         self.setPrereq(lmp_log, lammps_runner)
 
@@ -91,11 +95,74 @@ class Runner(jobcontrol.Runner):
         """
         super().setAggregation()
         name = f"{self.options.jobname}{self.SEP}{self.LMP_LOG}"
-        Lmp_Log.getAgg(name=name,
-                       tname=self.LMP_LOG,
-                       log=log,
-                       clean=self.options.clean,
-                       state_label='Scale Factor')
+        combine_agg = Lmp_Log.getAgg(name=name,
+                                     tname=self.LMP_LOG,
+                                     log=log,
+                                     clean=self.options.clean,
+                                     state_label='Scale Factor')
+        name = f"{self.options.jobname}{self.SEP}fitting"
+        fit_agg = Lmp_Log.getAgg(name=name,
+                                 attr=self.minEneAgg,
+                                 tname=Lmp_Log.DRIVER.TOTENG,
+                                 post=self.minEnePost,
+                                 log=log,
+                                 clean=self.options.clean,
+                                 state_label='Scale Factor')
+        self.setPrereq(fit_agg, combine_agg)
+
+    @staticmethod
+    def minEneAgg(*jobs, log=None, name=None, tname=None, **kwargs):
+        """
+        The aggregator job task that combines the output files of a custom dump
+        task.
+
+        :param jobs: the task jobs the aggregator collected
+        :type jobs: list of 'signac.contrib.job.Job'
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        :param name: the jobname based on which output files are named
+        :type name: str
+        :param tname: aggregate the job tasks of this name
+        :type tname: str
+        """
+        jname = name.split(Runner.SEP)[0]
+        filename = jname + Lmp_Log.DRIVER.LmpLog.AVE_DATA_EXT % Lmp_Log.DRIVER.THERMO
+        data = pd.read_csv(filename, index_col=0)
+        columns = [x for x in data.columns if x.split('(')[0].strip() == tname]
+        index = data[columns[0]].argmin()
+        factor = data.iloc[index].name
+        val = data.iloc[index][columns[0]]
+        unit = columns[0].split('(')[-1].split(')')[0]
+        log(f"A scale factor of {factor} {Runner.MINIMUM_ENERGY} {val} {unit}")
+        job = [x for x in jobs if x.statepoint[jobutils.STATE_ID] == factor][0]
+        datafile = [
+            x for x in job.doc[jobutils.OUTFILES]['crystal_builder']
+            if x.endswith(stillinger.LammpsData.DATA_EXT)
+        ][0]
+        log(f'The corresponding datafile is saved as in {datafile}')
+
+    @classmethod
+    def minEnePost(cls, *jobs, name=None):
+        """
+        Report the status of the aggregation for minimum energy.
+
+        Main driver log should report results found the csv saved on the success
+        of aggregation.
+
+        :param jobs: the task jobs the aggregator collected
+        :type jobs: list of 'signac.contrib.job.Job'
+        :param name: jobname based on which log file is found
+        :type name: str
+        :return: the label after job completion
+        :rtype: str
+        """
+        jname = name.split(cls.SEP)[0]
+        logfile = jname + logutils.DRIVER_LOG
+        try:
+            line = sh.grep(cls.MINIMUM_ENERGY, logfile)
+        except sh.ErrorReturnCode_1:
+            return False
+        return line.split(cls.MINIMUM_ENERGY)[0].strip()
 
 
 def get_parser():
@@ -130,6 +197,10 @@ def validate_options(argv):
     """
     parser = get_parser()
     options = parser.parse_args(argv)
+    if Lmp_Log.DRIVER.TOTENG not in options.task:
+        options.task += [Lmp_Log.DRIVER.TOTENG]
+        index = argv.index(Lmp_Log.DRIVER.FlAG_TASK)
+        argv.insert(index + 1, Lmp_Log.DRIVER.TOTENG)
     return options
 
 

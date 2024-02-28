@@ -111,7 +111,9 @@ def get_parser(parser=None, jflags=None):
     parser.add_argument(
         FlAG_DIMENSION,
         default=constants.ONE_ONE_ONE,
+        type=int,
         metavar=FlAG_DIMENSION.upper()[1:],
+        nargs='+',
         help='Unit cell is duplicated along each lattice vector by the '
         'corresponding factor.')
     parser.add_argument(

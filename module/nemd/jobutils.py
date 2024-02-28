@@ -32,6 +32,7 @@ UNKNOWN_ARGS = 'unknown_args'
 FN_DOCUMENT = job.Job.FN_DOCUMENT
 TASK = 'task'
 AGGREGATOR = 'aggregator'
+STATE_ID = 'state_id'
 
 
 def get_arg(args, flag, val=None):

@@ -37,7 +37,7 @@ class BaseTask:
     TIME = 'time'
     STIME = 'stime'
     ETIME = 'etime'
-    STATE_ID = 'state_id'
+    STATE_ID = jobutils.STATE_ID
     TIME_REPORTED = 'time_reported'
     TIME_BREAKDOWN = 'Task timing breakdown:'
     SEP = symbols.SEP
@@ -221,8 +221,8 @@ class BaseTask:
         :type with_job: bool
         :param name: the taskname
         :type name: str
-        :param attr: the class method that is a operator function
-        :type attr: str
+        :param attr: the attribute name of a staticmethod method or callable function
+        :type attr: str or types.FunctionType
         :param pre: add pre-condition for the aggregator if True
         :type pre: bool
         :param post: add post-condition for the aggregator if True
@@ -241,7 +241,7 @@ class BaseTask:
         if pre is None:
             pre = cls.pre
 
-        func = cls.DupeFunc(attr, name)
+        func = cls.dupeFunc(attr, name)
         # Pass jobname, taskname, and logging function
         kwargs.update({'name': name})
         if tname:
@@ -267,19 +267,24 @@ class BaseTask:
         return func
 
     @classmethod
-    def DupeFunc(cls, attr, name):
+    def dupeFunc(cls, attr, name):
         """
         Duplicate a function or static method with new naming.
         From http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)
 
-        :param attr: the class method that is a operator function
-        :type attr: str
+        :param attr: the attribute name of a staticmethod method or callable function
+        :type attr: str or types.FunctionType
         :param name: the taskname
         :type name: str
         :return: the function to execute
         :rtype: 'function'
         """
-        ofunc = getattr(cls, attr)
+        if isinstance(attr, str):
+            ofunc = getattr(cls, attr)
+        elif isinstance(attr, types.FunctionType):
+            ofunc = attr
+        else:
+            raise ValueError(f"{attr} is not a callable function or str.")
         origin_name = ofunc.__name__
         if name is None:
             name = ofunc.__name__
@@ -338,8 +343,8 @@ class BaseTask:
         :type with_job: bool
         :param name: the name of this aggregator job task.
         :type name: str
-        :param attr: the class method that is a aggregator function
-        :type attr: str
+        :param attr: the attribute name of a staticmethod method or callable function
+        :type attr: str or types.FunctionType
         :param pre: add pre-condition for the aggregator if True
         :type pre: bool
         :param post: add post-condition for the aggregator if True
@@ -699,8 +704,7 @@ class Lmp_Log(BaseTask):
     @staticmethod
     def aggregator(*jobs, log=None, name=None, tname=None, **kwargs):
         """
-        The aggregator job task that combines the output files of a custom dump
-        task.
+        The aggregator job task that combines the output files lmp log jobs.
 
         :param jobs: the task jobs the aggregator collected
         :type jobs: list of 'signac.contrib.job.Job'
@@ -762,3 +766,42 @@ class Lmp_Log(BaseTask):
         ext = '.' + cls.DRIVER.LmpLog.DATA_EXT.split('.')[-1]
         filenames = [x for x in lines if x.split()[-1].endswith(ext)]
         return f'{len(filenames)} files found'
+
+    @staticmethod
+    def aggregator(*jobs, log=None, name=None, tname=None, **kwargs):
+        """
+        The aggregator job task that combines the output files of a custom dump
+        task.
+
+        :param jobs: the task jobs the aggregator collected
+        :type jobs: list of 'signac.contrib.job.Job'
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        :param name: the jobname based on which output files are named
+        :type name: str
+        :param tname: aggregate the job tasks of this name
+        :type tname: str
+        """
+        log(f"{len(jobs)} jobs found for aggregation.")
+        job = jobs[0]
+        logfile = job.fn(job.document[jobutils.OUTFILE][tname])
+        outfiles = Lmp_Log.DRIVER.LmpLog.getOutfiles(logfile)
+        if kwargs.get(jobutils.FLAG_CLEAN[1:]):
+            jname = name.split(BaseTask.SEP)[0]
+            for filename in outfiles.values():
+                try:
+                    os.remove(filename.replace(tname, jname))
+                except FileNotFoundError:
+                    pass
+        jobs = sorted(jobs, key=lambda x: x.statepoint[BaseTask.STATE_ID])
+        outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
+        jname = name.split(BaseTask.SEP)[0]
+        inav = environutils.is_interactive()
+        state_ids = [x.statepoint[BaseTask.STATE_ID] for x in jobs]
+        state_label = kwargs.get('state_label')
+        iname = pd.Index(state_ids, name=state_label) if state_label else None
+        Lmp_Log.DRIVER.LmpLog.combine(outfiles,
+                                      log,
+                                      jname,
+                                      inav=inav,
+                                      iname=iname)

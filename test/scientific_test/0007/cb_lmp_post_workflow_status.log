@@ -1,0 +1,60 @@
+Fetching status:   0%|          | 0/60 [00:00<?, ?it/s]Fetching status: 100%|██████████| 60/60 [00:00<00:00, 2579.76it/s]
+Fetching labels:   0%|          | 0/20 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 20/20 [00:00<00:00, 89335.55it/s]
+
+Overview: 20 jobs/aggregates, 0 jobs/aggregates with eligible operations.
+
+label                             ratio
+--------------------------------  -------------------------------------------------------
+{'state_id': 0.9991}              |██                                      | 1/20 (5.00%)
+{'state_id': 0.9992}              |██                                      | 1/20 (5.00%)
+{'state_id': 0.9993}              |██                                      | 1/20 (5.00%)
+{'state_id': 0.9994999999999999}  |██                                      | 1/20 (5.00%)
+{'state_id': 0.9994}              |██                                      | 1/20 (5.00%)
+{'state_id': 0.9995999999999999}  |██                                      | 1/20 (5.00%)
+{'state_id': 0.9996999999999999}  |██                                      | 1/20 (5.00%)
+{'state_id': 0.9997999999999999}  |██                                      | 1/20 (5.00%)
+{'state_id': 0.9998999999999999}  |██                                      | 1/20 (5.00%)
+{'state_id': 0.9999999999999999}  |██                                      | 1/20 (5.00%)
+{'state_id': 0.999}               |██                                      | 1/20 (5.00%)
+{'state_id': 1.0000999999999998}  |██                                      | 1/20 (5.00%)
+{'state_id': 1.0002999999999997}  |██                                      | 1/20 (5.00%)
+{'state_id': 1.0002}              |██                                      | 1/20 (5.00%)
+{'state_id': 1.0004999999999997}  |██                                      | 1/20 (5.00%)
+{'state_id': 1.0004}              |██                                      | 1/20 (5.00%)
+{'state_id': 1.0006999999999997}  |██                                      | 1/20 (5.00%)
+{'state_id': 1.0006}              |██                                      | 1/20 (5.00%)
+{'state_id': 1.0008999999999997}  |██                                      | 1/20 (5.00%)
+{'state_id': 1.0008}              |██                                      | 1/20 (5.00%)
+
+operation/group
+-----------------
+
+
+Detailed View:
+
+job id                            operation/group    labels
+--------------------------------  -----------------  --------------------------------
+206556705c9a9f525b31f5f3e00905b2  [ ]                {'state_id': 0.9995999999999999}
+2351e64f99cccabd4c96e590e8385ddd  [ ]                {'state_id': 1.0002999999999997}
+28cb48069feafd5d0fa71925163ce030  [ ]                {'state_id': 1.0002}
+2f48450057380680d35f64bb2cae6f8e  [ ]                {'state_id': 0.9998999999999999}
+30ea0b4e9dcc05f9bbac87d247679b24  [ ]                {'state_id': 1.0008999999999997}
+344b91ea53eff8ebfc62f29d0484c4a5  [ ]                {'state_id': 0.9991}
+3ec731892d613b191c3171e8b095acdf  [ ]                {'state_id': 1.0006999999999997}
+48e94f64839180ed1b9f532195be2af4  [ ]                {'state_id': 1.0004999999999997}
+5a43116a97b893395f0b1c23a4d37144  [ ]                {'state_id': 1.0008}
+5a8704167d85b98b2cf0fa9d310ac539  [ ]                {'state_id': 1.0006}
+65ac63f06ebc6849361b65c8afbdc1d8  [ ]                {'state_id': 1.0000999999999998}
+71e4eecc6f43618361ea8831ee1b8921  [ ]                {'state_id': 0.9997999999999999}
+78cc64132310a0421dacccf7922e2953  [ ]                {'state_id': 0.9994999999999999}
+8a03a4d86c14b819937af834a5037774  [ ]                {'state_id': 0.999}
+ab2dece8e33e2b0f3ba65ac930a7f214  [ ]                {'state_id': 0.9999999999999999}
+adfff6a609f57afd777c0395bfad740f  [ ]                {'state_id': 0.9996999999999999}
+b66aada40571e0cf2dea78dacd09950f  [ ]                {'state_id': 0.9993}
+c1fb44536e4276f48fb41572c3f89b8e  [ ]                {'state_id': 0.9992}
+f0c0db2d1ff76fa14a18f2e3d5ca0444  [ ]                {'state_id': 0.9994}
+f13396c71c81e88a5ea2ea04d23501b9  [ ]                {'state_id': 1.0004}
+
+[U]:unknown [R]:registered [I]:inactive [S]:submitted [H]:held [Q]:queued [A]:active [E]:error [GR]:group_registered [GI]:group_inactive [GS]:group_submitted [GH]:group_held [GQ]:group_queued [GA]:group_active [GE]:group_error
+
+

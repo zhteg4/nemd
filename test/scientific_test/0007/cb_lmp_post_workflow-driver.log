@@ -1,0 +1,30 @@
+..........Command Options..........
+scaled_range: 0.999, 1.001, 0.0001
+name: Si
+dimension: 2, 2, 2
+scale_factor: (1, 1, 1)
+task: Press, TotEng
+last_pct: 0.2
+slice: None
+interactive: False
+jobname: cb_lmp_post_workflow
+debug: False
+cpu: 4
+clean: True
+jtype: task, aggregator
+prj_path: .
+JobStart: 00:19:30 02/28/24
+...................................
+20 / 20 completed jobs.
+20 jobs found for aggregation.
+Results for TotEng,Press written into cb_lmp_post_workflow_ave_thermo.csv
+Thermodynamic information figure saved as cb_lmp_post_workflow_toteng_thermo.png
+Thermodynamic information figure saved as cb_lmp_post_workflow_press_thermo.png
+Task timing breakdown:
+crystal_builder: 1 second, 1 second, 0 seconds, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 1 second; 0.35 seconds (ave)
+lammps_runner: 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds; 10 seconds (ave)
+lmp_log: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
+A scale factor of 1.0002 yields the minimum energy of -277.54229 eV.
+The corresponding datafile is saved as in crystal_builder.data
+finished.
+00:20:49 02/28/24
