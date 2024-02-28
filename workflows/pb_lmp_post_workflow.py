@@ -105,8 +105,8 @@ def get_parser():
         metavar=FLAG_STATE_NUM.upper(),
         type=parserutils.type_positive_int,
         help='Number of states for the dynamical system via random seed')
-    parser = Polymer_Builder.DRIVER.get_parser(parser)
-    parser = Custom_Dump.DRIVER.get_parser(parser)
+    parser = Polymer_Builder.DRIVER.get_parser(parser, jflags=[])
+    parser = Custom_Dump.DRIVER.get_parser(parser, jflags=[])
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
     parserutils.add_workflow_arguments(parser)

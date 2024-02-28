@@ -250,10 +250,12 @@ class LmpLog(object):
             analyzer.Thermo.plot(ave, name, log=log, inav=inav)
 
 
-def get_parser(parser=None):
+def get_parser(parser=None, jflags=None):
     """
     The user-friendly command-line parser.
 
+    :param parser ArgumentParser: the parse to add arguments
+    :param jflags list: specific job control related flags to add
     :return 'argparse.ArgumentParser':  argparse figures out how to parse those
         out of sys.argv.
     """
@@ -287,6 +289,7 @@ def get_parser(parser=None):
                         type=parserutils.type_slice,
                         help=f"Slice the thermo output for analysis.")
     parserutils.add_job_arguments(parser,
+                                  arg_flags=jflags,
                                   jobname=environutils.get_jobname(JOBNAME))
     return parser
 

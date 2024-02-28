@@ -82,7 +82,7 @@ class Runner(jobcontrol.Runner):
         """
         Add jobs to the project.
         """
-        ids = np.arange(*self.options.scaled_range, )
+        ids = np.arange(*self.options.scaled_range)
         super().addJobs(ids=ids)
 
     def setAggregation(self):
@@ -113,8 +113,8 @@ def get_parser():
         metavar=FLAG_SCALED_RANGE.upper()[1:],
         type=parserutils.type_positive_float,
         help='Number of states for the dynamical system via random seed')
-    parser = Crystal_Builder.DRIVER.get_parser(parser)
-    parser = Lmp_Log.DRIVER.get_parser(parser)
+    parser = Crystal_Builder.DRIVER.get_parser(parser, jflags=[])
+    parser = Lmp_Log.DRIVER.get_parser(parser, jflags=[])
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
     parserutils.add_workflow_arguments(parser)

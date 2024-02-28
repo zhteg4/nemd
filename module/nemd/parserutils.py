@@ -267,6 +267,9 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
     if arg_flags is None:
         arg_flags = [FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG, FLAG_CPU]
     # Workflow drivers may add the job control options a few times
+    if FLAG_JOBNAME in arg_flags and FLAG_JOBNAME in parser._option_string_actions:
+        parser.set_defaults(jobname=jobname)
+    # Workflow drivers may add the job control options a few times
     arg_flags = [
         x for x in arg_flags if x not in parser._option_string_actions
     ]
@@ -280,7 +283,7 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
             FLAG_JOBNAME,
             dest=FLAG_JOBNAME[1:].lower(),
             default=jobname,
-            help='The jobnamee based on which filenames are created.')
+            help='The jobname based on which filenames are created.')
     if FLAG_DEBUG in arg_flags:
         parser.add_argument(
             FLAG_DEBUG,
