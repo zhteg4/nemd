@@ -27,23 +27,20 @@ class Runner:
     JOB_ID = 'job_id'
     SEP = symbols.SEP
 
-    def __init__(self, options, argv, jobname, logger=None):
+    def __init__(self, options, argv, logger=None):
         """
         :param options: parsed commandline options
         :type options: 'argparse.Namespace'
         :param argv: list of commandline arguments
         :type argv: list
-        :param jobname: the jobname
-        :type jobname: str
         :param logger: print to this logger if exists
         :type logger: 'logging.Logger'
         """
         self.options = options
         self.argv = argv
-        self.jobname = jobname
         self.logger = logger
         self.project = None
-        self.status_file = self.jobname + fileutils.STATUS_LOG
+        self.status_file = self.options.jobname + fileutils.STATUS_LOG
         # flow/project.py gets logger from logging.getLogger(__name__)
         logutils.createModuleLogger(self.FLOW_PROJECT, file_ext=fileutils.LOG)
         self.status_fh = None
@@ -148,7 +145,7 @@ class Runner:
             print("Showing task workflow graph. Click X to close the figure "
                   "and continue..")
             plt.show(block=True)
-        fig.savefig(self.jobname + '_nx.png')
+        fig.savefig(self.options.jobname + '_nx.png')
         self.project.run(np=self.options.cpu)
 
     def logStatus(self):
@@ -186,7 +183,7 @@ class Runner:
         """
         Collect jobs and analyze for statics, chemical space, and states.
         """
-        BaseTask.getAgg(log=self.log, name=self.jobname)
+        BaseTask.getAgg(log=self.log, name=self.options.jobname)
 
     def runAggregation(self):
         """

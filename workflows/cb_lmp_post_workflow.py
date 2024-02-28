@@ -9,6 +9,7 @@ import numpy as np
 from flow import FlowProject
 
 from nemd import logutils
+from nemd import jobutils
 from nemd import jobcontrol
 from nemd import parserutils
 from nemd import environutils
@@ -81,7 +82,7 @@ class Runner(jobcontrol.Runner):
         """
         Add jobs to the project.
         """
-        ids = np.arange(*self.options.scaled_range)
+        ids = np.arange(*self.options.scaled_range, )
         super().addJobs(ids=ids)
 
     def setAggregation(self):
@@ -89,7 +90,7 @@ class Runner(jobcontrol.Runner):
         Aggregate post analysis jobs.
         """
         super().setAggregation()
-        name = f"{self.jobname}{self.SEP}{self.LMP_LOG}"
+        name = f"{self.options.jobname}{self.SEP}{self.LMP_LOG}"
         Lmp_Log.getAgg(name=name,
                        tname=self.LMP_LOG,
                        log=log,
@@ -114,7 +115,8 @@ def get_parser():
         help='Number of states for the dynamical system via random seed')
     parser = Crystal_Builder.DRIVER.get_parser(parser)
     parser = Lmp_Log.DRIVER.get_parser(parser)
-    parserutils.add_job_arguments(parser)
+    parserutils.add_job_arguments(parser,
+                                  jobname=environutils.get_jobname(JOBNAME))
     parserutils.add_workflow_arguments(parser)
     return parser
 
@@ -137,11 +139,12 @@ logger = None
 def main(argv):
     global logger
     options = validate_options(argv)
-    jobname = environutils.get_jobname(JOBNAME)
-    logger = logutils.createDriverLogger(jobname=jobname)
+    logger = logutils.createDriverLogger(jobname=options.jobname)
     logutils.logOptions(logger, options)
-    runner = Runner(options, argv, jobname, logger=logger)
+    runner = Runner(options, argv, logger=logger)
     runner.run()
+    log_file = os.path.basename(logger.handlers[0].baseFilename)
+    jobutils.add_outfile(log_file, options.jobname, set_file=True)
     log('finished.', timestamp=True)
 
 

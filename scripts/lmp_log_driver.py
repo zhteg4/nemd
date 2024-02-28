@@ -145,6 +145,7 @@ class LmpLog(object):
         if thermo_tasks:
             filename = self.options.jobname + self.DATA_EXT % THERMO
             self.lmp_log.write(thermo_tasks, filename)
+            jobutils.add_outfile(filename, jobname=self.options.jobname)
             log(f'{thermo_tasks} info written into {filename}')
 
     @classmethod
@@ -244,6 +245,7 @@ class LmpLog(object):
             ave.index = iname
             filename = name + cls.AVE_DATA_EXT % THERMO
             ave.to_csv(filename)
+            jobutils.add_outfile(filename, jobname=name)
             log(f"{cls.RESULTS}{','.join(tasks)} written into {filename}")
             analyzer.Thermo.plot(ave, name, log=log, inav=inav)
 
@@ -320,7 +322,8 @@ def main(argv):
 
     global logger
     options = validate_options(argv)
-    logger = logutils.createDriverLogger(jobname=options.jobname)
+    logger = logutils.createDriverLogger(jobname=options.jobname,
+                                         log_file=True)
     logutils.logOptions(logger, options)
     lmp_log = LmpLog(options)
     lmp_log.run()

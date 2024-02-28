@@ -126,7 +126,7 @@ class BaseAnalyzer:
         :type inav: bool
         """
         with plotutils.get_pyplot(backend=None if inav else 'Agg') as plt:
-            fig = plt.figure()
+            fig = plt.figure(figsize=(10, 6))
             ax = fig.add_axes([0.13, 0.1, 0.8, 0.8])
             line_style = '--' if any([sidx, eidx]) else '-'
             ax.plot(data.index, data.iloc[:, 0], line_style, label='average')

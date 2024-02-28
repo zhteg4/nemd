@@ -149,7 +149,8 @@ def main(argv):
 
     global logger
     options = validate_options(argv)
-    logger = logutils.createDriverLogger(jobname=options.jobname)
+    logger = logutils.createDriverLogger(jobname=options.jobname,
+                                         log_file=True)
     logutils.logOptions(logger, options)
     xtal_builder = CrystalBuilder(options)
     xtal_builder.run()
