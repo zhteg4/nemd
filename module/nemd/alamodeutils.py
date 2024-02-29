@@ -3,6 +3,7 @@
 """
 This module provides utilities for alamode submodule.
 """
+import sh
 import scipy
 import itertools
 from nemd import symbols
@@ -13,7 +14,7 @@ class AlaWriter(object):
     """
     """
     IN = '.in'
-    DSP = 'dsp'
+    PAT = 'pat'
     DFSET = 'dfset'
 
     AND = symbols.AND
@@ -47,7 +48,7 @@ class AlaWriter(object):
         self.data = {}
         if self.jobname is None:
             dimensions = 'x'.join(map(str, self.scell.dimensions))
-            mode = self.DSP if mode == self.SUGGEST else self.DFSET
+            mode = self.PAT if mode == self.SUGGEST else self.DFSET
             self.jobname = f"{self.scell.chemical_formula}_{dimensions}_{mode}"
         self.filename = self.jobname + self.IN
 
@@ -120,3 +121,21 @@ class AlaWriter(object):
                     fh.write(f"  {line}\n")
                 fh.write(f"{self.FORWARDSLASH}\n")
                 fh.write("\n")
+
+
+class AlaLogReader(object):
+
+    SYMMETRY = 'SYMMETRY'
+    SUGGESTED_DSIP_FILE = 'Suggested displacement patterns are printed in ' \
+                          'the following files:'
+
+    def __init__(self, filename):
+        self.filename = filename
+        self.disp_pattern_file = None
+
+    def run(self):
+        self.setDispPatternFile()
+
+    def setDispPatternFile(self):
+        lines = sh.grep(self.SUGGESTED_DSIP_FILE, self.filename, '-A 1')
+        self.disp_pattern_file = lines.split()[-1]

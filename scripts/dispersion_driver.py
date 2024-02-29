@@ -5,14 +5,19 @@ Calculate dispersion by building crystal, symmetry search, displacement, force
 constant, and xxx.
 """
 import os
+import re
 import sys
+import glob
+import subprocess
 
 from nemd import xtal
+from nemd import task
 from nemd import jobutils
 from nemd import logutils
 from nemd import constants
 from nemd import stillinger
 from nemd import parserutils
+from nemd import alamodeutils
 from nemd import environutils
 
 PATH = os.path.basename(__file__)
@@ -57,37 +62,87 @@ def log_error(msg):
     sys.exit(1)
 
 
-class CrystalBuilder(object):
+class Dispersion(object):
 
     SUBMODULE_PATH = environutils.get_submodule_path()
     ALAMODE = environutils.ALAMODE
     ALAMODE_SRC = os.path.join(SUBMODULE_PATH, ALAMODE, ALAMODE)
     Si_LAMMPS = os.path.join(ALAMODE_SRC, 'example', 'Si_LAMMPS')
     SI_FF = os.path.join(Si_LAMMPS, 'Si.sw')
+    LAMMPS_EXT = '.lammps'
 
     def __init__(self, options):
         """
         :param options 'argparse.ArgumentParser': Parsed command-line options
         """
         self.options = options
+        self.xbuild = None
+        self.ala_log_reader = None
+        self.lmp_dat = None
+        self.datafiles = None
 
     def run(self):
-        xbuild = xtal.CrystalBuilder(self.options.name,
-                                     dim=self.options.dimension,
-                                     scale_factor=self.options.scale_factor)
-        xbuild.run()
-        xbuild.writeDispPattern()
-        mol = xbuild.getMol()
-        lmp_dat = stillinger.LammpsData({1: mol}, self.SI_FF,
-                                        self.options.jobname)
-        lmp_dat.writeData()
-        log(f"LAMMPS data file written as {lmp_dat.lammps_data}")
-        lmp_dat.writeLammpsIn()
-        log(f"LAMMPS input script written as {lmp_dat.lammps_in}")
-        jobutils.add_outfile(lmp_dat.lammps_data, jobname=self.options.jobname)
-        jobutils.add_outfile(lmp_dat.lammps_in,
-                             jobname=self.options.jobname,
-                             set_file=True)
+        self.buildCell()
+        self.writeDispPattern()
+        self.writeLammpsFile()
+        self.writeDisplacements()
+        self.runLammps()
+
+    def buildCell(self):
+        self.xbuild = xtal.CrystalBuilder(
+            self.options.name,
+            dim=self.options.dimension,
+            scale_factor=self.options.scale_factor)
+        self.xbuild.run()
+        log(f"The supper cell is created with the lattice parameters "
+            f"being {self.xbuild.scell.lattice_parameters}")
+
+    def writeDispPattern(self):
+        ala_log_file = self.xbuild.writeDispPattern()
+        self.ala_log_reader = alamodeutils.AlaLogReader(ala_log_file)
+        self.ala_log_reader.run()
+        log(f"{self.ala_log_reader.SUGGESTED_DSIP_FILE} "
+            f"{self.ala_log_reader.disp_pattern_file}")
+
+    def writeLammpsFile(self):
+        mol = self.xbuild.getMol()
+        self.lmp_dat = stillinger.LammpsData({1: mol}, self.SI_FF,
+                                             self.options.jobname)
+        self.lmp_dat.writeData()
+        log(f"LAMMPS data file written as {self.lmp_dat.lammps_data}")
+
+    def writeDisplacements(self):
+        cmd = f"{jobutils.RUN_NEMD} displace.py --LAMMPS {self.lmp_dat.lammps_data} " \
+              f"--prefix {self.options.jobname} --mag 0.01 " \
+              f"-pf {self.ala_log_reader.disp_pattern_file}"
+        info = subprocess.run(cmd, capture_output=True, shell=True)
+        if bool(info.stderr):
+            raise ValueError(info.stderr)
+        dsp_logfile = f'{self.options.jobname}_dsp.log'
+        with open(dsp_logfile, 'wb') as fh:
+            fh.write(info.stdout)
+        name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
+        self.datafiles = glob.glob(f"{name}*{self.LAMMPS_EXT}")
+        log(f"Data files with displacements are written as: {self.datafiles}")
+
+    def runLammps(self):
+        name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
+        pattern = f"{name}(.*){self.LAMMPS_EXT}"
+        for datafile in self.datafiles:
+            index = re.search(pattern, datafile).groups()[0]
+            self.lmp_dat.lammps_in = f"{self.options.jobname}{index}{self.lmp_dat.IN_EXT}"
+            self.lmp_dat.lammps_data = datafile
+            self.lmp_dat.writeLammpsIn()
+            lmp_log = f"{self.options.jobname}{index}{task.Lammps_Driver.DRIVER_LOG}"
+            cmd = f"{task.Lammps_Driver.LMP_SERIAL} {task.Lammps_Driver.FLAG_IN} " \
+                  f"{self.lmp_dat.lammps_in} {task.Lammps_Driver.FLAG_LOG} {lmp_log}"
+            info = subprocess.run(cmd, capture_output=True, shell=True)
+            log(f"Running {cmd}")
+
+        # jobutils.add_outfile(lmp_dat.lammps_data, jobname=self.options.jobname)
+        # jobutils.add_outfile(lmp_dat.lammps_in,
+        #                      jobname=self.options.jobname,
+        #                      set_file=True)
 
 
 def get_parser(parser=None, jflags=None):
@@ -157,8 +212,8 @@ def main(argv):
     logger = logutils.createDriverLogger(jobname=options.jobname,
                                          log_file=True)
     logutils.logOptions(logger, options)
-    xtal_builder = CrystalBuilder(options)
-    xtal_builder.run()
+    dispersio = Dispersion(options)
+    dispersio.run()
     log_file = os.path.basename(logger.handlers[0].baseFilename)
     jobutils.add_outfile(log_file, options.jobname, set_file=True)
     log('Finished.', timestamp=True)

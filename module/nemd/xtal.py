@@ -7,9 +7,9 @@ import crystals
 import subprocess
 from rdkit import Chem
 from nemd import jobutils
+from nemd import constants
 from nemd import rdkitutils
 from nemd import alamodeutils
-from nemd import constants
 
 
 class CrystalBuilder(object):
@@ -53,5 +53,7 @@ class CrystalBuilder(object):
         info = subprocess.run(cmd, capture_output=True, shell=True)
         if bool(info.stderr):
             raise ValueError(info.stderr)
-        with open(f'{ala_writer.jobname}.log', 'wb') as fh:
+        ala_logfile = f'{ala_writer.jobname}.log'
+        with open(ala_logfile, 'wb') as fh:
             fh.write(info.stdout)
+        return ala_logfile
