@@ -10,6 +10,7 @@ from signac import job
 from nemd import environutils
 
 RUN_NEMD = 'run_nemd'
+ALM = 'alm'
 OUTFILE = 'outfile'
 LOGFILE = 'logfile'
 OUTFILES = 'outfiles'

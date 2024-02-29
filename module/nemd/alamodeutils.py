@@ -13,7 +13,8 @@ class AlaWriter(object):
     """
     """
     IN = '.in'
-    DSP_IN = f'_dsp{IN}'
+    DSP = 'dsp'
+    DFSET = 'dfset'
 
     AND = symbols.AND
     FORWARDSLASH = symbols.FORWARDSLASH
@@ -36,15 +37,19 @@ class AlaWriter(object):
     CUTOFF = 'cutoff'
     POSITION = 'position'
 
-    def __init__(self, scell, jobname, mode=SUGGEST):
+    def __init__(self, scell, jobname=None, mode=SUGGEST):
         """
         """
         self.scell = scell
         self.jobname = jobname
         self.elements = list(self.scell.chemical_composition.keys())
-        self.filename = self.jobname + self.DSP_IN
         self.mode = mode
         self.data = {}
+        if self.jobname is None:
+            dimensions = 'x'.join(map(str, self.scell.dimensions))
+            mode = self.DSP if mode == self.SUGGEST else self.DFSET
+            self.jobname = f"{self.scell.chemical_formula}_{dimensions}_{mode}"
+        self.filename = self.jobname + self.IN
 
     def run(self):
         """
@@ -58,12 +63,11 @@ class AlaWriter(object):
         self.write()
 
     def setGeneral(self):
-        prefix = 'si222'
         nat = len(self.scell.atoms)
         nkd = len(self.elements)
         kd = ','.join(self.elements)
         general = [
-            f"{self.PREFIX} = {prefix}", f"{self.MODE} = {self.mode}",
+            f"{self.PREFIX} = {self.jobname}", f"{self.MODE} = {self.mode}",
             f"{self.NAT} = {nat}", f"{self.NKD} = {nkd}", f"{self.KD} = {kd}"
         ]
         self.data[self.GENERAL] = general
