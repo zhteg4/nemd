@@ -75,8 +75,6 @@ class CrystalBuilder(object):
                                      dim=self.options.dimension,
                                      scale_factor=self.options.scale_factor)
         xbuild.run()
-        # ala_writer = alamodeutils.AlaWriter(xbuild.scell, self.options.jobname)
-        # ala_writer.run()
         mol = xbuild.getMol()
         lmp_dat = stillinger.LammpsData({1: mol}, self.SI_FF,
                                         self.options.jobname)

@@ -1,5 +1,5 @@
 ..........Command Options..........
-scaled_range: 0.999, 1.001, 0.0001
+scaled_range: 0.999, 1.001, 2e-05
 name: Si
 dimension: 2, 2, 2
 scale_factor: (1, 1, 1)
@@ -13,18 +13,18 @@ cpu: 4
 clean: True
 jtype: task, aggregator
 prj_path: .
-JobStart: 00:19:30 02/28/24
+JobStart: 00:28:02 02/28/24
 ...................................
-20 / 20 completed jobs.
-20 jobs found for aggregation.
+100 / 100 completed jobs.
+100 jobs found for aggregation.
 Results for TotEng,Press written into cb_lmp_post_workflow_ave_thermo.csv
 Thermodynamic information figure saved as cb_lmp_post_workflow_toteng_thermo.png
 Thermodynamic information figure saved as cb_lmp_post_workflow_press_thermo.png
 Task timing breakdown:
-crystal_builder: 1 second, 1 second, 0 seconds, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 1 second; 0.35 seconds (ave)
-lammps_runner: 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds, 10 seconds; 10 seconds (ave)
-lmp_log: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
-A scale factor of 1.0002 yields the minimum energy of -277.54229 eV.
+crystal_builder: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 0 seconds, 1 second, 1 second, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0.22 seconds (ave)
+lammps_runner: 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds, 19 seconds; 19 seconds (ave)
+lmp_log: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0.03 seconds (ave)
+A scale factor of 1.0002000000000013 yields the minimum energy of -277.54229 eV
 The corresponding datafile is saved as in crystal_builder.data
 finished.
-00:20:49 02/28/24
+00:33:28 02/28/24
