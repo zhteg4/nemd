@@ -16,9 +16,11 @@ class CrystalBuilder(object):
 
     def __init__(self,
                  name,
+                 jobname=None,
                  dim=constants.ONE_ONE_ONE,
                  scale_factor=constants.ONE_ONE_ONE):
         self.name = name
+        self.jobname = jobname
         self.dim = dim
         self.scale_factor = scale_factor
         self.scell = None
@@ -47,13 +49,28 @@ class CrystalBuilder(object):
                               dimensions=self.scell.dimensions)
 
     def writeDispPattern(self):
-        ala_writer = alamodeutils.AlaWriter(self.scell)
+        filename = self.runAlm(mode=alamodeutils.AlaWriter.SUGGEST)
+        ala_log_reader = alamodeutils.AlaLogReader(filename)
+        return ala_log_reader.getDispPatternFile()
+
+    def writeForceConstant(self):
+        filename = self.runAlm(mode=alamodeutils.AlaWriter.OPTIMIZE)
+        ala_log_reader = alamodeutils.AlaLogReader(filename)
+        return ala_log_reader.getAfcsXml()
+
+    def runAlm(self, mode=alamodeutils.AlaWriter.SUGGEST):
+        ala_writer = alamodeutils.AlaWriter(self.scell,
+                                            jobname=self.jobname,
+                                            mode=mode)
         ala_writer.run()
+
         cmd = f"{jobutils.ALM} {ala_writer.filename}"
         info = subprocess.run(cmd, capture_output=True, shell=True)
         if bool(info.stderr):
             raise ValueError(info.stderr)
+
         ala_logfile = f'{ala_writer.jobname}.log'
         with open(ala_logfile, 'wb') as fh:
             fh.write(info.stdout)
+
         return ala_logfile

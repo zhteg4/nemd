@@ -78,12 +78,12 @@ class Dispersion(object):
         """
         self.options = options
         self.xbuild = None
-        self.ala_log_reader = None
         self.lmp_dat = None
         self.orig_lammps_data = None
         self.datafiles = None
         self.dumpfiles = []
-        self.k_file = f"{self.options.jobname}{self.DFSET_HARMONIC_EXT}"
+        self.dump_kfile = f"{self.options.jobname}{self.DFSET_HARMONIC_EXT}"
+        self.afcs_xml = None
 
     def run(self):
         self.buildCell()
@@ -91,11 +91,13 @@ class Dispersion(object):
         self.writeLammpsFile()
         self.writeDisplacements()
         self.runLammps()
-        self.combineKFile()
+        self.combineDump()
+        self.writeForceConstant()
 
     def buildCell(self):
         self.xbuild = xtal.CrystalBuilder(
             self.options.name,
+            jobname=self.options.jobname,
             dim=self.options.dimension,
             scale_factor=self.options.scale_factor)
         self.xbuild.run()
@@ -103,11 +105,9 @@ class Dispersion(object):
             f"being {self.xbuild.scell.lattice_parameters}")
 
     def writeDispPattern(self):
-        ala_log_file = self.xbuild.writeDispPattern()
-        self.ala_log_reader = alamodeutils.AlaLogReader(ala_log_file)
-        self.ala_log_reader.run()
-        log(f"{self.ala_log_reader.SUGGESTED_DSIP_FILE} "
-            f"{self.ala_log_reader.disp_pattern_file}")
+        self.disp_pattern_file = self.xbuild.writeDispPattern()
+        log(f"{alamodeutils.AlaLogReader.SUGGESTED_DSIP_FILE} {self.disp_pattern_file}"
+            )
 
     def writeLammpsFile(self):
         mol = self.xbuild.getMol()
@@ -123,7 +123,7 @@ class Dispersion(object):
     def writeDisplacements(self):
         cmd = f"{jobutils.RUN_NEMD} displace.py --LAMMPS {self.orig_lammps_data} " \
               f"--prefix {self.options.jobname} --mag 0.01 " \
-              f"-pf {self.ala_log_reader.disp_pattern_file}"
+              f"-pf {self.disp_pattern_file}"
         info = subprocess.run(cmd, capture_output=True, shell=True)
         if bool(info.stderr):
             raise ValueError(info.stderr)
@@ -151,12 +151,16 @@ class Dispersion(object):
             log(f"Running {cmd}")
             subprocess.run(cmd, capture_output=True, shell=True)
 
-    def combineKFile(self):
+    def combineDump(self):
         cmd = f"{jobutils.RUN_NEMD} extract.py --LAMMPS {self.orig_lammps_data} " \
               f"{' '.join(self.dumpfiles)}"
         info = subprocess.run(cmd, capture_output=True, shell=True)
-        with open(self.k_file, 'wb') as fh:
+        with open(self.dump_kfile, 'wb') as fh:
             fh.write(info.stdout)
+
+    def writeForceConstant(self):
+        self.afcs_xml = self.xbuild.writeForceConstant()
+        log(f"{alamodeutils.AlaLogReader.INPUT_FOR_ANPHON}: {self.afcs_xml} ")
 
         # jobutils.add_outfile(lmp_dat.lammps_data, jobname=self.options.jobname)
         # jobutils.add_outfile(lmp_dat.lammps_in,

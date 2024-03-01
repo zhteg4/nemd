@@ -15,7 +15,6 @@ class AlaWriter(object):
     """
     IN = '.in'
     PAT = 'pat'
-    DFSET = 'dfset'
 
     AND = symbols.AND
     FORWARDSLASH = symbols.FORWARDSLASH
@@ -28,7 +27,7 @@ class AlaWriter(object):
     KD = 'KD'
 
     OPTIMIZE = 'optimize'
-    DFSET = 'DFSET'
+    DFSET = 'dfset'
 
     SUGGEST = 'suggest'
     INTERACTION = 'interaction'
@@ -46,17 +45,18 @@ class AlaWriter(object):
         self.elements = list(self.scell.chemical_composition.keys())
         self.mode = mode
         self.data = {}
+        mode = self.PAT if mode == self.SUGGEST else self.DFSET
         if self.jobname is None:
             dimensions = 'x'.join(map(str, self.scell.dimensions))
-            mode = self.PAT if mode == self.SUGGEST else self.DFSET
-            self.jobname = f"{self.scell.chemical_formula}_{dimensions}_{mode}"
-        self.filename = self.jobname + self.IN
+            self.jobname = f"{self.scell.chemical_formula}_{dimensions}"
+        self.filename = f"{self.jobname}_{mode}{self.IN}"
 
     def run(self):
         """
         Main method to run the tasks.
         """
         self.setGeneral()
+        self.setOptimize()
         self.setInteraction()
         self.setCell()
         self.setCutoff()
@@ -76,7 +76,9 @@ class AlaWriter(object):
     def setOptimize(self):
         if self.mode != self.OPTIMIZE:
             return
-        self.data[self.DFSET] = f"{self.DFSET}_harmonic"
+        self.data[self.OPTIMIZE] = [
+            f"{self.DFSET.upper()} = {self.jobname}.{self.DFSET}_harmonic"
+        ]
 
     def setInteraction(self):
         norder = 1  # 1: harmonic, 2: cubic, ..
@@ -128,14 +130,20 @@ class AlaLogReader(object):
     SYMMETRY = 'SYMMETRY'
     SUGGESTED_DSIP_FILE = 'Suggested displacement patterns are printed in ' \
                           'the following files:'
+    INPUT_FOR_ANPHON = 'Input data for the phonon code ANPHON      :'
 
     def __init__(self, filename):
         self.filename = filename
         self.disp_pattern_file = None
 
     def run(self):
-        self.setDispPatternFile()
+        self.disp_pattern_file = self.getDispPatternFile()
+        self.afcs_xml = self.getAfcsXml()
 
-    def setDispPatternFile(self):
+    def getDispPatternFile(self):
         lines = sh.grep(self.SUGGESTED_DSIP_FILE, self.filename, '-A 1')
-        self.disp_pattern_file = lines.split()[-1]
+        return lines.split()[-1]
+
+    def getAfcsXml(self):
+        lines = sh.grep(self.INPUT_FOR_ANPHON, self.filename, '-A 1')
+        return lines.split()[-1]
