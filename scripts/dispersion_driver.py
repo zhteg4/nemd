@@ -87,12 +87,12 @@ class Dispersion(object):
 
     def run(self):
         self.buildCell()
+        self.writeDataFile()
         self.writeDispPattern()
-        self.writeLammpsFile()
-        self.writeDisplacements()
-        self.runLammps()
-        self.combineDump()
+        self.writeDisplacement()
+        self.calculateForce()
         self.writeForceConstant()
+        self.calculateDispersion()
 
     def buildCell(self):
         self.xbuild = xtal.CrystalBuilder(
@@ -109,7 +109,7 @@ class Dispersion(object):
         log(f"{alamodeutils.AlaLogReader.SUGGESTED_DSIP_FILE} {self.disp_pattern_file}"
             )
 
-    def writeLammpsFile(self):
+    def writeDataFile(self):
         mol = self.xbuild.getMol()
         tasks = [stillinger.LammpsData.XYZ, stillinger.LammpsData.FORCE]
         self.lmp_dat = stillinger.LammpsData({1: mol},
@@ -120,7 +120,7 @@ class Dispersion(object):
         self.orig_lammps_data = self.lmp_dat.lammps_data
         log(f"LAMMPS data file written as {self.orig_lammps_data}")
 
-    def writeDisplacements(self):
+    def writeDisplacement(self):
         cmd = f"{jobutils.RUN_NEMD} displace.py --LAMMPS {self.orig_lammps_data} " \
               f"--prefix {self.options.jobname} --mag 0.01 " \
               f"-pf {self.disp_pattern_file}"
@@ -134,7 +134,7 @@ class Dispersion(object):
         self.datafiles = glob.glob(f"{name}*{self.LAMMPS_EXT}")
         log(f"Data files with displacements are written as: {self.datafiles}")
 
-    def runLammps(self):
+    def calculateForce(self):
         name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
         pattern = f"{name}(.*){self.LAMMPS_EXT}"
         for datafile in self.datafiles:
@@ -151,17 +151,17 @@ class Dispersion(object):
             log(f"Running {cmd}")
             subprocess.run(cmd, capture_output=True, shell=True)
 
-    def combineDump(self):
+    def writeForceConstant(self):
         cmd = f"{jobutils.RUN_NEMD} extract.py --LAMMPS {self.orig_lammps_data} " \
               f"{' '.join(self.dumpfiles)}"
         info = subprocess.run(cmd, capture_output=True, shell=True)
         with open(self.dump_kfile, 'wb') as fh:
             fh.write(info.stdout)
-
-    def writeForceConstant(self):
         self.afcs_xml = self.xbuild.writeForceConstant()
         log(f"{alamodeutils.AlaLogReader.INPUT_FOR_ANPHON}: {self.afcs_xml} ")
 
+    def calculateDispersion(self):
+        self.xbuild.writePhbandIn()
         # jobutils.add_outfile(lmp_dat.lammps_data, jobname=self.options.jobname)
         # jobutils.add_outfile(lmp_dat.lammps_in,
         #                      jobname=self.options.jobname,

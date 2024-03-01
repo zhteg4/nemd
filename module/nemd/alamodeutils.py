@@ -14,7 +14,7 @@ class AlaWriter(object):
     """
     """
     IN = '.in'
-    PAT = 'pat'
+    XML_EXT = '.xml'
 
     AND = symbols.AND
     FORWARDSLASH = symbols.FORWARDSLASH
@@ -25,17 +25,26 @@ class AlaWriter(object):
     NAT = 'NAT'
     NKD = 'NKD'
     KD = 'KD'
+    MASS = 'MASS'
 
     OPTIMIZE = 'optimize'
     DFSET = 'dfset'
 
     SUGGEST = 'suggest'
+    PAT = 'pat'
+
+    PHONONS = 'phonons'
+    FCSXML = 'FCSXML'
+    PH = 'ph'
+
     INTERACTION = 'interaction'
     NORDER = 'NORDER'
 
     CELL = 'cell'
     CUTOFF = 'cutoff'
     POSITION = 'position'
+
+    EXT = {OPTIMIZE: DFSET, SUGGEST: PAT, PHONONS: PH}
 
     def __init__(self, scell, jobname=None, mode=SUGGEST):
         """
@@ -45,11 +54,10 @@ class AlaWriter(object):
         self.elements = list(self.scell.chemical_composition.keys())
         self.mode = mode
         self.data = {}
-        mode = self.PAT if mode == self.SUGGEST else self.DFSET
         if self.jobname is None:
             dimensions = 'x'.join(map(str, self.scell.dimensions))
             self.jobname = f"{self.scell.chemical_formula}_{dimensions}"
-        self.filename = f"{self.jobname}_{mode}{self.IN}"
+        self.filename = f"{self.jobname}_{self.EXT[self.mode]}{self.IN}"
 
     def run(self):
         """
@@ -68,9 +76,16 @@ class AlaWriter(object):
         nkd = len(self.elements)
         kd = ','.join(self.elements)
         general = [
-            f"{self.PREFIX} = {self.jobname}", f"{self.MODE} = {self.mode}",
-            f"{self.NAT} = {nat}", f"{self.NKD} = {nkd}", f"{self.KD} = {kd}"
+            f"{self.PREFIX} = {self.jobname}", f"{self.MODE} = {self.mode}"
         ]
+        if self.mode in [self.SUGGEST, self.OPTIMIZE]:
+            general += [f"{self.NAT} = {nat}"]
+        if self.mode == self.PHONONS:
+            general += [f"{self.FCSXML} = {self.jobname}{self.XML_EXT}"]
+        general += [f"{self.NKD} = {nkd}", f"{self.KD} = {kd}"]
+        if self.mode == self.PHONONS:
+            unitcell = [x for x in self.scell.unitcell][0]
+            general += [f"{self.MASS} = {unitcell.mass}"]
         self.data[self.GENERAL] = general
 
     def setOptimize(self):
@@ -81,6 +96,8 @@ class AlaWriter(object):
         ]
 
     def setInteraction(self):
+        if self.mode not in [self.SUGGEST, self.OPTIMIZE]:
+            return
         norder = 1  # 1: harmonic, 2: cubic, ..
         self.data[self.INTERACTION] = [f"{self.NORDER} = {norder}"]
 
@@ -88,10 +105,9 @@ class AlaWriter(object):
         bohr_radius = scipy.constants.physical_constants['Bohr radius'][0]
         angstrom = scipy.constants.angstrom
         scale = angstrom / bohr_radius  # Bohr unit
-        vectors = [
-            x * y
-            for x, y in zip(self.scell.lattice_vectors, self.scell.dimensions)
-        ]
+        vectors = self.scell.lattice_vectors
+        if self.mode in [self.SUGGEST, self.OPTIMIZE]:
+            vectors = [x * y for x, y in zip(vectors, self.scell.dimensions)]
         self.vectors = [x * scale for x in vectors]
         cell = ["1"] + [self.pos_fmt(x) for x in self.vectors]
         self.data[self.CELL] = cell
@@ -100,10 +116,14 @@ class AlaWriter(object):
         return ' '.join(map('{:.8f}'.format, numbers))
 
     def setCutoff(self):
+        if self.mode not in [self.SUGGEST, self.OPTIMIZE]:
+            return
         pairs = itertools.combinations_with_replacement(self.elements, 2)
         self.data[self.CUTOFF] = [f"{x}-{y} 7.3" for x, y in pairs]
 
     def setPosition(self):
+        if self.mode not in [self.SUGGEST, self.OPTIMIZE]:
+            return
         atoms = [x for x in self.scell.atoms]
         atoms = sorted(atoms, key=lambda x: tuple(x.coords_fractional))
         pos = [[x.element, x.coords_fractional / self.scell.dimensions]

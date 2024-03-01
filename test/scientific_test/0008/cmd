@@ -1,0 +1,1 @@
+run_nemd dispersion_driver.py -dimension 2 2 2

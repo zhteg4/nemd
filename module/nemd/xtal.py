@@ -58,6 +58,10 @@ class CrystalBuilder(object):
         ala_log_reader = alamodeutils.AlaLogReader(filename)
         return ala_log_reader.getAfcsXml()
 
+    def writePhbandIn(self):
+        filename = self.runAlm(mode=alamodeutils.AlaWriter.PHONONS)
+        ala_log_reader = alamodeutils.AlaLogReader(filename)
+
     def runAlm(self, mode=alamodeutils.AlaWriter.SUGGEST):
         ala_writer = alamodeutils.AlaWriter(self.scell,
                                             jobname=self.jobname,
