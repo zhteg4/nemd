@@ -1051,6 +1051,7 @@ class LammpsIn(fileutils.LammpsInput):
         self.concise = concise
         self.lammps_in = self.jobname + self.IN_EXT
         self.lammps_data = self.jobname + self.DATA_EXT
+        self.lammps_dump = self.jobname + self.CUSTOM_EXT
         self.units = self.REAL
         self.atom_style = self.FULL
         self.bond_style = self.HARMONIC
@@ -1067,6 +1068,11 @@ class LammpsIn(fileutils.LammpsInput):
         }
         self.in_fh = None
         self.is_debug = environutils.is_debug()
+
+    def resetFilenames(self, jobname):
+        self.lammps_in = jobname + self.IN_EXT
+        self.lammps_data = jobname + self.DATA_EXT
+        self.lammps_dump = jobname + self.CUSTOM_EXT
 
     def writeLammpsIn(self):
         """

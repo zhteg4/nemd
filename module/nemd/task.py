@@ -474,7 +474,7 @@ class Lammps_Driver:
     FLAG_LOG = '-log'
     DRIVER_LOG = '_lammps.log'
 
-    ARGS_TMPL = [FLAG_IN, FILE, '-screen', 'none']
+    ARGS_TMPL = [FLAG_IN, FILE, FLAG_SCREEN, 'none']
 
     @classmethod
     def get_parser(cls):

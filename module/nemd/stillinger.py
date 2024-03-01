@@ -7,10 +7,17 @@ from nemd import symbols
 
 class LammpsData(oplsua.LammpsDataBase):
 
-    def __init__(self, *args, **kwargs):
+    XYZ = 'XYZ'
+    FORCE = 'force'
+    CUSTOM_EXT = f'.{oplsua.LammpsDataBase.DUMP}'
+
+    def __init__(self, *args, tasks=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.tasks = tasks
         self.units = self.METAL
         self.atom_style = self.ATOMIC
+        if self.tasks is None:
+            self.tasks = [self.XYZ]
 
     def writeLammpsIn(self):
         """
@@ -21,7 +28,7 @@ class LammpsData(oplsua.LammpsDataBase):
             self.writeDescriptions()
             self.readData()
             self.writePairStyle()
-            self.writeData()
+            self.writeDump()
             self.writeEnergy()
 
     def writeDescriptions(self):
@@ -36,11 +43,19 @@ class LammpsData(oplsua.LammpsDataBase):
         self.in_fh.write("pair_style sw\n")
         self.in_fh.write(f"pair_coeff * * {self.ff} Si\n")
 
+    def writeDump(self):
+        dump = f"{self.DUMP} 1 all custom 1 {self.lammps_dump} id "
+        if self.XYZ in self.tasks:
+            dump += "xu yu zu "
+        if self.FORCE in self.tasks:
+            dump += "fx fy fz "
+        self.in_fh.write(f"{dump}\n")
+        self.in_fh.write(f"dump_modify 1 format float '%20.15f'\n")
+
     def writeEnergy(self):
         self.in_fh.write("run 0\n")
 
-    def writeData(self, adjust_coords=False):
-
+    def writeData(self, *args, **kwargs):
         with open(self.lammps_data, 'w') as self.data_fh:
             self.setAtoms()
             self.writeDescription()

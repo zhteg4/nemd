@@ -70,6 +70,7 @@ class Dispersion(object):
     Si_LAMMPS = os.path.join(ALAMODE_SRC, 'example', 'Si_LAMMPS')
     SI_FF = os.path.join(Si_LAMMPS, 'Si.sw')
     LAMMPS_EXT = '.lammps'
+    DFSET_HARMONIC_EXT = '.dfset_harmonic'
 
     def __init__(self, options):
         """
@@ -79,7 +80,10 @@ class Dispersion(object):
         self.xbuild = None
         self.ala_log_reader = None
         self.lmp_dat = None
+        self.orig_lammps_data = None
         self.datafiles = None
+        self.dumpfiles = []
+        self.k_file = f"{self.options.jobname}{self.DFSET_HARMONIC_EXT}"
 
     def run(self):
         self.buildCell()
@@ -87,6 +91,7 @@ class Dispersion(object):
         self.writeLammpsFile()
         self.writeDisplacements()
         self.runLammps()
+        self.combineKFile()
 
     def buildCell(self):
         self.xbuild = xtal.CrystalBuilder(
@@ -106,13 +111,17 @@ class Dispersion(object):
 
     def writeLammpsFile(self):
         mol = self.xbuild.getMol()
-        self.lmp_dat = stillinger.LammpsData({1: mol}, self.SI_FF,
-                                             self.options.jobname)
+        tasks = [stillinger.LammpsData.XYZ, stillinger.LammpsData.FORCE]
+        self.lmp_dat = stillinger.LammpsData({1: mol},
+                                             self.SI_FF,
+                                             self.options.jobname,
+                                             tasks=tasks)
         self.lmp_dat.writeData()
-        log(f"LAMMPS data file written as {self.lmp_dat.lammps_data}")
+        self.orig_lammps_data = self.lmp_dat.lammps_data
+        log(f"LAMMPS data file written as {self.orig_lammps_data}")
 
     def writeDisplacements(self):
-        cmd = f"{jobutils.RUN_NEMD} displace.py --LAMMPS {self.lmp_dat.lammps_data} " \
+        cmd = f"{jobutils.RUN_NEMD} displace.py --LAMMPS {self.orig_lammps_data} " \
               f"--prefix {self.options.jobname} --mag 0.01 " \
               f"-pf {self.ala_log_reader.disp_pattern_file}"
         info = subprocess.run(cmd, capture_output=True, shell=True)
@@ -130,14 +139,24 @@ class Dispersion(object):
         pattern = f"{name}(.*){self.LAMMPS_EXT}"
         for datafile in self.datafiles:
             index = re.search(pattern, datafile).groups()[0]
-            self.lmp_dat.lammps_in = f"{self.options.jobname}{index}{self.lmp_dat.IN_EXT}"
-            self.lmp_dat.lammps_data = datafile
+            jobname = f"{self.options.jobname}{index}"
+            self.lmp_dat.resetFilenames(jobname)
+            self.lmp_dat.lammps_data = f"{jobname}{self.LAMMPS_EXT}"
             self.lmp_dat.writeLammpsIn()
+            self.dumpfiles.append(self.lmp_dat.lammps_dump)
             lmp_log = f"{self.options.jobname}{index}{task.Lammps_Driver.DRIVER_LOG}"
             cmd = f"{task.Lammps_Driver.LMP_SERIAL} {task.Lammps_Driver.FLAG_IN} " \
-                  f"{self.lmp_dat.lammps_in} {task.Lammps_Driver.FLAG_LOG} {lmp_log}"
-            info = subprocess.run(cmd, capture_output=True, shell=True)
+                  f"{self.lmp_dat.lammps_in} {task.Lammps_Driver.FLAG_LOG} {lmp_log} " \
+                  f"{task.Lammps_Driver.FLAG_SCREEN} none"
             log(f"Running {cmd}")
+            subprocess.run(cmd, capture_output=True, shell=True)
+
+    def combineKFile(self):
+        cmd = f"{jobutils.RUN_NEMD} extract.py --LAMMPS {self.orig_lammps_data} " \
+              f"{' '.join(self.dumpfiles)}"
+        info = subprocess.run(cmd, capture_output=True, shell=True)
+        with open(self.k_file, 'wb') as fh:
+            fh.write(info.stdout)
 
         # jobutils.add_outfile(lmp_dat.lammps_data, jobname=self.options.jobname)
         # jobutils.add_outfile(lmp_dat.lammps_in,
