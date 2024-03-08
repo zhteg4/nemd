@@ -8,7 +8,8 @@ Original file is located at
 """
 
 import torch
-tensor = torch.tensor([1,2,3])
+
+tensor = torch.tensor([1, 2, 3])
 tensor + 10
 torch.add(tensor, 10)
 tensor * tensor
@@ -26,7 +27,7 @@ torch.matmul(tensor, tensor)
 # torch.matmul(tensor, tensor)
 # print(value)
 
-tensor_A = torch.tensor([[1, 2],[3, 4],[5, 6]])
+tensor_A = torch.tensor([[1, 2], [3, 4], [5, 6]])
 tensor_B = torch.tensor([[7, 10, 10], [3, 4, 34], [5, 6, 3]])
 torch.mm(tensor_B, tensor_A)
 torch.mm(tensor_A.T, tensor_B)
@@ -52,8 +53,8 @@ torch.arange(0, 10).shape
 x_original = torch.rand(size=(224, 220, 3))
 x_permuted = x_original.permute(2, 0, 1)
 print(x_original.shape, x_permuted.shape)
-x_original[0, 0, 0], x_permuted[0,0,0]
-x_original[0, 0, 1], x_permuted[0,0,1]
+x_original[0, 0, 0], x_permuted[0, 0, 0]
+x_original[0, 0, 1], x_permuted[0, 0, 1]
 x_original[0, 0, 0]
 x_original[0, 0, 0] = 2
 x_original[0, 0, 0], x_permuted[0, 0, 0]

@@ -29,9 +29,11 @@ class CrystalBuilder(object):
         self.setSuperCell()
 
     def setSuperCell(self):
-        cell = crystals.Crystal.from_database(self.name)
-        vect = [x * y for x, y in zip(cell.lattice_vectors, self.scale_factor)]
-        ucell_xtal = crystals.Crystal(cell, vect)
+        self.cell = crystals.Crystal.from_database(self.name)
+        vect = [
+            x * y for x, y in zip(self.cell.lattice_vectors, self.scale_factor)
+        ]
+        ucell_xtal = crystals.Crystal(self.cell, vect)
         self.scell = ucell_xtal.supercell(*self.dim)
 
     def getMol(self):
@@ -63,7 +65,9 @@ class CrystalBuilder(object):
         ala_log_reader = alamodeutils.AlaLogReader(filename)
 
     def runAlm(self, mode=alamodeutils.AlaWriter.SUGGEST):
-        ala_writer = alamodeutils.AlaWriter(self.scell,
+        cell = self.cell.primitive(
+        ) if mode == alamodeutils.AlaWriter.PHONONS else self.scell
+        ala_writer = alamodeutils.AlaWriter(cell,
                                             jobname=self.jobname,
                                             mode=mode)
         ala_writer.run()

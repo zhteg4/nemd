@@ -8,6 +8,7 @@ Original file is located at
 """
 
 import torch
+
 print(torch.__version__)
 
 scalar = torch.tensor(7)
@@ -16,33 +17,35 @@ scalar.item()
 vector = torch.tensor([7, 7])
 vector.ndim
 
-MATRIX = torch.tensor([[7,8], [9, 10]])
+MATRIX = torch.tensor([[7, 8], [9, 10]])
 MATRIX
 MATRIX.ndim, MATRIX.shape
 
-TENSOR = torch.tensor([[[1,2,3],[1,3,5],[7,2,7]]])
+TENSOR = torch.tensor([[[1, 2, 3], [1, 3, 5], [7, 2, 7]]])
 TENSOR.ndim, TENSOR.shape
 
-
-
 # Create a random tensor of size (3, 4)
-random_tensor = torch.rand(3,4)
+random_tensor = torch.rand(3, 4)
 random_tensor.ndim
 
-random_image_size_tensor = torch.rand(size=(224,224,3)) # height, width, color channel
+random_image_size_tensor = torch.rand(size=(224, 224,
+                                            3))  # height, width, color channel
 random_image_size_tensor.shape, random_image_size_tensor.ndim
 
-zeros = torch.zeros(size=(3,4))
+zeros = torch.zeros(size=(3, 4))
 zeros
 
-ones = torch.ones(size=(3,4))
+ones = torch.ones(size=(3, 4))
 ones, ones.dtype
 
 one_to_ten = torch.arange(0, 10)
 ten_zeros = torch.zeros_like(input=one_to_ten)
 ten_zeros
 
-float_32_tensor = torch.tensor([3.0, 6, 9], dtype=torch.float32, device=None, requires_grad=False)
+float_32_tensor = torch.tensor([3.0, 6, 9],
+                               dtype=torch.float32,
+                               device=None,
+                               requires_grad=False)
 float_32_tensor.dtype
 
 float_16_tensor = float_32_tensor.type(torch.float16)

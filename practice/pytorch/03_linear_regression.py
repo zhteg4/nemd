@@ -8,7 +8,7 @@ Original file is located at
 """
 
 import torch
-from torch import nn # building blocks for neural network
+from torch import nn  # building blocks for neural network
 import matplotlib.pyplot as plt
 
 weight = 0.7
@@ -25,28 +25,35 @@ X_test, y_test = X[train_split:], y[train_split:]
 
 len(X_train), len(y_train), len(X_test), len(y_test)
 
+
 def plot_predictions(train_data=X_train,
                      train_labels=y_train,
                      test_data=X_test,
                      test_labels=y_test,
                      predictions=None):
-  plt.figure(figsize=(10, 7))
-  plt.scatter(train_data, train_labels, c='b', s=4, label='train data')
-  plt.scatter(test_data, test_labels, c='g', label='test data')
-  if predictions is not None:
-    plt.scatter(test_data, predictions, c='r', s=4, label='Predictions')
-  plt.legend(prop={'size': 12})
+    plt.figure(figsize=(10, 7))
+    plt.scatter(train_data, train_labels, c='b', s=4, label='train data')
+    plt.scatter(test_data, test_labels, c='g', label='test data')
+    if predictions is not None:
+        plt.scatter(test_data, predictions, c='r', s=4, label='Predictions')
+    plt.legend(prop={'size': 12})
+
 
 plot_predictions()
 
-class LinearRegressionModel(nn.Module):
-  def __init__(self):
-    super().__init__()
-    self.weights = nn.Parameter(torch.randn(1, requires_grad=True, dtype=torch.float))
-    self.bias = nn.Parameter(torch.rand(1, requires_grad=True, dtype=torch.float))
 
-  def forward(self, x: torch.Tensor) -> torch.Tensor:
-    return self.weights * x + self.bias
+class LinearRegressionModel(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        self.weights = nn.Parameter(
+            torch.randn(1, requires_grad=True, dtype=torch.float))
+        self.bias = nn.Parameter(
+            torch.rand(1, requires_grad=True, dtype=torch.float))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.weights * x + self.bias
+
 
 torch.manual_seed(42)
 
@@ -55,6 +62,6 @@ list(model_0.parameters())
 model_0.state_dict()
 
 with torch.inference_mode():
-  y_preds = model_0(X_test)
+    y_preds = model_0(X_test)
 
 y_preds

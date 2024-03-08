@@ -8,21 +8,23 @@ Original file is located at
 """
 
 import torch
+
 RANDOM_SEED = 42
 torch.manual_seed(RANDOM_SEED)
 random_tensor_D = torch.rand(3, 4)
 random_tensor_D
 
-!nvidia-smi
+#!nvidia-smi
 
 import torch
+
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 torch.cuda.device_count()
 
-tensor = torch.tensor([1,2,3], device='cpu')
+tensor = torch.tensor([1, 2, 3], device='cpu')
 print(tensor, tensor.device)
 
-tensor = torch.tensor([1,2,3], device=device)
+tensor = torch.tensor([1, 2, 3], device=device)
 print(tensor, tensor.device)
 
 # TypeError: can't convert cuda:0 device type tensor to numpy.

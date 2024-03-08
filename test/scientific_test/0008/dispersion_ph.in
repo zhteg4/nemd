@@ -1,0 +1,16 @@
+&general
+  PREFIX = dispersion
+  MODE = phonons
+  FCSXML = dispersion.xml
+  NKD = 1
+  KD = Si
+  MASS = 28.085
+/
+
+&cell
+  1
+  0.00000000 5.13126783 5.13126783
+  5.13126783 0.00000000 5.13126783
+  5.13126783 5.13126783 0.00000000
+/
+

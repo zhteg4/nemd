@@ -44,19 +44,21 @@ class AlaWriter(object):
     CUTOFF = 'cutoff'
     POSITION = 'position'
 
+    KPOINT = 'kpoint'
+
     EXT = {OPTIMIZE: DFSET, SUGGEST: PAT, PHONONS: PH}
 
     def __init__(self, scell, jobname=None, mode=SUGGEST):
         """
         """
-        self.scell = scell
+        self.cell = scell
         self.jobname = jobname
-        self.elements = list(self.scell.chemical_composition.keys())
+        self.elements = list(self.cell.chemical_composition.keys())
         self.mode = mode
         self.data = {}
         if self.jobname is None:
-            dimensions = 'x'.join(map(str, self.scell.dimensions))
-            self.jobname = f"{self.scell.chemical_formula}_{dimensions}"
+            dimensions = 'x'.join(map(str, self.cell.dimensions))
+            self.jobname = f"{self.cell.chemical_formula}_{dimensions}"
         self.filename = f"{self.jobname}_{self.EXT[self.mode]}{self.IN}"
 
     def run(self):
@@ -69,10 +71,11 @@ class AlaWriter(object):
         self.setCell()
         self.setCutoff()
         self.setPosition()
+        self.setKpoint()
         self.write()
 
     def setGeneral(self):
-        nat = len(self.scell.atoms)
+        nat = len(self.cell.atoms)
         nkd = len(self.elements)
         kd = ','.join(self.elements)
         general = [
@@ -84,7 +87,7 @@ class AlaWriter(object):
             general += [f"{self.FCSXML} = {self.jobname}{self.XML_EXT}"]
         general += [f"{self.NKD} = {nkd}", f"{self.KD} = {kd}"]
         if self.mode == self.PHONONS:
-            unitcell = [x for x in self.scell.unitcell][0]
+            unitcell = [x for x in self.cell.unitcell][0]
             general += [f"{self.MASS} = {unitcell.mass}"]
         self.data[self.GENERAL] = general
 
@@ -105,9 +108,9 @@ class AlaWriter(object):
         bohr_radius = scipy.constants.physical_constants['Bohr radius'][0]
         angstrom = scipy.constants.angstrom
         scale = angstrom / bohr_radius  # Bohr unit
-        vectors = self.scell.lattice_vectors
+        vectors = self.cell.lattice_vectors
         if self.mode in [self.SUGGEST, self.OPTIMIZE]:
-            vectors = [x * y for x, y in zip(vectors, self.scell.dimensions)]
+            vectors = [x * y for x, y in zip(vectors, self.cell.dimensions)]
         self.vectors = [x * scale for x in vectors]
         cell = ["1"] + [self.pos_fmt(x) for x in self.vectors]
         self.data[self.CELL] = cell
@@ -124,14 +127,21 @@ class AlaWriter(object):
     def setPosition(self):
         if self.mode not in [self.SUGGEST, self.OPTIMIZE]:
             return
-        atoms = [x for x in self.scell.atoms]
+        atoms = [x for x in self.cell.atoms]
         atoms = sorted(atoms, key=lambda x: tuple(x.coords_fractional))
-        pos = [[x.element, x.coords_fractional / self.scell.dimensions]
+        pos = [[x.element, x.coords_fractional / self.cell.dimensions]
                for x in atoms]
         pos = [
             f"{self.elements.index(e) + 1} {self.pos_fmt(x)}" for e, x in pos
         ]
         self.data[self.POSITION] = pos
+
+    def setKpoint(self):
+        if self.mode != self.PHONONS:
+            return
+        self.data[self.KPOINT] = ['1\n # line mode']
+        import pdb
+        pdb.set_trace()
 
     def write(self):
         with open(self.filename, 'w') as fh:
