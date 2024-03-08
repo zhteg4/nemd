@@ -101,7 +101,6 @@ class Reciprocal:
         sel_x = np.logical_and(self.real_xs >= min_x, self.real_xs <= max_x)
         sel_y = np.logical_and(self.real_ys >= min_y, self.real_ys <= max_y)
         sel = np.logical_and(sel_x, sel_y)
-        # import pdb; pdb.set_trace()
         self.ax.scatter(self.real_xs[sel].tolist(),
                         self.real_ys[sel].tolist(),
                         marker='o',
@@ -138,6 +137,7 @@ class Reciprocal:
                 plt.show(block=True)
             fname = self.options.jobname + self.PNG_EXT
             fig.savefig(fname)
+            jobutils.add_outfile(fname, jobname=self.options.jobname)
         log(f'Figure saved as {fname}')
 
     def plotVect(self, pnt, text, color='b'):
