@@ -1,0 +1,10 @@
+..........Command Options..........
+interactive: False
+jobname: reciprocal_lattice
+debug: False
+cpu: 4
+JobStart: 13:22:45 03/08/24
+...................................
+Figure saved as reciprocal_lattice.png
+Finished.
+13:22:45 03/08/24
