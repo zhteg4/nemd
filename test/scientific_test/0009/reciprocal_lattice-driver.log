@@ -1,10 +1,11 @@
 ..........Command Options..........
-interactive: False
+interactive: True
 jobname: reciprocal_lattice
 debug: False
 cpu: 4
-JobStart: 13:27:53 03/08/24
+miller_indices: 0, 2
+JobStart: 12:00:03 03/12/24
 ...................................
 Figure saved as reciprocal_lattice.png
 Finished.
-13:27:54 03/08/24
+12:00:11 03/12/24

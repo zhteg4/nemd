@@ -6,7 +6,7 @@ interactive: False
 jobname: dispersion
 debug: False
 cpu: 4
-JobStart: 11:42:06 03/06/24
+JobStart: 14:27:29 03/11/24
 ...................................
 The supper cell is created with the lattice parameters being (5.4307, 5.4307, 5.4307, 90.0, 90.0, 90.0)
 LAMMPS data file written as dispersion.data

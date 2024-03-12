@@ -5,7 +5,7 @@
 
  Number of OpenMP threads = 8
 
- Job started at Wed Mar  6 11:42:07 2024
+ Job started at Mon Mar 11 14:27:31 2024
 
 
  Input variables:
@@ -132,7 +132,7 @@
     64   8.750000e-01   8.750000e-01   6.250000e-01    1
 
 
-  Time Elapsed: 0.003548 sec.
+  Time Elapsed: 0.003705 sec.
 
  -------------------------------------------------------------------
 
@@ -181,7 +181,7 @@
     31 |    55   63
     32 |    56   64
 
-  Time Elapsed: 0.227319 sec.
+  Time Elapsed: 0.211512 sec.
 
  -------------------------------------------------------------------
 
@@ -232,7 +232,7 @@
                8   14.5134 (  3) -  14( Si)  42( Si)  45( Si)
                9   17.7752 (  1) -  46( Si)
 
-  Time Elapsed: 0.291838 sec.
+  Time Elapsed: 0.274026 sec.
 
  -------------------------------------------------------------------
 
@@ -243,7 +243,7 @@
 
   Number of  HARMONIC FCs : 7
 
-  Time Elapsed: 0.29835 sec.
+  Time Elapsed: 0.280174 sec.
 
  -------------------------------------------------------------------
 
@@ -270,7 +270,7 @@
 
   Number of free HARMONIC FCs : 6
 
-  Time Elapsed: 0.30116 sec.
+  Time Elapsed: 0.282979 sec.
 
  -------------------------------------------------------------------
 
@@ -295,7 +295,7 @@
   Residual sum of squares for the solution: 0.00377683
   Fitting error (%) : 42.7479
 
-  Time Elapsed: 0.313205 sec.
+  Time Elapsed: 0.302545 sec.
 
  -------------------------------------------------------------------
 
@@ -304,5 +304,5 @@
  Force constants in a human-readable format : dispersion.fcs
  Input data for the phonon code ANPHON      : dispersion.xml
 
- Job finished at Wed Mar  6 11:42:08 2024
+ Job finished at Mon Mar 11 14:27:32 2024
 
