@@ -3,9 +3,13 @@ interactive: True
 jobname: reciprocal_lattice
 debug: False
 cpu: 4
-miller_indices: 0, 2
-JobStart: 12:00:03 03/12/24
+miller_indices: 1, 10
+JobStart: 17:51:06 03/12/24
 ...................................
+The vector in reciprocal Space is: [0.90659341 1.28476296] with 1.5724272550828768 as the norm.
+The vector in reciprocal Space is: [2.30383461 3.26483886] with 3.995851182857053 being the norm.
+The cross product is -4.441e-16
+The product is  2 * pi
 Figure saved as reciprocal_lattice.png
 Finished.
-12:00:11 03/12/24
+17:51:13 03/12/24

@@ -126,18 +126,12 @@ setup(name='nemd',
           'dash_bootstrap_components', 'pytest == 7.3.2', 'dash[testing]',
           'pyqt5 == 5.15.7', 'webdriver-manager == 3.8.6', 'flask >= 2.2.5',
           'openpyxl == 3.1.2', 'sh == 2.0.4', 'humanfriendly == 10.0',
-          'Pillow == 9.4.0', 'pyvim'
+          'Pillow == 9.4.0', 'pyvim', 'adjustText'
       ],
       extras_require={
           'dev': [
-              'ipdb',
-              'ipython',
-              'notebook',
-              'jupyterlab',
-              'yapf',
-              'RBTools == 4.1',
-              'snakeviz',
-              'pyvim',
+              'ipdb', 'ipython', 'notebook', 'jupyterlab', 'yapf',
+              'RBTools == 4.1', 'snakeviz', 'pyvim'
           ]
       },
       classifiers=[
