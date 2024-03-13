@@ -11,6 +11,7 @@ from nemd import environutils
 
 RUN_NEMD = 'run_nemd'
 ALM = 'alm'
+ANPHON = 'anphon'
 OUTFILE = 'outfile'
 LOGFILE = 'logfile'
 OUTFILES = 'outfiles'

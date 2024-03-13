@@ -48,6 +48,22 @@ class AlaWriter(object):
 
     EXT = {OPTIMIZE: DFSET, SUGGEST: PAT, PHONONS: PH}
 
+    # https://en.wikipedia.org/wiki/Brillouin_zone
+    # https://www.businessballs.com/glossaries-and-terminology/greek-alphabet/
+    # Center of the Brillouin zone
+    GAMMA = 'G'
+    GAMMA_PNT = '0 0 0'
+    # Simple cube
+    # Center of a face
+    CHI = 'X'
+    CHI_PNT = '0.5 0.5 0.0'
+    # Corner point
+    RHO = 'R'
+    RHO_PNT = '0.5 0.5 1'
+    # Center of a hexagonal face
+    LAMBDA = 'L'
+    LAMBDA_PNT = '0.5 0.5 0.5'
+
     def __init__(self, scell, jobname=None, mode=SUGGEST):
         """
         """
@@ -136,12 +152,21 @@ class AlaWriter(object):
         ]
         self.data[self.POSITION] = pos
 
-    def setKpoint(self):
+    def setKpoint(self, num=51):
+
         if self.mode != self.PHONONS:
             return
-        self.data[self.KPOINT] = ['1\n # line mode']
-        import pdb
-        pdb.set_trace()
+        self.data[self.KPOINT] = ['1 # line mode']
+        lines = [
+            f"{self.GAMMA} {self.GAMMA_PNT} {self.CHI} {self.CHI_PNT} {num}"
+        ]
+        lines += [
+            f"{self.RHO} {self.RHO_PNT} {self.GAMMA} {self.GAMMA_PNT} {num}"
+        ]
+        lines += [
+            f"{self.GAMMA} {self.GAMMA_PNT} {self.LAMBDA} {self.LAMBDA_PNT} {num}"
+        ]
+        self.data[self.KPOINT] += lines
 
     def write(self):
         with open(self.filename, 'w') as fh:
@@ -161,6 +186,8 @@ class AlaLogReader(object):
     SUGGESTED_DSIP_FILE = 'Suggested displacement patterns are printed in ' \
                           'the following files:'
     INPUT_FOR_ANPHON = 'Input data for the phonon code ANPHON      :'
+    PHONON_BAND_STRUCTURE = "Phonon band structure"
+    PHONON_BAND_STRUCTURE_EXT = ": " + PHONON_BAND_STRUCTURE
 
     def __init__(self, filename):
         self.filename = filename
@@ -177,3 +204,7 @@ class AlaLogReader(object):
     def getAfcsXml(self):
         lines = sh.grep(self.INPUT_FOR_ANPHON, self.filename, '-A 1')
         return lines.split()[-1]
+
+    def getPhBands(self):
+        lines = sh.grep(self.PHONON_BAND_STRUCTURE_EXT, self.filename)
+        return lines.split()[0]

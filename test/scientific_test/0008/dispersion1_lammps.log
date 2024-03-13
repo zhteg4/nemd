@@ -8,7 +8,7 @@ Reading data file ...
   1 by 1 by 1 MPI processor grid
   reading atoms ...
   64 atoms
-  read_data CPU = 0.001 seconds
+  read_data CPU = 0.003 seconds
 pair_style sw
 pair_coeff * * /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si.sw Si
 Reading sw potential file /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si.sw with DATE: 2007-06-11
@@ -31,9 +31,9 @@ Neighbor list info ...
 Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
    Step          Temp          E_pair         E_mol          TotEng         Press     
          0   0             -277.54139      0             -277.54139      141.10654    
-Loop time of 2.358e-06 on 1 procs for 0 steps with 64 atoms
+Loop time of 2.707e-06 on 1 procs for 0 steps with 64 atoms
 
-127.2% CPU use with 1 MPI tasks x no OpenMP threads
+147.8% CPU use with 1 MPI tasks x no OpenMP threads
 
 MPI task timing breakdown:
 Section |  min time  |  avg time  |  max time  |%varavg| %total
@@ -43,7 +43,7 @@ Neigh   | 0          | 0          | 0          |   0.0 |  0.00
 Comm    | 0          | 0          | 0          |   0.0 |  0.00
 Output  | 0          | 0          | 0          |   0.0 |  0.00
 Modify  | 0          | 0          | 0          |   0.0 |  0.00
-Other   |            | 2.358e-06  |            |       |100.00
+Other   |            | 2.707e-06  |            |       |100.00
 
 Nlocal:             64 ave          64 max          64 min
 Histogram: 1 0 0 0 0 0 0 0 0 0

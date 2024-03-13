@@ -1,8 +1,8 @@
 # This software is licensed under the BSD 3-Clause License.
 # Authors: Teng Zhang (zhteg4@gmail.com)
 """
-Calculate dispersion by building crystal, symmetry search, displacement, force
-constant, and xxx.
+Calculate dispersion by crystal build, symmetry search, displacement, force
+constant, Kpace mesh and mode analysis.
 """
 import os
 import re
@@ -161,11 +161,9 @@ class Dispersion(object):
         log(f"{alamodeutils.AlaLogReader.INPUT_FOR_ANPHON}: {self.afcs_xml} ")
 
     def calculateDispersion(self):
-        self.xbuild.writePhbandIn()
-        # jobutils.add_outfile(lmp_dat.lammps_data, jobname=self.options.jobname)
-        # jobutils.add_outfile(lmp_dat.lammps_in,
-        #                      jobname=self.options.jobname,
-        #                      set_file=True)
+        self.ph_bonds_file = self.xbuild.writePhbands()
+        log(f"{alamodeutils.AlaLogReader.PHONON_BAND_STRUCTURE} is saved as {self.ph_bonds_file}"
+            )
 
 
 def get_parser(parser=None, jflags=None):

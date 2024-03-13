@@ -13,6 +13,11 @@ from nemd import alamodeutils
 
 
 class CrystalBuilder(object):
+    EXECUTABLE = {
+        alamodeutils.AlaWriter.SUGGEST: jobutils.ALM,
+        alamodeutils.AlaWriter.PHONONS: jobutils.ANPHON,
+        alamodeutils.AlaWriter.OPTIMIZE: jobutils.ALM
+    }
 
     def __init__(self,
                  name,
@@ -60,9 +65,10 @@ class CrystalBuilder(object):
         ala_log_reader = alamodeutils.AlaLogReader(filename)
         return ala_log_reader.getAfcsXml()
 
-    def writePhbandIn(self):
+    def writePhbands(self):
         filename = self.runAlm(mode=alamodeutils.AlaWriter.PHONONS)
         ala_log_reader = alamodeutils.AlaLogReader(filename)
+        return ala_log_reader.getPhBands()
 
     def runAlm(self, mode=alamodeutils.AlaWriter.SUGGEST):
         cell = self.cell.primitive(
@@ -71,8 +77,8 @@ class CrystalBuilder(object):
                                             jobname=self.jobname,
                                             mode=mode)
         ala_writer.run()
-
-        cmd = f"{jobutils.ALM} {ala_writer.filename}"
+        executable = self.EXECUTABLE[mode]
+        cmd = f"{executable} {ala_writer.filename}"
         info = subprocess.run(cmd, capture_output=True, shell=True)
         if bool(info.stderr):
             raise ValueError(info.stderr)
