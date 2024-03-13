@@ -1,0 +1,9 @@
+# Python Vs C++ Vs Java; interpreted language, compiled language, bytecode languages
+https://www.youtube.com/watch?v=hnlz0YYCpBU
+# Power ON -> BIOS/UEFI -> POST (hardware)
+# UEFI finds and uses boot loader (e.g., grub2) to locates, loads, and run kernel
+# kernel does device driver, kernal module, and background
+# kernel also uses systemd (hardware driver, mount disk, network, sound, power, login, panel)
+https://www.youtube.com/watch?v=XpFsMB6FoOs
+# Linux File System
+https://www.youtube.com/watch?v=bbmWOjuFmgA
