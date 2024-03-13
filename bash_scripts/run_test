@@ -1,8 +1,8 @@
-${@:1}
-
+SCRIPTS=${@:1}
 if [ -z "$1" ]; then
-    python3 -m pytest  -s --pdb $NEMD_SRC/test/module/*_test.py $NEMD_SRC/test/*_test.py
-    exit
+    SCRIPTS="$NEMD_SRC/test/module/*_test.py $NEMD_SRC/test/*_test.py"
 fi
+SCRIPT_ARGS="python3 -m pytest  -s --pdb $SCRIPTS"
 
-python3 -m pytest  -s --pdb ${@:1}
+echo "$SCRIPT_ARGS"
+$SCRIPT_ARGS

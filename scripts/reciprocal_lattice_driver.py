@@ -10,7 +10,6 @@ import os
 import sys
 import math
 import numpy as np
-import adjustText
 
 from nemd import jobutils
 from nemd import logutils
@@ -54,259 +53,6 @@ def log_error(msg):
     """
     log(msg + '\nAborting...', timestamp=True)
     sys.exit(1)
-
-
-class LatticePlotter:
-
-    def __init__(self, ax, a_vect=None, b_vect=None, indices=None, color='b'):
-        """
-        :param ax 'matplotlib.axes._axes.Axes': axis to plot
-        :param a_vect: a vector
-        :param b_vect: b vector
-        :param indices: the Miller Indexes
-        :param color: the color of the lines and arrows
-        """
-        self.ax = ax
-        self.a_vect = a_vect
-        self.b_vect = b_vect
-        self.indices = indices
-        self.color = color
-        self.ma_vect = None
-        self.mb_vect = None
-        self.origin = np.array([0., 0.])
-        self.texts = []
-        self.vect = None
-
-    def run(self):
-        """
-        Main method to run.
-        """
-        self.setGrids()
-        self.plotGrids()
-        self.plotVect(self.a_vect, 'a', color=self.color)
-        self.plotVect(self.b_vect, 'b', color=self.color)
-        self.setVects()
-        self.plotVect(self.ma_vect, 'ma', color='r', linestyle="--")
-        self.plotVect(self.mb_vect, 'mb', color='r', linestyle="--")
-        self.plotPlanes(index=-1)
-        self.plotPlanes(index=0)
-        self.plotPlanes(index=1)
-        self.plotPlaneNorm()
-        self.setPlotStyle()
-
-    def plotVect(self,
-                 vect,
-                 text,
-                 xytext=None,
-                 color='b',
-                 linestyle="-",
-                 arrowstyle="->"):
-        """
-        Plot an arrow for the vector.
-
-        :param vect list: list of two points
-        :param text: the label for the arrow
-        :param color: the color of the arrow
-        :param linestyle: the line style of the arrow
-        """
-        if not any(vect):
-            return
-        if xytext is None:
-            xytext = self.origin
-        arrowprops = dict(linestyle=linestyle,
-                          arrowstyle=arrowstyle,
-                          color=color)
-        self.ax.annotate("", xy=vect, xytext=xytext, arrowprops=arrowprops)
-        text = self.ax.annotate(text, xy=(vect + xytext) / 2, color=color)
-        self.texts.append(text)
-
-    def setGrids(self, num=6):
-        """
-        Set the grids based on the lattice vectors, and crop the grids by a
-        rectangular.
-
-        :param num int: the minimum number of duplicates along each lattice vector.
-        """
-        num = max(self.indices + [num]) + 2
-        xv, yv = np.meshgrid(range(-num, num + 1), range(-num, num + 1))
-        xs = xv * self.a_vect[0] + yv * self.b_vect[0]
-        ys = xv * self.a_vect[1] + yv * self.b_vect[1]
-        bottom_idx = np.unravel_index(ys.argmin(), ys.shape)
-        top_idx = np.unravel_index(ys.argmax(), ys.shape)
-        left_idx = np.unravel_index(xs.argmin(), xs.shape)
-        right_idx = np.unravel_index(xs.argmax(), xs.shape)
-        tl_x = (xs[top_idx] + xs[left_idx]) / 2
-        tl_y = (ys[top_idx] + ys[left_idx]) / 2
-        tr_x = (xs[top_idx] + xs[right_idx]) / 2
-        tr_y = (ys[top_idx] + ys[right_idx]) / 2
-        bl_x = (xs[bottom_idx] + xs[left_idx]) / 2
-        bl_y = (ys[bottom_idx] + ys[left_idx]) / 2
-        br_x = (xs[bottom_idx] + xs[right_idx]) / 2
-        br_y = (ys[bottom_idx] + ys[right_idx]) / 2
-        self.min_x = max(tl_x, bl_x)
-        self.max_x = min(tr_x, br_x)
-        self.min_y = max(bl_y, br_y)
-        self.max_y = min(tl_y, tr_y)
-        sel_x = np.logical_and(xs >= self.min_x, xs <= self.max_x)
-        sel_y = np.logical_and(ys >= self.min_y, ys <= self.max_y)
-        sel = np.logical_and(sel_x, sel_y)
-        self.xs = (xs[sel] + self.origin[0]).tolist()
-        self.ys = (ys[sel] + self.origin[1]).tolist()
-
-    def plotGrids(self):
-        """
-        Plot the cropped grids.
-        """
-        self.ax.scatter(self.xs, self.ys, marker='o', alpha=0.5)
-
-    def setVects(self):
-        """
-        Set the vectors for Miller Plane.
-        """
-        self.ma_vect = self.a_vect * self.indices[0]
-        self.mb_vect = self.b_vect * self.indices[1]
-
-    def plotPlanes(self, index=1):
-        """
-        Plot the Miller plane moved by the index factor.
-
-        :param index int: by this factor the Miller plane is moved.
-        """
-
-        sel_pnts = self.selectPoints(index=index)
-        if np.isclose(*sel_pnts[:, 0]):
-            ymin, ymax = sorted(sel_pnts[:, 1])
-            self.ax.vlines(np.average(sel_pnts[:, 0]),
-                           ymin,
-                           ymax,
-                           linestyles='--',
-                           colors='r')
-            return
-        self.ax.plot(sel_pnts[:, 0], sel_pnts[:, 1], linestyle='--', color='r')
-
-    def selectPoints(self, index=1):
-        """
-        Get two intersection points of the miller plane crossing the boundary.
-
-        :param index int: by this factor the Miller plane is moved.
-        """
-        if index == 0:
-            minus_pnts = self.getPoints(index=-1)
-            plus_pnts = self.getPoints(index=1)
-            pnts = np.average([minus_pnts, plus_pnts], axis=0)
-        else:
-            pnts = self.getPoints(index=index)
-
-        sel_pnts = [
-            pnt for pnt in pnts
-            if (pnt[0] >= self.min_x) and (pnt[0] <= self.max_x) and (
-                pnt[1] >= self.min_y) and (pnt[1] <= self.max_y)
-        ]
-        return np.array(sel_pnts)
-
-    def getPoints(self, index=1):
-        """
-        Get the point to draw the plane with proper translation.
-
-        :param index int: the Miller index plane is moved by this factor.
-        :return list: two points
-        """
-        ma_vect = self.ma_vect
-        if not ma_vect.any():
-            ma_vect = self.mb_vect + self.a_vect
-        mb_vect = self.mb_vect
-        if not mb_vect.any():
-            mb_vect = self.ma_vect + self.b_vect
-        mb_vect = mb_vect * index
-        ma_vect = ma_vect * index
-        ab = np.linalg.solve([mb_vect, ma_vect], [1, 1])
-        x_pnts = []
-        if ab[1]:
-            x_pnts = [[x, (1 - ab[0] * x) / ab[1]]
-                      for x in [self.min_x, self.max_x]]
-        y_pnts = []
-        if ab[0]:
-            y_pnts = [[(1 - ab[1] * y) / ab[0], y]
-                      for y in [self.min_y, self.max_y]]
-        return x_pnts + y_pnts
-
-    def plotPlaneNorm(self):
-        """
-        Plot the normal to a plane.
-        """
-        pnt1 = self.getDPoint(index=0)
-        pnt2 = self.getDPoint(index=1)
-        self.vect = pnt2 - pnt1
-        norm = np.linalg.norm(self.vect)
-        self.plotVect(pnt2,
-                      f'd={norm:.4g}',
-                      xytext=pnt1,
-                      color='g',
-                      arrowstyle='<->')
-        log(f"The vector in reciprocal Space is: {self.vect} with {norm} as the norm."
-            )
-
-    def getDPoint(self, index=1):
-        """
-        Get the intersection between the plane and its normal.
-
-        :param index int: the Miller index to define the plane.
-        :return list of two float: the intersection point
-        """
-        pnts = self.selectPoints(index=index)
-        vect = pnts[1] - pnts[0]
-        d_vect = np.dot([[0, 1], [-1, 0]], vect)
-        factor = np.linalg.solve(np.transpose([d_vect, -vect]), pnts[0])[0]
-        return d_vect * factor
-
-    def setPlotStyle(self):
-        """
-        Set the style of the plot including axis, title and so on.
-        """
-        adjustText.adjust_text(self.texts, ax=self.ax)
-        self.ax.set_aspect('equal')
-        self.ax.set_title('Real Space')
-
-
-class ReciprocalLatticePlotter(LatticePlotter):
-
-    def run(self):
-        """
-        Main method to run.
-        """
-        self.setGrids()
-        self.plotGrids()
-        self.setIndexes()
-        self.plotVect(self.a_vect, 'a', color=self.color)
-        self.plotVect(self.b_vect, 'b', color=self.color)
-        self.setVects()
-        self.plotVect(self.ma_vect, 'ma', color='r', linestyle="--")
-        self.plotVect(self.mb_vect, 'mb', color='r', linestyle="--")
-        self.plotVectSummation()
-        self.setPlotStyle()
-
-    def setIndexes(self):
-        """
-        Set the reciprocal index (lattice scalar) from real space Miller index.
-        """
-        self.indices = [1. / x if x else 0 for x in self.indices]
-
-    def plotVectSummation(self):
-        """
-        Plot the vector summation.
-        """
-        self.vect = self.ma_vect + self.mb_vect
-        norm = np.linalg.norm(self.vect)
-        self.plotVect(self.vect, f'r={norm:.4g}', color='g', linestyle="--")
-        log(f"The vector in reciprocal Space is: {self.vect} with {norm} being "
-            "the norm.")
-
-    def setPlotStyle(self):
-        """
-        Set the style of the plot including axis, title and so on.
-        """
-        super().setPlotStyle()
-        self.ax.set_title('Reciprocal Space')
 
 
 class Reciprocal:
@@ -358,20 +104,23 @@ class Reciprocal:
         """
         with plotutils.get_pyplot() as plt:
             fig = plt.figure(figsize=(15, 9))
-
             self.ax1 = fig.add_subplot(1, 2, 1)
             self.ax2 = fig.add_subplot(1, 2, 2)
-            ltp = LatticePlotter(self.ax1,
-                                 a_vect=self.a_vect,
-                                 b_vect=self.b_vect,
-                                 indices=self.options.miller_indices)
+            ltp = plotutils.LatticePlotter(self.ax1,
+                                           a_vect=self.a_vect,
+                                           b_vect=self.b_vect,
+                                           indices=self.options.miller_indices)
             ltp.run()
-            rltp = ReciprocalLatticePlotter(
+            log(f"The vector in the real space is: {ltp.vect} with "
+                f"{np.linalg.norm(ltp.vect)} being the norm.")
+            rltp = plotutils.ReciprocalLatticePlotter(
                 self.ax2,
                 a_vect=self.ga_vect,
                 b_vect=self.gb_vect,
                 indices=self.options.miller_indices)
             rltp.run()
+            log(f"The vector in the reciprocal space is: {rltp.vect} with "
+                f"{np.linalg.norm(rltp.vect)} being the norm.")
             log(f"The cross product is {np.cross(ltp.vect, rltp.vect): .4g}")
             log(f"The product is {np.dot(ltp.vect, rltp.vect) / np.pi: .4g} * pi"
                 )
