@@ -6,14 +6,17 @@ constant, Kpace mesh and mode analysis.
 """
 import os
 import re
+import sh
 import sys
 import glob
 import subprocess
+import pandas as pd
 
 from nemd import xtal
 from nemd import task
 from nemd import jobutils
 from nemd import logutils
+from nemd import plotutils
 from nemd import constants
 from nemd import stillinger
 from nemd import parserutils
@@ -71,6 +74,8 @@ class Dispersion(object):
     SI_FF = os.path.join(Si_LAMMPS, 'Si.sw')
     LAMMPS_EXT = '.lammps'
     DFSET_HARMONIC_EXT = '.dfset_harmonic'
+    THZ = 'THz'
+    PNG_EXT = '.png'
 
     def __init__(self, options):
         """
@@ -84,15 +89,17 @@ class Dispersion(object):
         self.dumpfiles = []
         self.dump_kfile = f"{self.options.jobname}{self.DFSET_HARMONIC_EXT}"
         self.afcs_xml = None
+        self.ph_bonds_file = None
 
     def run(self):
         self.buildCell()
         self.writeDataFile()
         self.writeDispPattern()
         self.writeDisplacement()
-        self.calculateForce()
+        self.writeForce()
         self.writeForceConstant()
-        self.calculateDispersion()
+        self.writeDispersion()
+        self.plot()
 
     def buildCell(self):
         self.xbuild = xtal.CrystalBuilder(
@@ -134,7 +141,7 @@ class Dispersion(object):
         self.datafiles = glob.glob(f"{name}*{self.LAMMPS_EXT}")
         log(f"Data files with displacements are written as: {self.datafiles}")
 
-    def calculateForce(self):
+    def writeForce(self):
         name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
         pattern = f"{name}(.*){self.LAMMPS_EXT}"
         for datafile in self.datafiles:
@@ -158,12 +165,61 @@ class Dispersion(object):
         with open(self.dump_kfile, 'wb') as fh:
             fh.write(info.stdout)
         self.afcs_xml = self.xbuild.writeForceConstant()
-        log(f"{alamodeutils.AlaLogReader.INPUT_FOR_ANPHON}: {self.afcs_xml} ")
+        log(f"{alamodeutils.AlaLogReader.INPUT_FOR_ANPHON} {self.afcs_xml} ")
 
-    def calculateDispersion(self):
+    def writeDispersion(self):
         self.ph_bonds_file = self.xbuild.writePhbands()
         log(f"{alamodeutils.AlaLogReader.PHONON_BAND_STRUCTURE} is saved as {self.ph_bonds_file}"
             )
+
+    def plot(self, unit=THZ):
+        with plotutils.get_pyplot() as plt:
+            data = pd.read_csv(self.ph_bonds_file,
+                               header=None,
+                               skiprows=3,
+                               delim_whitespace=True)
+            data = data.set_index(0)
+            if unit == self.THZ:
+                data *= constants.CM_INV_THZ
+
+            fig = plt.figure(figsize=(10, 6))
+            ax = fig.add_subplot(1, 1, 1)
+            for column in data.columns:
+                ax.plot(data.index, data[column], '-')
+            ax.set_xlim([data.index.min(), data.index.max()])
+            ymin = min([0, data.min().min()])
+            ymax = data.max().max()
+            ax.set_ylim([ymin, ymax * 1.05])
+
+            header = sh.head('-n', '2', self.ph_bonds_file).split('\n')[:2]
+            symbols, pnts = [x.strip('#').split() for x in header]
+            pnts = [float(x) for x in pnts]
+            # Adjacent K points may have the same value
+            same_ids = [
+                i for i in range(1, len(pnts)) if pnts[i - 1] == pnts[i]
+            ]
+            idxs = [x for x in range(len(pnts)) if x not in same_ids]
+            pnts = [pnts[i] for i in idxs]
+            symbols = [
+                symbols[i] if i +
+                1 not in same_ids else '|'.join([symbols[i], symbols[i + 1]])
+                for i in idxs
+            ]
+            ax.set_xticks(pnts)
+            ax.set_xticklabels(symbols)
+            for x_val in pnts[1:-1]:
+                ax.vlines(x_val, ymin, ymax, linestyles='--', color='k')
+            ax.set_xlabel('Wave vector')
+            ax.set_ylabel(f'Frequency ({unit})')
+
+            fig.tight_layout()
+            if self.options.interactive:
+                print(f"Showing the plot. Click X to close and continue..")
+                plt.show(block=True)
+            fname = self.options.jobname + self.PNG_EXT
+            fig.savefig(fname)
+            jobutils.add_outfile(fname, jobname=self.options.jobname)
+        log(f'Figure of phonon dispersion saved as {fname}')
 
 
 def get_parser(parser=None, jflags=None):

@@ -4,11 +4,11 @@ atom_style atomic
 boundary p p p
 read_data dispersion1.lammps
 Reading data file ...
-  triclinic box = (0 0 0) to (10.8614 10.8614 10.8614) with tilt (0 0 0)
+  triclinic box = (0 0 0) to (16.2957 16.2957 16.2957) with tilt (0 0 0)
   1 by 1 by 1 MPI processor grid
   reading atoms ...
-  64 atoms
-  read_data CPU = 0.003 seconds
+  216 atoms
+  read_data CPU = 0.002 seconds
 pair_style sw
 pair_coeff * * /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si.sw Si
 Reading sw potential file /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si.sw with DATE: 2007-06-11
@@ -21,19 +21,19 @@ Neighbor list info ...
   max neighbors/atom: 2000, page size: 100000
   master list distance cutoff = 5.77118
   ghost atom cutoff = 5.77118
-  binsize = 2.88559, bins = 4 4 4
+  binsize = 2.88559, bins = 6 6 6
   1 neighbor lists, perpetual/occasional/extra = 1 0 0
   (1) pair sw, perpetual
       attributes: full, newton on
       pair build: full/bin/atomonly
       stencil: full/bin/3d
       bin: standard
-Per MPI rank memory allocation (min/avg/max) = 3.074 | 3.074 | 3.074 Mbytes
+Per MPI rank memory allocation (min/avg/max) = 3.093 | 3.093 | 3.093 Mbytes
    Step          Temp          E_pair         E_mol          TotEng         Press     
-         0   0             -277.54139      0             -277.54139      141.10654    
-Loop time of 2.707e-06 on 1 procs for 0 steps with 64 atoms
+         0   0             -936.70434      0             -936.70434     -531.61415    
+Loop time of 2.287e-06 on 1 procs for 0 steps with 216 atoms
 
-147.8% CPU use with 1 MPI tasks x no OpenMP threads
+87.5% CPU use with 1 MPI tasks x no OpenMP threads
 
 MPI task timing breakdown:
 Section |  min time  |  avg time  |  max time  |%varavg| %total
@@ -43,18 +43,18 @@ Neigh   | 0          | 0          | 0          |   0.0 |  0.00
 Comm    | 0          | 0          | 0          |   0.0 |  0.00
 Output  | 0          | 0          | 0          |   0.0 |  0.00
 Modify  | 0          | 0          | 0          |   0.0 |  0.00
-Other   |            | 2.707e-06  |            |       |100.00
+Other   |            | 2.287e-06  |            |       |100.00
 
-Nlocal:             64 ave          64 max          64 min
+Nlocal:            216 ave         216 max         216 min
 Histogram: 1 0 0 0 0 0 0 0 0 0
-Nghost:            557 ave         557 max         557 min
+Nghost:            950 ave         950 max         950 min
 Histogram: 1 0 0 0 0 0 0 0 0 0
 Neighs:              0 ave           0 max           0 min
 Histogram: 1 0 0 0 0 0 0 0 0 0
-FullNghs:         2176 ave        2176 max        2176 min
+FullNghs:         7344 ave        7344 max        7344 min
 Histogram: 1 0 0 0 0 0 0 0 0 0
 
-Total # of neighbors = 2176
+Total # of neighbors = 7344
 Ave neighs/atom = 34
 Neighbor list builds = 0
 Dangerous builds = 0

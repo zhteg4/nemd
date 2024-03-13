@@ -1,1 +1,1 @@
-run_nemd cb_lmp_post_workflow.py -task Press -scaled_range 0.999 1.001 0.00002 -dimension 2 2 2 -clean
+run_nemd cb_lmp_post_workflow.py -task Press -scaled_range 0.999 1.001 0.00002 -dimension 3 3 3 -clean

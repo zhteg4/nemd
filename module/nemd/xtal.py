@@ -83,7 +83,7 @@ class CrystalBuilder(object):
         if bool(info.stderr):
             raise ValueError(info.stderr)
 
-        ala_logfile = f'{ala_writer.jobname}.log'
+        ala_logfile = f'{ala_writer.jobname}_{mode.lower()}.log'
         with open(ala_logfile, 'wb') as fh:
             fh.write(info.stdout)
 

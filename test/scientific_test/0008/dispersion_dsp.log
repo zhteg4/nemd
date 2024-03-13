@@ -8,7 +8,7 @@ Running python3  /Users/tzhang/git/nemd/submodule/alamode/alamode/tools/displace
  Structure before displacements : dispersion.data
  Output file names              : dispersion{counter}.lammps
  Magnitude of displacements     : 0.01 Angstrom
- Number of atoms                : 64
+ Number of atoms                : 216
 
  Displacement mode              : Finite displacement
 

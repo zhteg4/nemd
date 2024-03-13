@@ -56,6 +56,7 @@ def log_error(msg):
 
 
 class Reciprocal:
+
     PNG_EXT = '.png'
 
     def __init__(self, options):

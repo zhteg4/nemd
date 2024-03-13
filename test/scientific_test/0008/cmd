@@ -1,1 +1,1 @@
-run_nemd dispersion_driver.py -dimension 2 2 2
+run_nemd dispersion_driver.py -dimension 3 3 3 -scale_factor 1.0002200000000012
