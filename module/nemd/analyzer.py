@@ -251,7 +251,7 @@ class RDF(BaseAnalyzer):
     ILABEL = f'r ({symbols.ANGSTROM})'
     DEFAULT_CUT = oplsua.LammpsIn.DEFAULT_CUT
 
-    def setData(self, res=0.02, dcut=None):
+    def setData(self, res=0.02, dcut=None, dres=None):
         """
         Set the radial distribution function.
 
@@ -259,6 +259,7 @@ class RDF(BaseAnalyzer):
         :param dcut float: the cutoff distance to look for neighbors. If None,
             all the neighbors are counted when the cell is not significantly
              larger than the LJ cutoff.
+        :param dres float: the distance cell resolution
         """
         frms = self.frms[self.sidx:]
         span = np.array([[x for x in x.getSpan().values()] for x in frms])
