@@ -103,7 +103,7 @@ class Reciprocal:
         """
         Plot the real and reciprocal paces.
         """
-        with plotutils.get_pyplot() as plt:
+        with plotutils.get_pyplot(inav=self.options.interactive) as plt:
             fig = plt.figure(figsize=(15, 9))
             self.ax1 = fig.add_subplot(1, 2, 1)
             self.ax2 = fig.add_subplot(1, 2, 2)
@@ -126,9 +126,6 @@ class Reciprocal:
             log(f"The product is {np.dot(ltp.vect, rltp.vect) / np.pi: .4g} * pi"
                 )
             fig.tight_layout()
-            if self.options.interactive:
-                print(f"Showing the plot. Click X to close and continue..")
-                plt.show(block=True)
             fname = self.options.jobname + self.PNG_EXT
             fig.savefig(fname)
             jobutils.add_outfile(fname, jobname=self.options.jobname)

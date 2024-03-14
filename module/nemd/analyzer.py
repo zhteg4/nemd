@@ -125,7 +125,7 @@ class BaseAnalyzer:
             interactive mode is on
         :type inav: bool
         """
-        with plotutils.get_pyplot(backend=None if inav else 'Agg') as plt:
+        with plotutils.get_pyplot(inav=inav, name=cls.DESCR.upper()) as plt:
             fig = plt.figure(figsize=(10, 6))
             ax = fig.add_axes([0.13, 0.1, 0.8, 0.8])
             line_style = '--' if any([sidx, eidx]) else '-'
@@ -149,10 +149,6 @@ class BaseAnalyzer:
             ax.set_xlabel(xlabel)
             ax.set_ylabel(data.columns.values.tolist()[0])
             fname = name + cls.FIG_EXT % cls.NAME
-            if inav:
-                print(f"Showing {cls.DESCR.upper()}. "
-                      "Click X to close and continue..")
-                plt.show(block=True)
             fig.savefig(fname)
         log(f'{cls.DESCR.capitalize()} figure saved as {fname}')
 

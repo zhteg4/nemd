@@ -213,9 +213,6 @@ class Dispersion(object):
             ax.set_ylabel(f'Frequency ({unit})')
 
             fig.tight_layout()
-            if self.options.interactive:
-                print(f"Showing the plot. Click X to close and continue..")
-                plt.show(block=True)
             fname = self.options.jobname + self.PNG_EXT
             fig.savefig(fname)
             jobutils.add_outfile(fname, jobname=self.options.jobname)

@@ -1,5 +1,6 @@
 # Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
 # All rights reserved.
+
 # This software is licensed under the BSD 3-Clause License.
 # Authors: Teng Zhang (2022010236@hust.edu.cn)
 """
@@ -12,23 +13,29 @@ from contextlib import contextmanager
 
 
 @contextmanager
-def get_pyplot(backend=None):
+def get_pyplot(inav=None, name='the plot'):
     """
     Get the pyplot with requested backend and restoration after usage.
 
-    :param backend: the backend to use
-    :type backend: str
+    :param inav: use Agg on False (no show)
+    :type inav: bool
+    :param name str: the name of the plot
     :return: the pyplot with requested backend
     :rtype: module 'matplotlib.pyplot'
     """
+    if inav is None:
+        inav = environutils.is_interactive()
     import matplotlib
     obackend = matplotlib.get_backend()
-    backend = backend if backend else obackend
+    backend = obackend if inav else 'Agg'
     matplotlib.use(backend)
     import matplotlib.pyplot as plt
     try:
         yield plt
     finally:
+        if inav:
+            print(f"Showing {name}. Click X to close and continue..")
+            plt.show(block=True)
         # Restore the backend
         matplotlib.use(obackend)
 
