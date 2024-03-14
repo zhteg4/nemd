@@ -6,11 +6,9 @@ constant, Kpace mesh and mode analysis.
 """
 import os
 import re
-import sh
 import sys
 import glob
 import subprocess
-import pandas as pd
 
 from nemd import xtal
 from nemd import task
@@ -74,7 +72,6 @@ class Dispersion(object):
     SI_FF = os.path.join(Si_LAMMPS, 'Si.sw')
     LAMMPS_EXT = '.lammps'
     DFSET_HARMONIC_EXT = '.dfset_harmonic'
-    THZ = 'THz'
     PNG_EXT = '.png'
 
     def __init__(self, options):
@@ -99,9 +96,12 @@ class Dispersion(object):
         self.writeForce()
         self.writeForceConstant()
         self.writeDispersion()
-        self.plot()
+        self.plotDispersion()
 
     def buildCell(self):
+        """
+        Build the supercell based on the unit cell.
+        """
         self.xbuild = xtal.CrystalBuilder(
             self.options.name,
             jobname=self.options.jobname,
@@ -172,50 +172,12 @@ class Dispersion(object):
         log(f"{alamodeutils.AlaLogReader.PHONON_BAND_STRUCTURE} is saved as "
             f"{self.ph_bonds_file}")
 
-    def plot(self, unit=THZ):
-        with plotutils.get_pyplot() as plt:
-            data = pd.read_csv(self.ph_bonds_file,
-                               header=None,
-                               skiprows=3,
-                               delim_whitespace=True)
-            data = data.set_index(0)
-            if unit == self.THZ:
-                data *= constants.CM_INV_THZ
-
-            fig = plt.figure(figsize=(10, 6))
-            ax = fig.add_subplot(1, 1, 1)
-            for column in data.columns:
-                ax.plot(data.index, data[column], '-')
-            ax.set_xlim([data.index.min(), data.index.max()])
-            ymin = min([0, data.min().min()])
-            ymax = data.max().max() * 1.05
-            ax.set_ylim([ymin, ymax])
-
-            header = sh.head('-n', '2', self.ph_bonds_file).split('\n')[:2]
-            symbols, pnts = [x.strip('#').split() for x in header]
-            pnts = [float(x) for x in pnts]
-            # Adjacent K points may have the same value
-            same_ids = [
-                i for i in range(1, len(pnts)) if pnts[i - 1] == pnts[i]
-            ]
-            idxs = [x for x in range(len(pnts)) if x not in same_ids]
-            pnts = [pnts[i] for i in idxs]
-            symbols = [
-                symbols[i] if i +
-                1 not in same_ids else '|'.join([symbols[i], symbols[i + 1]])
-                for i in idxs
-            ]
-            ax.set_xticks(pnts)
-            ax.set_xticklabels(symbols)
-            for x_val in pnts[1:-1]:
-                ax.vlines(x_val, ymin, ymax, linestyles='--', color='k')
-            ax.set_xlabel('Wave vector')
-            ax.set_ylabel(f'Frequency ({unit})')
-
-            fig.tight_layout()
-            fname = self.options.jobname + self.PNG_EXT
-            fig.savefig(fname)
-            jobutils.add_outfile(fname, jobname=self.options.jobname)
+    def plotDispersion(self):
+        plotter = plotutils.DispersionPlotter(self.ph_bonds_file)
+        plotter.run()
+        fname = self.options.jobname + self.PNG_EXT
+        plotter.fig.savefig(fname)
+        jobutils.add_outfile(fname, jobname=self.options.jobname)
         log(f'Figure of phonon dispersion saved as {fname}')
 
 

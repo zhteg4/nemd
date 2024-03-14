@@ -6,8 +6,11 @@
 """
 This module provides backend plotting for drivers.
 """
+import sh
 import numpy as np
+import pandas as pd
 import adjustText
+from nemd import constants
 from nemd import environutils
 from contextlib import contextmanager
 
@@ -397,3 +400,82 @@ class ReciprocalLatticePlotter(LatticePlotter):
         """
         super().setPlotStyle()
         self.ax.set_title('Reciprocal Space')
+
+
+class DispersionPlotter:
+
+    THZ = 'THz'
+
+    def __init__(self, filename, unit=THZ):
+        """
+        :param filename str: the file containing the dispersion data
+        :param unit str: the unit of the y data (either THz or cm^-1)
+        """
+        self.filename = filename
+        self.unit = unit
+        self.data = None
+        self.ymin, self.ymax = None, None
+        self.fig = None
+
+    def run(self):
+        """
+        Main method to run.
+        """
+        self.readData()
+        self.setKpoints()
+        self.setFigure()
+
+    def readData(self):
+        """
+        Read the data from the file with unit conversion and range set.
+        """
+        data = pd.read_csv(self.filename,
+                           header=None,
+                           skiprows=3,
+                           delim_whitespace=True)
+        self.data = data.set_index(0)
+        if self.unit == self.THZ:
+            self.data *= constants.CM_INV_THZ
+        self.ymin = min([0, self.data.min().min()])
+        self.ymax = self.data.max().max() * 1.05
+
+    def setKpoints(self):
+        """
+        Set the point values and labels.
+        """
+        header = sh.head('-n', '2', self.filename).split('\n')[:2]
+        symbols, pnts = [x.strip('#').split() for x in header]
+        pnts = [float(x) for x in pnts]
+        # Adjacent K points may have the same value
+        same_ids = [i for i in range(1, len(pnts)) if pnts[i - 1] == pnts[i]]
+        idxs = [x for x in range(len(pnts)) if x not in same_ids]
+        self.pnts = [pnts[i] for i in idxs]
+        self.symbols = [symbols[i] for i in idxs]
+        for id in same_ids:
+            # Adjacent K points with the same value combine the labels
+            self.symbols[id - 1] = '|'.join([symbols[id - 1], symbols[id]])
+
+    def setFigure(self):
+        """
+        Plot the frequency vs wave vector with k-point vertical lines.
+        """
+        with get_pyplot() as plt:
+            self.fig = plt.figure(figsize=(10, 6))
+            ax = self.fig.add_subplot(1, 1, 1)
+            for column in self.data.columns:
+                ax.plot(self.data.index,
+                        self.data[column],
+                        linestyle='-',
+                        color='b')
+            ax.vlines(self.pnts[1:-1],
+                      self.ymin,
+                      self.ymax,
+                      linestyles='--',
+                      color='k')
+            ax.set_xlim([self.data.index.min(), self.data.index.max()])
+            ax.set_ylim([self.ymin, self.ymax])
+            ax.set_xticks(self.pnts)
+            ax.set_xticklabels(self.symbols)
+            ax.set_xlabel('Wave vector')
+            ax.set_ylabel(f'Frequency ({self.unit})')
+            self.fig.tight_layout()

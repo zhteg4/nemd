@@ -5,7 +5,7 @@
 
  Number of OpenMP threads = 8
 
- Job started at Wed Mar 13 19:48:14 2024
+ Job started at Thu Mar 14 10:50:10 2024
 
 
  Input variables:
@@ -270,7 +270,7 @@
    216   9.166667e-01   9.166667e-01   7.500000e-01    1
 
 
-  Time Elapsed: 0.004674 sec.
+  Time Elapsed: 0.004803 sec.
 
  -------------------------------------------------------------------
 
@@ -395,7 +395,7 @@
    107 |   196  214
    108 |   197  215
 
-  Time Elapsed: 2.2296 sec.
+  Time Elapsed: 2.32448 sec.
 
  -------------------------------------------------------------------
 
@@ -522,7 +522,7 @@
               18   24.0731 (  6) - 138( Si) 140( Si) 173( Si) 101( Si)
                                    134( Si) 137( Si)
 
-  Time Elapsed: 2.83286 sec.
+  Time Elapsed: 2.92505 sec.
 
  -------------------------------------------------------------------
 
@@ -533,7 +533,7 @@
 
   Number of  HARMONIC FCs : 7
 
-  Time Elapsed: 2.84908 sec.
+  Time Elapsed: 2.94153 sec.
 
  -------------------------------------------------------------------
 
@@ -550,5 +550,5 @@
   HARMONIC : dispersion.pattern_HARMONIC
 
 
- Job finished at Wed Mar 13 19:48:16 2024
+ Job finished at Thu Mar 14 10:50:13 2024
 
