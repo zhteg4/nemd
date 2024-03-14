@@ -92,13 +92,13 @@ class Dispersion(object):
         self.ph_bonds_file = None
 
     def run(self):
-        self.buildCell()
-        self.writeDataFile()
-        self.writeDispPattern()
-        self.writeDisplacement()
-        self.writeForce()
-        self.writeForceConstant()
-        self.writeDispersion()
+        # self.buildCell()
+        # self.writeDataFile()
+        # self.writeDispPattern()
+        # self.writeDisplacement()
+        # self.writeForce()
+        # self.writeForceConstant()
+        # self.writeDispersion()
         self.plot()
 
     def buildCell(self):
@@ -169,12 +169,12 @@ class Dispersion(object):
 
     def writeDispersion(self):
         self.ph_bonds_file = self.xbuild.writePhbands()
-        log(f"{alamodeutils.AlaLogReader.PHONON_BAND_STRUCTURE} is saved as {self.ph_bonds_file}"
-            )
+        log(f"{alamodeutils.AlaLogReader.PHONON_BAND_STRUCTURE} is saved as "
+            f"{self.ph_bonds_file}")
 
     def plot(self, unit=THZ):
         with plotutils.get_pyplot() as plt:
-            data = pd.read_csv(self.ph_bonds_file,
+            data = pd.read_csv('si222.bands',
                                header=None,
                                skiprows=3,
                                delim_whitespace=True)
@@ -188,8 +188,8 @@ class Dispersion(object):
                 ax.plot(data.index, data[column], '-')
             ax.set_xlim([data.index.min(), data.index.max()])
             ymin = min([0, data.min().min()])
-            ymax = data.max().max()
-            ax.set_ylim([ymin, ymax * 1.05])
+            ymax = data.max().max() * 1.05
+            ax.set_ylim([ymin, ymax])
 
             header = sh.head('-n', '2', self.ph_bonds_file).split('\n')[:2]
             symbols, pnts = [x.strip('#').split() for x in header]
