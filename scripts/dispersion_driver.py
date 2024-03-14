@@ -92,13 +92,13 @@ class Dispersion(object):
         self.ph_bonds_file = None
 
     def run(self):
-        # self.buildCell()
-        # self.writeDataFile()
-        # self.writeDispPattern()
-        # self.writeDisplacement()
-        # self.writeForce()
-        # self.writeForceConstant()
-        # self.writeDispersion()
+        self.buildCell()
+        self.writeDataFile()
+        self.writeDispPattern()
+        self.writeDisplacement()
+        self.writeForce()
+        self.writeForceConstant()
+        self.writeDispersion()
         self.plot()
 
     def buildCell(self):
@@ -174,7 +174,7 @@ class Dispersion(object):
 
     def plot(self, unit=THZ):
         with plotutils.get_pyplot() as plt:
-            data = pd.read_csv('si222.bands',
+            data = pd.read_csv(self.ph_bonds_file,
                                header=None,
                                skiprows=3,
                                delim_whitespace=True)
