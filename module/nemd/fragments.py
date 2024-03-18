@@ -3,8 +3,9 @@
 # This software is licensed under the BSD 3-Clause License.
 # Authors: Teng Zhang (2022010236@hust.edu.cn)
 """
-This module fragmentizes molecules into the smallest rigid bodies.
+Fragmentize molecules into the smallest rigid bodies.
 """
+import math
 import itertools
 import numpy as np
 from rdkit import Chem
@@ -224,7 +225,7 @@ class FragMixIn:
         # memory saving flaot16 to regular float32
         self.max_clash_dist = float(self.data_reader.radii.max())
         # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
-        # seperated by 1 max_clash_dist, meaning no clashes.
+        # Separated by 1 max_clash_dist, meaning no clashes.
         self.cell_cut = self.max_clash_dist
 
 
@@ -616,7 +617,12 @@ class FragMols(FragMixIn):
         frags = [x.init_frag for x in self.fmols.values()]
         self.setInitFrm(frags)
         self.setDcell()
-        for frag in frags:
+        self.log(f'Placing {len(frags)} initiators into the cell...')
+        tenth, threshold, = math.floor(len(frags)) / 10, 0
+        for index, frag in enumerate(frags):
+            if index > threshold:
+                self.log(f"{index} placed..")
+                threshold += tenth
             self.placeInitFrag(frag)
         self.logInitFragsPlaced(frags)
 

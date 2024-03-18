@@ -1,0 +1,92 @@
+units real
+atom_style full
+bond_style harmonic
+angle_style harmonic
+dihedral_style opls
+improper_style cvff
+pair_style lj/cut 11.0
+pair_modify mix geometric
+special_bonds lj/coul 0 0 0.5 
+read_data polymer_builder.data
+dump 1 all custom 1000 dump.custom.gz id xu yu zu
+dump_modify 1 sort id
+min_style fire
+minimize 1.0e-6 1.0e-8 10000 100000
+timestep 1
+thermo_modify flush yes
+thermo 1000
+velocity all create 10 482748
+fix 1a all temp/berendsen 10 10 100
+fix 1b all nve
+run 1000
+unfix 1b
+unfix 1a
+
+fix 2a all press/berendsen iso 1 1 1000
+fix 2b all temp/berendsen 10 300 100
+fix 2c all nve
+run 10000
+unfix 2c
+unfix 2b
+unfix 2a
+
+variable xl equal "xhi - xlo"
+variable yl equal "yhi - ylo"
+variable zl equal "zhi - zlo"
+fix xyzl all ave/time 1 1000 1000 v_xl v_yl v_zl file xyzl.data
+
+fix 4a all press/berendsen iso 1 1 1000
+fix 4b all temp/berendsen 300 300 100
+fix 4c all nve
+run 1000000
+unfix 4c
+unfix 4b
+unfix 4a
+
+print "Final Boundary: xl = ${xl}, yl = ${yl}, zl = ${zl}"
+variable ave_xl python getXL
+variable ave_yl python getYL
+variable ave_zl python getZL
+python getXL return v_ave_xl format f here """
+def getXL():
+    return getL(1)
+def getYL():
+    return getL(2)
+def getZL():
+    return getL(3)
+def getL(n):
+    import math
+    with open('xyzl.data') as fh:
+        vals = [float(x.split()[n]) for x in fh.readlines() if not x.startswith('#')]
+        num = len(vals)
+        sel = vals[math.floor(num*0.2):]
+        return sum(sel)/len(sel)
+ """
+python getYL return v_ave_yl format f exists
+python getZL return v_ave_zl format f exists
+print "Averaged  xl = ${ave_xl} yl = ${ave_yl} zl = ${ave_zl}"
+variable ave_xr equal "v_ave_xl / (xhi - xlo)"
+variable ave_yr equal "v_ave_xl / (xhi - xlo)"
+variable ave_zr equal "v_ave_xl / (xhi - xlo)"
+change_box all x scale ${ave_xr} y scale ${ave_yr} z scale ${ave_zr} remap
+variable ave_xr delete
+variable ave_yr delete
+variable ave_zr delete
+variable ave_xl delete
+variable ave_yl delete
+variable ave_zl delete
+unfix xyzl
+variable xl delete
+variable yl delete
+variable zl delete
+
+fix 6a all temp/berendsen 300 300 100
+fix 6b all nve
+run 10000
+unfix 6b
+unfix 6a
+
+fix 7a all nve
+run 1000000
+unfix 7a
+

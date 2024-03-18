@@ -562,7 +562,6 @@ class GrowedCell(PackedCell):
         :raise DensityError: if the max number of trials at this density is
             reached.
         """
-
         frag_mols = fragments.FragMols(self.mols,
                                        data_file='tmp.data',
                                        box=self.box,
