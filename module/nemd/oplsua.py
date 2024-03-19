@@ -1832,7 +1832,6 @@ class LammpsData(LammpsDataBase):
 
         :return list of three floats: the xyz box limits.
         """
-
         if min_box is None:
             # PBC should be 2x larger than the cutoff, otherwise one particle
             # can interact with another particle within its cutoff twice: within
@@ -1841,8 +1840,10 @@ class LammpsData(LammpsDataBase):
             min_box = (cut_x2, cut_x2, cut_x2,)  # yapf: disable
         if buffer is None:
             buffer = self.BUFFER  # yapf: disable
-            box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
-            box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
+        box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
+        if self.box is not None:
+            box = [(x - y) * 0.5 for x, y in zip(self.box[1::2], self.box[::2])]
+        box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
         if len(self.mols) != 1:
             return box_hf
         # All-trans single molecule with internal tension runs into clashes

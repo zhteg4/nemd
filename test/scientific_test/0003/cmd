@@ -1,2 +1,0 @@
-run_nemd polymer_builder_driver.py O -mol_num 400 -force_field -force_field OPLSUA,SPC
-run_nemd custom_dump_driver.py dump.custom -data_file polymer_builder.data -task rdf

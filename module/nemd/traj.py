@@ -136,7 +136,6 @@ class Frame(pd.DataFrame):
                     float(y) for x in range(5, 8)
                     for y in lines[x].strip('\n').split()
                 ])
-                print(box)
                 yield cls(frm, box=box, step=int(lines[1].strip()))
 
     @classmethod

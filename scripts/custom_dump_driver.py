@@ -149,6 +149,8 @@ class CustomDump(object):
         frms = traj.slice_frames(self.options.custom_dump,
                                  slice=self.options.slice)
         self.frms = [x for x in frms]
+        if len(self.frms) == 0:
+            return
         self.time = np.array([x.getStep() * self.timestep for x in self.frms
                               ]) * constants.femto / constants.pico
 
@@ -169,7 +171,8 @@ class CustomDump(object):
         """
         Run analyzers.
         """
-
+        if len(self.frms) == 0:
+            log_error(f'{self.options.custom_dump} contains no frames.')
         for name in self.options.task:
             Analyzer = self.ANALYZER[name]
             anl = Analyzer(self.time,
