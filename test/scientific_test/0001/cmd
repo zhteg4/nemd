@@ -1,5 +1,5 @@
 # Methane Gas: polymer builder on C via -grow; lammps simulation; density
-run_nemd polymer_builder_driver.py C -cru_num 10 -mol_num 100 -seed 5678 -temp 298.15
+run_nemd polymer_builder_driver.py C -cru_num 10 -mol_num 200 -seed 5678 -temp 298.15
 lmp_serial < polymer_builder.in
 run_nemd custom_dump_driver.py dump.custom.gz -task xyz -data_file polymer_builder.data -task density
 grep "g/cm^3" custom_dump-driver.log

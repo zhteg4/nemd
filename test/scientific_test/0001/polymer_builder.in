@@ -25,7 +25,7 @@ unfix 1a
 fix 2a all press/berendsen iso 1 1 10000
 fix 2b all temp/berendsen 10 298.15 100
 fix 2c all nve
-run 10000
+run 100000
 unfix 2c
 unfix 2b
 unfix 2a

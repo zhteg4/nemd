@@ -214,7 +214,7 @@ class FixWriter:
         """
         if self.testing:
             return
-        self.npt(nstep=self.relax_step / 1E2,
+        self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.stemp,
                  temp=self.temp,
                  press=self.press,
