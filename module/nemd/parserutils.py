@@ -75,6 +75,14 @@ def type_positive_float(arg):
     return value
 
 
+def type_nonnegative_float(arg):
+    value = type_float(arg)
+    if value < 0:
+        raise argparse.ArgumentTypeError(
+            f'{value} is not a nonnegative float.')
+    return value
+
+
 def type_ranged_float(arg,
                       bottom=-constants.LARGE_NUM,
                       top=constants.LARGE_NUM,
@@ -233,12 +241,12 @@ def add_md_arguments(parser):
     parser.add_argument(oplsua.FLAG_RELAX_TIME,
                         metavar='ns',
                         type=type_positive_float,
-                        default=4,
+                        default=1,
                         help='Relaxation simulation time.')
     parser.add_argument(oplsua.FLAG_PROD_TIME,
                         metavar='ns',
-                        type=type_positive_float,
-                        default=4,
+                        type=type_nonnegative_float,
+                        default=1,
                         help='Production simulation time.')
     parser.add_argument(oplsua.FLAG_PROD_ENS,
                         metavar=oplsua.FLAG_PROD_ENS[1:].upper(),

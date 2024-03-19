@@ -100,13 +100,32 @@ class FixWriter:
     FIX_NVE = "fix %s all nve\n"
     FIX_NVT = "fix %s all nvt temp {stemp} {temp} {tdamp}\n"
     FIX_TEMP_BERENDSEN = "fix %s all " + TEMP_BERENDSEN + " {stemp} {temp} {tdamp}\n"
-    FIX_PRESS_BERENDSEN = "fix %s all " + PRESS_BERENDSEN + " iso {press} {press} {pdamp} modulus 100\n"
+    FIX_PRESS_BERENDSEN = "fix %s all " + PRESS_BERENDSEN + " iso {spress} {press} {pdamp} modulus 20\n"
+
+    RECORD_PRESS = """
+    fix press all ave/time 1 1000 1000 c_thermo_press file press.data
+    """
+    RECORD_PRESS = RECORD_PRESS.replace('\n    ', '\n').lstrip('\n')
+    SET_PRESS = """
+    variable ave_press python getPress
+    python getPress return v_ave_press format f here \"""
+    def getPress():
+        import math
+        with open('press.data') as fh:
+            vals = [float(x.split()[1]) for x in fh.readlines() if not x.startswith('#')]
+            num = len(vals)
+            sel = vals[math.floor(num*0.2):]
+            return sum(sel)/len(sel)
+    \"""
+    print "Averaged Press = ${ave_press}"
+    """
+    SET_PRESS = SET_PRESS.replace('\n    ', '\n').lstrip('\n')
 
     RECORD_BDRY = """
     variable xl equal "xhi - xlo"
     variable yl equal "yhi - ylo"
     variable zl equal "zhi - zlo"
-    fix xyzl all ave/time 1 1000 1000 v_xl v_yl v_zl file xyzl.data
+    fix xyzl all ave/time 1 1000 1000 v_xl v_yl v_zl file xyzl.data\n
     """
     RECORD_BDRY = RECORD_BDRY.replace('\n    ', '\n').lstrip('\n')
 
@@ -129,7 +148,7 @@ class FixWriter:
             num = len(vals)
             sel = vals[math.floor(num*0.2):]
             return sum(sel)/len(sel)
-     \"""
+    \"""
     python getYL return v_ave_yl format f exists
     python getZL return v_ave_zl format f exists
     print "Averaged  xl = ${ave_xl} yl = ${ave_yl} zl = ${ave_zl}"
@@ -163,7 +182,7 @@ class FixWriter:
         self.mols = {} if mols is None else mols
         self.mol_num = len(self.mols)
         self.atom_num = sum([x.GetNumAtoms() for x in self.mols.values()])
-        self.testing = self.mol_num ==1 and self.atom_num < 100
+        self.testing = self.mol_num == 1 and self.atom_num < 100
         self.timestep = self.options.timestep
         self.relax_time = self.options.relax_time
         self.prod_time = self.options.prod_time
@@ -182,7 +201,7 @@ class FixWriter:
         """
         self.test()
         self.startLow()
-        self.rampUp()
+        self.rampUp(ensemble=None)
         self.relaxAndDefrom()
         self.production()
         self.write()
@@ -208,15 +227,32 @@ class FixWriter:
                  stemp=self.stemp,
                  temp=self.stemp)
 
-    def rampUp(self):
+    def rampUp(self, ensemble=None):
         """
         Ramp up temperature to the targe value.
+
+        :ensemble str: the ensemble to ramp up temperature.
+
+        NOTE: ensemble=None runs NVT at low temperature and ramp up with constant
+        volume, calculate the averaged pressure at high temperature, and changes
+        volume to reach the target pressure.
         """
         if self.testing:
             return
+        if ensemble == NPT:
+            self.npt(nstep=self.relax_step / 1E1,
+                     stemp=self.stemp,
+                     temp=self.temp,
+                     press=self.press)
+            return
+        self.nvt(nstep=self.relax_step / 1E1, stemp=self.stemp, temp=self.temp)
+        self.cmd.append(self.RECORD_PRESS)
+        self.nvt(nstep=self.relax_step / 1E1, stemp=self.temp, temp=self.temp)
+        self.cmd.append(self.SET_PRESS)
         self.npt(nstep=self.relax_step / 1E1,
-                 stemp=self.stemp,
+                 stemp=self.temp,
                  temp=self.temp,
+                 spress='${ave_press}',
                  press=self.press)
 
     def relaxAndDefrom(self):
@@ -289,6 +325,7 @@ class FixWriter:
             nstep=20000,
             stemp=300,
             temp=300,
+            spress=1.,
             press=1.,
             style=PRESS_BERENDSEN,
             pdamp=None):
@@ -298,14 +335,18 @@ class FixWriter:
         :nstep int: run this steps for time integration
         :stemp int: starting temperature
         :temp float: target temperature
-        :press float: target temperature
+        :spress float: starting pressure
+        :press float: target pressure
         :style str: the style for the command
         :pdamp pdamp: Pressure damping parameter (x timestep to get the param)
         """
         if pdamp is None:
             pdamp = self.pdamp
+        if spress is None:
+            spress = press
         if style == self.PRESS_BERENDSEN:
-            cmd1 = self.FIX_PRESS_BERENDSEN.format(press=press,
+            cmd1 = self.FIX_PRESS_BERENDSEN.format(spress=spress,
+                                                   press=press,
                                                    pdamp=pdamp)
             cmd2 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
                                                   temp=temp,
@@ -1128,7 +1169,7 @@ class LammpsIn(fileutils.LammpsInput):
         """
         Write data file related information.
         """
-        self.in_fh.write(f"{self.READ_DATA} {self.lammps_data}\n")
+        self.in_fh.write(f"{self.READ_DATA} {self.lammps_data}\n\n")
 
     def writeMinimize(self, min_style=FIRE, dump=True):
         """
@@ -1143,7 +1184,7 @@ class LammpsIn(fileutils.LammpsInput):
             )
             self.in_fh.write("dump_modify 1 sort id\n")
         self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
-        self.in_fh.write("minimize 1.0e-6 1.0e-8 1000000 10000000\n")
+        self.in_fh.write("minimize 1.0e-6 1.0e-8 1000000 10000000\n\n")
 
     def writeTimestep(self):
         """
@@ -1841,7 +1882,8 @@ class LammpsData(LammpsDataBase):
             buffer = self.BUFFER  # yapf: disable
         box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
         if self.box is not None:
-            box = [(x - y) * 0.5 for x, y in zip(self.box[1::2], self.box[::2])]
+            box = [(x - y) * 0.5
+                   for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
         if len(self.mols) != 1:
             return box_hf
