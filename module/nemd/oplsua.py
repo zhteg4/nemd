@@ -100,7 +100,7 @@ class FixWriter:
     FIX_NVE = "fix %s all nve\n"
     FIX_NVT = "fix %s all nvt temp {stemp} {temp} {tdamp}\n"
     FIX_TEMP_BERENDSEN = "fix %s all " + TEMP_BERENDSEN + " {stemp} {temp} {tdamp}\n"
-    FIX_PRESS_BERENDSEN = "fix %s all " + PRESS_BERENDSEN + " iso {spress} {press} {pdamp} modulus 20\n"
+    FIX_PRESS_BERENDSEN = "fix %s all " + PRESS_BERENDSEN + " iso {spress} {press} {pdamp} modulus 100\n"
 
     RECORD_PRESS = """
     fix press all ave/time 1 1000 1000 c_thermo_press file press.data
@@ -201,7 +201,7 @@ class FixWriter:
         """
         self.test()
         self.startLow()
-        self.rampUp(ensemble=None)
+        self.rampUp()
         self.relaxAndDefrom()
         self.production()
         self.write()
