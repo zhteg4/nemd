@@ -956,6 +956,7 @@ class Conformer(object):
         """
         Adjust the conformer coordinates based on the force field.
         """
+
         mols = {1: self.polym}
         self.lmw = oplsua.LammpsData(mols,
                                      self.ff,

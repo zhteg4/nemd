@@ -1,14 +1,22 @@
 ..........Command Options..........
-custom_dump: dump.custom
+custom_dump: dump.custom.gz
 data_file: polymer_builder.data
-task: ['msd']
+task: density
+sel: None
+last_pct: 0.2
+slice: None
 interactive: False
-jobname: None
+jobname: custom_dump
 debug: False
-JobStart: 2023-05-08 17:48
+cpu: 4
+JobStart: 20:19:19 03/18/24
 ...................................
-5.05e-05 ± 6.181e-07 Å^2 (R-squared: 0.9979) linear fit of [2.0000 16.1780] ps ∈ [79.1780, 98.1780] ps
-Mean squared displacement data written into custom_dump_msd.csv
-Mean squared displacement figure saved as custom_dump_msd.png
+500 atoms selected.
+2023 trajectory frames found.
+density analyze all frames and save per frame results ∈ [0.000, 2021.000] ps
+density average results from last 20.0% frames ∈ [ 1617.000,  2021.000] ps
+Density data written into custom_dump_density.csv
+0.0006577 ± 1.086e-19 g/cm^3 ∈ [1617.0000, 2021.0000] ps
+Density figure saved as custom_dump_density.png
 Finished.
-2023-05-08 17:48
+20:19:25 03/18/24

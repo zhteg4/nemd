@@ -119,13 +119,16 @@ class Frame(pd.DataFrame):
                 atom_num = int(lines[3].strip('\n'))
                 # 'id', 'xu', 'yu', 'zu'
                 names = lines[-1].strip('\n').split()[-4:]
-                frm = pd.read_csv(fh,
-                                  nrows=atom_num,
-                                  header=None,
-                                  delimiter=r'\s',
-                                  index_col=0,
-                                  names=names,
-                                  engine='python')
+                try:
+                    frm = pd.read_csv(fh,
+                                      nrows=atom_num,
+                                      header=None,
+                                      delimiter=r'\s',
+                                      index_col=0,
+                                      names=names,
+                                      engine='python')
+                except EOFError:
+                    return
                 if frm.shape[0] != atom_num or frm.isnull().values.any():
                     return
                 # array([  8.8 ,  68.75,   2.86,  67.43, -28.76,  19.24])
@@ -133,6 +136,7 @@ class Frame(pd.DataFrame):
                     float(y) for x in range(5, 8)
                     for y in lines[x].strip('\n').split()
                 ])
+                print(box)
                 yield cls(frm, box=box, step=int(lines[1].strip()))
 
     @classmethod

@@ -101,7 +101,7 @@ class BaseAnalyzer:
         sel = data.iloc[sidx:]
         ave = sel.mean().iloc[0]
         std = sel.std().iloc[0]
-        log(f'{ave:.4f} {symbols.PLUS_MIN} {std:.4f} {cls.UNIT} '
+        log(f'{ave:.4g} {symbols.PLUS_MIN} {std:.4g} {cls.UNIT} '
             f'{symbols.ELEMENT_OF} [{data.index[sidx]:.4f}, '
             f'{data.index[-1]:.4f}] ps')
         return sidx, None

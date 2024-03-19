@@ -163,7 +163,7 @@ class FixWriter:
         self.mols = {} if mols is None else mols
         self.mol_num = len(self.mols)
         self.atom_num = sum([x.GetNumAtoms() for x in self.mols.values()])
-        self.testing = self.mol_num < 2 and self.atom_num < 10
+        self.testing = self.mol_num ==1 and self.atom_num < 100
         self.timestep = self.options.timestep
         self.relax_time = self.options.relax_time
         self.prod_time = self.options.prod_time
@@ -217,7 +217,8 @@ class FixWriter:
         self.npt(nstep=self.relax_step / 1E2,
                  stemp=self.stemp,
                  temp=self.temp,
-                 press=self.press)
+                 press=self.press,
+                 pdamp=self.pdamp * 10)
 
     def relaxAndDefrom(self):
         """
@@ -290,7 +291,8 @@ class FixWriter:
             stemp=300,
             temp=300,
             press=1.,
-            style=PRESS_BERENDSEN):
+            style=PRESS_BERENDSEN,
+            pdamp=None):
         """
         Append command for constant pressure and temperature.
 
@@ -299,10 +301,13 @@ class FixWriter:
         :temp float: target temperature
         :press float: target temperature
         :style str: the style for the command
+        :pdamp pdamp: Pressure damping parameter (x timestep to get the param)
         """
+        if pdamp is None:
+            pdamp = self.pdamp
         if style == self.PRESS_BERENDSEN:
             cmd1 = self.FIX_PRESS_BERENDSEN.format(press=press,
-                                                   pdamp=self.pdamp)
+                                                   pdamp=pdamp)
             cmd2 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
                                                   temp=temp,
                                                   tdamp=self.tdamp)
@@ -1099,7 +1104,7 @@ class LammpsIn(fileutils.LammpsInput):
         pair_style = self.LJ_CUT_COUL_LONG if self.hasCharge() else self.LJ_CUT
         self.in_fh.write(f"{self.PAIR_STYLE} {self.pair_style[pair_style]}\n")
         self.in_fh.write(f"{self.PAIR_MODIFY} {self.MIX} {self.GEOMETRIC}\n")
-        self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5 \n")
+        self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5\n")
         if self.hasCharge():
             self.in_fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
 
@@ -1828,10 +1833,6 @@ class LammpsData(LammpsDataBase):
         :return list of three floats: the xyz box limits.
         """
 
-        if self.box is not None:
-            return [(x - y) * 0.5
-                    for x, y in zip(self.box[1::2], self.box[::2])]
-
         if min_box is None:
             # PBC should be 2x larger than the cutoff, otherwise one particle
             # can interact with another particle within its cutoff twice: within
@@ -1842,7 +1843,6 @@ class LammpsData(LammpsDataBase):
             buffer = self.BUFFER  # yapf: disable
             box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
             box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-
         if len(self.mols) != 1:
             return box_hf
         # All-trans single molecule with internal tension runs into clashes
