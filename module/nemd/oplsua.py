@@ -100,7 +100,7 @@ class FixWriter:
     FIX_NVE = "fix %s all nve\n"
     FIX_NVT = "fix %s all nvt temp {stemp} {temp} {tdamp}\n"
     FIX_TEMP_BERENDSEN = "fix %s all " + TEMP_BERENDSEN + " {stemp} {temp} {tdamp}\n"
-    FIX_PRESS_BERENDSEN = "fix %s all " + PRESS_BERENDSEN + " iso {press} {press} {pdamp}\n"
+    FIX_PRESS_BERENDSEN = "fix %s all " + PRESS_BERENDSEN + " iso {press} {press} {pdamp} modulus 100\n"
 
     RECORD_BDRY = """
     variable xl equal "xhi - xlo"
@@ -217,8 +217,7 @@ class FixWriter:
         self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.stemp,
                  temp=self.temp,
-                 press=self.press,
-                 pdamp=self.pdamp * 10)
+                 press=self.press)
 
     def relaxAndDefrom(self):
         """
@@ -1086,8 +1085,8 @@ class LammpsIn(fileutils.LammpsInput):
         with open(self.lammps_in, 'w') as self.in_fh:
             self.writeDescriptions()
             self.readData()
-            self.writeMinimize()
             self.writeTimestep()
+            self.writeMinimize()
             self.writeFixShake()
             self.writeRun()
 
@@ -1144,7 +1143,7 @@ class LammpsIn(fileutils.LammpsInput):
             )
             self.in_fh.write("dump_modify 1 sort id\n")
         self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
-        self.in_fh.write("minimize 1.0e-6 1.0e-8 10000 100000\n")
+        self.in_fh.write("minimize 1.0e-6 1.0e-8 1000000 10000000\n")
 
     def writeTimestep(self):
         """

@@ -233,12 +233,12 @@ def add_md_arguments(parser):
     parser.add_argument(oplsua.FLAG_RELAX_TIME,
                         metavar='ns',
                         type=type_positive_float,
-                        default=1,
+                        default=4,
                         help='Relaxation simulation time.')
     parser.add_argument(oplsua.FLAG_PROD_TIME,
                         metavar='ns',
                         type=type_positive_float,
-                        default=1,
+                        default=4,
                         help='Production simulation time.')
     parser.add_argument(oplsua.FLAG_PROD_ENS,
                         metavar=oplsua.FLAG_PROD_ENS[1:].upper(),
