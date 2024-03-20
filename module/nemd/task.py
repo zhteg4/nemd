@@ -517,7 +517,9 @@ class Lammps(BaseTask):
         """
         lmp = Lammps(*arg, **kwargs)
         lmp.run()
-        return lmp.getCmd()
+        cmd = lmp.getCmd()
+        # run_nemd echo Running xxx
+        return f'echo Running {cmd}; {cmd}'
 
     def run(self):
         """
