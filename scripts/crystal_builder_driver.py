@@ -88,12 +88,11 @@ class CrystalBuilder(object):
                              set_file=True)
 
 
-def get_parser(parser=None, jflags=None):
+def get_parser(parser=None):
     """
     The user-friendly command-line parser.
 
     :param parser ArgumentParser: the parse to add arguments
-    :param jflags list: specific job control related flags to add
     :return 'argparse.ArgumentParser':  argparse figures out how to parse those
         out of sys.argv.
     """
