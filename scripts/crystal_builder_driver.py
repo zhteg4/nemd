@@ -121,7 +121,6 @@ def get_parser(parser=None):
         type=parserutils.type_positive_float,
         help='Each lattice vector is scaled by the cor factor.')
     parserutils.add_job_arguments(parser,
-                                  arg_flags=jflags,
                                   jobname=environutils.get_jobname(JOBNAME))
     return parser
 

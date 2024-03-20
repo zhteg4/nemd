@@ -84,7 +84,7 @@ class Runner(jobcontrol.Runner):
         Aggregate post analysis jobs.
         """
         super().setAggregation()
-        name = f"{self.jobname}{self.SEP}{self.CUSTOM_DUMP}"
+        name = f"{self.options.jobname}{self.SEP}{self.CUSTOM_DUMP}"
         Custom_Dump.getAgg(name=name,
                            tname=self.CUSTOM_DUMP,
                            log=log,
