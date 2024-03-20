@@ -80,7 +80,7 @@ def log_error(msg):
 
 class LmpLog(object):
     """
-    Analyze a dump custom file.
+    Analyze a lammps log.
     """
 
     TASK = FlAG_TASK[1:]

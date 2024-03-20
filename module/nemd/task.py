@@ -770,8 +770,7 @@ class Lmp_Log(BaseTask):
     @staticmethod
     def aggregator(*jobs, log=None, name=None, tname=None, **kwargs):
         """
-        The aggregator job task that combines the output files of a custom dump
-        task.
+        The aggregator job task that combines the lammps log analysis.
 
         :param jobs: the task jobs the aggregator collected
         :type jobs: list of 'signac.contrib.job.Job'
