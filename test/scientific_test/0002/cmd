@@ -1,6 +1,6 @@
 # Ethane Gas: polymer builder on CC via -pack; lammps simulation; density
-run_nemd polymer_builder_driver.py *C* -cru_num 2 -mol_num 200 -seed 5678 -temp 273.15 -cell pack -relax_time 5
-lmp_serial < polymer_builder.in
+run_nemd polymer_builder_driver.py *C* -cru_num 2 -mol_num 200 -seed 5678 -temp 273.15 -cell pack -prod_ens NPT -prod_time 4
+lmp_serial < polymer_builder.in | tee lammps.log
 run_nemd custom_dump_driver.py dump.custom.gz -task xyz -data_file polymer_builder.data -task density
 grep "g/cm^3" custom_dump-driver.log
 # 1.3562 kg/m3 from https://en.wikipedia.org/wiki/Ethane

@@ -1882,8 +1882,7 @@ class LammpsData(LammpsDataBase):
             buffer = self.BUFFER  # yapf: disable
         box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
         if self.box is not None:
-            box = [(x - y) * 0.5
-                   for x, y in zip(self.box[1::2], self.box[::2])]
+            box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
         if len(self.mols) != 1:
             return box_hf
