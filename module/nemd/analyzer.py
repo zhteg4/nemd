@@ -80,9 +80,11 @@ class BaseAnalyzer:
         """
         raise NotImplemented
 
-    def saveData(self, float_format='%.4f'):
+    def saveData(self, float_format='%.4g'):
         """
         Save the data.
+
+        :param float_format str: the format to save float
         """
         outfile = self.options.jobname + self.DATA_EXT % self.NAME
         self.data.to_csv(outfile, float_format=float_format)
@@ -153,7 +155,7 @@ class BaseAnalyzer:
         log(f'{cls.DESCR.capitalize()} figure saved as {fname}')
 
     @classmethod
-    def read(cls, name, files=None, log=None):
+    def read(cls, name, files=None, log=None, float_format='%.4g'):
         """
         Read the output file based on jobname or input files.
 
@@ -163,6 +165,7 @@ class BaseAnalyzer:
         :type files: list of str
         :param log: the function to print user-facing information
         :type log: 'function'
+        :param float_format str: the format to save float
         :return: x values, y average, y standard deviation
         :rtype: 'pandas.core.frame.DataFrame'
         """
@@ -189,7 +192,7 @@ class BaseAnalyzer:
         cname, num = datas[0].columns[0], len(datas)
         data.columns = [f'{cname} (num={num})', f'std (num={num})']
         data.index.name = iname
-        data.to_csv(filename)
+        data.to_csv(filename, float_format=float_format)
         log(f"{cls.RESULTS}{cls.DESCR} saved to {filename}")
         return data
 
