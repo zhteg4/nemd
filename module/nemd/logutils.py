@@ -15,6 +15,27 @@ END = 'end'
 DELTA = 'delta'
 
 
+class FileHandler(logging.FileHandler):
+    """
+    Handler that controls the writing of the newline character.
+
+    https://stackoverflow.com/questions/7168790/suppress-newline-in-python-logging-module
+    """
+
+    NO_NEWLINE = '[!n]'
+
+    def emit(self, record):
+        """
+        See parent method for documentation.
+        """
+
+        self.terminator = '\n'
+        if record.msg.endswith(self.NO_NEWLINE):
+            record.msg = record.msg.replace(self.NO_NEWLINE, '')
+            self.terminator = ''
+        return super().emit(record)
+
+
 def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):
     """
     Create a logger.
@@ -39,7 +60,7 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):
             os.remove(log_filename)
         except FileNotFoundError:
             pass
-    hdlr = logging.FileHandler(log_filename)
+    hdlr = FileHandler(log_filename)
     logger.addHandler(hdlr)
     if log_file:
         jobutils.add_outfile(log_filename, jobname=basename, log_file=log_file)
