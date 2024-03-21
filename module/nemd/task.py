@@ -76,6 +76,7 @@ class BaseTask:
         """
         self.setArgs()
         self.setName()
+        self.addQuote()
 
     def setArgs(self):
         """
@@ -122,6 +123,15 @@ class BaseTask:
             with open(f"{self.name}_cmd", 'w') as fh:
                 fh.write(cmd)
         return cmd
+
+    def addQuote(self):
+        """
+        Add quotes for str with special characters.
+        """
+        self.doc[self.KNOWN_ARGS] = [
+            f'"{x}"' if self.QUOTED_CHAR.search(str(x)) else x
+            for x in self.doc[self.KNOWN_ARGS]
+        ]
 
     @classmethod
     def success(cls, job, name):
@@ -402,7 +412,6 @@ class Polymer_Builder(BaseTask):
         """
         super().run()
         self.setSeed()
-        self.addQuote()
 
     def setSeed(self):
         """
@@ -414,15 +423,6 @@ class Polymer_Builder(BaseTask):
         state = self.job.statepoint()
         seed = int(seed) + int(state.get(self.STATE_ID, state.get(self.ID)))
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SEED, seed)
-
-    def addQuote(self):
-        """
-        Add quotes for str with special characters.
-        """
-        self.doc[self.KNOWN_ARGS] = [
-            f'"{x}"' if self.QUOTED_CHAR.search(str(x)) else x
-            for x in self.doc[self.KNOWN_ARGS]
-        ]
 
     @staticmethod
     def operator(*arg, **kwargs):

@@ -200,6 +200,9 @@ class AmorphousCell(object):
     def setPackedCell(self, mini_density=MINIMUM_DENSITY):
         """
         Build packed cell.
+
+        :param mini_density float: the minium density for liquid and solid when
+            reducing it automatically.
         """
         if self.options.cell != PACK:
             return
@@ -208,6 +211,9 @@ class AmorphousCell(object):
     def setGrowedCell(self, mini_density=0.01):
         """
         Build packed cell.
+
+        :param mini_density float: the minium density for liquid and solid when
+            reducing it automatically.
         """
         if self.options.cell != GROW:
             return
@@ -219,8 +225,8 @@ class AmorphousCell(object):
 
         :param cell_type: the algorithm type for amorphous cell.
         :type cell_type: str
-        :param mini_density: the minium density when reducing it automatically.
-        :type mini_density: float
+        :param mini_density float: the minium density for liquid and solid when
+            reducing it automatically.
         """
         cell_builder = PackedCell if cell_type == PACK else GrowedCell
         cell = cell_builder(self.polymers, self.options)
@@ -228,12 +234,13 @@ class AmorphousCell(object):
         cell.setDataReader()
         cell.setAtomMapNum()
         density = self.options.density
-
+        mini_density = min([mini_density, density / 5.])
+        delta = min([0.1, (density - mini_density) / 4])
         while density >= mini_density:
             try:
                 cell.runWithDensity(density)
             except DensityError:
-                density -= 0.1 if density > 0.1 else 0.01
+                density -= delta if density > mini_density else mini_density
                 log(f'Density is reduced to {density:.4f} g/cm^3')
             else:
                 break
@@ -450,7 +457,8 @@ class PackedCell:
         :raise DensityError: if the max number of trials at this density is
             reached.
         """
-        trial_num = 1
+        trial_num, mol_num = 1, len(self.df_reader.molecule)
+        tenth, threshold, = mol_num / 10., 0
         while trial_num <= max_trial:
             self.extg_aids = set()
             for mol_id in self.df_reader.mols.keys():
@@ -462,6 +470,11 @@ class PackedCell:
                               f'molecules placed in the cell.)')
                     trial_num += 1
                     break
+                else:
+                    if mol_id >= threshold:
+                        new_line = "" if mol_id == mol_num else ", [!n]"
+                        log(f"{int(mol_id / mol_num * 100)}%{new_line}")
+                        threshold = round(threshold + tenth, 1)
             else:
                 # All molecules successfully placed (no break)
                 return
@@ -1092,7 +1105,8 @@ def get_parser(parser=None):
         FlAG_DENSITY,
         metavar=FlAG_DENSITY[1:].upper(),
         type=functools.partial(parserutils.type_ranged_float,
-                               bottom=AmorphousCell.MINIMUM_DENSITY,
+                               bottom=0,
+                               included_bottom=False,
                                top=30),
         default=0.5,
         help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
