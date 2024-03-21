@@ -1,4 +1,5 @@
 import os
+import re
 import sh
 import types
 import logging
@@ -50,6 +51,7 @@ class BaseTask:
     DRIVER_LOG = logutils.DRIVER_LOG
     KNOWN_ARGS = jobutils.KNOWN_ARGS
     UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
+    QUOTED_CHAR = re.compile("[@!#$%^&*()<>?/|}{~:]")
 
     def __init__(self, job, pre_run=RUN_NEMD, name=None):
         """
@@ -400,6 +402,7 @@ class Polymer_Builder(BaseTask):
         """
         super().run()
         self.setSeed()
+        self.addQuote()
 
     def setSeed(self):
         """
@@ -411,6 +414,15 @@ class Polymer_Builder(BaseTask):
         state = self.job.statepoint()
         seed = int(seed) + int(state.get(self.STATE_ID, state.get(self.ID)))
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SEED, seed)
+
+    def addQuote(self):
+        """
+        Add quotes for str with special characters.
+        """
+        self.doc[self.KNOWN_ARGS] = [
+            f'"{x}"' if self.QUOTED_CHAR.search(str(x)) else x
+            for x in self.doc[self.KNOWN_ARGS]
+        ]
 
     @staticmethod
     def operator(*arg, **kwargs):
