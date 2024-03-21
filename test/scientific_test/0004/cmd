@@ -1,2 +1,4 @@
-# rdf, 16 replica, 1000 Ar, last 40% pct, 10 ns relax and prod
-run_nemd pb_lmp_post_workflow.py [Ar] -mol_num 1000 -last_pct 0.4 -task rdf -cpu 8 -state_num 16 -relax_time 10 -prod_time 10
+# Butane liquid: polymer builder on CCCC via -grow; lammps simulation; density
+run_nemd pb_lmp_post_workflow.py *CC* -cru_num 2 -mol_num 200 -seed 5678 -temp 293.15 -prod_ens NPT -prod_time 4 -last_pct 0.4 -task density -cpu 4 -state_num 4 -clean
+grep "g/cm^3" pb_lmp_post_workflow-driver.log
+# 0.579 g/mL at 20 °C https://www.sigmaaldrich.com/US/en/product/aldrich/494402

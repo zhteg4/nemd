@@ -1,26 +1,14 @@
-Fetching status:   0%|          | 0/48 [00:00<?, ?it/s]Fetching status: 100%|██████████| 48/48 [00:00<00:00, 5522.76it/s]
-Fetching labels:   0%|          | 0/16 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 16/16 [00:00<00:00, 177536.68it/s]
+Fetching status:   0%|          | 0/12 [00:00<?, ?it/s]Fetching status: 100%|██████████| 12/12 [00:00<00:00, 1132.40it/s]
+Fetching labels:   0%|          | 0/4 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 4/4 [00:00<00:00, 26132.74it/s]
 
-Overview: 16 jobs/aggregates, 0 jobs/aggregates with eligible operations.
+Overview: 4 jobs/aggregates, 0 jobs/aggregates with eligible operations.
 
-label             ratio
-----------------  -------------------------------------------------------
-{'state_id': 0}   |██▌                                     | 1/16 (6.25%)
-{'state_id': 10}  |██▌                                     | 1/16 (6.25%)
-{'state_id': 11}  |██▌                                     | 1/16 (6.25%)
-{'state_id': 12}  |██▌                                     | 1/16 (6.25%)
-{'state_id': 13}  |██▌                                     | 1/16 (6.25%)
-{'state_id': 14}  |██▌                                     | 1/16 (6.25%)
-{'state_id': 15}  |██▌                                     | 1/16 (6.25%)
-{'state_id': 1}   |██▌                                     | 1/16 (6.25%)
-{'state_id': 2}   |██▌                                     | 1/16 (6.25%)
-{'state_id': 3}   |██▌                                     | 1/16 (6.25%)
-{'state_id': 4}   |██▌                                     | 1/16 (6.25%)
-{'state_id': 5}   |██▌                                     | 1/16 (6.25%)
-{'state_id': 6}   |██▌                                     | 1/16 (6.25%)
-{'state_id': 7}   |██▌                                     | 1/16 (6.25%)
-{'state_id': 8}   |██▌                                     | 1/16 (6.25%)
-{'state_id': 9}   |██▌                                     | 1/16 (6.25%)
+label            ratio
+---------------  -------------------------------------------------------
+{'state_id': 0}  |██████████                              | 1/4 (25.00%)
+{'state_id': 1}  |██████████                              | 1/4 (25.00%)
+{'state_id': 2}  |██████████                              | 1/4 (25.00%)
+{'state_id': 3}  |██████████                              | 1/4 (25.00%)
 
 operation/group
 -----------------
@@ -29,22 +17,10 @@ operation/group
 Detailed View:
 
 job id                            operation/group    labels
---------------------------------  -----------------  ----------------
-09d6116ee7b2777955fabf36bbe1cfb3  [ ]                {'state_id': 5}
-0ea236a33ee1ba90db4013aeb12e8fd5  [ ]                {'state_id': 12}
-21eae2a284ad90a9f6aa4961d7a204b8  [ ]                {'state_id': 15}
-28ae58143eb3bc58fc199cad6fd5d257  [ ]                {'state_id': 14}
-32b97b71c7973a50fa4fb04dede174df  [ ]                {'state_id': 7}
+--------------------------------  -----------------  ---------------
 547480862c82103cc80942330d51a9db  [ ]                {'state_id': 2}
-576f53adb2f9b31705167946e8133222  [ ]                {'state_id': 6}
 8010761c5b7526d494ed08208756e8b4  [ ]                {'state_id': 0}
-9cdbe206b768ac05831b6eeb3bdc6f4b  [ ]                {'state_id': 8}
-a183394e5555801787cfd7b4d82f25ef  [ ]                {'state_id': 13}
-a63e40884f46ce954b47478a0c290b9a  [ ]                {'state_id': 10}
 c928c57d59db7fb695e9e9d1ac18502a  [ ]                {'state_id': 1}
-cbe7ab4dbe7921a63654118fd1c3ed06  [ ]                {'state_id': 4}
-d8230f44bf3af31f8382084fe75486b4  [ ]                {'state_id': 9}
-dba8919777fddb69493840a830898a6c  [ ]                {'state_id': 11}
 eb1a6f0a4ddd865f8f60d6b88e6f715b  [ ]                {'state_id': 3}
 
 [U]:unknown [R]:registered [I]:inactive [S]:submitted [H]:held [Q]:queued [A]:active [E]:error [GR]:group_registered [GI]:group_inactive [GS]:group_submitted [GH]:group_held [GQ]:group_queued [GA]:group_active [GE]:group_error

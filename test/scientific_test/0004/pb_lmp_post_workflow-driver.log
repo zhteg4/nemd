@@ -1,44 +1,44 @@
 ..........Command Options..........
-cru: ['[Ar]']
-cru_num: None
-mol_num: [1000]
-seed: None
+state_num: 4
+cru: *CC*
+cru_num: 2
+mol_num: 200
+seed: 5678
 cell: grow
 density: 0.5
 timestep: 1
 stemp: 10
-temp: 300
+temp: 293.15
 tdamp: 100
 press: 1
 pdamp: 1000
 lj_cut: 11.0
 coul_cut: 11.0
-relax_time: 10.0
-prod_time: 10.0
-prod_ens: NVE
+relax_time: 1
+prod_time: 4.0
+prod_ens: NPT
 force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
 interactive: False
-jobname: polymer_builder
+jobname: pb_lmp_post_workflow
 debug: False
-cpu: 8
-task: ['rdf']
+cpu: 4
+task: density
 sel: None
 last_pct: 0.4
 slice: None
-state_num: 16
-clean: False
-jtype: ['task', 'aggregator']
+clean: True
+jtype: task, aggregator
 prj_path: .
-JobStart: 18:18:13 06/01/23
+JobStart: 21:19:02 03/20/24
 ...................................
-16 / 16 completed jobs.
+4 / 4 completed jobs.
 Task timing breakdown:
-polymer_builder: 1 minute and 20 seconds, 1 minute and 20 seconds, 1 minute and 19 seconds, 1 minute and 20 seconds, 1 minute and 17 seconds, 1 minute and 19 seconds, 1 minute and 20 seconds, 1 minute and 18 seconds, 1 minute and 18 seconds, 1 minute and 19 seconds, 1 minute and 18 seconds, 1 minute and 19 seconds, 1 minute and 18 seconds, 1 minute and 17 seconds, 1 minute and 19 seconds, 1 minute and 19 seconds; 1 minute and 18.75 seconds (ave)
-lammps_runner: 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds, 21 minutes and 38 seconds; 21 minutes and 38 seconds (ave)
-custom_dump: 1 hour, 34 minutes and 13 seconds, 1 hour, 34 minutes and 34 seconds, 1 hour, 34 minutes and 54 seconds, 1 hour, 34 minutes and 29 seconds, 1 hour, 35 minutes and 27 seconds, 1 hour, 35 minutes and 47 seconds, 1 hour, 33 minutes and 51 seconds, 1 hour, 32 minutes and 57 seconds, 1 hour, 35 minutes and 20 seconds, 1 hour, 34 minutes and 38 seconds, 1 hour, 34 minutes and 26 seconds, 1 hour, 34 minutes and 16 seconds, 1 hour, 35 minutes and 7 seconds, 1 hour, 34 minutes and 51 seconds, 1 hour, 34 minutes and 39 seconds, 1 hour, 34 minutes and 59 seconds; 1 hour, 34 minutes and 39.25 seconds (ave)
-16 jobs found for aggregation.
-Results for radial distribution function saved to pb_lmp_post_workflow_rdf.csv
-Peak position: 3.8; peak value:  1.46
-Radial distribution function figure saved as pb_lmp_post_workflow_rdf.png
+polymer_builder: 1 minute and 22 seconds, 1 minute and 22 seconds, 1 minute and 22 seconds, 1 minute and 22 seconds; 1 minute and 22 seconds (ave)
+lammps_runner: 4 hours, 47 minutes and 47 seconds, 4 hours, 47 minutes and 47 seconds, 4 hours, 47 minutes and 47 seconds, 4 hours, 47 minutes and 47 seconds; 4 hours, 47 minutes and 47 seconds (ave)
+custom_dump: 1 minute and 10 seconds, 1 minute and 10 seconds, 1 minute and 10 seconds, 1 minute and 10 seconds; 1 minute and 10 seconds (ave)
+4 jobs found for aggregation.
+Results for density saved to pb_lmp_post_workflow_density.csv
+0.5821 ± 0.004345 g/cm^3 ∈ [3184.7500, 5307.7500] ps
+Density figure saved as pb_lmp_post_workflow_density.png
 finished.
-21:53:50 06/01/23
+02:10:02 03/21/24
