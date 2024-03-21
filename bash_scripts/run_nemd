@@ -7,7 +7,7 @@ for ((i=0; i<=$#; i++)); do
   if [ $arg == '-JOBNAME' ]; then
     j=$(( $i + 1 ))
     export JOBNAME=${!j}
-    [[ -z "$JOBNAME" ]] && echo "Please provide a jobname after -JOBNAME" && exit
+    [[ -z "$JOBNAME" ]] && echo "Please provide a jobname after -JOBNAME" && exit 2
   elif [ $arg == '-INTERACTIVE' ]; then
     export INTERACTIVE='1'
   elif [ $arg == '-DEBUG' ]; then
@@ -27,7 +27,7 @@ do
 done
 if [ -z $FILE_IDX ]; then
     echo "Please provide a python script name after "$0"."
-    exit
+    exit 2
 fi
 
 # Search for python filename in the user, source, and installation folders
@@ -48,7 +48,7 @@ if [ -z $SPATH ]; then
     echo "  $ALAMODE_PTOOLS"
     echo "  or $PATH"
     echo "Please install $BASENAME, or source the premake in the source code."
-    exit
+    exit 2
 fi
 
 # Finalize the command so that Python script is of absolute path

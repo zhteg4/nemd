@@ -1,0 +1,23 @@
+#!/bin/bash
+# The profiling process is always successful, but virtualize the results with empty stderr only
+# https://stackoverflow.com/questions/11027679/capture-stdout-and-stderr-into-different-variables
+SCRIPT_ARGS="run_nemd -m cProfile -o nemd.profile ${@}"
+
+{
+    IFS=$'\n' read -r -d '' CAPTURED_STDERR;
+    IFS=$'\n' read -r -d '' CAPTURED_STDOUT;
+} < <((printf '\0%s\0' "$($SCRIPT_ARGS)" 1>&2) 2>&1)
+
+echo 'Here is the captured stdout:'
+echo "${CAPTURED_STDOUT}"
+echo
+
+echo 'And here is the captured stderr:'
+echo "${CAPTURED_STDERR}"
+echo
+
+if [ -z $CAPTURED_STDERR ]; then
+    echo "Running snakeviz nemd.profile"
+    snakeviz nemd.profile
+    exit
+fi
