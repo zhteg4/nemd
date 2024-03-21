@@ -1,0 +1,33 @@
+..........Command Options..........
+state_num: 4
+cru: CCCCCC
+cru_num: 1
+mol_num: 200
+seed: 5678
+cell: grow
+density: 0.5
+timestep: 1
+stemp: 10
+temp: 298.15
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 1
+prod_time: 4.0
+prod_ens: NPT
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+interactive: False
+jobname: pb_lmp_post_workflow
+debug: False
+cpu: 4
+task: density
+sel: None
+last_pct: 0.4
+slice: None
+clean: True
+jtype: task, aggregator
+prj_path: .
+JobStart: 19:27:01 03/21/24
+...................................

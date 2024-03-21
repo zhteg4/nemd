@@ -1,0 +1,3 @@
+# rdf, 8 replica, 1000 Ar, last 40% pct, 10 ns relax and prod
+run_nemd pb_lmp_post_workflow.py [Ar] -mol_num 1000 -last_pct 0.2 -task rdf -cpu 8 -state_num 8 -relax_time 10 -prod_time 10
+# https://www.nature.com/articles/s41598-021-96328-1/figures/4

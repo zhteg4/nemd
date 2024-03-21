@@ -1,0 +1,27 @@
+..........Command Options..........
+scaled_range: (0.95, 1.05, 0.01)
+name: Si
+dimension: (1, 1, 1)
+scale_factor: (1, 1, 1)
+interactive: False
+jobname: crystal_builder
+debug: False
+cpu: 4
+task: TotEng
+last_pct: 0.2
+slice: None
+clean: False
+jtype: task, aggregator
+prj_path: .
+JobStart: 11:53:08 02/27/24
+...................................
+11 / 11 completed jobs.
+Task timing breakdown:
+crystal_builder: 1 second, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0.36 seconds (ave)
+lammps_runner: 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds, 7 seconds; 7 seconds (ave)
+lmp_log: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0 seconds (ave)
+11 jobs found for aggregation.
+Results for TotEng written into cb_lmp_post_workflow_ave_thermo.csv
+Thermodynamic information figure saved as cb_lmp_post_workflow_toteng_thermo.png
+finished.
+11:53:51 02/27/24

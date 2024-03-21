@@ -1,0 +1,2 @@
+# diffusion, msd, slice ::200, 123 Ar, 4 eplica
+run_nemd pb_lmp_post_workflow.py [Ar] -mol_num 123 -last_pct 0.4 -task msd -cpu 4 -state_num 4 -relax_time 10 -prod_time 10 -slice ::200

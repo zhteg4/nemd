@@ -1,0 +1,44 @@
+..........Command Options..........
+state_num: 8
+cru: [Ar]
+cru_num: None
+mol_num: 1000
+seed: None
+cell: grow
+density: 0.5
+timestep: 1
+stemp: 10
+temp: 300
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 10.0
+prod_time: 10.0
+prod_ens: NVE
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+interactive: False
+jobname: pb_lmp_post_workflow
+debug: False
+cpu: 8
+task: rdf
+sel: None
+last_pct: 0.2
+slice: None
+clean: False
+jtype: task, aggregator
+prj_path: .
+JobStart: 21:20:22 03/20/24
+...................................
+8 / 8 completed jobs.
+Task timing breakdown:
+polymer_builder: 27 minutes, 26 minutes and 59 seconds, 26 minutes and 43 seconds, 26 minutes and 50 seconds, 26 minutes and 29 seconds, 26 minutes and 42 seconds, 27 minutes and 3 seconds, 26 minutes and 30 seconds; 26 minutes and 47 seconds (ave)
+lammps_runner: 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds; 1 hour, 48 minutes and 39 seconds (ave)
+custom_dump: 3 hours, 11 minutes and 35 seconds, 3 hours, 11 minutes and 20 seconds, 3 hours, 9 minutes and 52 seconds, 3 hours, 10 minutes and 54 seconds, 3 hours, 11 minutes and 22 seconds, 3 hours, 11 minutes and 16 seconds, 3 hours, 11 minutes and 25 seconds, 3 hours, 11 minutes and 15 seconds; 3 hours, 11 minutes and 7.38 seconds (ave)
+8 jobs found for aggregation.
+Results for radial distribution function saved to pb_lmp_post_workflow_rdf.csv
+Peak position: 3.8; peak value:  1.46
+Radial distribution function figure saved as pb_lmp_post_workflow_rdf.png
+finished.
+02:48:35 03/21/24

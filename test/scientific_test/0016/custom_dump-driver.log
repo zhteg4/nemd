@@ -1,0 +1,14 @@
+..........Command Options..........
+custom_dump: dump.custom
+data_file: polymer_builder.data
+task: ['msd']
+interactive: False
+jobname: None
+debug: False
+JobStart: 2023-05-08 18:27
+...................................
+3.389e-05 ± 2.442e-07 Å^2 (R-squared: 0.9989) linear fit of [3.0000 26.0000] ps ∈ [119.1780, 148.1780] ps
+Mean squared displacement data written into custom_dump_msd.csv
+Mean squared displacement figure saved as custom_dump_msd.png
+Finished.
+2023-05-08 18:27

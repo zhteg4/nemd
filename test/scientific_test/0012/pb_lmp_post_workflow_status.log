@@ -1,0 +1,36 @@
+Fetching status:   0%|          | 0/24 [00:00<?, ?it/s]Fetching status: 100%|██████████| 24/24 [00:00<00:00, 2022.94it/s]
+Fetching labels:   0%|          | 0/8 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 8/8 [00:00<00:00, 47934.90it/s]
+
+Overview: 8 jobs/aggregates, 0 jobs/aggregates with eligible operations.
+
+label            ratio
+---------------  -------------------------------------------------------
+{'state_id': 0}  |█████                                   | 1/8 (12.50%)
+{'state_id': 1}  |█████                                   | 1/8 (12.50%)
+{'state_id': 2}  |█████                                   | 1/8 (12.50%)
+{'state_id': 3}  |█████                                   | 1/8 (12.50%)
+{'state_id': 4}  |█████                                   | 1/8 (12.50%)
+{'state_id': 5}  |█████                                   | 1/8 (12.50%)
+{'state_id': 6}  |█████                                   | 1/8 (12.50%)
+{'state_id': 7}  |█████                                   | 1/8 (12.50%)
+
+operation/group
+-----------------
+
+
+Detailed View:
+
+job id                            operation/group    labels
+--------------------------------  -----------------  ---------------
+09d6116ee7b2777955fabf36bbe1cfb3  [ ]                {'state_id': 5}
+32b97b71c7973a50fa4fb04dede174df  [ ]                {'state_id': 7}
+547480862c82103cc80942330d51a9db  [ ]                {'state_id': 2}
+576f53adb2f9b31705167946e8133222  [ ]                {'state_id': 6}
+8010761c5b7526d494ed08208756e8b4  [ ]                {'state_id': 0}
+c928c57d59db7fb695e9e9d1ac18502a  [ ]                {'state_id': 1}
+cbe7ab4dbe7921a63654118fd1c3ed06  [ ]                {'state_id': 4}
+eb1a6f0a4ddd865f8f60d6b88e6f715b  [ ]                {'state_id': 3}
+
+[U]:unknown [R]:registered [I]:inactive [S]:submitted [H]:held [Q]:queued [A]:active [E]:error [GR]:group_registered [GI]:group_inactive [GS]:group_submitted [GH]:group_held [GQ]:group_queued [GA]:group_active [GE]:group_error
+
+
