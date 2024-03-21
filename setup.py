@@ -11,14 +11,18 @@ from setuptools import setup
 from setuptools.command.install import install
 
 
-class BaseInstall:
+class DarwinInstall:
 
     LMP = 'lmp_serial'
     LMP_PY = f'{LMP} -h | grep PYTHON'
+    USR_LOCAL_BIN = '/usr/local/bin'
+    BUILD_LMP = f'submodule/lammps/build/{LMP}'
+    USR_LOCAL_LMP = os.path.join(USR_LOCAL_BIN, LMP)
 
     def __init__(self):
         self.lmp_found = True
-        self.qt_found = True
+        build_lmp = os.path.join(os.getcwd(), self.BUILD_LMP)
+        self.ln_lmp = f'ln -sf {build_lmp} {self.USR_LOCAL_LMP}'
 
     def run(self):
         self.checkLammps()
@@ -46,32 +50,6 @@ class BaseInstall:
         """
         Install the lammps with specific packages if not available.
         """
-        pass
-
-    def installQt(self):
-        """
-        Install the qt, a C++framework for developing graphical user interfaces
-        and cross-platform applications, both desktop and embedded.
-        """
-        pass
-
-
-class DarwinInstall(BaseInstall):
-
-    USR_LOCAL_BIN = '/usr/local/bin'
-    LMP = BaseInstall.LMP
-    BUILD_LMP = f'submodule/lammps/build/{LMP}'
-    USR_LOCAL_LMP = os.path.join(USR_LOCAL_BIN, LMP)
-
-    def __init__(self):
-        super().__init__()
-        build_lmp = os.path.join(os.getcwd(), self.BUILD_LMP)
-        self.ln_lmp = f'ln -sf {build_lmp} {self.USR_LOCAL_LMP}'
-
-    def installLammps(self):
-        """
-        Install the lammps with specific packages if not available.
-        """
         if self.lmp_found:
             return
         print('Lammps executable with python package not found. Installing...')
@@ -91,7 +69,7 @@ class DarwinInstall(BaseInstall):
         subprocess.run('brew install qt5', shell=True)
 
 
-class LinuxInstall(BaseInstall):
+class LinuxInstall(DarwinInstall):
 
     def run(self):
         super().run()
@@ -146,9 +124,9 @@ class CustomInstallCommand(install):
         """
         Main method to run post installation.
         """
-        install.run(self)
         self.setPlatform()
         self.install()
+        install.run(self)
 
     def setPlatform(self):
         """

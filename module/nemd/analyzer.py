@@ -284,7 +284,8 @@ class RDF(BaseAnalyzer):
         bins = round(mdist / res)
         hist_range = [res / 2, res * bins + res / 2]
         rdf, num = np.zeros((bins)), len(self.gids)
-        for idx, frm in enumerate(frms):
+        tenth, threshold, = len(frms) / 10., 0
+        for idx, frm in enumerate(frms, start=1):
             self.log_debug(f"Analyzing frame {idx} for RDF..")
             dists = frm.pairDists(ids=self.gids, cut=dcut, res=dres)
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
@@ -293,6 +294,10 @@ class RDF(BaseAnalyzer):
             norm_factor = 4 * np.pi * mid**2 * res * num / frm.getVolume()
             # Stands at every id but either (1->2) or (2->1) is computed
             rdf += (hist * 2 / num / norm_factor)
+            if idx >= threshold:
+                new_line = "" if idx == len(frms) else ", [!n]"
+                self.log(f"{int(idx / len(frms) * 100)}%{new_line}")
+                threshold = round(threshold + tenth, 1)
         rdf /= len(frms)
         mid, rdf = np.concatenate(([0], mid)), np.concatenate(([0], rdf))
         index = pd.Index(data=mid, name=self.ILABEL)

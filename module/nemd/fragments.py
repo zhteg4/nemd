@@ -619,13 +619,13 @@ class FragMols(FragMixIn):
         self.setDcell()
         self.log(f'Placing {len(frags)} initiators into the cell...')
 
-        tenth, threshold, = len(frags) / 10., -1
-        for index, frag in enumerate(frags):
+        tenth, threshold, = len(frags) / 10., 0
+        for index, frag in enumerate(frags, start=1):
             self.placeInitFrag(frag)
             if index >= threshold:
-                new_line = "" if index == len(frags) - 1 else ", [!n]"
-                self.log(f"{int(index + 1 / len(frags) * 100)}%{new_line}")
-                threshold += tenth
+                new_line = "" if index == len(frags) else ", [!n]"
+                self.log(f"{int(index / len(frags) * 100)}%{new_line}")
+                threshold = round(threshold + tenth, 1)
         self.logInitFragsPlaced(frags)
 
         while frags:
