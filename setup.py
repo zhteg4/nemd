@@ -44,6 +44,7 @@ class DarwinInstall:
             subprocess.run(self.ln_lmp, shell=True)
             return
 
+        print('Lammps executable with python package not found.')
         self.lmp_found = False
 
     def installLammps(self):
@@ -52,7 +53,7 @@ class DarwinInstall:
         """
         if self.lmp_found:
             return
-        print('Lammps executable with python package not found. Installing...')
+        print('Installing lammps...')
         subprocess.run('cd submodule/lammps; bash install.sh', shell=True)
         subprocess.run(self.ln_lmp, shell=True)
 
@@ -81,19 +82,15 @@ class LinuxInstall(DarwinInstall):
         """
         if self.lmp_found:
             return
+        print('Installing lammps prerequisites...')
+        # zsh for install.sh
+        # python3-venv for make install-python
         subprocess.run(
-            'sudo apt-get install lsb-release gcc openmpi-bin cmake python3-apt python3-setuptools openmpi-common libopenmpi-dev libgtk2.0-dev -y',
+            'sudo apt-get install zsh python3-venv lsb-release gcc '
+            'openmpi-bin cmake python3-apt python3-setuptools openmpi-common '
+            'libopenmpi-dev libgtk2.0-dev -y',
             shell=True)
-        subprocess.run(
-            'cd build; git clone -b stable https://github.com/lammps/lammps.git mylammps; '
-            'cd mylammps; cd cmake; rm -f CMakeFiles CMakeCache.txt; rm -rf build ; mkdir build; cd build; '
-            'cmake .. -DPKG_PYTHON=yes -DPKG_MOLECULE=yes -DPKG_KSPACE=yes -DPKG_RIGID=yes; cmake --build .',
-            shell=True)
-        lmp_path = os.path.join('build', 'mylammps', 'cmake', 'build', 'lmp')
-        # To be consistent with class Lammps_Driver.PATH in task.py
-        subprocess.run(shutil.move(
-            lmp_path, os.path.join(self.install_scripts, 'lmp_serial')),
-                       shell=True)
+        super().installLammps()
 
     def installQt(self):
         """
@@ -153,7 +150,8 @@ setup(name='nemd',
       packages=['nemd'],
       package_dir={'nemd': 'module/nemd'},
       package_data={'nemd': ['ff/*.prm']},
-      scripts=glob.glob('bash_scripts/*') + glob.glob('scripts/*.py') + glob.glob('workflows/*.py'),
+      scripts=glob.glob('bash_scripts/*') + glob.glob('scripts/*.py') +
+      glob.glob('workflows/*.py'),
       install_requires=[
           'numpy == 1.24.3', 'scipy == 1.10.1', 'networkx == 3.1',
           'pandas == 2.0.2', 'more_itertools == 9.1.0', 'chemparse == 0.1.2',
