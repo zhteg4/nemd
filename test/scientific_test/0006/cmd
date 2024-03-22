@@ -1,1 +1,4 @@
-run_nemd cb_lmp_post_workflow.py -task TotEng
+# Iso-butane gas: polymer builder on CC(C)C via -grow; lammps simulation; density
+run_nemd pb_lmp_post_workflow.py "CC(C)C" -cru_num 1 -mol_num 200 -density 0.00251 -seed 5678 -temp 288.15 -prod_ens NPT -prod_time 4 -last_pct 0.4 -task density -cpu 4 -state_num 4 -clean
+grep "g/cm^3" pb_lmp_post_workflow-driver.log
+# 2.51 kg/m3 https://en.wikipedia.org/wiki/Isobutane

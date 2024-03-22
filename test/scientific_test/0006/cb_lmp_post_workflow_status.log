@@ -1,42 +1,0 @@
-Fetching status:   0%|          | 0/33 [00:00<?, ?it/s]Fetching status: 100%|██████████| 33/33 [00:00<00:00, 3831.79it/s]
-Fetching labels:   0%|          | 0/11 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 11/11 [00:00<00:00, 87381.33it/s]
-
-Overview: 11 jobs/aggregates, 0 jobs/aggregates with eligible operations.
-
-label               ratio
-------------------  -------------------------------------------------------
-{'state_id': 0.95}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 0.96}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 0.97}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 0.98}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 0.99}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 1.01}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 1.02}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 1.03}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 1.04}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 1.05}  |███▋                                    | 1/11 (9.09%)
-{'state_id': 1.0}   |███▋                                    | 1/11 (9.09%)
-
-operation/group
------------------
-
-
-Detailed View:
-
-job id                            operation/group    labels
---------------------------------  -----------------  ------------------
-02a6b4903dd7da923c1e2ef67ab20e0e  [ ]                {'state_id': 0.97}
-1bbaf217ec9309f8de6eb2d3233eb1cb  [ ]                {'state_id': 1.0}
-1eab149c7aa74101bcd14fbd02433a32  [ ]                {'state_id': 0.95}
-2d7c837a6fcd82a795ef66d413ffd031  [ ]                {'state_id': 1.05}
-35be3c070aadc36f5524707c8baeefca  [ ]                {'state_id': 0.96}
-6740cd15d6fee94bf7462cabfe5a3015  [ ]                {'state_id': 0.98}
-720ded731c65675bac5a36f3bd9604a3  [ ]                {'state_id': 1.04}
-a562cf540394c7a6ad5ca1c7c6119d1c  [ ]                {'state_id': 1.02}
-c6045f1d5960747334cf0f64413ab767  [ ]                {'state_id': 1.03}
-f942ad16b20957451a9f8c49646aed0c  [ ]                {'state_id': 1.01}
-fcf902fb90302a7814d2f05707d11acf  [ ]                {'state_id': 0.99}
-
-[U]:unknown [R]:registered [I]:inactive [S]:submitted [H]:held [Q]:queued [A]:active [E]:error [GR]:group_registered [GI]:group_inactive [GS]:group_submitted [GH]:group_held [GQ]:group_queued [GA]:group_active [GE]:group_error
-
-
