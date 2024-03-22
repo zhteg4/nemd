@@ -1,6 +1,5 @@
 #! /bin/zsh
 
-# brew install clang-format
 # git submodule add -b develop https://github.com/lammps/lammps.git
 git submodule update --init --recursive
 

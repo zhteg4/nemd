@@ -5,7 +5,6 @@ pip3 install ".[dev]" -v
 import os
 import sys
 import glob
-import shutil
 import subprocess
 from setuptools import setup
 from setuptools.command.install import install
@@ -26,6 +25,7 @@ class DarwinInstall:
 
     def run(self):
         self.checkLammps()
+        self.lammpsPrereq()
         self.installLammps()
         self.installQt()
 
@@ -46,6 +46,14 @@ class DarwinInstall:
 
         print('Lammps executable with python package not found.')
         self.lmp_found = False
+
+    def lammpsPrereq(self):
+        """
+        Install the packages requird by lammps compilation.
+        """
+        if self.lmp_found:
+            return
+        subprocess.run('brew install clang-format', shell=True)
 
     def installLammps(self):
         """
@@ -76,21 +84,20 @@ class LinuxInstall(DarwinInstall):
         super().run()
         self.installTerm()
 
-    def installLammps(self):
+    def lammpsPrereq(self):
         """
-        Install the lammps with specific packages if not available.
+        Install the packages requird by lammps compilation.
         """
         if self.lmp_found:
             return
         print('Installing lammps prerequisites...')
         # zsh for install.sh
-        # python3-venv for make install-python
+        # python3-venv, clang-format for make install-python
         subprocess.run(
-            'sudo apt-get install zsh python3-venv lsb-release gcc '
-            'openmpi-bin cmake python3-apt python3-setuptools openmpi-common '
+            'sudo apt-get install zsh python3-venv clang-format lsb-release '
+            'gcc openmpi-bin cmake python3-apt python3-setuptools openmpi-common '
             'libopenmpi-dev libgtk2.0-dev -y',
             shell=True)
-        super().installLammps()
 
     def installQt(self):
         """
