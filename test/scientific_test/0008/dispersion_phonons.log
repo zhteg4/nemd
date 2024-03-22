@@ -3,7 +3,7 @@
  +                             Ver.  1.5.0                         +
  +-----------------------------------------------------------------+
 
- Job started at Thu Mar 14 10:50:17 2024
+ Job started at Fri Mar 22 10:27:40 2024
 
  The number of MPI processes: 1
  The number of OpenMP threads: 8
@@ -1523,5 +1523,5 @@
  The following files are created: 
   dispersion.bands       : Phonon band structure
 
- Job finished at Thu Mar 14 10:50:17 2024
+ Job finished at Fri Mar 22 10:27:40 2024
 

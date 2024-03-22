@@ -153,7 +153,7 @@ setup(name='nemd',
       packages=['nemd'],
       package_dir={'nemd': 'module/nemd'},
       package_data={'nemd': ['ff/*.prm']},
-      scripts=glob.glob('bash_scripts/*') + glob.glob('scripts/*.py'),
+      scripts=glob.glob('bash_scripts/*') + glob.glob('scripts/*.py') + glob.glob('workflows/*.py'),
       install_requires=[
           'numpy == 1.24.3', 'scipy == 1.10.1', 'networkx == 3.1',
           'pandas == 2.0.2', 'more_itertools == 9.1.0', 'chemparse == 0.1.2',
