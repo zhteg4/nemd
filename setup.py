@@ -108,11 +108,11 @@ class LinuxInstall(DarwinInstall):
             return
         nvdia = subprocess.run(self.NVDIA, capture_output=True, shell=True)
         self.gpu = bool(nvdia.stdout)
-        print(f"GPU found as found as 'nvdia.stdout'")
+        print(f"GPU found as 'nvdia.stdout'")
 
     def lammpsPrereq(self):
         """
-        Install the packages requird by lammps compilation.
+        Install the packages required by lammps compilation.
         """
         if self.lmp_found:
             return
@@ -125,7 +125,7 @@ class LinuxInstall(DarwinInstall):
             "cmake python3-apt python3-setuptools openmpi-common "
             "libopenmpi-dev libgtk2.0-dev fftw3 fftw3-dev ffmpeg")
         if self.gpu:
-            packages == " nvidia-cuda-toolkit nvidia-cuda-toolkit-gcc"
+            packages += " nvidia-cuda-toolkit nvidia-cuda-toolkit-gcc"
         subprocess.run(f'sudo apt-get install {packages} -y', shell=True)
 
     def installLammps(self):

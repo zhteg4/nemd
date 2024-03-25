@@ -1,0 +1,45 @@
+..........Command Options..........
+state_num: 8
+cru: [Ar]
+cru_num: None
+mol_num: 1000
+seed: None
+cell: grow
+density: 0.5
+timestep: 1
+stemp: 10
+temp: 50.0
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 4.0
+prod_time: 4.0
+prod_ens: NVE
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+interactive: False
+jobname: replot
+debug: False
+cpu: 8
+task: density, rdf
+sel: None
+last_pct: 0.2
+slice: None
+clean: False
+jtype: aggregator
+prj_path: .
+JobStart: 18:50:16 03/25/24
+...................................
+Task timing breakdown:
+polymer_builder: 24 minutes and 35 seconds, 24 minutes and 34 seconds, 24 minutes and 25 seconds, 24 minutes and 29 seconds, 24 minutes and 15 seconds, 24 minutes and 26 seconds, 24 minutes and 38 seconds, 24 minutes and 11 seconds; 24 minutes and 26.62 seconds (ave)
+custom_dump: 2 hours, 3 minutes and 21 seconds, 2 hours, 3 minutes and 21 seconds, 2 hours, 3 minutes and 21 seconds, 2 hours, 3 minutes and 21 seconds, 2 hours, 3 minutes and 21 seconds, 2 hours, 3 minutes and 21 seconds, 2 hours, 2 minutes and 38 seconds; 2 hours, 3 minutes and 14.86 seconds (ave)
+8 jobs found for aggregation.
+Results for density saved to replot_density.csv
+1.466 ± 0 g/cm^3 ∈ [7399.8571, 9248.8571] ps
+Density figure saved as replot_density.png
+Results for radial distribution function saved to replot_rdf.csv
+Peak position: 4.700000000000001; peak value:  3.79
+Radial distribution function figure saved as replot_rdf.png
+finished.
+18:50:18 03/25/24

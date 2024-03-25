@@ -329,6 +329,9 @@ class BaseTask:
                 delta_times[tname].append(delta)
         log(BaseTask.TIME_BREAKDOWN)
         for tname, deltas in delta_times.items():
+            deltas = [x for x in deltas if x]
+            if not deltas:
+                continue
             ave = sum(deltas, timedelta(0)) / len(deltas)
             deltas = [humanfriendly.format_timespan(x) for x in deltas]
             ave = humanfriendly.format_timespan(ave)

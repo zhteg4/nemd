@@ -179,7 +179,10 @@ def get_time(filepath, dtype=DELTA):
     stime = timeutils.dtime(stime)
     if dtype == START:
         return stime
-    dtime = sh.grep('-A', '1', FINISHED, filepath).split(FINISHED)[-1]
+    try:
+        dtime = sh.grep('-A', '1', FINISHED, filepath).split(FINISHED)[-1]
+    except sh.ErrorReturnCode_1:
+        return
     dtime = timeutils.dtime(' '.join(dtime.split()[-2:]))
     if dtype == END:
         return dtime
