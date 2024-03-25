@@ -14,16 +14,19 @@ class DarwinInstall:
 
     LMP = 'lmp_serial'
     LMP_PY = f'{LMP} -h | grep PYTHON'
-    USR_LOCAL_BIN = '/usr/local/bin'
+    LOCAL_BIN = '/usr/local/bin'
     BUILD_LMP = f'submodule/lammps/build/{LMP}'
-    USR_LOCAL_LMP = os.path.join(USR_LOCAL_BIN, LMP)
 
     def __init__(self):
         self.lmp_found = True
+        self.local_lmp = os.path.join(self.LOCAL_BIN, self.LMP)
         build_lmp = os.path.join(os.getcwd(), self.BUILD_LMP)
-        self.ln_lmp = f'ln -sf {build_lmp} {self.USR_LOCAL_LMP}'
+        self.ln_lmp = f'ln -sf {build_lmp} {self.local_lmp}'
 
     def run(self):
+        """
+        Main method to run.
+        """
         self.checkLammps()
         self.lammpsPrereq()
         self.installLammps()
@@ -55,14 +58,19 @@ class DarwinInstall:
             return
         subprocess.run('brew install clang-format', shell=True)
 
-    def installLammps(self):
+    def installLammps(self, std_cmake_args=None):
         """
         Install the lammps with specific packages if not available.
+
+        :param std_cmake_args: the additional packages or flags.
         """
         if self.lmp_found:
             return
         print('Installing lammps...')
-        subprocess.run('cd submodule/lammps; bash install.sh', shell=True)
+        cmd = 'cd submodule/lammps; bash install.sh'
+        if std_cmake_args:
+            cmd += f" {std_cmake_args}"
+        subprocess.run(cmd, shell=True)
         subprocess.run(self.ln_lmp, shell=True)
 
     def installQt(self):
@@ -80,9 +88,27 @@ class DarwinInstall:
 
 class LinuxInstall(DarwinInstall):
 
+    LOCAL_BIN = "$HOME/.local/bin"
+    NVDIA = "nvidia-smi | grep 'NVIDIA-SMI'"
+
+    def __init__(self):
+        super().__init__()
+        self.gpu = False
+
     def run(self):
         super().run()
         self.installTerm()
+
+    def checkLammps(self):
+        """
+        See parent class.
+        """
+        super().checkLammps()
+        if self.lmp_found:
+            return
+        nvdia = subprocess.run(self.NVDIA, capture_output=True, shell=True)
+        self.gpu = bool(nvdia.stdout)
+        print(f"GPU found as found as 'nvdia.stdout'")
 
     def lammpsPrereq(self):
         """
@@ -93,11 +119,21 @@ class LinuxInstall(DarwinInstall):
         print('Installing lammps prerequisites...')
         # zsh for install.sh
         # python3-venv, clang-format for make install-python
-        subprocess.run(
-            'sudo apt-get install zsh python3-venv clang-format lsb-release '
-            'gcc openmpi-bin cmake python3-apt python3-setuptools openmpi-common '
-            'libopenmpi-dev libgtk2.0-dev -y',
-            shell=True)
+        # lammps cmake: Found FFMPEG
+        packages = (
+            "zsh python3-venv clang-format lsb-release gcc openmpi-bin "
+            "cmake python3-apt python3-setuptools openmpi-common "
+            "libopenmpi-dev libgtk2.0-dev fftw3 fftw3-dev ffmpeg")
+        if self.gpu:
+            packages == " nvidia-cuda-toolkit nvidia-cuda-toolkit-gcc"
+        subprocess.run(f'sudo apt-get install {packages} -y', shell=True)
+
+    def installLammps(self):
+        """
+        See parent method for docs.
+        """
+        std_cmake_args = "-D PKG_GPU=on" if self.gpu else ""
+        super().installLammps(std_cmake_args=std_cmake_args)
 
     def installQt(self):
         """
