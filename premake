@@ -3,9 +3,8 @@ WORKFLOWS=workflows
 SCRIPTS=scripts
 MODULE=module
 export GIT_EDITOR=vim
-
 # Bash linux assigns /usr/bin as $0
-if [ BASH_SOURCE[0] ]; then PREMAKE=BASH_SOURCE[0]; else PREMAKE=$0; fi
+if [ ${BASH_SOURCE[0]} ]; then PREMAKE=${BASH_SOURCE[0]}; else PREMAKE="$0"; fi
 export NEMD_SRC="$(readlink -f ${PREMAKE} | xargs dirname)"
 echo \$NEMD_SRC=$NEMD_SRC
 
