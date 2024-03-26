@@ -1,2 +1,2 @@
-echo python3 $NEMD_SRC/test/integration/run.py ${@:1}
-python3 $NEMD_SRC/test/integration/run.py ${@:1}
+echo python3 $NEMD_SRC/test/integration/run.py ${@}
+python3 $NEMD_SRC/test/integration/run.py ${@}

@@ -431,6 +431,7 @@ def validate_options(argv):
             options.dir = environutils.get_integration_test_dir()
         except ValueError as err:
             parser.error(str(err))
+    options.dir = os.path.realpath(os.path.expanduser(options.dir))
     return options
 
 

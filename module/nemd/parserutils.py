@@ -46,11 +46,18 @@ def type_dir(arg):
 
 
 def type_itest_dir(arg):
+    """
+    Return the dir of tests.
+
+    For example, $input_dir,  $NEMD_SRC/$input_dir, and $NEMD_SRC/0*?$input_dir
+
+    return str: the integration test dir
+    """
     try:
         return type_dir(arg)
     except argparse.ArgumentTypeError:
         dir = environutils.get_integration_test_dir()
-        nargs = [arg, '0' * (4 - len(arg)) + arg]
+        nargs = [arg, f"{arg:0>4}"]
         nargs = [os.path.join(dir, x) for x in nargs]
         for narg in nargs:
             if os.path.isdir(narg):
