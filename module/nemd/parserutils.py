@@ -57,11 +57,11 @@ def type_itest_dir(arg):
         return type_dir(arg)
     except argparse.ArgumentTypeError:
         dir = environutils.get_integration_test_dir()
-        nargs = [arg, f"{arg:0>4}"]
-        nargs = [os.path.join(dir, x) for x in nargs]
-        for narg in nargs:
-            if os.path.isdir(narg):
-                return narg
+        args = arg.split(',')
+        nargs = [f"{x:0>4}" for x in args]
+        nargs = [os.path.join(dir, x) for x in set(args + nargs)]
+        dirs = [x for x in nargs if os.path.isdir(x)]
+        return dirs
     raise argparse.ArgumentTypeError(
         f"None of {', '.join([arg] + nargs)} exists.")
 

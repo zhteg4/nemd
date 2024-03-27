@@ -245,6 +245,7 @@ class AmorphousCell(object):
             else:
                 break
 
+        self.density = density
         self.box = cell.box
         self.mols = cell.mols
 
@@ -258,6 +259,10 @@ class AmorphousCell(object):
                                 box=self.box,
                                 options=self.options)
         lmw.writeData(adjust_coords=False)
+        if not np.isclose(lmw.density, self.density):
+            log_warning(
+                f'The density of the final data file is {lmw.density:.4g} kg/cm^3'
+            )
         if round(lmw.total_charge, 4):
             log_warning(
                 f'The system has a net charge of {lmw.total_charge:.4f}')
@@ -751,8 +756,12 @@ class Polymer(object):
 
     @property
     def molecular_weight(self):
-        atypes = [x.GetIntProp(self.TYPE_ID) for x in self.polym.GetAtoms()]
-        return sum(self.ff.atoms[x].mass for x in atypes)
+        """
+        The molecular weight of the polymer.
+
+        :return float: the total weight.
+        """
+        return self.ff.molecular_weight(self.polym)
 
     mw = molecular_weight
 

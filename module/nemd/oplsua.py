@@ -7,6 +7,7 @@ This module handles opls-ua related typing, parameterization, assignment,
 datafile, and in-script.
 """
 import math
+import scipy
 import types
 import string
 import base64
@@ -1054,6 +1055,16 @@ class OplsParser:
             raise ValueError(err)
         return matches
 
+    def molecular_weight(self, mol):
+        """
+        The molecular weight of one rdkit molecule.
+
+        :parm mol: rdkit.Chem.rdchem.Mol one rdkit molecule.
+        :return float: the total weight.
+        """
+        atypes = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
+        return sum(self.atoms[x].mass for x in atypes)
+
 
 class LammpsIn(fileutils.LammpsInput):
     """
@@ -1359,6 +1370,7 @@ class LammpsData(LammpsDataBase):
         self.impr_types = {}
         self.total_charge = 0.
         self.data_fh = None
+        self.density = None
 
     def hasCharge(self):
         """
@@ -1864,6 +1876,13 @@ class LammpsData(LammpsDataBase):
                 f"{centroid[dim]-box_hf[dim]:.2f} {centroid[dim]+box_hf[dim]:.2f} "
                 f"{self.LO_HI[dim]}\n")
         self.data_fh.write("\n")
+        # Calculate density as the revised box may alter the box size.
+        weight = sum([self.ff.molecular_weight(x) for x in self.molecule])
+        edges = [
+            x * 2 * scipy.constants.angstrom / scipy.constants.centi
+            for x in box_hf
+        ]
+        self.density = weight / math.prod(edges) / scipy.constants.Avogadro
 
     def getHalfBox(self, xyzs, min_box=None, buffer=None):
         """
@@ -2132,6 +2151,11 @@ class DataFileReader(LammpsData):
 
     @property
     def molecular_weight(self):
+        """
+        The total molecular weight over all atoms.
+
+        :return float: the total weight.
+        """
         type_ids = [x.type_id for x in self.atom]
         return sum(self.masses[x].mass for x in type_ids)
 

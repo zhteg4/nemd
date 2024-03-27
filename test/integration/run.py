@@ -101,8 +101,9 @@ def run_cmd(job):
     test_cmd_file = os.path.join(job.document[DIR], CMD)
     with open(test_cmd_file) as fh:
         lines = [x.strip() for x in fh.readlines()]
+    comment = symbols.COMMA.join([x for x in lines if x.startswith('#')])
     cmd = symbols.SEMICOLON.join([x for x in lines if not x.startswith('#')])
-    return cmd
+    return f"echo \"{os.path.basename(job.document[DIR])} {comment}\"; {cmd}"
 
 
 def checked(job):
@@ -280,13 +281,15 @@ class Integration:
         Set the test dirs by looking for the sub-folder tests or the input
         folder itself.
         """
-        base_dir = os.path.join(self.options.dir, symbols.WILD_CARD)
         self.test_dirs = [
-            x for x in glob.glob(base_dir)
-            if os.path.isdir(x) and os.path.basename(x).isdigit()
+            x for x in self.options.dir if os.path.basename(x).isdigit()
         ]
-        if not self.test_dirs and os.path.basename(self.options.dir).isdigit():
-            self.test_dirs = [self.options.dir]
+        if not self.test_dirs:
+            self.test_dirs = [
+                y for x in self.options.dir
+                for y in glob.glob(os.path.join(x, symbols.WILD_CARD))
+                if os.path.isdir(y) and os.path.basename(y).isdigit()
+            ]
         if not self.test_dirs:
             log_error(f'No tests found in {self.options.dir}.')
         log(f"{len(self.test_dirs)} tests found.")
@@ -403,7 +406,9 @@ def get_parser():
                         metavar=FLAG_DIR.upper(),
                         type=parserutils.type_itest_dir,
                         nargs='?',
-                        help='The directory to search for integration tests.')
+                        help='The directory to search for integration tests, '
+                             f'or directories of the tests separated by '
+                             f'\"{symbols.COMMA}\"')
     parser.add_argument(
         FLAG_CLEAN,
         action='store_true',
@@ -431,7 +436,11 @@ def validate_options(argv):
             options.dir = environutils.get_integration_test_dir()
         except ValueError as err:
             parser.error(str(err))
-    options.dir = os.path.realpath(os.path.expanduser(options.dir))
+    if isinstance(options.dir, str):
+        options.dir = [options.dir]
+    options.dir = [
+        os.path.realpath(os.path.expanduser(x)) for x in options.dir
+    ]
     return options
 
 
