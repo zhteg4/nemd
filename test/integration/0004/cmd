@@ -1,2 +1,2 @@
-# polymer builder on long *CC(*)C(=O)O and CN(C)C=O mixture
+# polymer builder on short *CC(*)C(=O)O and CN(C)C=O mixture
 run_nemd polymer_builder_driver.py '*CC(*)C(=O)O' 'CN(C)C=O' -cru_num 3 1 -mol_num 5 15 -seed 5
