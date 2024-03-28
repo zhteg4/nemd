@@ -15,3 +15,4 @@ _deps
 [Bb][Uu][Ii][Ll][Dd]/
 *.egg-info/
 *workspace/
+*.signac/

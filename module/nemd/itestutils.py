@@ -143,7 +143,8 @@ class Results(task.BaseTask):
         """
         Execute all operators. Raise errors during operation if one failed.
         """
-        print(f"Analyzing {symbols.COMMA.join(self.operators)}")
+        print(f"{self.job.statepoint[self.STATE_ID]}: "
+              f"Analyzing {symbols.COMMA.join(self.operators)}")
         for operator in self.operators:
             self.execute(operator)
 
