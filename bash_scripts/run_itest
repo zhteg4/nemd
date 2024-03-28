@@ -1,2 +1,6 @@
-echo python3 $NEMD_SRC/test/integration/run.py ${@}
-python3 $NEMD_SRC/test/integration/run.py ${@}
+#!/bin/bash
+
+[ -z "$NEMD_SRC" ] && echo "Please source premake" && exit 1
+SCRIPT_ARGS="python3 $NEMD_SRC/test/integration/run.py $*"
+echo "$SCRIPT_ARGS"
+eval "$SCRIPT_ARGS"

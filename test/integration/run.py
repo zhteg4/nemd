@@ -19,6 +19,7 @@ import shutil
 import filecmp
 import datetime
 from flow import FlowProject
+from nemd import task
 from nemd import symbols
 from nemd import logutils
 from nemd import fileutils
@@ -82,11 +83,14 @@ def cmd_completed(job):
 
     NOTE：This should be modified when using with slurm schedular.
     """
-
-    return bool([
-        x for x in glob.glob(job.fn(symbols.WILD_CARD))
-        if not os.path.basename(x).startswith(SIGNAC)
-    ])
+    filenames = glob.glob(job.fn(f"{symbols.WILD_CARD}{logutils.DRIVER_LOG}"))
+    if not filenames:
+        return False
+    jobnames = [
+        os.path.basename(x).replace(logutils.DRIVER_LOG, '') for x in filenames
+    ]
+    success = [task.BaseTask.success(job, x) for x in jobnames]
+    return all(success)
 
 
 @FlowProject.post(cmd_completed)
@@ -407,8 +411,8 @@ def get_parser():
                         type=parserutils.type_itest_dir,
                         nargs='?',
                         help='The directory to search for integration tests, '
-                             f'or directories of the tests separated by '
-                             f'\"{symbols.COMMA}\"')
+                        f'or directories of the tests separated by '
+                        f'\"{symbols.COMMA}\"')
     parser.add_argument(
         FLAG_CLEAN,
         action='store_true',

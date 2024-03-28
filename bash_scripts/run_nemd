@@ -1,16 +1,17 @@
 #!/bin/bash
 
+# run_nemd polymer_builder_driver.py C -cru_num 10 -mol_num 10 -seed 5678 -DEBUG
 # Set environment variables based on jobcontrol flags
 # This block has to be on top as debug flag debugs the shell as well
 for ((i=0; i<=$#; i++)); do
   arg=${!i}
-  if [ $arg == '-JOBNAME' ]; then
-    j=$(( $i + 1 ))
+  if [ "$arg" == '-JOBNAME' ]; then
+    j=$(( i + 1 ))
     export JOBNAME=${!j}
     [[ -z "$JOBNAME" ]] && echo "Please provide a jobname after -JOBNAME" && exit 2
-  elif [ $arg == '-INTERACTIVE' ]; then
+  elif [ "$arg" == '-INTERACTIVE' ]; then
     export INTERACTIVE='1'
-  elif [ $arg == '-DEBUG' ]; then
+  elif [ "$arg" == '-DEBUG' ]; then
     export DEBUG='1'
   fi
 done
@@ -26,22 +27,22 @@ do
     fi
 done
 if [ -z $FILE_IDX ]; then
-    echo "Please provide a python script name after "$0"."
+    echo "Please provide a python script name after $0."
     exit 2
 fi
 
 # Search for python filename in the user, source, and installation folders
-FILE=${@:$FILE_IDX:1} && [[ -n "$DEBUG" ]] && echo "Python file: $FILE"
+FILE=${!FILE_IDX} && [[ -n "$DEBUG" ]] && echo "Python file: $FILE"
 DIR="$(dirname $FILE)" && [[ -n "$DEBUG" ]] && echo "File dir: $DIR"
-BASENAME=`basename $FILE` && [[ -n "$DEBUG" ]] && echo "Filename: $BASENAME"
+BASENAME="$(basename $FILE)" && [[ -n "$DEBUG" ]] && echo "Filename: $BASENAME"
 # Assume that the file come with absolute or relative path (curdir implicitly)
-SPATH="$(cd $DIR; pwd)/$BASENAME" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
-[ ! -f $SPATH ] && [ -n "$NEMD_SCRIPTS" ] && SPATH=$NEMD_SCRIPTS/$BASENAME && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
-[ ! -f $SPATH ] && [ -n "$NEMD_WORKFLOWS" ] && SPATH=$NEMD_WORKFLOWS/$BASENAME && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
-[ ! -f $SPATH ] && [ -n "$ALAMODE_PTOOLS" ] && SPATH=$ALAMODE_PTOOLS/$BASENAME && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
-[ ! -f $SPATH ] && SPATH=`which $BASENAME` && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
+SPATH="$(cd "$DIR"; pwd)/$BASENAME" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
+[ ! -f "$SPATH" ] && [ -n "$NEMD_SCRIPTS" ] && SPATH="$NEMD_SCRIPTS/$BASENAME" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
+[ ! -f "$SPATH" ] && [ -n "$NEMD_WORKFLOWS" ] && SPATH="$NEMD_WORKFLOWS/$BASENAME" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
+[ ! -f "$SPATH" ] && [ -n "$ALAMODE_PTOOLS" ] && SPATH="$ALAMODE_PTOOLS/$BASENAME" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
+[ ! -f "$SPATH" ] && SPATH="$(which "$BASENAME")" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
 
-if [ -z $SPATH ]; then
+if [ -z "$SPATH" ]; then
     echo "Cannot find $BASENAME in"
     echo "  $NEMD_SCRIPTS,"
     echo "  $NEMD_WORKFLOWS,"
@@ -52,8 +53,7 @@ if [ -z $SPATH ]; then
 fi
 
 # Finalize the command so that Python script is of absolute path
-SCRIPT_ARGS="${@:1:$FILE_IDX-1} $SPATH ${@:$FILE_IDX+1}"
-echo "Running python3 $SCRIPT_ARGS"
-
+SCRIPT_ARGS="python3 ${*:1:$FILE_IDX-1} $SPATH ${*:$FILE_IDX+1}"
+echo "Running $SCRIPT_ARGS"
 # Actually run the script
-env FOO=BAR python3 $SCRIPT_ARGS
+eval "$SCRIPT_ARGS"

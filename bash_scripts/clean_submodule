@@ -1,2 +1,5 @@
-git submodule deinit -f $NEMD_SRC
+#!/bin/bash
+
+[ -z "$NEMD_SRC" ] && echo "Please source premake" && exit 1
+git submodule deinit -f "$NEMD_SRC"
 git submodule update --init --recursive --checkout

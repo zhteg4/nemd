@@ -1,8 +1,10 @@
-SCRIPTS=${@:1}
-if [ -z "$1" ]; then
+#!/bin/bash
+
+[ -z "$NEMD_SRC" ] && echo "Please source premake" && exit 1
+SCRIPTS=$*
+if [ -z "$SCRIPTS" ]; then
     SCRIPTS="$NEMD_SRC/test/module/*_test.py $NEMD_SRC/test/*_test.py"
 fi
-SCRIPT_ARGS="python3 -m pytest  -s --pdb $SCRIPTS"
 
-echo "$SCRIPT_ARGS"
-$SCRIPT_ARGS
+SCRIPT_ARGS="python3 -m pytest  -s --pdb $SCRIPTS"
+echo "$SCRIPT_ARGS" && eval "$SCRIPT_ARGS"
