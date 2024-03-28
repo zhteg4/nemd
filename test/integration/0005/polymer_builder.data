@@ -1,4 +1,4 @@
-LAMMPS Description
+LAMMPS Description # full
 
 4 atoms
 3 bonds
@@ -12,9 +12,9 @@ LAMMPS Description
 0 dihedral types
 1 improper types
 
--0.38 5.39 xlo xhi
--2.67 3.11 ylo yhi
--2.49 3.29 zlo zhi
+-13.14 13.26 xlo xhi
+-9.92 16.48 ylo yhi
+-9.91 16.49 zlo zhi
 
 Masses
 
@@ -43,10 +43,10 @@ Improper Coeffs
 
 Atoms
 
-1 1 3 0.0620 1.482 0.113 -0.675
-2 1 1 0.3000 2.492 0.296 0.448
-3 1 3 0.0620 3.526 -0.804 0.644
-4 1 2 -0.4240 2.521 1.271 1.197
+1 1 3 0.0620 -1.195 3.166 4.092
+2 1 1 0.3000 0.063 3.359 3.256
+3 1 3 0.0620 1.023 2.183 3.160
+4 1 2 -0.4240 0.342 4.398 2.662
 
 Bonds
 

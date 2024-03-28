@@ -17,21 +17,21 @@ MSG = task.MSG
 class Integration_Driver(task.BaseTask):
 
     @staticmethod
-    def operator(*arg, **kwargs):
+    def operator(*args, **kwargs):
         """
-        Get the polymer builder operation command.
+        Get the integration test cmd command.
 
         :return str: the command to run a task.
         """
-        integration_driver = Integration_Driver(*arg, **kwargs)
+        integration_driver = Integration_Driver(*args, **kwargs)
         return integration_driver.getCmd()
 
     def getCmd(self, write=True):
         """
         Get command line str.
 
-        :return: the command as str
-        :rtype: str
+        :param write bool: the msg to be printed
+        :return str: the command as str
         """
         cmd_file = os.path.join(self.job.document[DIR], CMD)
         with open(cmd_file) as fh:
@@ -39,6 +39,9 @@ class Integration_Driver(task.BaseTask):
         comment = symbols.COMMA.join([x for x in lines if x.startswith('#')])
         cmd = symbols.SEMICOLON.join(
             [x for x in lines if not x.startswith('#')])
+        if write:
+            with open(f"{self.job.statepoint[self.STATE_ID]}_cmd", 'w') as fh:
+                fh.write(cmd)
         return f"echo \"{os.path.basename(self.job.document[DIR])} {comment}\"; {cmd}"
 
     @classmethod
@@ -69,6 +72,11 @@ class CMP:
     """
 
     def __init__(self, original, target, job=None):
+        """
+        :param original str: the original filename
+        :param target str: the target filename
+        :param job 'signac.contrib.job.Job': the signac job instance
+        """
         self.orignal = original.strip().strip('\'"')
         self.target = target.strip().strip('\'"')
         self.job = job
@@ -135,6 +143,7 @@ class Results(task.BaseTask):
         """
         Execute all operators. Raise errors during operation if one failed.
         """
+        print(f"Analyzing {symbols.COMMA.join(self.operators)}")
         for operator in self.operators:
             self.execute(operator)
 

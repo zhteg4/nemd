@@ -118,8 +118,8 @@ class BaseTask:
         """
         Get command line str.
 
-        :return: the command as str
-        :rtype: str
+        :param write bool: the msg to be printed
+        :return str: the command as str
         """
         # self.doc[KNOWN_ARGS] is not a list but BufferedJSONAttrLists
         args = list(self.doc[self.KNOWN_ARGS])

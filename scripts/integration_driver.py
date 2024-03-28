@@ -36,6 +36,7 @@ FLAG_SLOW = '-slow'
 def log_debug(msg):
     """
     Print this message into the log file in debug mode.
+
     :param msg str: the msg to be printed
     """
     if logger:
@@ -186,7 +187,7 @@ class Integration(jobcontrol.Runner):
 
     def logStatus(self):
         """
-        Log message from the failed jobs.
+        Log message from the failed jobs in addition to the standard status log.
         """
         super().logStatus()
         jobs = self.project.find_jobs()
