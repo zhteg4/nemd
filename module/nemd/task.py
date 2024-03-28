@@ -8,6 +8,7 @@ import collections
 import humanfriendly
 import pandas as pd
 from datetime import timedelta
+from types import SimpleNamespace
 from flow import FlowProject, aggregator
 
 from nemd import oplsua
@@ -20,6 +21,9 @@ from nemd import environutils
 FILE = jobutils.FILE
 
 logger = logutils.createModuleLogger(file_path=__file__)
+
+SUCCESS = 'success'
+MSG = 'msg'
 
 
 def log_debug(msg):
@@ -52,6 +56,7 @@ class BaseTask:
     KNOWN_ARGS = jobutils.KNOWN_ARGS
     UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
     QUOTED_CHAR = re.compile("[@!#$%^&*()<>?/|}{~:]")
+    DRIVER = SimpleNamespace(PATH=None)
 
     def __init__(self, job, pre_run=RUN_NEMD, name=None):
         """
@@ -146,8 +151,8 @@ class BaseTask:
         :rtype: bool
         """
         logfile = job.fn(name + cls.DRIVER_LOG)
-        return os.path.exists(logfile) and sh.tail('-2', logfile).startswith(
-            cls.FINISHED)
+        return os.path.exists(logfile) and sh.tail('-2', logfile).split(
+            symbols.RETURN)[0].endswith(cls.FINISHED)
 
     @classmethod
     def pre(cls, job, name=None):
@@ -428,13 +433,13 @@ class Polymer_Builder(BaseTask):
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SEED, seed)
 
     @staticmethod
-    def operator(*arg, **kwargs):
+    def operator(*args, **kwargs):
         """
         Get the polymer builder operation command.
 
         :return str: the command to run a task.
         """
-        polymer_builder = Polymer_Builder(*arg, **kwargs)
+        polymer_builder = Polymer_Builder(*args, **kwargs)
         polymer_builder.run()
         return polymer_builder.getCmd()
 

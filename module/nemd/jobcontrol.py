@@ -55,7 +55,6 @@ class Runner:
         2) run a project with task jobs
         3) run a project with aggregator jobs
         """
-
         with open(self.status_file, 'w') as self.status_fh:
             if self.options.clean and jobutils.TASK in self.options.jtype:
                 self.clean()

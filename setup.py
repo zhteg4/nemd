@@ -208,7 +208,7 @@ setup(name='nemd',
       extras_require={
           'dev': [
               'ipdb', 'ipython', 'notebook', 'jupyterlab', 'yapf',
-              'RBTools == 4.1', 'snakeviz', 'pyvim'
+              'RBTools == 4.1', 'snakeviz', 'pyvim', 'remote_pdb'
           ]
       },
       classifiers=[
