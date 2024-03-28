@@ -54,6 +54,4 @@ fi
 
 # Finalize the command so that Python script is of absolute path
 SCRIPT_ARGS="python3 ${*:1:$FILE_IDX-1} $SPATH ${*:$FILE_IDX+1}"
-echo "Running $SCRIPT_ARGS"
-# Actually run the script
-eval "$SCRIPT_ARGS"
+echo "Running $SCRIPT_ARGS" && $SCRIPT_ARGS

@@ -7,4 +7,4 @@ if [ -z "$SCRIPTS" ]; then
 fi
 
 SCRIPT_ARGS="python3 -m pytest  -s --pdb $SCRIPTS"
-echo "$SCRIPT_ARGS" && eval "$SCRIPT_ARGS"
+echo "$SCRIPT_ARGS" && $SCRIPT_ARGS

@@ -21,7 +21,6 @@ echo
 
 if [ -z "$CAPTURED_STDERR" ]; then
     SCRIPT_ARGS="snakeviz nemd.profile"
-    echo "Running $SCRIPT_ARGS"
-    eval "$SCRIPT_ARGS"
+    echo "Running $SCRIPT_ARGS && $SCRIPT_ARGS
     exit
 fi
