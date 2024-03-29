@@ -31,16 +31,7 @@ JOBNAME = PATH.split('.')[0].replace('_driver', '')
 
 FLAG_DIR = itestutils.DIR
 FLAG_SLOW = '-slow'
-
-
-def log_debug(msg):
-    """
-    Print this message into the log file in debug mode.
-
-    :param msg str: the msg to be printed
-    """
-    if logger:
-        logger.debug(msg)
+FLAG_CHECK_ONLY = '-check_only'
 
 
 def log(msg, timestamp=False):
@@ -118,6 +109,8 @@ class Integration(jobcontrol.Runner):
             return
         orig_num = len(self.test_dirs)
         self.test_dirs = [x for x in self.test_dirs if not self.isSLow(x)]
+        if not self.test_dirs:
+            log_error(f'All tests in {self.options.dir} are skipped.')
         log(f"{orig_num - len(self.test_dirs)} tests skipped.")
 
     def isSLow(self, test_dir):
@@ -170,6 +163,12 @@ class Integration(jobcontrol.Runner):
         return key_vals
 
     def setOperators(self):
+        """
+        Set operators. For example, run cmd and check results.
+        """
+        if self.options.check_only:
+            itestutils.Results.getOpr(name='result', cmd=False)
+            return
         cmd = itestutils.Integration_Driver.getOpr(name='cmd')
         result = itestutils.Results.getOpr(name='result', cmd=False)
         self.setPrereq(result, cmd)
@@ -184,6 +183,8 @@ class Integration(jobcontrol.Runner):
             job = self.project.open_job(statepoint)
             job.document[itestutils.DIR] = test_dir
             job.init()
+            if self.options.check_only:
+                job.doc.pop(itestutils.SUCCESS)
 
     def logStatus(self):
         """
@@ -223,6 +224,9 @@ def get_parser():
         type=parserutils.type_positive_float,
         metavar='SECOND',
         help='Skip tests marked with time longer than this criteria.')
+    parser.add_argument(FLAG_CHECK_ONLY,
+                        action='store_true',
+                        help='Checking for results only (the cmd task)')
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
     parserutils.add_workflow_arguments(parser,

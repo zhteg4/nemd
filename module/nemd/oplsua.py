@@ -1869,12 +1869,15 @@ class LammpsData(LammpsDataBase):
         """
         xyzs = np.concatenate(
             [x.GetConformer(0).GetPositions() for x in self.mols.values()])
-        centroid = xyzs.mean(axis=0)
+        ctr = xyzs.mean(axis=0)
         box_hf = self.getHalfBox(xyzs, min_box=min_box, buffer=buffer)
-        for dim in range(3):
-            self.data_fh.write(
-                f"{centroid[dim]-box_hf[dim]:.2f} {centroid[dim]+box_hf[dim]:.2f} "
-                f"{self.LO_HI[dim]}\n")
+        box = [[x - y, x + y, z] for x, y, z in zip(ctr, box_hf, self.LO_HI)]
+        if self.box is not None:
+            boxes = zip(box, np.array(self.box).reshape(-1, 2))
+            box = [[*x, symbols.POUND, *y] for x, y in boxes]
+        for line in box:
+            line = [f'{x:.2f}' if isinstance(x, float) else x for x in line]
+            self.data_fh.write(f"{' '.join(line)}\n")
         self.data_fh.write("\n")
         # Calculate density as the revised box may alter the box size.
         weight = sum([self.ff.molecular_weight(x) for x in self.molecule])
@@ -1889,6 +1892,9 @@ class LammpsData(LammpsDataBase):
         Get the half box size based on interaction minimum, buffer, and structure
         span.
 
+        :param xyzs 'numpy.ndarray': the xyz of the structure
+        :param min_box list: minimum box size
+        :param buffer list: the buffer in xyz dimensions (good for non-pbc)
         :return list of three floats: the xyz box limits.
         """
         if min_box is None:
