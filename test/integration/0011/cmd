@@ -1,2 +1,2 @@
 # polymer builder on Isopropanol
-run_nemd polymer_builder_driver.py 'CC(C)O' -cru_num 1 -force_field OPLSUA,TIP3P -seed 4321 -DEBUG
+run_nemd polymer_builder_driver.py 'CC(C)O' -mol_num 1 -force_field OPLSUA,TIP3P -seed 4321 -DEBUG
