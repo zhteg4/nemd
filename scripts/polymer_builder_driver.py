@@ -122,7 +122,7 @@ class Validator:
         Validate (or set) the number of molecules.
         """
         if self.options.mol_num is None:
-            self.options.mol_num = [3] * len(self.options.cru_num)
+            self.options.mol_num = [1] * len(self.options.cru_num)
             return
         if len(self.options.cru_num) == len(self.options.mol_num):
             return
