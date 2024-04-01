@@ -1,2 +1,2 @@
 # polymer builder on t-Butyl Ketone
-run_nemd polymer_builder_driver.py 'CC(C)CC(=O)C(C)(C)C' -force_field OPLSUA,TIP3P -seed 1234 -DEBUG
+run_nemd polymer_builder_driver.py 'CC(C)CC(=O)C(C)(C)C' -mol_num 1 -force_field OPLSUA,TIP3P -seed 1234 -DEBUG
