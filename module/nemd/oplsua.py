@@ -100,12 +100,14 @@ class FixWriter:
     RUN_STEP = "run %i\n"
     UNFIX = "unfix %s\n"
     FIX_NVE = f"{FIX} %s all nve\n"
-    FIX_NVT = FIX + " %s all nvt temp {stemp} {temp} {tdamp}\n"
-    FIX_TEMP_BERENDSEN = FIX + " %s all " + TEMP_BERENDSEN + " {stemp} {temp} {tdamp}\n"
-    FIX_PRESS_BERENDSEN = FIX + " %s all " + PRESS_BERENDSEN + " iso {spress} {press} {pdamp} modulus 100\n"
-
-    RECORD_PRESS = f"{FIX} %s all ave/time 1 10 10 c_thermo_press file press.data\n"
-    DEFORM_BOX = f"{FIX} %s all deform 1 x wiggle 1 1000\n"
+    FIX_NVT = f"{FIX} %s all nvt temp {{stemp}} {{temp}} {{tdamp}}\n"
+    FIX_TEMP_BERENDSEN = f"{FIX} %s all {TEMP_BERENDSEN} {{stemp}} {{temp}} {{tdamp}}\n"
+    FIX_PRESS_BERENDSEN = f"{FIX} %s all {PRESS_BERENDSEN} iso {{spress}} {{press}} {{pdamp}} modulus 100\n"
+    RECORD_PRESS = f"variable vol equal vol\n" \
+                   f"{FIX} %s all ave/time 1 100 100 c_thermo_press v_vol file press.data\n"
+    VARIABLE_AMP = 'variable amplitude equal "0.05*vol^(1/3)"\n'
+    WIGGLE_DIM = "%s wiggle ${{amplitude}} {period}"
+    WIGGLE_VOL = f"{FIX} %s all deform 1 {{PARAM}}\n"
     SET_PRESS = """
     variable ave_press python getPress
     python getPress return v_ave_press format f here \"""
@@ -246,10 +248,13 @@ class FixWriter:
                      press=self.press)
             return
         self.nvt(nstep=self.relax_step / 1E2, stemp=self.stemp, temp=self.temp)
+        params = ' '.join([self.WIGGLE_DIM % dim for dim in ['x', 'y', 'z']])
+        wiggle_vol = self.WIGGLE_VOL.format(PARAM=params).format(period=1000)
+        wiggle_vol = self.VARIABLE_AMP + wiggle_vol
         self.nvt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
                  temp=self.temp,
-                 pre=self.RECORD_PRESS + self.DEFORM_BOX)
+                 pre=self.RECORD_PRESS + wiggle_vol)
         self.cmd.append(self.SET_PRESS)
         self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
