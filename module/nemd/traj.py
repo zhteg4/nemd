@@ -638,10 +638,11 @@ class DistanceCell:
         mcc = max(nx.connected_components(self.graph), key=len)
         cut = min(max(self.gindexes) / 3, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
         snum = num * 2 if len(mcc) > num * 2 else len(mcc)
-        largest_cc = {
-            x: len(nx.generators.ego_graph(self.graph, x, radius=cut))
-            for x in random.sample(list(mcc), snum)
-        }
+        sampled = [x for x in random.sample(list(mcc), snum)]
+        # yapf: disable
+        largest_cc = {x: len(nx.single_source_shortest_path_length(self.graph, x, cutoff=cut))
+                      for x in sampled}
+        # yapf: enable
         largest_cc_rv = collections.defaultdict(list)
         for node, size in largest_cc.items():
             largest_cc_rv[size].append(node)

@@ -105,7 +105,7 @@ class FixWriter:
     FIX_PRESS_BERENDSEN = FIX + " %s all " + PRESS_BERENDSEN + " iso {spress} {press} {pdamp} modulus 100\n"
 
     RECORD_PRESS = f"{FIX} %s all ave/time 1 10 10 c_thermo_press file press.data\n"
-    DEFORM_BOX = f"{FIX} %s all deform 1 x wiggle 1 100\n"
+    DEFORM_BOX = f"{FIX} %s all deform 1 x wiggle 1 1000\n"
     SET_PRESS = """
     variable ave_press python getPress
     python getPress return v_ave_press format f here \"""
