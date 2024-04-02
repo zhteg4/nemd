@@ -105,6 +105,7 @@ class FixWriter:
     FIX_PRESS_BERENDSEN = FIX + " %s all " + PRESS_BERENDSEN + " iso {spress} {press} {pdamp} modulus 100\n"
 
     RECORD_PRESS = f"{FIX} %s all ave/time 1 10 10 c_thermo_press file press.data\n"
+    DEFORM_BOX = f"{FIX} %s all deform 1 x wiggle 1 100\n"
     SET_PRESS = """
     variable ave_press python getPress
     python getPress return v_ave_press format f here \"""
@@ -248,7 +249,7 @@ class FixWriter:
         self.nvt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
                  temp=self.temp,
-                 pre=self.RECORD_PRESS)
+                 pre=self.RECORD_PRESS + self.DEFORM_BOX)
         self.cmd.append(self.SET_PRESS)
         self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
