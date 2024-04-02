@@ -95,18 +95,16 @@ class FixWriter:
 
     TEMP_BERENDSEN = 'temp/berendsen'
     PRESS_BERENDSEN = 'press/berendsen'
+    FIX = 'fix'
 
     RUN_STEP = "run %i\n"
     UNFIX = "unfix %s\n"
-    FIX_NVE = "fix %s all nve\n"
-    FIX_NVT = "fix %s all nvt temp {stemp} {temp} {tdamp}\n"
-    FIX_TEMP_BERENDSEN = "fix %s all " + TEMP_BERENDSEN + " {stemp} {temp} {tdamp}\n"
-    FIX_PRESS_BERENDSEN = "fix %s all " + PRESS_BERENDSEN + " iso {spress} {press} {pdamp} modulus 100\n"
+    FIX_NVE = f"{FIX} %s all nve\n"
+    FIX_NVT = FIX + " %s all nvt temp {stemp} {temp} {tdamp}\n"
+    FIX_TEMP_BERENDSEN = FIX + " %s all " + TEMP_BERENDSEN + " {stemp} {temp} {tdamp}\n"
+    FIX_PRESS_BERENDSEN = FIX + " %s all " + PRESS_BERENDSEN + " iso {spress} {press} {pdamp} modulus 100\n"
 
-    RECORD_PRESS = """
-    fix press all ave/time 1 1000 1000 c_thermo_press file press.data
-    """
-    RECORD_PRESS = RECORD_PRESS.replace('\n    ', '\n').lstrip('\n')
+    RECORD_PRESS = f"{FIX} %s all ave/time 1 10 10 c_thermo_press file press.data\n"
     SET_PRESS = """
     variable ave_press python getPress
     python getPress return v_ave_press format f here \"""
@@ -246,9 +244,11 @@ class FixWriter:
                      temp=self.temp,
                      press=self.press)
             return
-        self.nvt(nstep=self.relax_step / 1E1, stemp=self.stemp, temp=self.temp)
-        self.cmd.append(self.RECORD_PRESS)
-        self.nvt(nstep=self.relax_step / 1E1, stemp=self.temp, temp=self.temp)
+        self.nvt(nstep=self.relax_step / 1E2, stemp=self.stemp, temp=self.temp)
+        self.nvt(nstep=self.relax_step / 1E1,
+                 stemp=self.temp,
+                 temp=self.temp,
+                 pre=self.RECORD_PRESS)
         self.cmd.append(self.SET_PRESS)
         self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
@@ -305,7 +305,12 @@ class FixWriter:
         cmd = self.FIX_NVE + self.RUN_STEP % nstep + self.UNFIX
         self.cmd.append(cmd)
 
-    def nvt(self, nstep=1E4, stemp=300, temp=300, style=TEMP_BERENDSEN):
+    def nvt(self,
+            nstep=1E4,
+            stemp=300,
+            temp=300,
+            style=TEMP_BERENDSEN,
+            pre=""):
         """
         Append command for constant volume and temperature.
 
@@ -313,14 +318,16 @@ class FixWriter:
         :stemp float: starting temperature
         :temp float: target temperature
         :style str: the style for the command
+        :pre str: additional pre-conditions
         """
         if style == self.TEMP_BERENDSEN:
             cmd1 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
                                                   temp=temp,
                                                   tdamp=self.tdamp)
             cmd2 = self.FIX_NVE
-        self.cmd.append(cmd1 + cmd2 + self.RUN_STEP % nstep + self.UNFIX +
-                        self.UNFIX)
+        cmd = pre + cmd1 + cmd2
+        fx = [x for x in cmd.split(symbols.RETURN) if x.startswith(self.FIX)]
+        self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX * len(fx))
 
     def npt(self,
             nstep=20000,
