@@ -274,7 +274,8 @@ class FixWriter:
             self.npt(nstep=self.relax_step,
                      stemp=self.temp,
                      temp=self.temp,
-                     press=self.press)
+                     press=self.press,
+                     modulus="${modulus}")
             return
         # NVE and NVT production runs use averaged cell
         pre = self.getBdryPre()
@@ -303,7 +304,8 @@ class FixWriter:
             self.npt(nstep=self.prod_step,
                      stemp=self.temp,
                      temp=self.temp,
-                     press=self.press)
+                     press=self.press,
+                     modulus="${modulus}")
 
     def nve(self, nstep=1E3):
         """
