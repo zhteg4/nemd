@@ -240,34 +240,37 @@ def getModulus(filename, record_num):
     return modulus.modulus
 
 
-def getXL():
+def getXL(filename):
     """
     Get the box length in the x dimension.
 
+    :param filename str: the filename with path to load data from
     :return float: box length
     """
-    return getL(ending=BoxLength.XL)
+    return getL(filename, ending=BoxLength.XL)
 
 
-def getYL():
+def getYL(filename):
     """
     Get the box length in the y dimension.
 
+    :param filename str: the filename with path to load data from
     :return float: box length
     """
-    return getL(ending=BoxLength.YL)
+    return getL(filename, ending=BoxLength.YL)
 
 
-def getZL():
+def getZL(filename):
     """
     Get the box length in the z dimension.
 
+    :param filename str: the filename with path to load data from
     :return float: box length
     """
-    return getL(ending=BoxLength.ZL)
+    return getL(filename, ending=BoxLength.ZL)
 
 
-def getL(filename, last_pct=0.8, ending=BoxLength.XL):
+def getL(filename, last_pct=0.2, ending=BoxLength.XL):
     """
     Get the box length in the one dimension.
 
