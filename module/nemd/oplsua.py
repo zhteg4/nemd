@@ -102,23 +102,24 @@ class FixWriter:
     FIX_NVE = f"{FIX} %s all nve\n"
     FIX_NVT = f"{FIX} %s all nvt temp {{stemp}} {{temp}} {{tdamp}}\n"
     FIX_TEMP_BERENDSEN = f"{FIX} %s all {TEMP_BERENDSEN} {{stemp}} {{temp}} {{tdamp}}\n"
-    FIX_PRESS_BERENDSEN = f"{FIX} %s all {PRESS_BERENDSEN} iso {{spress}} {{press}} {{pdamp}} modulus 100\n"
+    FIX_PRESS_BERENDSEN = f"{FIX} %s all {PRESS_BERENDSEN} iso {{spress}} {{press}} {{pdamp}} modulus {{modulus}}\n"
     RECORD_PRESS = f"variable vol equal vol\n" \
-                   f"{FIX} %s all ave/time 1 100 100 c_thermo_press v_vol file press.data\n"
-    VARIABLE_AMP = 'variable amplitude equal "0.05*vol^(1/3)"\n'
-    WIGGLE_DIM = "%s wiggle ${{amplitude}} {period}"
-    WIGGLE_VOL = f"{FIX} %s all deform 1 {{PARAM}}\n"
+                   f"{FIX} %s all ave/time 1 {{period}} {{period}} " \
+                   f"c_thermo_press v_vol file press.data\n"
+    WIGGLE_DIM = "%s wiggle ${{amp}} {period}"
+    VARIABLE_AMP = 'variable amp equal "0.05*vol^(1/3)"\n'
+    WIGGLE_VOL = f"{VARIABLE_AMP}{FIX} %s all deform 1 {{PARAM}}\n"
+
+    SET_MODULUS = """
+    variable modulus python getModulus
+    python getModulus input 1 %s return v_modulus format if here "from nemd.pyfunc import getModulus"
+    print "Modulus = ${modulus}"
+    """
+    SET_MODULUS = SET_MODULUS.replace('\n    ', '\n').lstrip('\n')
+
     SET_PRESS = """
     variable ave_press python getPress
-    python getPress return v_ave_press format f here \"""
-    def getPress():
-        import math
-        with open('press.data') as fh:
-            vals = [float(x.split()[1]) for x in fh.readlines() if not x.startswith('#')]
-            num = len(vals)
-            sel = vals[math.floor(num*0.2):]
-            return sum(sel)/len(sel)
-    \"""
+    python getPress return v_ave_press format f here "from nemd.pyfunc import getPress"
     print "Averaged Press = ${ave_press}"
     """
     SET_PRESS = SET_PRESS.replace('\n    ', '\n').lstrip('\n')
@@ -127,36 +128,22 @@ class FixWriter:
     variable xl equal "xhi - xlo"
     variable yl equal "yhi - ylo"
     variable zl equal "zhi - zlo"
-    fix xyzl all ave/time 1 1000 1000 v_xl v_yl v_zl file xyzl.data\n
+    fix %s all ave/time 1 1000 1000 v_xl v_yl v_zl file xyzl.data
     """
     RECORD_BDRY = RECORD_BDRY.replace('\n    ', '\n').lstrip('\n')
 
     CHANGE_BDRY = """
     print "Final Boundary: xl = ${xl}, yl = ${yl}, zl = ${zl}"
     variable ave_xl python getXL
+    python getXL return v_ave_xl format f here "from nemd.pyfunc import getXL"
     variable ave_yl python getYL
+    python getYL return v_ave_yl format f here "from nemd.pyfunc import getYL"
     variable ave_zl python getZL
-    python getXL return v_ave_xl format f here \"""
-    def getXL():
-        return getL(1)
-    def getYL():
-        return getL(2)
-    def getZL():
-        return getL(3)
-    def getL(n):
-        import math
-        with open('xyzl.data') as fh:
-            vals = [float(x.split()[n]) for x in fh.readlines() if not x.startswith('#')]
-            num = len(vals)
-            sel = vals[math.floor(num*0.2):]
-            return sum(sel)/len(sel)
-    \"""
-    python getYL return v_ave_yl format f exists
-    python getZL return v_ave_zl format f exists
-    print "Averaged  xl = ${ave_xl} yl = ${ave_yl} zl = ${ave_zl}"
-    variable ave_xr equal "v_ave_xl / (xhi - xlo)"
-    variable ave_yr equal "v_ave_xl / (xhi - xlo)"
-    variable ave_zr equal "v_ave_xl / (xhi - xlo)"
+    python getZL return v_ave_zl format f here "from nemd.pyfunc import getZL"
+    print "Averaged  xl = ${ave_xl} yl = ${ave_yl} zl = ${ave_zl}"\n
+    variable ave_xr equal "v_ave_xl / v_xl"
+    variable ave_yr equal "v_ave_yl / v_yl"
+    variable ave_zr equal "v_ave_zl / v_zl"
     change_box all x scale ${ave_xr} y scale ${ave_yr} z scale ${ave_zr} remap
     variable ave_xr delete
     variable ave_yr delete
@@ -164,7 +151,6 @@ class FixWriter:
     variable ave_xl delete
     variable ave_yl delete
     variable ave_zl delete
-    unfix xyzl
     variable xl delete
     variable yl delete
     variable zl delete
@@ -248,19 +234,33 @@ class FixWriter:
                      press=self.press)
             return
         self.nvt(nstep=self.relax_step / 1E2, stemp=self.stemp, temp=self.temp)
-        params = ' '.join([self.WIGGLE_DIM % dim for dim in ['x', 'y', 'z']])
-        wiggle_vol = self.WIGGLE_VOL.format(PARAM=params).format(period=1000)
-        wiggle_vol = self.VARIABLE_AMP + wiggle_vol
-        self.nvt(nstep=self.relax_step / 1E1,
-                 stemp=self.temp,
-                 temp=self.temp,
-                 pre=self.RECORD_PRESS + wiggle_vol)
+        nstep = self.relax_step / 1E1
+        pre, record_num = self.getCyclePre(nstep)
+        self.nvt(nstep=nstep, stemp=self.temp, temp=self.temp, pre=pre)
+        self.cmd.append(self.SET_MODULUS % record_num)
         self.cmd.append(self.SET_PRESS)
         self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
                  temp=self.temp,
                  spress='${ave_press}',
-                 press=self.press)
+                 press=self.press,
+                 modulus="${modulus}")
+
+    def getCyclePre(self, nstep, cycle_num=10, record_num=100):
+        """
+        Get the pre-stage str for the cycle simulation.
+
+        :param nstep int: the simulation steps of the whole stage (all cycles)
+        :param cycle_num int: the number of cycles
+        :param record_num int: each cycle records this number of data
+        :return str: the prefix string of the cycle stage.
+        """
+        params = ' '.join([self.WIGGLE_DIM % dim for dim in ['x', 'y', 'z']])
+        period = nstep / cycle_num * self.timestep
+        wiggle_vol = self.WIGGLE_VOL.format(PARAM=params).format(period=period)
+        record = int(nstep / cycle_num / record_num)
+        record_press = self.RECORD_PRESS.format(period=int(record))
+        return record_press + wiggle_vol, record_num
 
     def relaxAndDefrom(self):
         """
@@ -275,11 +275,13 @@ class FixWriter:
                      press=self.press)
             return
         # NVE and NVT production runs use averaged cell
-        self.recordBdry()
+        pre = self.getBdryPre()
         self.npt(nstep=self.relax_step,
                  stemp=self.temp,
                  temp=self.temp,
-                 press=self.press)
+                 press=self.press,
+                 modulus="${modulus}",
+                 pre=pre)
         self.cmd.append(self.CHANGE_BDRY)
         self.nvt(nstep=self.relax_step / 1E2, stemp=self.temp, temp=self.temp)
 
@@ -316,7 +318,7 @@ class FixWriter:
             stemp=300,
             temp=300,
             style=TEMP_BERENDSEN,
-            pre=""):
+            pre=''):
         """
         Append command for constant volume and temperature.
 
@@ -342,7 +344,9 @@ class FixWriter:
             spress=1.,
             press=1.,
             style=PRESS_BERENDSEN,
-            pdamp=None):
+            modulus=10,
+            pdamp=None,
+            pre=''):
         """
         Append command for constant pressure and temperature.
 
@@ -353,6 +357,7 @@ class FixWriter:
         :press float: target pressure
         :style str: the style for the command
         :pdamp pdamp: Pressure damping parameter (x timestep to get the param)
+        :pre str: additional pre-conditions
         """
         if pdamp is None:
             pdamp = self.pdamp
@@ -361,22 +366,26 @@ class FixWriter:
         if style == self.PRESS_BERENDSEN:
             cmd1 = self.FIX_PRESS_BERENDSEN.format(spress=spress,
                                                    press=press,
-                                                   pdamp=pdamp)
+                                                   pdamp=pdamp,
+                                                   modulus=modulus)
             cmd2 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
                                                   temp=temp,
                                                   tdamp=self.tdamp)
             cmd3 = self.FIX_NVE
-        self.cmd.append(cmd1 + cmd2 + cmd3 + self.RUN_STEP % nstep +
-                        self.UNFIX + self.UNFIX + self.UNFIX)
+        cmd = pre + cmd1 + cmd2 + cmd3
+        fx = [x for x in cmd.split(symbols.RETURN) if x.startswith(self.FIX)]
+        self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX * len(fx))
 
-    def recordBdry(self, start_pct=0.2):
+    def getBdryPre(self, start_pct=0.2):
         """
         Record the boundary during the time integration before unset.
+
         :param start_pct float: exclude the first this percentage from average
+        return str: the prefix str to get the box boundary.
         """
         start = math.floor(start_pct * self.relax_step)
         every = self.relax_step - start
-        self.cmd.append(self.RECORD_BDRY.format(start=start, every=every))
+        return self.RECORD_BDRY.format(start=start, every=every)
 
     def write(self):
         """
@@ -386,8 +395,8 @@ class FixWriter:
             num = round(cmd.count('%s') / 2)
             ids = [f'{idx}{string.ascii_lowercase[x]}' for x in range(num)]
             ids += [x for x in reversed(ids)]
-            cmd_with_id = cmd % tuple(ids)
-            self.fh.write(cmd_with_id + '\n')
+            cmd = cmd % tuple(ids) if ids else cmd
+            self.fh.write(cmd + '\n')
 
 
 class OplsTyper:
