@@ -1,11 +1,11 @@
 ..........Command Options..........
 state_num: 4
-cru: CCCCCC
-cru_num: 1
+cru: *CC*
+cru_num: 3
 mol_num: 200
 seed: 5678
 cell: grow
-density: 0.5
+density: 0.6548
 timestep: 1
 stemp: 10
 temp: 298.15
@@ -29,5 +29,5 @@ slice: None
 clean: True
 jtype: task, aggregator
 prj_path: .
-JobStart: 19:27:01 03/21/24
+JobStart: 19:15:35 04/03/24
 ...................................

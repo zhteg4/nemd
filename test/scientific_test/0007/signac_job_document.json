@@ -1,1 +1,1 @@
-{"outfiles": {"cb_lmp_post_workflow": ["cb_lmp_post_workflow-driver.log", "cb_lmp_post_workflow_ave_thermo.csv"]}, "logfile": {"cb_lmp_post_workflow": "cb_lmp_post_workflow-driver.log"}, "outfile": {"cb_lmp_post_workflow": "cb_lmp_post_workflow-driver.log"}}
+{"outfiles": {"pb_lmp_post_workflow": ["pb_lmp_post_workflow-driver.log"]}, "logfile": {"pb_lmp_post_workflow": "pb_lmp_post_workflow-driver.log"}}

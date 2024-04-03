@@ -1,0 +1,4 @@
+# Hexame liquid: polymer builder on CC(C)C via -grow; lammps simulation; density
+run_nemd pb_lmp_post_workflow.py "*CC*" -cru_num 3 -mol_num 200 -density 0.6548 -seed 5678 -temp 298.15 -prod_ens NPT -prod_time 4 -last_pct 0.4 -task density -cpu 4 -state_num 4 -clean
+grep "g/cm^3" pb_lmp_post_workflow-driver.log
+# 0.6548 g/mL (5.464 lb/gal) at 25°C https://macro.lsu.edu/HowTo/solvents/hexane.htm
