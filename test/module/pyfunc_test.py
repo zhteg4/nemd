@@ -36,9 +36,19 @@ class TestBoxLength:
         box_length.setData()
         assert (999, 3) == box_length.data.shape
 
-    def testGetLength(self, box_length):
+    def testSetAve(self, box_length):
         box_length.setData()
-        np.testing.assert_almost_equal(35.17, box_length.getLength(), 2)
+        box_length.setAve()
+        np.testing.assert_almost_equal(35.17, box_length.ave_length, 2)
+
+    def testPlot(self, box_length, tmpdir):
+        with fileutils.chdir(tmpdir, rmtree=True):
+            box_length.setData()
+            box_length.setAve()
+            box_length.plot()
+            import pdb
+            pdb.set_trace()
+            assert os.path.isfile('press_modulus.png')
 
 
 class TestModulus:

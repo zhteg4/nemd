@@ -1,6 +1,5 @@
+import os
 import math
-import os.path
-
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
@@ -10,7 +9,10 @@ from nemd import plotutils
 
 
 class Press:
+
+    DATA = 'Data'
     PRESS = 'press'
+    PNG_EXT = '.png'
 
     def __init__(self, filename):
         """
@@ -19,6 +21,14 @@ class Press:
         self.filename = filename
         self.data = None
         self.ave_press = None
+
+    def run(self):
+        """
+        Main method to run.
+        """
+        self.setData()
+        self.setAve()
+        self.plot()
 
     def setData(self):
         """
@@ -35,10 +45,10 @@ class Press:
         """
         Set the averaged data.
         """
-        press_lb = self.getLabel(self.PRESS)
+        press_lb = self.getColumn(self.PRESS)
         self.ave_press = self.data[press_lb].mean()
 
-    def getLabel(self, ending=PRESS):
+    def getColumn(self, ending=PRESS):
         """
         Get the column label based the ending str.
 
@@ -47,13 +57,80 @@ class Press:
         """
         return [x for x in self.data.columns if x.endswith(ending)][0]
 
+    @staticmethod
+    def getLabel(column):
+        """
+        Shape the label for visualization.
+
+        :param column str: one data column label
+        :return str: label to be displayed on the figure.
+        """
+        column = column.removeprefix('c_').removeprefix('v_').split('_')
+        return ' '.join([x.capitalize() for x in column])
+
+    def plot(self):
+        """
+        To be overwritten.
+        """
+        pass
+
+
+class BoxLength(Press):
+
+    XL = 'xl'
+    YL = 'yl'
+    ZL = 'zl'
+
+    def __init__(self, filename, last_pct=0.2, ending=XL):
+        """
+        :param filename str: the filename with path to load data from
+        :param last_pct float: the last this percentage of the data are used
+        :param ending str: the data column ending with str is used.
+        """
+        super().__init__(filename)
+        self.last_pct = last_pct
+        self.sel_length = None
+        self.sindex = None
+        self.ending = ending
+
+    def setAve(self):
+        """
+        Get the box length in one dimension.
+
+        :return float: the averaged box length in one dimension.
+        """
+        column = self.getColumn(self.ending)
+        data = self.data[column]
+        self.sindex = math.floor(data.shape[0] * (1 - self.last_pct))
+        self.ave_length = data[self.sindex:].mean()
+
+    def plot(self):
+        """
+        To be overwritten.
+        """
+        with plotutils.get_pyplot(inav=False) as plt:
+            fig, ax = plt.subplots(1, 1, sharex=True, figsize=(8, 6))
+            column = self.getColumn(self.ending)
+            col = self.data[column]
+            ax.plot(self.data.index, col, label=self.DATA)
+            ax.plot(self.data.index[self.sindex:],
+                    col[self.sindex:],
+                    'g',
+                    label='Selected')
+            ax.set_xlabel(self.data.index.name)
+            ax.set_ylabel(self.getLabel(column))
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles, labels)
+            basename = os.path.basename(self.filename)
+            name = symbols.PERIOD.join(basename.split(symbols.PERIOD)[:-1])
+            fig.savefig(f"{name}_{self.ending}{self.PNG_EXT}")
+
 
 class Modulus(Press):
 
     MODULUS = 'modulus'
     DEFAULT = 10
     VOL = 'vol'
-    PNG_EXT = '.png'
     STD_DEV = '_(Std_Dev)'
     SMOOTHED = '_(Smoothed)'
 
@@ -71,9 +148,7 @@ class Modulus(Press):
         """
         Main method to run.
         """
-        self.setData()
-        self.setAve()
-        self.plot()
+        super().run()
         self.setModulus()
 
     def setAve(self):
@@ -114,7 +189,7 @@ class Modulus(Press):
         :param ax 'matplotlib.axes._axes.Axes':the axis to plot
         :param column str: the column of the data
         """
-        ax.plot(self.ave.index, self.ave[column], label="Data")
+        ax.plot(self.ave.index, self.ave[column], label=self.DATA)
         smoothed_lb = column + self.SMOOTHED
         ax.plot(self.ave.index, self.ave[smoothed_lb], label="Smoothed")
         std_dev = self.ave[column + self.STD_DEV]
@@ -122,8 +197,7 @@ class Modulus(Press):
         ubndry = self.ave[column] + std_dev
         ax.fill_between(self.ave.index, lbndry, ubndry, alpha=0.5, label="SD")
         ax.set_xlabel(self.data.index.name)
-        ylabel = column.removeprefix('c_').removeprefix('v_').split('_')
-        ax.set_ylabel(' '.join([x.capitalize() for x in ylabel]))
+        ax.set_ylabel(self.getLabel(column))
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles, labels)
 
@@ -133,39 +207,12 @@ class Modulus(Press):
 
         :return float: the bulk modulus from cycles.
         """
-        press_lb = self.getLabel(self.PRESS) + self.SMOOTHED
+        press_lb = self.getColumn(self.PRESS) + self.SMOOTHED
         press_delta = self.ave[press_lb].max() - self.ave[press_lb].min()
-        vol_lb = self.getLabel(self.VOL) + self.SMOOTHED
+        vol_lb = self.getColumn(self.VOL) + self.SMOOTHED
         vol_delta = self.ave[vol_lb].max() - self.ave[vol_lb].min()
         modulus = press_delta / vol_delta * self.ave[vol_lb].mean()
         self.modulus = max([modulus, self.DEFAULT])
-
-
-class BoxLength(Press):
-
-    XL = 'xl'
-    YL = 'yl'
-    ZL = 'zl'
-
-    def __init__(self, filename, last_pct=0.8):
-        """
-        :param filename str: the filename with path to load data from
-        :param last_pct float: the last this percentage of the data are used
-        """
-        super().__init__(filename)
-        self.last_pct = last_pct
-
-    def getLength(self, ending=XL):
-        """
-        Get the box length in one dimension.
-
-        :param ending str: the data column ending with str is used.
-        :return float: the averaged box length in one dimension.
-        """
-        column = self.getLabel(ending)
-        data = self.data[column]
-        index = math.floor(data.shape[0] * (1 - self.last_pct))
-        return data[index:].mean()
 
 
 def getPress(filename):
@@ -229,5 +276,6 @@ def getL(filename, last_pct=0.8, ending=BoxLength.XL):
     :param ending str: select the label ends with this string
     :return float: box length
     """
-    box_length = BoxLength(filename, last_pct=last_pct)
-    return box_length.getLength(ending=ending)
+    box_length = BoxLength(filename, last_pct=last_pct, ending=ending)
+    box_length.run()
+    return box_length.ave_length
