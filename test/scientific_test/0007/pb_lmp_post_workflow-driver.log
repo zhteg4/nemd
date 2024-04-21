@@ -31,3 +31,14 @@ jtype: task, aggregator
 prj_path: .
 JobStart: 19:44:18 04/03/24
 ...................................
+4 / 4 completed jobs.
+4 jobs found for aggregation.
+Results for density saved to pb_lmp_post_workflow_density.csv
+0.6567 ± 0.002954 g/cm^3 ∈ [3128.5000, 5214.5000] ps
+Density figure saved as pb_lmp_post_workflow_density.png
+Task timing breakdown:
+polymer_builder: 22 seconds, 21 seconds, 21 seconds, 20 seconds; 21 seconds (ave)
+lammps_runner: 4 hours, 11 minutes and 18 seconds, 4 hours, 11 minutes and 18 seconds, 4 hours, 11 minutes and 18 seconds, 4 hours, 11 minutes and 18 seconds; 4 hours, 11 minutes and 18 seconds (ave)
+custom_dump: 48 seconds, 48 seconds, 48 seconds, 48 seconds; 48 seconds (ave)
+finished.
+23:57:11 04/03/24
