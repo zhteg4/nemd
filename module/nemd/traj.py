@@ -116,27 +116,25 @@ class Frame(pd.DataFrame):
                 lines = [fh.readline() for _ in range(9)]
                 if not all(lines):
                     return
-                atom_num = int(lines[3].strip('\n'))
-                # 'id', 'xu', 'yu', 'zu'
-                names = lines[-1].strip('\n').split()[-4:]
+                atom_num = int(lines[3].rstrip())
                 try:
-                    frm = pd.read_csv(fh,
-                                      nrows=atom_num,
-                                      header=None,
-                                      delimiter=r'\s',
-                                      index_col=0,
-                                      names=names,
-                                      engine='python')
+                    data = np.loadtxt(fh, max_rows=atom_num)
                 except EOFError:
                     return
-                if frm.shape[0] != atom_num or frm.isnull().values.any():
+                if data.shape[0] != atom_num:
                     return
+                # 'xu', 'yu', 'zu'
+                names = lines[-1].rstrip().split()[-3:]
                 # array([  8.8 ,  68.75,   2.86,  67.43, -28.76,  19.24])
                 box = np.array([
                     float(y) for x in range(5, 8)
-                    for y in lines[x].strip('\n').split()
+                    for y in lines[x].rstrip().split()
                 ])
-                yield cls(frm, box=box, step=int(lines[1].strip()))
+                yield cls(xyz=data[:, 1:],
+                          box=box,
+                          index=data[:, 0],
+                          columns=names,
+                          step=int(lines[1].rstrip()))
 
     @classmethod
     def readXYZ(cls, filename=None, contents=None, box=None):
