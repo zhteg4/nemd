@@ -1,0 +1,22 @@
+# https://www.youtube.com/watch?v=i53Gi_K3o7I
+1. Vertical scaling (upgrade RAM, CPU etc): single point failure
+2. Horizontal scaling (replica): redundancy, fault-tolerance
+3. Load Balancer (Reverse-Proxy): round robin, hashing id, nearest location
+4. Content delivery network
+5. Cashing: HDD -> RAM -> CPU cashing
+6. Internet Protocol Address
+7. IP, TCP (Internet protocol suite, HTTP and Websocket built on top), UDP
+8. Domain Name System (DNS)
+9. HTTP (Application-Layer Protocol, Client / Server): Request Header, Request Body
+10. REST API: 200 OK, 400 Bad request, 500 Internal server error
+11. GraphQL: single request (query)
+12. gRPC: PRC framework, gRPC web, Protocol Buffer (binary)
+13. WebSocket
+14. SQL: Efficient storage, Faster retrieval (structured query language)
+15. ACID: Atomicity, Consistency, Isolation, Durability
+16. NoSQL (No relations): Key-value stores (DynamoDB), Document stores (MongoDB), Graph DBs (neo4j)
+17. Sharding (e.g. range based sharding)
+18. Replication: Leader-Follower Replication, Leader-leader Replication
+19. CAP theorem: consistency, availability, partition (network)
+20. Message queue
+# Wait, it's all just moving and storing data? Always has been !
