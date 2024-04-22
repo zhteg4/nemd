@@ -5,6 +5,7 @@ pip3 install .[dev] -v --break-system-packages
 import os
 import sys
 import glob
+import pathlib
 import subprocess
 from setuptools import setup
 from setuptools.command.install import install
@@ -12,19 +13,18 @@ from setuptools.command.install import install
 
 class DarwinInstall:
 
+    LOCAL_BIN = pathlib.Path('/usr/local/bin')
+    SUBMODULE = 'submodule'
+    LAMMPS = 'lammps'
+    ALAMODE = 'alamode'
     LMP = 'lmp_serial'
     ALM = 'alm'
-    LOCAL_BIN = '/usr/local/bin'
-    BUILD_LMP = f'submodule/lammps/build/{LMP}'
-    BUILD_ALM = f'submodule/alamode/build/{ALM}/{ALM}'
-
-    def __init__(self):
-        build_lmp = os.path.join(os.getcwd(), self.BUILD_LMP)
-        local_lmp = os.path.join(self.LOCAL_BIN, self.LMP)
-        self.ln_lmp = f'ln -sf {build_lmp} {local_lmp}'
-        build_alm = os.path.join(os.getcwd(), self.BUILD_ALM)
-        local_alm = os.path.join(self.LOCAL_BIN, self.ALM)
-        self.ln_alm = f'ln -sf {build_alm} {local_alm}'
+    ANPHON = 'anphon'
+    BUILD = 'build'
+    BUILD_LMP = pathlib.Path(f'{SUBMODULE}/{LAMMPS}/{BUILD}/{LMP}').resolve()
+    ALAMODE_BUILD = f'{SUBMODULE}/{ALAMODE}/{BUILD}'
+    BUILD_ALM = pathlib.Path(f'{ALAMODE_BUILD}/{ALM}/{ALM}').resolve()
+    BUILD_ANPHON = pathlib.Path(f'{ALAMODE_BUILD}/{ANPHON}/{ANPHON}').resolve()
 
     def run(self):
         """
@@ -54,7 +54,10 @@ class DarwinInstall:
 
         if os.path.isfile(self.BUILD_LMP):
             print(f'Creating soft link to lammps executable {self.BUILD_LMP}')
-            subprocess.run(self.ln_lmp, shell=True)
+            try:
+                self.LOCAL_BIN.joinpath(self.LMP).symlink_to(self.BUILD_LMP)
+            except FileExistsError:
+                pass
             return True
 
         print('Lammps executable with python package not found.')
@@ -81,27 +84,44 @@ class DarwinInstall:
         if std_cmake_args:
             cmd += f" {std_cmake_args}"
         subprocess.run(cmd, shell=True)
-        subprocess.run(self.ln_lmp, shell=True)
+        try:
+            self.LOCAL_BIN.joinpath(self.LMP).symlink_to(self.BUILD_LMP)
+        except FileExistsError:
+            pass
 
     def checkAlamode(self):
         """
-        Check whether alamode executable can be found.
+        Check whether alamode executables can be found.
 
-        :return: True if lammps executable with python package found.
+        :return: True if alamode executables are found.
         """
-        alm = subprocess.run(f"which {self.ALM}",
-                             capture_output=True,
-                             shell=True)
-        if alm.stdout:
-            print('Alamode executable found.')
-            return True
 
-        if os.path.isfile(self.BUILD_ALM):
-            print(f'Creating soft link to alamode executable {self.BUILD_ALM}')
-            subprocess.run(self.ln_alm, shell=True)
-            return True
+        return self.checkExecutable(self.ALM,
+                                    self.BUILD_ALM) and self.checkExecutable(
+                                        self.ANPHON, self.BUILD_ANPHON)
 
-        print('Alamode executable not found.')
+    def checkExecutable(self, exe, build_exe):
+        """
+        Check the existence of an executable and create a soft link to it if it
+        is found.
+
+        :param exe: the name of the executable.
+        :param build_exe: the path to the executable.
+        :return: True if the executable is found.
+        """
+        cmd = f'which {exe}'
+        info = subprocess.run(cmd, capture_output=True, shell=True)
+        if info.returncode != 0:
+            print(f'{exe} executable found.')
+            return True
+        if os.path.isfile(build_exe):
+            print(f'Creating soft link to {build_exe}')
+            try:
+                self.LOCAL_BIN.joinpath(exe).symlink_to(build_exe)
+            except FileExistsError:
+                pass
+            return True
+        print(f'Alamode {exe} not found.')
         return False
 
     def alamodePrereq(self):
@@ -128,7 +148,14 @@ class DarwinInstall:
         if std_cmake_args:
             cmd += f" {std_cmake_args}"
         subprocess.run(cmd, shell=True)
-        subprocess.run(self.ln_alm, shell=True)
+        try:
+            self.LOCAL_BIN.joinpath(self.ALM).symlink_to(self.BUILD_ALM)
+        except FileExistsError:
+            pass
+        try:
+            self.LOCAL_BIN.joinpath(self.ANPHON).symlink_to(self.BUILD_ANPHON)
+        except FileExistsError:
+            pass
 
     def installQt(self):
         """

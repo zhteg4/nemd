@@ -146,7 +146,7 @@ class Dispersion(object):
         info = subprocess.run(cmd, capture_output=True, shell=True)
         if bool(info.stderr):
             raise ValueError(info.stderr)
-        with open(f'{self.options.jobname}_{self.DSP_LOG}', 'wb') as fh:
+        with open(f'{self.options.jobname}{self.DSP_LOG}', 'wb') as fh:
             fh.write(info.stdout)
         name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
         self.datafiles = glob.glob(f"{name}*{self.LAMMPS_EXT}")
