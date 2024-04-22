@@ -123,6 +123,7 @@ class Frame(pd.DataFrame):
                     return
                 if data.shape[0] != atom_num:
                     return
+                data = data[data[:, 0].argsort()]
                 # 'xu', 'yu', 'zu'
                 names = lines[-1].rstrip().split()[-3:]
                 # array([  8.8 ,  68.75,   2.86,  67.43, -28.76,  19.24])
@@ -132,7 +133,7 @@ class Frame(pd.DataFrame):
                 ])
                 yield cls(xyz=data[:, 1:],
                           box=box,
-                          index=data[:, 0],
+                          index=data[:, 0].astype(int),
                           columns=names,
                           step=int(lines[1].rstrip()))
 
