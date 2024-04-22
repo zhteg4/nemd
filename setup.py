@@ -41,6 +41,8 @@ class DarwinInstall:
     def checkLammps(self):
         """
         Check whether lammps executable can be found.
+
+        :return: True if lammps executable with python package found.
         """
 
         lmp = subprocess.run(f'{self.LMP} -h | grep PYTHON',
@@ -84,6 +86,8 @@ class DarwinInstall:
     def checkAlamode(self):
         """
         Check whether alamode executable can be found.
+
+        :return: True if lammps executable with python package found.
         """
         alm = subprocess.run(f"which {self.ALM}",
                              capture_output=True,

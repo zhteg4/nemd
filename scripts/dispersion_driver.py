@@ -157,8 +157,6 @@ class Dispersion(object):
         Run LAMMPS to calculate the force on the atoms.
         """
         name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
-        import pdb
-        pdb.set_trace()
         pattern = f"{name}(.*){self.LAMMPS_EXT}"
         for datafile in self.datafiles:
             index = re.search(pattern, datafile).groups()[0]

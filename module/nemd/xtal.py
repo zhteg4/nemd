@@ -120,7 +120,9 @@ class CrystalBuilder(object):
         with open(ala_logfile, 'wb') as fh:
             fh.write(info.stdout)
 
-        if bool(info.stderr):
+        if bool(info.stderr) and info.returncode != 0:
             raise ValueError(info.stderr)
-
+        # The following stderr error message as info.stderr is more of a warning
+        # '[xxx.local:45424] shmem: mmap: an error occurred while determining
+        # whether or not xxx could be created.\n'
         return ala_logfile
