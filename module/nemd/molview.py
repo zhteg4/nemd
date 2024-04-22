@@ -128,7 +128,8 @@ class FrameView:
         else:
             element = set(ele_sz_clr[self.ELEMENT])
             color = {
-                x: self.X_COLOR
+                x:
+                self.X_COLOR
                 if x == self.X_ELE else nmendeleev.element(x).cpk_color
                 for x in element
             }

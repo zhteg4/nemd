@@ -1,6 +1,6 @@
 """
-pip3 install setuptools
-pip3 install ".[dev]" -v
+pip3 install setuptools openvino-telemetry
+pip3 install .[dev] -v --break-system-packages
 """
 import os
 import sys
@@ -13,23 +13,29 @@ from setuptools.command.install import install
 class DarwinInstall:
 
     LMP = 'lmp_serial'
-    LMP_PY = f'{LMP} -h | grep PYTHON'
+    ALM = 'alm'
     LOCAL_BIN = '/usr/local/bin'
     BUILD_LMP = f'submodule/lammps/build/{LMP}'
+    BUILD_ALM = f'submodule/alamode/build/{ALM}/{ALM}'
 
     def __init__(self):
-        self.lmp_found = True
-        self.local_lmp = os.path.join(self.LOCAL_BIN, self.LMP)
         build_lmp = os.path.join(os.getcwd(), self.BUILD_LMP)
-        self.ln_lmp = f'ln -sf {build_lmp} {self.local_lmp}'
+        local_lmp = os.path.join(self.LOCAL_BIN, self.LMP)
+        self.ln_lmp = f'ln -sf {build_lmp} {local_lmp}'
+        build_alm = os.path.join(os.getcwd(), self.BUILD_ALM)
+        local_alm = os.path.join(self.LOCAL_BIN, self.ALM)
+        self.ln_alm = f'ln -sf {build_alm} {local_alm}'
 
     def run(self):
         """
         Main method to run.
         """
-        self.checkLammps()
+        self.lmp_found = self.checkLammps()
         self.lammpsPrereq()
         self.installLammps()
+        self.alm_found = self.checkAlamode()
+        self.alamodePrereq()
+        self.installAlamode()
         self.installQt()
 
     def checkLammps(self):
@@ -37,18 +43,20 @@ class DarwinInstall:
         Check whether lammps executable can be found.
         """
 
-        lmp_py = subprocess.run(self.LMP_PY, capture_output=True, shell=True)
-        if lmp_py.stdout:
+        lmp = subprocess.run(f'{self.LMP} -h | grep PYTHON',
+                             capture_output=True,
+                             shell=True)
+        if lmp.stdout:
             print('Lammps executable with python package found.')
-            return
+            return True
 
         if os.path.isfile(self.BUILD_LMP):
             print(f'Creating soft link to lammps executable {self.BUILD_LMP}')
             subprocess.run(self.ln_lmp, shell=True)
-            return
+            return True
 
         print('Lammps executable with python package not found.')
-        self.lmp_found = False
+        return False
 
     def lammpsPrereq(self):
         """
@@ -72,6 +80,51 @@ class DarwinInstall:
             cmd += f" {std_cmake_args}"
         subprocess.run(cmd, shell=True)
         subprocess.run(self.ln_lmp, shell=True)
+
+    def checkAlamode(self):
+        """
+        Check whether alamode executable can be found.
+        """
+        alm = subprocess.run(f"which {self.ALM}",
+                             capture_output=True,
+                             shell=True)
+        if alm.stdout:
+            print('Alamode executable found.')
+            return True
+
+        if os.path.isfile(self.BUILD_ALM):
+            print(f'Creating soft link to alamode executable {self.BUILD_ALM}')
+            subprocess.run(self.ln_alm, shell=True)
+            return True
+
+        print('Alamode executable not found.')
+        return False
+
+    def alamodePrereq(self):
+        """
+        Install the packages required by alamode compilation.
+        """
+
+        if self.lmp_found:
+            return
+        subprocess.run(
+            'brew install gcc lapack open-mpi libomp boost eigen spglib fftw cmake llvm',
+            shell=True)
+
+    def installAlamode(self, std_cmake_args=None):
+        """
+        Install the alamode with specific packages if not available.
+
+        :param std_cmake_args: the additional packages or flags.
+        """
+        if self.alm_found:
+            return
+        print('Installing alamode...')
+        cmd = 'cd submodule/alamode; bash install.sh'
+        if std_cmake_args:
+            cmd += f" {std_cmake_args}"
+        subprocess.run(cmd, shell=True)
+        subprocess.run(self.ln_alm, shell=True)
 
     def installQt(self):
         """
@@ -196,14 +249,11 @@ setup(name='nemd',
       scripts=glob.glob('bash_scripts/*') + glob.glob('scripts/*.py') +
       glob.glob('workflows/*.py'),
       install_requires=[
-          'numpy == 1.24.3', 'scipy == 1.10.1', 'networkx == 3.1',
-          'pandas == 2.0.2', 'more_itertools == 9.1.0', 'chemparse == 0.1.2',
-          'mendeleev == 0.14.0', 'rdkit == 2023.3.1', 'signac == 2.0.0',
-          'signac-flow == 0.25.1', 'matplotlib == 3.7.1', 'plotly ==5.15.0',
-          'dash_bootstrap_components', 'pytest == 7.3.2', 'dash[testing]',
-          'pyqt5 == 5.15.7', 'webdriver-manager == 3.8.6', 'flask >= 2.2.5',
-          'openpyxl == 3.1.2', 'sh == 2.0.4', 'humanfriendly == 10.0',
-          'Pillow == 9.4.0', 'pyvim', 'adjustText', 'crystals'
+          'numpy', 'scipy', 'networkx', 'pandas', 'more_itertools',
+          'chemparse', 'mendeleev', 'rdkit', 'signac', 'signac-flow',
+          'matplotlib', 'plotly', 'dash_bootstrap_components', 'pytest',
+          'dash[testing]', 'pyqt5', 'webdriver-manager', 'flask', 'openpyxl',
+          'sh', 'humanfriendly', 'Pillow', 'pyvim', 'adjustText', 'crystals'
       ],
       extras_require={
           'dev': [

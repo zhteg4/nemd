@@ -73,6 +73,7 @@ class Dispersion(object):
     LAMMPS_EXT = '.lammps'
     DFSET_HARMONIC_EXT = '.dfset_harmonic'
     PNG_EXT = '.png'
+    DSP_LOG = '_dsp.log'
 
     def __init__(self, options):
         """
@@ -81,7 +82,7 @@ class Dispersion(object):
         self.options = options
         self.xbuild = None
         self.lmp_dat = None
-        self.orig_lammps_data = None
+        self.orig_lammps_dat = None
         self.datafiles = None
         self.dumpfiles = []
         self.dump_kfile = f"{self.options.jobname}{self.DFSET_HARMONIC_EXT}"
@@ -89,6 +90,9 @@ class Dispersion(object):
         self.ph_bonds_file = None
 
     def run(self):
+        """
+        Main method to run.
+        """
         self.buildCell()
         self.writeDataFile()
         self.writeDispPattern()
@@ -112,11 +116,17 @@ class Dispersion(object):
             f"being {self.xbuild.scell.lattice_parameters}")
 
     def writeDispPattern(self):
-        self.disp_pattern_file = self.xbuild.writeDispPattern()
-        log(f"{alamodeutils.AlaLogReader.SUGGESTED_DSIP_FILE} {self.disp_pattern_file}"
-            )
+        """
+        Write the alamode suggested displacement pattern.
+        """
+        self.sug_disp = self.xbuild.writeDispPattern()
+        log(f"{alamodeutils.AlaLogReader.SUGGESTED_DSIP_FILE} {self.sug_disp}")
 
     def writeDataFile(self):
+        """
+        Write the LAMMPS data file with the original structure and in script to
+        calculate the force.
+        """
         mol = self.xbuild.getMol()
         tasks = [stillinger.LammpsData.XYZ, stillinger.LammpsData.FORCE]
         self.lmp_dat = stillinger.LammpsData({1: mol},
@@ -124,25 +134,31 @@ class Dispersion(object):
                                              self.options.jobname,
                                              tasks=tasks)
         self.lmp_dat.writeData()
-        self.orig_lammps_data = self.lmp_dat.lammps_data
-        log(f"LAMMPS data file written as {self.orig_lammps_data}")
+        self.orig_lammps_dat = self.lmp_dat.lammps_data
+        log(f"LAMMPS data file written as {self.orig_lammps_dat}")
 
     def writeDisplacement(self):
-        cmd = f"{jobutils.RUN_NEMD} displace.py --LAMMPS {self.orig_lammps_data} " \
-              f"--prefix {self.options.jobname} --mag 0.01 " \
-              f"-pf {self.disp_pattern_file}"
+        """
+        Write the LAMMPS data files with the suggested displacements.
+        """
+        cmd = f"{jobutils.RUN_NEMD} displace.py --LAMMPS {self.orig_lammps_dat}" \
+              f" --prefix {self.options.jobname} --mag 0.01 -pf {self.sug_disp}"
         info = subprocess.run(cmd, capture_output=True, shell=True)
         if bool(info.stderr):
             raise ValueError(info.stderr)
-        dsp_logfile = f'{self.options.jobname}_dsp.log'
-        with open(dsp_logfile, 'wb') as fh:
+        with open(f'{self.options.jobname}_{self.DSP_LOG}', 'wb') as fh:
             fh.write(info.stdout)
         name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
         self.datafiles = glob.glob(f"{name}*{self.LAMMPS_EXT}")
         log(f"Data files with displacements are written as: {self.datafiles}")
 
     def writeForce(self):
+        """
+        Run LAMMPS to calculate the force on the atoms.
+        """
         name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
+        import pdb
+        pdb.set_trace()
         pattern = f"{name}(.*){self.LAMMPS_EXT}"
         for datafile in self.datafiles:
             index = re.search(pattern, datafile).groups()[0]
@@ -159,7 +175,7 @@ class Dispersion(object):
             subprocess.run(cmd, capture_output=True, shell=True)
 
     def writeForceConstant(self):
-        cmd = f"{jobutils.RUN_NEMD} extract.py --LAMMPS {self.orig_lammps_data} " \
+        cmd = f"{jobutils.RUN_NEMD} extract.py --LAMMPS {self.orig_lammps_dat} " \
               f"{' '.join(self.dumpfiles)}"
         info = subprocess.run(cmd, capture_output=True, shell=True)
         with open(self.dump_kfile, 'wb') as fh:
