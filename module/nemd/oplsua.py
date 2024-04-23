@@ -2141,9 +2141,9 @@ class DataFileReader(LammpsData):
     LAMMPS Data file reader
     """
 
-    SCALE = 0.5
+    SCALE = 0.45
 
-    def __init__(self, data_file=None, min_dist=2., contents=None):
+    def __init__(self, data_file=None, min_dist=1.2, contents=None):
         """
         :param data_file str: data file with path
         :param min_dist: the minimum distance as clash (some h-bond has zero vdw
@@ -2161,7 +2161,7 @@ class DataFileReader(LammpsData):
         self.dihedrals = {}
         self.impropers = {}
         self.vdws = {}
-        self.radii = {}
+        self.radii = None
         self.mols = {}
         self.excluded = collections.defaultdict(set)
 

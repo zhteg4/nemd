@@ -627,7 +627,7 @@ class DistanceCell:
             rnodes.append(rnode)
         self.graph.remove_nodes_from(nodes)
 
-    def getVoids(self, num=50):
+    def getVoids(self, num=100):
         """
         Get the points from the voids.
 
