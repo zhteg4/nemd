@@ -129,10 +129,10 @@ class DarwinInstall:
         Install the packages required by alamode compilation.
         """
 
-        if self.lmp_found:
+        if self.alm_found:
             return
         subprocess.run(
-            'brew install gcc lapack open-mpi libomp boost eigen spglib fftw cmake llvm',
+            'brew install gcc lapack open-mpi libomp boost eigen fftw cmake',
             shell=True)
 
     def installAlamode(self, std_cmake_args=None):
@@ -172,7 +172,7 @@ class DarwinInstall:
 
 class LinuxInstall(DarwinInstall):
 
-    LOCAL_BIN = "$HOME/.local/bin"
+    LOCAL_BIN = pathlib.Path.home().joinpath(".local/bin")
     NVDIA = "nvidia-smi | grep 'NVIDIA-SMI'"
 
     def __init__(self):
@@ -187,12 +187,13 @@ class LinuxInstall(DarwinInstall):
         """
         See parent class.
         """
-        super().checkLammps()
-        if self.lmp_found:
-            return
+        lmp_found = super().checkLammps()
+        if lmp_found:
+            return True
         nvdia = subprocess.run(self.NVDIA, capture_output=True, shell=True)
         self.gpu = bool(nvdia.stdout)
         print(f"GPU found as 'nvdia.stdout'")
+        return False
 
     def lammpsPrereq(self):
         """
@@ -218,6 +219,15 @@ class LinuxInstall(DarwinInstall):
         """
         std_cmake_args = "-D PKG_GPU=on" if self.gpu else ""
         super().installLammps(std_cmake_args=std_cmake_args)
+
+    def alamodePrereq(self):
+        """
+        Install the packages required by alamode compilation.
+        """
+
+        if self.alm_found:
+            return
+        subprocess.run('sudo apt install libeigen3-dev', shell=True)
 
     def installQt(self):
         """
@@ -284,12 +294,13 @@ setup(name='nemd',
           'chemparse', 'mendeleev', 'rdkit', 'signac', 'signac-flow',
           'matplotlib', 'plotly', 'dash_bootstrap_components', 'pytest',
           'dash[testing]', 'pyqt5', 'webdriver-manager', 'flask', 'openpyxl',
-          'sh', 'humanfriendly', 'Pillow', 'pyvim', 'adjustText', 'crystals'
+          'sh', 'humanfriendly', 'Pillow', 'pyvim', 'adjustText', 'crystals',
+          'spglib'
       ],
       extras_require={
           'dev': [
-              'ipdb', 'ipython', 'notebook', 'jupyterlab', 'yapf',
-              'RBTools == 4.1', 'snakeviz', 'pyvim', 'remote_pdb'
+              'ipdb', 'ipython', 'notebook', 'jupyterlab', 'yapf', 'RBTools',
+              'snakeviz', 'pyvim', 'remote_pdb'
           ]
       },
       classifiers=[
