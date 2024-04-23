@@ -5,6 +5,7 @@ import types
 import logging
 import functools
 import collections
+import subprocess
 import humanfriendly
 import pandas as pd
 from datetime import timedelta
@@ -114,15 +115,18 @@ class BaseTask:
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_JOBNAME,
                          self.name)
 
-    def getCmd(self, write=True):
+    def getCmd(self, write=True, extra_args=None):
         """
         Get command line str.
 
         :param write bool: the msg to be printed
+        :param extra_args list: extra args for the specific task
         :return str: the command as str
         """
         # self.doc[KNOWN_ARGS] is not a list but BufferedJSONAttrLists
         args = list(self.doc[self.KNOWN_ARGS])
+        if extra_args:
+            args += extra_args
         cmd = ' '.join(list(map(str, self.run_driver + args)))
         if write:
             with open(f"{self.name}_cmd", 'w') as fh:
@@ -554,6 +558,19 @@ class Lammps(BaseTask):
         Overwrite the parent as lammps executable doesn't take jobname flag.
         """
         pass
+
+    def getCmd(self, write=True):
+        """
+        Get command line str.
+
+        :param write bool: the msg to be printed
+        :return str: the command as str
+        """
+        lmp = subprocess.run(f'{self.DRIVER.LMP_SERIAL} -h | grep GPU',
+                             capture_output=True,
+                             shell=True)
+        extra_args = ['-sf', 'gpu'] if lmp.stdout else None
+        return super().getCmd(write=write, extra_args=extra_args)
 
     def setLammpsLog(self):
         """
