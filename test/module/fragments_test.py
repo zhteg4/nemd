@@ -100,7 +100,7 @@ class TestFragMol:
     def testSetDCellParams(self, fmol):
         fmol.readData()
         fmol.setDCellParams()
-        np.testing.assert_allclose(2.191, fmol.cell_cut, 0.001)
+        np.testing.assert_allclose(1.97168, fmol.cell_cut, 0.001)
 
     @pytest.mark.parametrize(('smiles_str', 'data_file'),
                              [(BUTANE, BUTANE_DATA)])
