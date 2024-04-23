@@ -1,0 +1,15 @@
+..........Command Options..........
+dir: /Users/tzhang/git/nemd/test/integration/0025
+slow: None
+check_only: False
+interactive: False
+jobname: integration
+debug: False
+cpu: 4
+clean: False
+jtype: task
+JobStart: 09:41:08 04/23/24
+...................................
+1 tests found.
+1 / 1 completed jobs.
+1 succeed; 0 failed.

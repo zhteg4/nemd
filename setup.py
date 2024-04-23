@@ -111,7 +111,7 @@ class DarwinInstall:
         """
         cmd = f'which {exe}'
         info = subprocess.run(cmd, capture_output=True, shell=True)
-        if info.returncode != 0:
+        if info.returncode == 0:
             print(f'{exe} executable found.')
             return True
         if os.path.isfile(build_exe):

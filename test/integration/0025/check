@@ -1,0 +1,1 @@
+cmp('dispersion.data', 'dispersion.data') and cmp('dispersion.pattern_HARMONIC', 'dispersion.pattern_HARMONIC') and cmp('dispersion.xml', 'dispersion.xml') and cmp('dispersion.bands', 'dispersion.bands')
