@@ -66,6 +66,29 @@ class Integration_Driver(task.BaseTask):
         return all(success)
 
 
+class EXIST:
+    """
+    The class to perform file existence check.
+    """
+
+    def __init__(self, target, job=None):
+        """
+        :param original str: the original filename
+        :param target str: the target filename
+        :param job 'signac.contrib.job.Job': the signac job instance
+        """
+        self.target = target.strip().strip('\'"')
+        self.job = job
+
+    def run(self):
+        """
+        The main method to check the existence of a file.
+        """
+        self.target = self.job.fn(self.target)
+        if not os.path.isfile(self.target):
+            raise FileNotFoundError(f"{self.target} not found")
+
+
 class CMP:
     """
     The class to perform file comparison.
@@ -102,7 +125,7 @@ class Results(task.BaseTask):
 
     CMD_BRACKET_RE = '\s.*?\(.*?\)'
     PAIRED_BRACKET_RE = '\(.*?\)'
-    CMD = {'cmp': CMP}
+    CMD = {'cmp': CMP, 'exist': EXIST}
 
     def __init__(self, args, **kwargs):
         """
@@ -180,7 +203,7 @@ class Results(task.BaseTask):
             job.document[SUCCESS] = True
 
     @classmethod
-    def post(cls, job, name=None):
+    def post(cls, job, **kwargs):
         """
         The method to question whether the checking process has been performed.
 
