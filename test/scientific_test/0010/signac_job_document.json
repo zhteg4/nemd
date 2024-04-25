@@ -1,1 +1,1 @@
-{"outfiles": {"polymer_builder": ["polymer_builder-driver.log", "polymer_builder.data", "polymer_builder.in"]}, "logfile": {"polymer_builder": "polymer_builder-driver.log"}, "outfile": {"polymer_builder": "polymer_builder.in"}}
+{"outfiles": {"pb_lmp_post_workflow": ["pb_lmp_post_workflow-driver.log"]}, "logfile": {"pb_lmp_post_workflow": "pb_lmp_post_workflow-driver.log"}, "outfile": {"pb_lmp_post_workflow": "pb_lmp_post_workflow-driver.log"}}

@@ -1,0 +1,44 @@
+..........Command Options..........
+state_num: 4
+cru: O
+cru_num: None
+mol_num: 500
+seed: None
+cell: pack
+density: 0.8
+timestep: 1
+stemp: 10
+temp: 298.15
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 1
+prod_time: 1
+prod_ens: NVE
+force_field: FF_MODEL(ff='OPLSUA', model='SPCE')
+interactive: False
+jobname: pb_lmp_post_workflow
+debug: False
+cpu: 4
+task: msd
+sel: None
+last_pct: 0.3
+slice: None
+clean: True
+jtype: task, aggregator
+prj_path: .
+JobStart: 16:37:00 04/25/24
+...................................
+4 / 4 completed jobs.
+4 jobs found for aggregation.
+Results for mean squared displacement saved to pb_lmp_post_workflow_msd.csv
+2.496e-05 ± 4.733e-09 cm^2/s (R-squared: 1.0000) linear fit of [66.5000 534.5000] ps
+Mean squared displacement figure saved as pb_lmp_post_workflow_msd.png
+Task timing breakdown:
+polymer_builder: 12 seconds, 12 seconds, 11 seconds, 12 seconds; 11.75 seconds (ave)
+lammps_runner: 2 hours, 15 minutes and 15 seconds, 2 hours, 15 minutes and 15 seconds, 2 hours, 15 minutes and 15 seconds, 2 hours, 15 minutes and 15 seconds; 2 hours, 15 minutes and 15 seconds (ave)
+custom_dump: 1 minute and 33 seconds, 1 minute and 32 seconds, 1 minute and 34 seconds, 1 minute and 34 seconds; 1 minute and 33.25 seconds (ave)
+finished.
+18:54:12 04/25/24
