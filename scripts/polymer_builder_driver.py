@@ -165,6 +165,7 @@ class AmorphousCell(object):
         self.mols = {}
         self.ff = ff
         self.box = None
+        self.density = None
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
 
@@ -259,7 +260,7 @@ class AmorphousCell(object):
                                 box=self.box,
                                 options=self.options)
         lmw.writeData(adjust_coords=False)
-        if not np.isclose(lmw.density, self.density):
+        if self.density is None or not np.isclose(lmw.density, self.density):
             log_warning(
                 f'The density of the final data file is {lmw.density:.4g} kg/cm^3'
             )
