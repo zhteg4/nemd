@@ -1,4 +1,4 @@
-# Water liquid: polymer builder on SPC water via -grow; lammps simulation; density, RDF, MSD
+# Water liquid: polymer builder on SPC water via -grow; lammps simulation; density
 run_nemd pb_lmp_post_workflow.py O -mol_num 500 -force_field OPLSUA,SPC -task density -temp 298.15 -density 0.8 -prod_ens NPT -last_pct 0.4 -state_num 2 -clean
 grep "g/cm^3" pb_lmp_post_workflow-driver.log
 # 997.13 kg/m3 https://www.vip-ltd.co.uk/Expansion/Density_Of_Water_Tables.pdf

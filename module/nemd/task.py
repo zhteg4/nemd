@@ -569,7 +569,7 @@ class Lammps(BaseTask):
         lmp = subprocess.run(f'{self.DRIVER.LMP_SERIAL} -h | grep GPU',
                              capture_output=True,
                              shell=True)
-        extra_args = ['-sf', 'gpu'] if lmp.stdout else None
+        extra_args = ['-sf', 'gpu', '-pk', 'gpu', '1'] if lmp.stdout else None
         return super().getCmd(write=write, extra_args=extra_args)
 
     def setLammpsLog(self):

@@ -1,0 +1,3 @@
+# Water liquid: polymer builder on SPC water via -grow; lammps simulation; MSD
+run_nemd pb_lmp_post_workflow.py O -mol_num 500 -force_field OPLSUA,SPC -task msd -temp 298.15 -density 0.8 -last_pct 0.3 -state_num 4 -clean
+# 4.3264 * 10^9 m^2 / s https://pubs.acs.org/doi/pdf/10.1021/jp003020w
