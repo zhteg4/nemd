@@ -16,4 +16,5 @@ _deps
 *.egg-info/
 *workspace/
 *.signac/
+signac*
 venv/
