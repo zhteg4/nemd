@@ -1,2 +1,2 @@
-# polymer builder on Ethanoic acid
-run_nemd polymer_builder_driver.py 'CC(=O)O' -mol_num 1 -force_field OPLSUA,TIP3P -seed 4321 -DEBUG
+# polymer builder on Ethanoic acid via pack
+run_nemd polymer_builder_driver.py 'CC(=O)O' -mol_num 1 -force_field OPLSUA,TIP3P -cell pack -seed 4321 -DEBUG

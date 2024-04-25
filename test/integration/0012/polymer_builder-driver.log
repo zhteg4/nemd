@@ -1,0 +1,32 @@
+2024-04-25 15:38:11,302 INFO ..........Command Options..........
+2024-04-25 15:38:11,302 INFO cru: CC(=O)O
+2024-04-25 15:38:11,302 INFO cru_num: 1
+2024-04-25 15:38:11,302 INFO mol_num: 1
+2024-04-25 15:38:11,302 INFO seed: 4321
+2024-04-25 15:38:11,302 INFO cell: pack
+2024-04-25 15:38:11,302 INFO density: 0.5
+2024-04-25 15:38:11,302 INFO timestep: 1
+2024-04-25 15:38:11,302 INFO stemp: 10
+2024-04-25 15:38:11,302 INFO temp: 300
+2024-04-25 15:38:11,302 INFO tdamp: 100
+2024-04-25 15:38:11,302 INFO press: 1
+2024-04-25 15:38:11,302 INFO pdamp: 1000
+2024-04-25 15:38:11,302 INFO lj_cut: 11.0
+2024-04-25 15:38:11,302 INFO coul_cut: 11.0
+2024-04-25 15:38:11,302 INFO relax_time: 1
+2024-04-25 15:38:11,302 INFO prod_time: 1
+2024-04-25 15:38:11,302 INFO prod_ens: NVE
+2024-04-25 15:38:11,302 INFO force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+2024-04-25 15:38:11,302 INFO interactive: False
+2024-04-25 15:38:11,302 INFO jobname: polymer_builder
+2024-04-25 15:38:11,302 INFO debug: True
+2024-04-25 15:38:11,302 INFO cpu: 4
+2024-04-25 15:38:11,302 INFO JobStart: 15:38:11 04/25/24
+2024-04-25 15:38:11,302 INFO ...................................
+2024-04-25 15:38:11,328 INFO Cubic box of size 5.84 angstrom is created.
+2024-04-25 15:38:11,334 INFO 100%
+2024-04-25 15:38:11,337 WARNING The density of the final data file is 0.00542 kg/cm^3
+2024-04-25 15:38:11,337 INFO Data file written into polymer_builder.data
+2024-04-25 15:38:11,337 INFO In script written into polymer_builder.in
+2024-04-25 15:38:11,339 INFO Finished.
+2024-04-25 15:38:11,339 INFO 15:38:11 04/25/24
