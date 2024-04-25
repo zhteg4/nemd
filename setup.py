@@ -13,6 +13,7 @@ from setuptools.command.install import install
 
 class DarwinInstall:
 
+    PATH = 'PATH'
     LOCAL_BIN = pathlib.Path('/usr/local/bin')
     SUBMODULE = 'submodule'
     LAMMPS = 'lammps'
@@ -25,6 +26,11 @@ class DarwinInstall:
     ALAMODE_BUILD = f'{SUBMODULE}/{ALAMODE}/{BUILD}'
     BUILD_ALM = pathlib.Path(f'{ALAMODE_BUILD}/{ALM}/{ALM}').resolve()
     BUILD_ANPHON = pathlib.Path(f'{ALAMODE_BUILD}/{ANPHON}/{ANPHON}').resolve()
+
+    def __init__(self):
+        self.lmp_found = False
+        self.alm_found = False
+        self.llvm = None
 
     def run(self):
         """
@@ -132,14 +138,20 @@ class DarwinInstall:
         if self.alm_found:
             return
         subprocess.run(
-            'brew install gcc lapack open-mpi libomp boost eigen fftw cmake',
+            'brew install gcc lapack open-mpi libomp boost eigen fftw cmake llvm',
             shell=True)
+        info = subprocess.run("brew info llvm | grep 'export PATH'",
+                              shell=True,
+                              capture_output=True)
+        self.llvm = info.stdout.decode('utf-8').split(
+            f'{self.PATH}=')[1].split(':')[0].strip('\'"')
 
-    def installAlamode(self, std_cmake_args=None):
+    def installAlamode(self, std_cmake_args=None, env=None):
         """
         Install the alamode with specific packages if not available.
 
-        :param std_cmake_args: the additional packages or flags.
+        :param std_cmake_args str: the additional packages or flags.
+        :param env dict: the environmental variables for the subprocess.
         """
         if self.alm_found:
             return
@@ -147,7 +159,10 @@ class DarwinInstall:
         cmd = 'cd submodule/alamode; bash install.sh'
         if std_cmake_args:
             cmd += f" {std_cmake_args}"
-        subprocess.run(cmd, shell=True)
+        if self.llvm:
+            env = os.environ.copy()
+            env[self.PATH] = f"{self.llvm}:{env[f'{self.PATH}']}"
+        subprocess.run(cmd, shell=True, env=env)
         try:
             self.LOCAL_BIN.joinpath(self.ALM).symlink_to(self.BUILD_ALM)
         except FileExistsError:
