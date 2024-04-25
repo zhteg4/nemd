@@ -3,6 +3,9 @@
 """
 Builder crystals.
 """
+import os
+import spglib
+import pathlib
 import crystals
 import subprocess
 from rdkit import Chem
@@ -18,6 +21,10 @@ class CrystalBuilder(object):
         alamodeutils.AlaWriter.SUGGEST: jobutils.ALM,
         alamodeutils.AlaWriter.PHONONS: jobutils.ANPHON,
         alamodeutils.AlaWriter.OPTIMIZE: jobutils.ALM
+    }
+
+    LD_LIBRARY_PATH = {
+        'LD_LIBRARY_PATH': pathlib.Path(spglib.__path__[0]).joinpath('lib')
     }
 
     def __init__(self,
@@ -114,7 +121,9 @@ class CrystalBuilder(object):
 
         executable = self.EXECUTABLE[mode]
         cmd = f"{executable} {ala_writer.filename}"
-        info = subprocess.run(cmd, capture_output=True, shell=True)
+        env = os.environ.copy()
+        env.update(self.LD_LIBRARY_PATH)
+        info = subprocess.run(cmd, capture_output=True, shell=True, env=env)
 
         ala_logfile = f'{ala_writer.jobname}_{mode.lower()}.log'
         with open(ala_logfile, 'wb') as fh:
