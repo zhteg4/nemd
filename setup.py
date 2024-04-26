@@ -310,7 +310,7 @@ setup(name='nemd',
           'matplotlib', 'plotly', 'dash_bootstrap_components', 'pytest',
           'dash[testing]', 'pyqt5', 'webdriver-manager', 'flask', 'openpyxl',
           'sh', 'humanfriendly', 'Pillow', 'pyvim', 'adjustText', 'crystals',
-          'spglib'
+          'spglib', 'numba'
       ],
       extras_require={
           'dev': [

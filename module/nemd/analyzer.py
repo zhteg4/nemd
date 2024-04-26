@@ -267,7 +267,7 @@ class RDF(BaseAnalyzer):
         frms = self.frms[self.sidx:]
         span = np.array([[x for x in x.getSpan().values()] for x in frms])
         vol = np.prod(span, axis=1)
-        self.log(f'The volume fluctuate: [{vol.min():.2f} {vol.max():.2f}] '
+        self.log(f'The volume fluctuates: [{vol.min():.2f} {vol.max():.2f}] '
                  f'{symbols.ANGSTROM}^3')
         # The auto resolution based on cut grabs left, middle, and right boxes
         if dcut is None and span.min() > self.DEFAULT_CUT * 5:

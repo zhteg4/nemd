@@ -9,6 +9,7 @@ import io
 import os
 import math
 import gzip
+import numba
 import random
 import base64
 import itertools
@@ -302,17 +303,25 @@ class Frame(pd.DataFrame):
         :param atom_id int: atom ids
         :param xyz (3,) 'pandas.core.series.Series': xyz coordinates and atom id
         :return list of floats: distances
-
-        NOTE: the following slows down the performance
-            dists %= self.attrs[self.SPAN]
-            dists[dists > self.attrs[self.HSPAN]] -= self.attrs[self.SPAN]
         """
         dists = (self.getXYZ(ids) - xyz).to_numpy()
-        for id, col in enumerate(self.XYZU):
-            dists[:, id] = np.frompyfunc(
-                lambda x: math.remainder(x, self.attrs[self.SPAN][col]), 1,
-                1)(dists[:, id])
+        span = np.array(list(self.attrs[self.SPAN].values()))
+        dists = self.remainderIEEE(dists, span)
         return np.linalg.norm(dists, axis=1)
+
+    @staticmethod
+    @numba.jit(nopython=True)
+    def remainderIEEE(dists, span):
+        """
+        Calculate IEEE 754 remainder.
+
+        https://stackoverflow.com/questions/26671975/why-do-we-need-ieee-754-remainder
+
+        :param dists numpy.ndarray: distances
+        :param span numpy.ndarray: box span
+        :return numpy.ndarray: distances within half box span
+        """
+        return dists - np.round(np.divide(dists, span)) * span
 
     def pairDists(self, ids=None, cut=None, res=2.):
         """
