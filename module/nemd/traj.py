@@ -295,17 +295,23 @@ class Frame(pd.DataFrame):
             return []
         return oplsua.DataFileReader.getEdgesFromList(box)
 
-    def getDists(self, ids, xyz):
+    def getDists(self, ids, xyz, id_map=None, span=None):
         """
         Get the distance between the xyz and the of the xyzs associated with the
         input atom ids.
 
         :param atom_id int: atom ids
         :param xyz (3,) 'pandas.core.series.Series': xyz coordinates and atom id
+        :param id_map 'numpy.ndarray': the map from atom id to xyz row id
+        :param span 'numpy.ndarray': the span of box
         :return list of floats: distances
         """
-        dists = (self.getXYZ(ids) - xyz).to_numpy()
-        span = np.array(list(self.attrs[self.SPAN].values()))
+        if span is None:
+            span = np.array(list(self.attrs[self.SPAN].values()))
+        if id_map is None:
+            dists = (self.getXYZ(ids) - xyz).to_numpy()
+        else:
+            dists = self.to_numpy()[id_map[ids], :] - np.array(xyz)
         dists = self.remainderIEEE(dists, span)
         return np.linalg.norm(dists, axis=1)
 
@@ -336,11 +342,14 @@ class Frame(pd.DataFrame):
         if cut:
             dcell = DistanceCell(self, gids=ids, cut=cut, res=res)
             dcell.setUp()
+        id = {label: i for i, label in enumerate(self.index)}
+        id_map = np.array([id.get(x, -1) for x in range(self.index.max() + 1)])
+        span = np.array(list(self.attrs[self.SPAN].values()))
         dists = []
         for idx, (id, row) in enumerate(self.loc[ids].iterrows()):
             oids = [x for x in dcell.getNeighbors(row)
                     if x > id] if cut else ids[idx + 1:]
-            dist = self.getDists(oids, row)
+            dist = self.getDists(oids, row, id_map=id_map, span=span)
             dists.append(dist)
         return np.concatenate(dists)
 
