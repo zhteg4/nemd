@@ -1,6 +1,10 @@
 """
 pip3 install setuptools openvino-telemetry
-pip3 install .[dev] -v --break-system-packages
+pip3 install .[dev] -v
+
+Python 3.10.12 is supported and tested.
+request 'pyqt5==5.15.4', 'pyqt5-sip==12.12.1' to remove the DeprecationWarning:
+sipPyTypeDict() is deprecated, xxx sipPyTypeDictRef() instead
 """
 import os
 import sys
@@ -308,9 +312,9 @@ setup(name='nemd',
           'numpy', 'scipy', 'networkx', 'pandas', 'more_itertools',
           'chemparse', 'mendeleev', 'rdkit', 'signac', 'signac-flow',
           'matplotlib', 'plotly', 'dash_bootstrap_components', 'pytest',
-          'dash[testing]', 'pyqt5', 'webdriver-manager', 'flask', 'openpyxl',
-          'sh', 'humanfriendly', 'Pillow', 'pyvim', 'adjustText', 'crystals',
-          'spglib', 'numba'
+          'dash[testing]', 'pyqt5==5.15.4', 'pyqt5-sip==12.12.1',
+          'webdriver-manager', 'flask', 'openpyxl', 'sh', 'humanfriendly',
+          'Pillow', 'pyvim', 'adjustText', 'crystals', 'spglib', 'numba'
       ],
       extras_require={
           'dev': [

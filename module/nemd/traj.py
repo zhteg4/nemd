@@ -561,7 +561,8 @@ class DistanceCell:
         :param xyz 1x3 array of floats: xyz of one atom coordinates
         :return list int: the atom ids of the neighbor atoms
         """
-        return self.getNeighborsNumba(np.array(xyz), self.grids, self.indexes,
+        return self.getNeighborsNumba(np.array(xyz), self.grids,
+                                      numba.typed.List(self.indexes),
                                       self.neigh_map, self.atom_cell)
 
     @staticmethod
