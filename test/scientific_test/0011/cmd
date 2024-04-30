@@ -1,2 +1,3 @@
-run_nemd polymer_builder_driver.py O -mol_num 400 -force_field -force_field OPLSUA,SPC
-run_nemd custom_dump_driver.py dump.custom -data_file polymer_builder.data -task rdf
+# TIP3P water radial distribution function
+run_nemd pb_lmp_post_workflow.py O -mol_num 400 -density 0.8 -force_field OPLSUA,TIP3P -task density rdf -sel O -state_num 3 
+# https://www.researchgate.net/publication/23986407_Comparative_atomistic_and_coarse-grained_study_of_water_What_do_we_lose_by_coarse-graining

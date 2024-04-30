@@ -1,0 +1,47 @@
+..........Command Options..........
+state_num: 3
+cru: O
+cru_num: None
+mol_num: 400
+seed: None
+cell: grow
+density: 0.8
+timestep: 1
+stemp: 10
+temp: 300
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 1
+prod_time: 1
+prod_ens: NVE
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+interactive: False
+jobname: pb_lmp_post_workflow
+debug: False
+cpu: 4
+task: density, rdf
+sel: O
+last_pct: 0.2
+slice: None
+clean: False
+jtype: task, aggregator
+prj_path: .
+JobStart: 18:50:55 04/29/24
+...................................
+3 / 3 completed jobs.
+3 jobs found for aggregation.
+Results for density saved to pb_lmp_post_workflow_density.csv
+0.9765 ± 1.111e-16 g/cm^3 ∈ [1779.3333, 2224.3333] ps
+Density figure saved as pb_lmp_post_workflow_density.png
+Results for radial distribution function saved to pb_lmp_post_workflow_rdf.csv
+Peak position: 2.8266666666666667; peak value:  2.56
+Radial distribution function figure saved as pb_lmp_post_workflow_rdf.png
+Task timing breakdown:
+polymer_builder: 18 seconds, 19 seconds, 19 seconds; 18.67 seconds (ave)
+lammps_runner: 1 hour, 18 minutes and 33 seconds, 1 hour, 18 minutes and 33 seconds, 1 hour, 18 minutes and 33 seconds; 1 hour, 18 minutes and 33 seconds (ave)
+custom_dump: 2 minutes and 30 seconds, 2 minutes and 29 seconds, 2 minutes and 32 seconds; 2 minutes and 30.33 seconds (ave)
+finished.
+20:12:26 04/29/24
