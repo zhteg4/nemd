@@ -29,16 +29,16 @@ slice: None
 clean: False
 jtype: task, aggregator
 prj_path: .
-JobStart: 21:20:22 03/20/24
+JobStart: 20:34:07 04/29/24
 ...................................
 8 / 8 completed jobs.
 Task timing breakdown:
-polymer_builder: 27 minutes, 26 minutes and 59 seconds, 26 minutes and 43 seconds, 26 minutes and 50 seconds, 26 minutes and 29 seconds, 26 minutes and 42 seconds, 27 minutes and 3 seconds, 26 minutes and 30 seconds; 26 minutes and 47 seconds (ave)
-lammps_runner: 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds, 1 hour, 48 minutes and 39 seconds; 1 hour, 48 minutes and 39 seconds (ave)
-custom_dump: 3 hours, 11 minutes and 35 seconds, 3 hours, 11 minutes and 20 seconds, 3 hours, 9 minutes and 52 seconds, 3 hours, 10 minutes and 54 seconds, 3 hours, 11 minutes and 22 seconds, 3 hours, 11 minutes and 16 seconds, 3 hours, 11 minutes and 25 seconds, 3 hours, 11 minutes and 15 seconds; 3 hours, 11 minutes and 7.38 seconds (ave)
+polymer_builder: 1 minute and 56 seconds, 1 minute and 54 seconds, 1 minute and 54 seconds, 1 minute and 52 seconds, 1 minute and 55 seconds, 1 minute and 54 seconds, 1 minute and 54 seconds, 1 minute and 53 seconds; 1 minute and 54 seconds (ave)
+lammps_runner: 6 hours, 16 minutes and 5 seconds, 6 hours, 16 minutes and 5 seconds, 6 hours, 16 minutes and 5 seconds, 6 hours, 16 minutes and 5 seconds, 6 hours, 16 minutes and 5 seconds, 6 hours, 16 minutes and 5 seconds, 6 hours, 16 minutes and 5 seconds, 6 hours, 16 minutes and 5 seconds; 6 hours, 16 minutes and 5 seconds (ave)
+custom_dump: 30 minutes and 16 seconds, 29 minutes and 59 seconds, 30 minutes and 12 seconds, 29 minutes and 54 seconds, 29 minutes and 58 seconds, 30 minutes and 4 seconds, 29 minutes and 55 seconds, 29 minutes and 59 seconds; 30 minutes and 2.12 seconds (ave)
 8 jobs found for aggregation.
-Results for radial distribution function saved to pb_lmp_post_workflow_rdf.csv
+Results for radial distribution function found as pb_lmp_post_workflow_rdf.csv
 Peak position: 3.8; peak value:  1.46
 Radial distribution function figure saved as pb_lmp_post_workflow_rdf.png
 finished.
-02:48:35 03/21/24
+03:22:39 04/30/24

@@ -1,5 +1,5 @@
-Fetching status:   0%|          | 0/24 [00:00<?, ?it/s]Fetching status: 100%|██████████| 24/24 [00:00<00:00, 2022.94it/s]
-Fetching labels:   0%|          | 0/8 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 8/8 [00:00<00:00, 47934.90it/s]
+Fetching status:   0%|          | 0/24 [00:00<?, ?it/s]Fetching status: 100%|██████████| 24/24 [00:00<00:00, 4027.98it/s]
+Fetching labels:   0%|          | 0/8 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 8/8 [00:00<00:00, 37786.52it/s]
 
 Overview: 8 jobs/aggregates, 0 jobs/aggregates with eligible operations.
 
