@@ -4,15 +4,20 @@
 # Authors: Teng Zhang (2022010236@hust.edu.cn)
 """
 This module read, parser, and analyze trajectories.
+
+Unzip a GZ trajectory file: zip -dv dump.custom.gz
 """
 import io
 import os
 import math
 import gzip
 import numba
+import types
 import random
 import base64
+import warnings
 import itertools
+import subprocess
 import collections
 import numpy as np
 import pandas as pd
@@ -24,29 +29,47 @@ from nemd import symbols
 
 FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
+ITEM_TIMESTEP = 'ITEM: TIMESTEP'
 
 
-def slice_frames(filename=None, contents=None, slice=None):
+def frame_steps(filename):
+    """
+    Get the frame steps.
+
+    :param filename str: the filename to read frames
+    :return list of int: the step information of all steps
+    """
+    info = subprocess.run(
+        f"zgrep '{ITEM_TIMESTEP}' {filename} "
+        f"--no-group-separator -A1 | grep -v '{ITEM_TIMESTEP}'",
+        capture_output=True,
+        shell=True)
+    return list(map(int, info.stdout.split()))
+
+
+def slice_frames(filename=None, contents=None, slice=slice, start=0):
     """
     Get and slice the trajectory frames.
 
     :param filename str: the filename to read frames
     :param contents `bytes`: parse the contents if filename not provided
     :param slice list: start, stop, and interval
+    :param start int: only frames with step >= this value will be fully read
     :return iterator of 'Frame': each frame has coordinates and box info
     """
-    frm_iter = get_frames(filename=filename, contents=contents)
+    frm_iter = get_frames(filename=filename, contents=contents, start=start)
     if not slice:
         return frm_iter
     return itertools.islice(frm_iter, *slice)
 
 
-def get_frames(filename=None, contents=None):
+def get_frames(filename=None, contents=None, start=0):
     """
     Get the trajectory frames based on file extension.
 
     :param filename str: the filename to read frames
     :param contents `bytes`: parse the contents if filename not provided
+    :param start int: only frames with step >= this value will be fully read
     :return iterator of 'Frame': each frame has coordinates and box info
     """
     is_xyz = False
@@ -58,7 +81,7 @@ def get_frames(filename=None, contents=None):
         contents = base64.b64decode(content_string).decode("utf-8")
     if is_xyz:
         return Frame.readXYZ(filename=filename, contents=contents)
-    return Frame.read(filename=filename, contents=contents)
+    return Frame.read(filename=filename, contents=contents, start=start)
 
 
 class Frame(pd.DataFrame):
@@ -104,13 +127,17 @@ class Frame(pd.DataFrame):
         self.setStep(step)
 
     @classmethod
-    def read(cls, filename=None, contents=None):
+    def read(cls, filename=None, contents=None, start=0):
         """
         Read a custom dumpy file with id, xu, yu, zu.
 
+        Note: only fully read frames contain full information.
+
         :param filename str: the filename to read frames
         :param contents `bytes`: parse the contents if filename not provided
-        :return iterator of 'Frame': each frame has coordinates and box info
+        :param start int: only frames with step >= this value will be fully read
+        :return iterator of 'Frame' and/or 'SimpleNamespace': 'Frame' has step,
+            coordinates and box information. 'SimpleNamespace' only has step info.
         """
         with cls.open_traj(filename=filename, contents=contents) as fh:
             while True:
@@ -118,25 +145,32 @@ class Frame(pd.DataFrame):
                 if not all(lines):
                     return
                 atom_num = int(lines[3].rstrip())
-                try:
-                    data = np.loadtxt(fh, max_rows=atom_num)
-                except EOFError:
-                    return
-                if data.shape[0] != atom_num:
-                    return
-                data = data[data[:, 0].argsort()]
-                # 'xu', 'yu', 'zu'
-                names = lines[-1].rstrip().split()[-3:]
-                # array([  8.8 ,  68.75,   2.86,  67.43, -28.76,  19.24])
-                box = np.array([
-                    float(y) for x in range(5, 8)
-                    for y in lines[x].rstrip().split()
-                ])
-                yield cls(xyz=data[:, 1:],
-                          box=box,
-                          index=data[:, 0].astype(int),
-                          columns=names,
-                          step=int(lines[1].rstrip()))
+                step = int(lines[1].rstrip())
+                if start > step:
+                    with warnings.catch_warnings(record=True):
+                        np.loadtxt(fh, skiprows=atom_num, max_rows=0)
+                        frame = types.SimpleNamespace(step=step)
+                else:
+                    try:
+                        data = np.loadtxt(fh, max_rows=atom_num)
+                    except EOFError:
+                        return
+                    if data.shape[0] != atom_num:
+                        return
+                    data = data[data[:, 0].argsort()]
+                    # array([  8.8 ,  68.75,   2.86,  67.43, -28.76,  19.24])
+                    box = np.array([
+                        float(y) for x in range(5, 8)
+                        for y in lines[x].rstrip().split()
+                    ])
+                    # 'xu', 'yu', 'zu'
+                    columns = lines[-1].rstrip().split()[-3:]
+                    frame = cls(xyz=data[:, 1:],
+                                box=box,
+                                index=data[:, 0].astype(int),
+                                columns=columns,
+                                step=step)
+                yield frame
 
     @classmethod
     def readXYZ(cls, filename=None, contents=None, box=None):
@@ -230,7 +264,8 @@ class Frame(pd.DataFrame):
             return
         self.attrs[self.STEP] = step
 
-    def getStep(self):
+    @property
+    def step(self):
         """
         Get the simulation step.
 

@@ -84,7 +84,6 @@ class CustomDump(object):
     """
     Analyze a dump custom file.
     """
-
     TASK = FlAG_TASK[1:]
     DATA_EXT = '_%s.csv'
     PNG_EXT = '_%s.png'
@@ -145,18 +144,23 @@ class CustomDump(object):
         """
         Load trajectory frames and set range.
         """
-
-        frms = traj.slice_frames(self.options.custom_dump,
-                                 slice=self.options.slice)
+        af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
+        if af_tasks:
+            frms = traj.slice_frames(self.options.custom_dump,
+                                     slice=self.options.slice)
+        else:
+            steps = traj.frame_steps(self.options.custom_dump)
+            sidx = math.floor(len(steps) * (1 - self.options.last_pct))
+            frms = traj.slice_frames(self.options.custom_dump,
+                                     slice=self.options.slice,
+                                     start=int(steps[sidx]))
         self.frms = [x for x in frms]
         if len(self.frms) == 0:
             return
-        self.time = np.array([x.getStep() * self.timestep for x in self.frms
+        self.time = np.array([x.step * self.timestep for x in self.frms
                               ]) * constants.femto / constants.pico
-
         self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
         log(f"{len(self.frms)} trajectory frames found.")
-        af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
         if af_tasks:
             log(f"{', '.join(af_tasks)} analyze all frames and save per frame "
                 f"results {symbols.ELEMENT_OF} [{self.time[0]:.3f}, "
