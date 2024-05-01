@@ -26,6 +26,7 @@ from contextlib import contextmanager
 
 from nemd import oplsua
 from nemd import symbols
+from nemd import numbautils
 
 FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
@@ -347,10 +348,10 @@ class Frame(pd.DataFrame):
             dists = (self.getXYZ(ids) - xyz).values
         else:
             dists = self.values[id_map[ids], :] - np.array(xyz)
-        return self.remainderIEEE(dists, span)
+        return np.array(self.remainderIEEE(dists, span))
 
     @staticmethod
-    @numba.jit(nopython=True, cache=True)
+    @numbautils.jit
     def remainderIEEE(dists, span):
         """
         Calculate IEEE 754 remainder.
