@@ -122,7 +122,7 @@ class Frame(pd.DataFrame):
             index = range(1, xyz.shape[0] + 1)
         if columns is None:
             columns = self.XYZU
-        super().__init__(data=xyz, index=index, columns=columns)
+        super().__init__(data=xyz, index=index, columns=columns, dtype=float)
         self.setBox(box)
         self.setStep(step)
 
@@ -565,7 +565,7 @@ class DistanceCell:
         self.neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
 
     @staticmethod
-    @numba.jit(nopython=True)
+    @numba.jit(nopython=True, parallel=True)
     def getNeighborMap(indexes, neigh_ids):
         """
         Get map between node id to neighbor node ids.
@@ -577,9 +577,9 @@ class DistanceCell:
         """
         shape = (indexes[0], indexes[1], indexes[2], len(neigh_ids), 3)
         neigh_map = np.empty(shape, dtype=numba.int32)
-        for xid in range(indexes[0]):
-            for yid in range(indexes[1]):
-                for zid in range(indexes[2]):
+        for xid in numba.prange(indexes[0]):
+            for yid in numba.prange(indexes[1]):
+                for zid in numba.prange(indexes[2]):
                     id = np.array([xid, yid, zid])
                     neigh_map[xid, yid, zid, :, :] = (neigh_ids + id) % indexes
         return neigh_map
@@ -633,16 +633,18 @@ class DistanceCell:
         :param atom_cell ixjxkxn array of floats: map cell id into containing atom ids
         :return list int: the atom ids of the neighbor atoms
         """
-
+        # The cell id for xyz
         id = [
             x % y
             for x, y in zip(np.round(xyz / grids).astype(np.int64), indexes)
         ]
+        # Unique neighbor cell ids
         ids = neigh_map[id[0], id[1], id[2], :]
-        id_mx = np.zeros((np.max(ids[:, 0]) + 1, np.max(ids[:, 1]) + 1,
-                          np.max(ids[:, 2]) + 1))
+        id_mx = [np.max(ids[:, i]) + 1 for i in range(3)]
+        id_mx = np.zeros((id_mx[0], id_mx[1], id_mx[2]), dtype=numba.boolean)
         for x in ids:
-            id_mx[x[0], x[1], x[2]] = 1
+            id_mx[x[0], x[1], x[2]] = True
+        # The atom ids from all neighbor cells
         neighbors = [
             j for i, x in np.ndenumerate(id_mx) if x
             for j in atom_cell[i[0], i[1], i[2], :].nonzero()[0]

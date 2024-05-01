@@ -52,6 +52,7 @@ if [ -z "$SPATH" ]; then
     exit 2
 fi
 
+LD_LIBRARY_PATH=`pip3 show tbb | grep 'Location:' | sed 's/^.*: //;s/python.*\/site-packages//'`
 # Finalize the command so that Python script is of absolute path
-SCRIPT_ARGS="python3 ${*:1:$FILE_IDX-1} $SPATH ${*:$FILE_IDX+1}"
+SCRIPT_ARGS="env LD_LIBRARY_PATH=${LD_LIBRARY_PATH} python3 ${*:1:$FILE_IDX-1} $SPATH ${*:$FILE_IDX+1}"
 echo "Running $SCRIPT_ARGS" && $SCRIPT_ARGS
