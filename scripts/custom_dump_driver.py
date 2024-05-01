@@ -140,20 +140,21 @@ class CustomDump(object):
             ]
         log(f"{len(self.gids)} atoms selected.")
 
-    def setFrames(self):
+    def setFrames(self, start=0):
         """
         Load trajectory frames and set range.
+
+        :param start int: only frames with step >= this value will be fully read
         """
         af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
-        if af_tasks:
-            frms = traj.slice_frames(self.options.custom_dump,
-                                     slice=self.options.slice)
-        else:
+        if not af_tasks:
             steps = traj.frame_steps(self.options.custom_dump)
             sidx = math.floor(len(steps) * (1 - self.options.last_pct))
-            frms = traj.slice_frames(self.options.custom_dump,
-                                     slice=self.options.slice,
-                                     start=int(steps[sidx]))
+            start = int(steps[sidx])
+
+        frms = traj.slice_frames(self.options.custom_dump,
+                                 slice=self.options.slice,
+                                 start=start)
         self.frms = [x for x in frms]
         if len(self.frms) == 0:
             return

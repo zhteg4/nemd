@@ -556,13 +556,29 @@ class DistanceCell:
         """
         Set map between node id to neighbor node ids.
         """
-        self.neigh_map = np.zeros((*self.indexes, len(self.neigh_ids), 3),
-                                  dtype=int)
-        indexes = [range(x) for x in self.indexes]
-        nodes = list(itertools.product(*indexes))
+        indexes = numba.int32(self.indexes)
         neigh_ids = np.array(list(self.neigh_ids))
-        for node in nodes:
-            self.neigh_map[node] = (neigh_ids + node) % self.indexes
+        self.neigh_map = self.getNeighborMap(indexes, neigh_ids)
+
+    @staticmethod
+    @numba.jit(nopython=True)
+    def getNeighborMap(indexes, neigh_ids):
+        """
+        Get map between node id to neighbor node ids.
+
+        :param indexes numpy.ndarray: the number of cells in three dimensions
+        :param neigh_ids numpy.ndarray: Neighbors cells (separation distances
+            less than the cutoff)
+        :return numpy.ndarray: map between node id to neighbor node ids
+        """
+        shape = (indexes[0], indexes[1], indexes[2], len(neigh_ids), 3)
+        neigh_map = np.empty(shape, dtype=numba.int32)
+        for xid in range(indexes[0]):
+            for yid in range(indexes[1]):
+                for zid in range(indexes[2]):
+                    id = np.array([xid, yid, zid])
+                    neigh_map[xid, yid, zid, :, :] = (neigh_ids + id) % indexes
+        return neigh_map
 
     def setAtomCell(self):
         """
