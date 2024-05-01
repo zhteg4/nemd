@@ -37,14 +37,14 @@ def frame_steps(filename):
     Get the frame steps.
 
     :param filename str: the filename to read frames
-    :return list of int: the step information of all steps
+    :return 'numpy.ndarray': the step information of all steps
     """
     info = subprocess.run(
         f"zgrep '{ITEM_TIMESTEP}' {filename} "
         f"--no-group-separator -A1 | grep -v '{ITEM_TIMESTEP}'",
         capture_output=True,
         shell=True)
-    return list(map(int, info.stdout.split()))
+    return np.loadtxt(io.StringIO(info.stdout.decode("utf-8")), dtype=int)
 
 
 def slice_frames(filename=None, contents=None, slice=slice, start=0):
@@ -344,13 +344,13 @@ class Frame(pd.DataFrame):
         if span is None:
             span = np.array(list(self.attrs[self.SPAN].values()))
         if id_map is None:
-            dists = (self.getXYZ(ids) - xyz).to_numpy()
+            dists = (self.getXYZ(ids) - xyz).values
         else:
-            dists = self.to_numpy()[id_map[ids], :] - np.array(xyz)
+            dists = self.values[id_map[ids], :] - np.array(xyz)
         return self.remainderIEEE(dists, span)
 
     @staticmethod
-    @numba.jit(nopython=True)
+    @numba.jit(nopython=True, cache=True)
     def remainderIEEE(dists, span):
         """
         Calculate IEEE 754 remainder.
@@ -373,7 +373,7 @@ class Frame(pd.DataFrame):
         :param res float: the res of the grid step
         :return `numpy.ndarray`: distances array
 
-        NOTE: sel.to_numpy() is used instead of iterrows due to performace
+        NOTE: sel.values is used instead of iterrows due to performace
         https://stackoverflow.com/questions/24870953/does-pandas-iterrows-have-performance-issues
         """
         ids = sorted(ids) if ids else list(range(1, self.shape[0] + 1))
@@ -383,9 +383,8 @@ class Frame(pd.DataFrame):
         id = {label: i for i, label in enumerate(self.index)}
         id_map = np.array([id.get(x, -1) for x in range(self.index.max() + 1)])
         span = np.array(list(self.attrs[self.SPAN].values()))
-        dists = []
-        sel = self.loc[ids]
-        for idx, (id, row) in enumerate(zip(sel.index, sel.to_numpy())):
+        sel, dists = self.loc[ids], []
+        for idx, (id, row) in enumerate(zip(sel.index, sel.values)):
             oids = [x for x in dcell.getNeighbors(row)
                     if x > id] if cut else ids[idx + 1:]
             dist = self.getDists(oids, row, id_map=id_map, span=span)
@@ -565,7 +564,7 @@ class DistanceCell:
         self.neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
 
     @staticmethod
-    @numba.jit(nopython=True, parallel=True)
+    @numba.jit(nopython=True, parallel=True, cache=True)
     def getNeighborMap(indexes, neigh_ids):
         """
         Get map between node id to neighbor node ids.
@@ -590,11 +589,36 @@ class DistanceCell:
 
         self.atom_cell.shape = [X index, Y index, Z index, all atom ids]
         """
-        ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
-        self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
-                                  dtype=bool)
-        for row in ids.loc[self.gids].itertuples():
-            self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
+        # ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
+        # self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
+        #                           dtype=bool)
+        # for row in ids.loc[self.gids].itertuples():
+        #     self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
+        # The above code is sped up by the following
+        atom_ids = numba.int32(self.frm.index)
+        self.atom_cell = self.setAtomCellNumba(atom_ids, self.frm.values,
+                                               self.grids, self.indexes_numba)
+
+    @staticmethod
+    @numba.jit(nopython=True, cache=True)
+    def setAtomCellNumba(atom_ids, xyzs, grids, indexes):
+        """
+        Put atom ids into the corresponding cells.
+
+        :param atom_ids 'numpy.ndarray': the atom gids
+        :param xyzs 'numpy.ndarray': xyz of atom coordinates
+        :param grids 'numpy.ndarray': the length of the cell in each dimension
+        :param indexes list of numba.int32: the number of the cell in each dimension
+        :return 'numpy.ndarray': map between cell id to atom ids
+            [X index, Y index, Z index, all atom ids]
+        """
+
+        cids = np.round(xyzs / grids).astype(numba.int32) % indexes
+        shape = (indexes[0], indexes[1], indexes[2], cids.shape[0] + 1)
+        atom_cell = np.zeros(shape, dtype=numba.boolean)
+        for aid, cid in zip(atom_ids, cids):
+            atom_cell[cid[0], cid[1], cid[2]][aid] = True
+        return atom_cell
 
     def atomCellUpdate(self, gids):
         ids = ((self.frm.loc[gids]) /
@@ -620,7 +644,7 @@ class DistanceCell:
                                       self.neigh_map, self.atom_cell)
 
     @staticmethod
-    @numba.jit(nopython=True)
+    @numba.jit(nopython=True, cache=True)
     def getNeighborsNumba(xyz, grids, indexes, neigh_map, atom_cell):
         """
         Get the neighbor atom ids from the neighbor cells (including the current
@@ -628,25 +652,22 @@ class DistanceCell:
 
         :param xyz 1x3 'numpy.ndarray': xyz of one atom coordinates
         :param grids 'numpy.ndarray': the length of the cell in each dimension
-        :param indexes 'list': the number of the cell in each dimension
+        :param indexes list of 'numba.int32': the number of the cell in each dimension
         :param neigh_map ixjxkxnx3 'numpy.ndarray': map between cell id to neighbor cell ids
         :param atom_cell ixjxkxn array of floats: map cell id into containing atom ids
         :return list int: the atom ids of the neighbor atoms
         """
         # The cell id for xyz
-        id = [
-            x % y
-            for x, y in zip(np.round(xyz / grids).astype(np.int64), indexes)
-        ]
+        id = np.round(xyz / grids).astype(numba.int32) % indexes
         # Unique neighbor cell ids
         ids = neigh_map[id[0], id[1], id[2], :]
-        id_mx = [np.max(ids[:, i]) + 1 for i in range(3)]
-        id_mx = np.zeros((id_mx[0], id_mx[1], id_mx[2]), dtype=numba.boolean)
+        mx = [np.max(ids[:, i]) + 1 for i in range(3)]
+        uids = np.zeros((mx[0], mx[1], mx[2]), dtype=numba.boolean)
         for x in ids:
-            id_mx[x[0], x[1], x[2]] = True
+            uids[x[0], x[1], x[2]] = True
         # The atom ids from all neighbor cells
         neighbors = [
-            j for i, x in np.ndenumerate(id_mx) if x
+            j for i, x in np.ndenumerate(uids) if x
             for j in atom_cell[i[0], i[1], i[2], :].nonzero()[0]
         ]
         return neighbors
