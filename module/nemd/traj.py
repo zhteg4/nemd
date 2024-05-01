@@ -347,8 +347,7 @@ class Frame(pd.DataFrame):
             dists = (self.getXYZ(ids) - xyz).to_numpy()
         else:
             dists = self.to_numpy()[id_map[ids], :] - np.array(xyz)
-        dists = self.remainderIEEE(dists, span)
-        return np.linalg.norm(dists, axis=1)
+        return self.remainderIEEE(dists, span)
 
     @staticmethod
     @numba.jit(nopython=True)
@@ -362,7 +361,8 @@ class Frame(pd.DataFrame):
         :param span numpy.ndarray: box span
         :return numpy.ndarray: distances within half box span
         """
-        return dists - np.round(np.divide(dists, span)) * span
+        dists -= np.round(np.divide(dists, span)) * span
+        return [np.linalg.norm(x) for x in dists]
 
     def pairDists(self, ids=None, cut=None, res=2.):
         """
