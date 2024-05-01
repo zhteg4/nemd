@@ -372,6 +372,9 @@ class Frame(pd.DataFrame):
         :param cut float: the cutoff distance to search neighbors
         :param res float: the res of the grid step
         :return `numpy.ndarray`: distances array
+
+        NOTE: sel.to_numpy() is used instead of iterrows due to performace
+        https://stackoverflow.com/questions/24870953/does-pandas-iterrows-have-performance-issues
         """
         ids = sorted(ids) if ids else list(range(1, self.shape[0] + 1))
         if cut:
@@ -381,7 +384,8 @@ class Frame(pd.DataFrame):
         id_map = np.array([id.get(x, -1) for x in range(self.index.max() + 1)])
         span = np.array(list(self.attrs[self.SPAN].values()))
         dists = []
-        for idx, (id, row) in enumerate(self.loc[ids].iterrows()):
+        sel = self.loc[ids]
+        for idx, (id, row) in enumerate(zip(sel.index, sel.to_numpy())):
             oids = [x for x in dcell.getNeighbors(row)
                     if x > id] if cut else ids[idx + 1:]
             dist = self.getDists(oids, row, id_map=id_map, span=span)
@@ -532,6 +536,7 @@ class DistanceCell:
         """
         res = self.cut if self.res == self.AUTO else self.res
         self.indexes = [math.ceil(x / res) for x in self.span]
+        self.indexes_numba = numba.int32(self.indexes)
         self.grids = np.array([x / i for x, i in zip(self.span, self.indexes)])
 
     def setNeighborIds(self):
@@ -556,9 +561,8 @@ class DistanceCell:
         """
         Set map between node id to neighbor node ids.
         """
-        indexes = numba.int32(self.indexes)
         neigh_ids = np.array(list(self.neigh_ids))
-        self.neigh_map = self.getNeighborMap(indexes, neigh_ids)
+        self.neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
 
     @staticmethod
     @numba.jit(nopython=True)
@@ -612,8 +616,7 @@ class DistanceCell:
         :param xyz 1x3 array of floats: xyz of one atom coordinates
         :return list int: the atom ids of the neighbor atoms
         """
-        return self.getNeighborsNumba(np.array(xyz), self.grids,
-                                      numba.typed.List(self.indexes),
+        return self.getNeighborsNumba(xyz, self.grids, self.indexes_numba,
                                       self.neigh_map, self.atom_cell)
 
     @staticmethod
