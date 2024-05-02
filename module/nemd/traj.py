@@ -565,18 +565,19 @@ class DistanceCell:
         self.neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
 
     @staticmethod
-    @numba.jit(nopython=True, parallel=True, cache=True)
-    def getNeighborMap(indexes, neigh_ids):
+    @numbautils.jit(parallel=True)
+    def getNeighborMap(indexes, neigh_ids, nopython=False):
         """
         Get map between node id to neighbor node ids.
 
         :param indexes numpy.ndarray: the number of cells in three dimensions
         :param neigh_ids numpy.ndarray: Neighbors cells (separation distances
             less than the cutoff)
+        :param nopython bool: whether numba nopython mode is on
         :return numpy.ndarray: map between node id to neighbor node ids
         """
         shape = (indexes[0], indexes[1], indexes[2], len(neigh_ids), 3)
-        neigh_map = np.empty(shape, dtype=numba.int32)
+        neigh_map = np.empty(shape, dtype=numba.int32 if nopython else int)
         for xid in numba.prange(indexes[0]):
             for yid in numba.prange(indexes[1]):
                 for zid in numba.prange(indexes[2]):
@@ -601,7 +602,7 @@ class DistanceCell:
                                                self.grids, self.indexes_numba)
 
     @staticmethod
-    @numba.jit(nopython=True, cache=True)
+    @numbautils.jit
     def setAtomCellNumba(atom_ids, xyzs, grids, indexes):
         """
         Put atom ids into the corresponding cells.
@@ -645,7 +646,7 @@ class DistanceCell:
                                       self.neigh_map, self.atom_cell)
 
     @staticmethod
-    @numba.jit(nopython=True, cache=True)
+    @numba.jit
     def getNeighborsNumba(xyz, grids, indexes, neigh_map, atom_cell):
         """
         Get the neighbor atom ids from the neighbor cells (including the current

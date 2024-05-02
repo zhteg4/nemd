@@ -16,6 +16,7 @@ FLAG_CPU = jobutils.FLAG_CPU
 FLAG_INTERACTIVE = jobutils.FLAG_INTERACTIVE
 FLAG_JOBNAME = jobutils.FLAG_JOBNAME
 FLAG_DEBUG = jobutils.FLAG_DEBUG
+FLAG_PYTHON = jobutils.FLAG_PYTHON
 FLAG_CPU = jobutils.FLAG_CPU
 FLAG_PRJ_PATH = jobutils.FLAG_PRJ_PATH
 
@@ -280,7 +281,9 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
     :type jobname: str
     """
     if arg_flags is None:
-        arg_flags = [FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG, FLAG_CPU]
+        arg_flags = [
+            FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG, FLAG_PYTHON, FLAG_CPU
+        ]
     # Workflow drivers may add the job control options a few times
     if FLAG_JOBNAME in arg_flags and FLAG_JOBNAME in parser._option_string_actions:
         parser.set_defaults(jobname=jobname)
@@ -304,6 +307,18 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
             action='store_true',
             dest=FLAG_DEBUG[1:].lower(),
             help='Enable debug mode (e.g. extra printing and files)')
+    if FLAG_PYTHON in arg_flags:
+        parser.add_argument(
+            FLAG_PYTHON,
+            type=int,
+            default=environutils.CACHE_MODE,
+            dest=FLAG_PYTHON[1:].lower(),
+            choices=[
+                environutils.PYTHON_MODE, environutils.NOPYTHON_MODE,
+                environutils.CACHE_MODE
+            ],
+            help='0: pure native python; 1:compile supported python code to'
+            'improve performance; 2: cache compiled python code.')
     if FLAG_CPU in arg_flags:
         parser.add_argument(FLAG_CPU,
                             type=type_positive_int,

@@ -11,6 +11,10 @@ import pkgutil
 NEMD_DEBUG = 'NEMD_DEBUG'
 NEMD_SRC = 'NEMD_SRC'
 DEBUG = 'DEBUG'
+PYTHON = 'PYTHON'
+PYTHON_MODE = 0
+NOPYTHON_MODE = 1
+CACHE_MODE = 2
 JOBNAME = 'JOBNAME'
 INTERACTIVE = 'INTERACTIVE'
 NEMD = 'nemd'
@@ -32,6 +36,18 @@ def is_debug():
     usually fed into specific execution command.
     """
     return bool(os.environ.get(NEMD_DEBUG)) or os.environ.get(DEBUG)
+
+
+def get_python_mode():
+    """
+    Get the mode of python compilation.
+
+    :return int: The mode of python compilation as follows:
+        0: pure native python;
+        1:compile supported python code to improve performance;
+        2: cache compiled python code.
+    """
+    return int(os.environ.get(PYTHON, CACHE_MODE))
 
 
 def get_nemd_src():
