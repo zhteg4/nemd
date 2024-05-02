@@ -372,7 +372,7 @@ class Frame(pd.DataFrame):
         :return numpy.ndarray: distances within half box span
         """
         dists -= np.round(np.divide(dists, span)) * span
-        return [np.linalg.norm(x) for x in dists]
+        return [np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) for x in dists]
 
     def pairDists(self, ids=None, cut=None, res=2.):
         """
