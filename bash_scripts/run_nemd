@@ -12,7 +12,7 @@ for ((i=0; i<=$#; i++)); do
   elif [ "$arg" == '-PYTHON' ]; then
     j=$(( i + 1 ))
     export PYTHON=${!j}
-    [[ -z "$PYTHON" ]] && echo "Please choice from [0, 1, 2] after -PYTHON" && exit 2
+    [[ -z "$PYTHON" ]] && echo "Please choice from [-1, 0, 1, 2] after -PYTHON" && exit 2
   elif [ "$arg" == '-INTERACTIVE' ]; then
     export INTERACTIVE='1'
   elif [ "$arg" == '-DEBUG' ]; then

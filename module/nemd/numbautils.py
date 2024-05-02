@@ -21,18 +21,18 @@ def jit(*args, **kwargs):
     """
 
     def _decorator(func):
+        pmode = environutils.get_python_mode()
+        kwargs[NOPYTHON] = kwargs.get(NOPYTHON, pmode >= NOPYTHON_MODE)
+        if kwargs[NOPYTHON]:
+            kwargs[CACHE] = kwargs.get(CACHE, pmode == CACHE_MODE)
+            nargs = [] if args and callable(args[0]) else args
+            func = numba.jit(func, *nargs, **kwargs)
+        if NOPYTHON in inspect.signature(func).parameters:
+            func = functools.partial(func, nopython=kwargs[NOPYTHON])
 
         @functools.wraps(func)
         def wrapper(*func_args, **func_kwargs):
-            pmode = environutils.get_python_mode()
-            kwargs[NOPYTHON] = kwargs.get(NOPYTHON, pmode >= NOPYTHON_MODE)
-            kwargs[CACHE] = kwargs.get(CACHE, pmode == CACHE_MODE)
-            nargs = [] if args and callable(args[0]) else args
-            nb_func = numba.jit(func, *nargs, **
-                                kwargs) if kwargs[NOPYTHON] else func
-            if NOPYTHON in inspect.signature(func).parameters:
-                nb_func = functools.partial(nb_func, nopython=kwargs[NOPYTHON])
-            return nb_func(*func_args, **func_kwargs)
+            return func(*func_args, **func_kwargs)
 
         return wrapper
 

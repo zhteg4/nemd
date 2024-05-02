@@ -313,10 +313,7 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
             type=int,
             default=environutils.CACHE_MODE,
             dest=FLAG_PYTHON[1:].lower(),
-            choices=[
-                environutils.PYTHON_MODE, environutils.NOPYTHON_MODE,
-                environutils.CACHE_MODE
-            ],
+            choices=environutils.PYTHON_MODES,
             help='0: pure native python; 1:compile supported python code to'
             'improve performance; 2: cache compiled python code.')
     if FLAG_CPU in arg_flags:

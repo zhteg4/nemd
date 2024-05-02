@@ -26,6 +26,7 @@ from contextlib import contextmanager
 
 from nemd import oplsua
 from nemd import symbols
+from nemd import environutils
 from nemd import numbautils
 
 FlAG_CUSTOM_DUMP = 'custom_dump'
@@ -41,8 +42,8 @@ def frame_steps(filename):
     :return 'numpy.ndarray': the step information of all steps
     """
     info = subprocess.run(
-        f"zgrep '{ITEM_TIMESTEP}' {filename} "
-        f"--no-group-separator -A1 | grep -v '{ITEM_TIMESTEP}'",
+        f"zgrep -A1 '{ITEM_TIMESTEP}' {filename} | "
+        f"sed '/{ITEM_TIMESTEP}/d;/^--$/d'",
         capture_output=True,
         shell=True)
     return np.loadtxt(io.StringIO(info.stdout.decode("utf-8")), dtype=int)
@@ -147,7 +148,7 @@ class Frame(pd.DataFrame):
                     return
                 atom_num = int(lines[3].rstrip())
                 step = int(lines[1].rstrip())
-                if start > step:
+                if step < start:
                     with warnings.catch_warnings(record=True):
                         np.loadtxt(fh, skiprows=atom_num, max_rows=0)
                         frame = types.SimpleNamespace(step=step)
@@ -342,12 +343,20 @@ class Frame(pd.DataFrame):
         :param span 'numpy.ndarray': the span of box
         :return list of floats: distances
         """
-        if span is None:
-            span = np.array(list(self.attrs[self.SPAN].values()))
         if id_map is None:
             dists = (self.getXYZ(ids) - xyz).values
         else:
             dists = self.values[id_map[ids], :] - np.array(xyz)
+
+        if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
+            for id, col in enumerate(self.XYZU):
+                dists[:, id] = np.frompyfunc(
+                    lambda x: math.remainder(x, self.attrs[self.SPAN][col]), 1,
+                    1)(dists[:, id])
+            return np.linalg.norm(dists, axis=1)
+
+        if span is None:
+            span = np.array(list(self.attrs[self.SPAN].values()))
         return np.array(self.remainderIEEE(dists, span))
 
     @staticmethod
@@ -646,7 +655,7 @@ class DistanceCell:
                                       self.neigh_map, self.atom_cell)
 
     @staticmethod
-    @numba.jit
+    @numbautils.jit
     def getNeighborsNumba(xyz, grids, indexes, neigh_map, atom_cell):
         """
         Get the neighbor atom ids from the neighbor cells (including the current

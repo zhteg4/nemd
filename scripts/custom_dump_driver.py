@@ -10,6 +10,7 @@ import sh
 import os
 import sys
 import math
+import types
 import functools
 import numpy as np
 from scipy import constants
@@ -149,6 +150,8 @@ class CustomDump(object):
         af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
         if not af_tasks:
             steps = traj.frame_steps(self.options.custom_dump)
+            if len(steps) == 0:
+                return
             sidx = math.floor(len(steps) * (1 - self.options.last_pct))
             start = int(steps[sidx])
 
@@ -161,6 +164,9 @@ class CustomDump(object):
         self.time = np.array([x.step * self.timestep for x in self.frms
                               ]) * constants.femto / constants.pico
         self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
+        if isinstance(self.frms[self.sidx], types.SimpleNamespace):
+            # pre-read by frame_steps farsely count the last broken frame
+            self.sidx += 1
         log(f"{len(self.frms)} trajectory frames found.")
         if af_tasks:
             log(f"{', '.join(af_tasks)} analyze all frames and save per frame "
