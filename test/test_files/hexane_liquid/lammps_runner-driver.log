@@ -1,0 +1,7 @@
+..........Command Options..........
+in: polymer_builder.in
+screen: none
+log: lammps_runner_lammps.log
+JobStart: 09:26:04 04/23/24
+...................................
+Running lammps simulations..

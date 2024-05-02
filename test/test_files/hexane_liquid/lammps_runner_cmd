@@ -1,0 +1,1 @@
+lmp_serial -in polymer_builder.in -screen none -log lammps_runner_lammps.log

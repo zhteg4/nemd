@@ -1,0 +1,1 @@
+run_nemd polymer_builder_driver.py O -mol_num 800 -force_field OPLSUA,SPC -temp 298.15 -density 0.8 -prod_ens NPT -JOBNAME polymer_builder -seed 1
