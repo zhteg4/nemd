@@ -637,7 +637,7 @@ class DistanceCell:
         int32 = numba.int32 if nopython else np.int32
         cids = np.round(xyzs / grids).astype(int32) % indexes
         shape = (indexes[0], indexes[1], indexes[2], cids.shape[0] + 1)
-        boolean = numba.boolean if nopython else bool
+        boolean = numba.boolean if nopython else np.bool_
         atom_cell = np.zeros(shape, dtype=boolean)
         for aid, cid in zip(atom_ids, cids):
             atom_cell[cid[0], cid[1], cid[2]][aid] = True
@@ -693,7 +693,7 @@ class DistanceCell:
         # Unique neighbor cell ids
         ids = neigh_map[id[0], id[1], id[2], :]
         mx = [np.max(ids[:, i]) + 1 for i in range(3)]
-        boolean = numba.boolean if nopython else bool
+        boolean = numba.boolean if nopython else np.bool_
         uids = np.zeros((mx[0], mx[1], mx[2]), dtype=boolean)
         for x in ids:
             uids[x[0], x[1], x[2]] = True

@@ -1,0 +1,25 @@
+..........Command Options..........
+custom_dump: /home/zhteg/git/nemd/test/test_files/argon_gas/dump.custom
+data_file: /home/zhteg/git/nemd/test/test_files/argon_gas/polymer_builder.data
+task: rdf
+sel: None
+last_pct: 0.8
+slice: None
+interactive: False
+jobname: custom_dump
+debug: False
+python: 2
+cpu: 4
+JobStart: 21:42:34 05/02/24
+...................................
+1000 atoms selected.
+10 trajectory frames found.
+rdf average results from last 80.0% frames ∈ [ 22207.000,  22215.000] ps
+The volume fluctuates: [40820690.49 40820690.49] Å^3
+Only neighbors within 11.0 are accurate. (res=17.21)
+11%, 22%, 33%, 44%, 55%, 66%, 77%, 88%, 100%
+Radial distribution function data written into custom_dump_rdf.csv
+Peak position: 4.039999999999999; peak value:  2.21
+Radial distribution function figure saved as custom_dump_rdf.png
+Finished.
+21:42:40 05/02/24
