@@ -11,7 +11,7 @@ echo \$NEMD_SRC=$NEMD_SRC
 # Bash scripts dir to PATH and $PYTHONPATH
 export NEMD_BASH=$NEMD_SRC/$BASH_SCRIPTS
 echo \$NEMD_BASH=$NEMD_BASH
-[[ ":$PATH:" != *":$NEMD_BASH:"* ]] && PATH="$NEMD_BASH${PATH:+":$PATH"}"
+[[ ":$PATH:" != *":$NEMD_BASH:"* ]] && export PATH="$NEMD_BASH${PATH:+":$PATH"}"
 [[ ":$PYTHONPATH:" != *":$NEMD_BASH:"* ]] && export PYTHONPATH="$NEMD_BASH${PYTHONPATH:+":$PYTHONPATH"}"
 
 # Bash submodule dir
@@ -20,18 +20,18 @@ export ALAMODE_PTOOLS=$ALAMODE/alamode/tools && echo "\$ALAMODE_PTOOLS=$ALAMODE/
 ALAMODE_BUILD=$ALAMODE/build
 ALAMODE_ALM=$ALAMODE_BUILD/alm
 [ -d $ALAMODE_ALM ] && echo \$ALAMODE_ALM=$ALAMODE_ALM &&
-  [[ ":$PATH:" != *":$ALAMODE_ALM:"* ]] && PATH="$ALAMODE_ALM${PATH:+":$PATH"}"
+  [[ ":$PATH:" != *":$ALAMODE_ALM:"* ]] && export PATH="$ALAMODE_ALM${PATH:+":$PATH"}"
 ALAMODE_ANPHON=$ALAMODE_BUILD/anphon
 [ -d $ALAMODE_ANPHON ] && echo \$ALAMODE_ANPHON=$ALAMODE_ANPHON &&
-  [[ ":$PATH:" != *":$ALAMODE_ANPHON:"* ]] && PATH="$ALAMODE_ANPHON${PATH:+":$PATH"}"
+  [[ ":$PATH:" != *":$ALAMODE_ANPHON:"* ]] && export PATH="$ALAMODE_ANPHON${PATH:+":$PATH"}"
 ALAMODE_TOOLS=$ALAMODE_BUILD/tools
 [ -d $ALAMODE_TOOLS ] && echo \$ALAMODE_TOOLS=$ALAMODE_TOOLS &&
-  [[ ":$PATH:" != *":$ALAMODE_TOOLS:"* ]] && PATH="$ALAMODE_TOOLS${PATH:+":$PATH"}"
+  [[ ":$PATH:" != *":$ALAMODE_TOOLS:"* ]] && export PATH="$ALAMODE_TOOLS${PATH:+":$PATH"}"
 
 LAMMPS=$NEMD_SRC/submodule/lammps
 LAMMPS_BUILD=$LAMMPS/build
 [ -d $LAMMPS_BUILD ] && echo \$LAMMPS_BUILD=$LAMMPS_BUILD &&
-  [[ ":$PATH:" != *":$LAMMPS_BUILD:"* ]] && PATH="$LAMMPS_BUILD${PATH:+":$PATH"}"
+  [[ ":$PATH:" != *":$LAMMPS_BUILD:"* ]] && export PATH="$LAMMPS_BUILD${PATH:+":$PATH"}"
 
 # Workflows dir
 export NEMD_WORKFLOWS=$NEMD_SRC/$WORKFLOWS

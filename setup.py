@@ -144,11 +144,11 @@ class DarwinInstall:
         subprocess.run(
             'brew install gcc lapack open-mpi libomp boost eigen fftw cmake llvm',
             shell=True)
-        info = subprocess.run("brew info llvm | grep 'export PATH'",
-                              shell=True,
-                              capture_output=True)
-        self.llvm = info.stdout.decode('utf-8').split(
-            f'{self.PATH}=')[1].split(':')[0].strip('\'"')
+        info = subprocess.run(
+            "brew info llvm | grep 'export PATH' | sed 's/^.*export PATH=//; s/:$PATH.*$//; s/\"//'",
+            shell=True,
+            capture_output=True)
+        self.llvm = info.stdout.decode('utf-8').strip()
 
     def installAlamode(self, std_cmake_args=None, env=None):
         """
