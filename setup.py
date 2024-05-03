@@ -142,7 +142,7 @@ class DarwinInstall:
         if self.alm_found:
             return
         subprocess.run(
-            'brew install gcc lapack open-mpi libomp boost eigen fftw cmake llvm',
+            'brew install gcc lapack open-mpi libomp boost eigen fftw cmake llvm spglib',
             shell=True)
         info = subprocess.run(
             "brew info llvm | grep 'export PATH' | sed 's/^.*export PATH=//; s/:$PATH.*$//; s/\"//'",
