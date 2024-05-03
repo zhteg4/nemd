@@ -195,6 +195,12 @@ def type_slice(arg):
         f"{arg} doesn't follow list slicing rules.")
 
 
+def type_python_mode(arg):
+    assert arg in environutils.PYTHON_MODES
+    os.environ[environutils.CACHE_MODE] = arg
+    return arg
+
+
 def add_md_arguments(parser):
     parser.add_argument(oplsua.FLAG_TIMESTEP,
                         metavar='fs',
@@ -312,9 +318,10 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
             FLAG_PYTHON,
             default=environutils.CACHE_MODE,
             dest=FLAG_PYTHON[1:].lower(),
+            type=type_python_mode,
             choices=environutils.PYTHON_MODES,
-            help='0: pure native python; 1:compile supported python code to'
-            'improve performance; 2: cache compiled python code.')
+            help='0: pure native python; 1: compile supported python code to '
+            'improve performance; 2: run previous compiled python.')
     if FLAG_CPU in arg_flags:
         parser.add_argument(FLAG_CPU,
                             type=type_positive_int,
