@@ -5,7 +5,7 @@
 """
 This module read, parser, and analyze trajectories.
 
-Unzip a GZ trajectory file: zip -dv dump.custom.gz
+Unzip a GZ trajectory file: gzip -dv dump.custom.gz
 """
 import io
 import os
