@@ -310,7 +310,6 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
     if FLAG_PYTHON in arg_flags:
         parser.add_argument(
             FLAG_PYTHON,
-            type=int,
             default=environutils.CACHE_MODE,
             dest=FLAG_PYTHON[1:].lower(),
             choices=environutils.PYTHON_MODES,

@@ -1,0 +1,1 @@
+run_nemd polymer_builder_driver.py [Ar] -mol_num 1000 -cpu 8 -relax_time 10 -prod_time 10 -JOBNAME polymer_builder -seed 6

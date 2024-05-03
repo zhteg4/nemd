@@ -22,7 +22,8 @@ def jit(*args, **kwargs):
 
     def _decorator(func):
         pmode = environutils.get_python_mode()
-        kwargs[NOPYTHON] = kwargs.get(NOPYTHON, pmode >= NOPYTHON_MODE)
+        kwargs[NOPYTHON] = kwargs.get(NOPYTHON, pmode
+                                      in [NOPYTHON_MODE, CACHE_MODE])
         if kwargs[NOPYTHON]:
             kwargs[CACHE] = kwargs.get(CACHE, pmode == CACHE_MODE)
             nargs = [] if args and callable(args[0]) else args

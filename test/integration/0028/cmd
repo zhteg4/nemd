@@ -1,0 +1,2 @@
+# RDF on Argon trajectory using neighour search (numba without compilation)
+env PYTHON=-1 run_nemd custom_dump_driver.py $NEMD_SRC/test/test_files/argon_gas/dump.custom -data_file $NEMD_SRC/test/test_files/argon_gas/polymer_builder.data -task rdf -last_pct 0.8

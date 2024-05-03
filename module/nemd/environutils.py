@@ -12,10 +12,10 @@ NEMD_DEBUG = 'NEMD_DEBUG'
 NEMD_SRC = 'NEMD_SRC'
 DEBUG = 'DEBUG'
 PYTHON = 'PYTHON'
-PYTHON_MODE = -1
-ORIGINAL_MODE = 0
-NOPYTHON_MODE = 1
-CACHE_MODE = 2
+PYTHON_MODE = '-1'
+ORIGINAL_MODE = '0'
+NOPYTHON_MODE = '1'
+CACHE_MODE = '2'
 PYTHON_MODES = [PYTHON_MODE, ORIGINAL_MODE, NOPYTHON_MODE, CACHE_MODE]
 JOBNAME = 'JOBNAME'
 INTERACTIVE = 'INTERACTIVE'
@@ -44,12 +44,12 @@ def get_python_mode():
     """
     Get the mode of python compilation.
 
-    :return int: The mode of python compilation as follows:
+    :return str: The mode of python compilation as follows:
         0: pure native python;
         1:compile supported python code to improve performance;
         2: cache compiled python code.
     """
-    return int(os.environ.get(PYTHON, CACHE_MODE))
+    return os.environ.get(PYTHON, CACHE_MODE)
 
 
 def get_nemd_src():

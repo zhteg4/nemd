@@ -571,11 +571,19 @@ class DistanceCell:
         Set map between node id to neighbor node ids.
         """
         neigh_ids = np.array(list(self.neigh_ids))
+        if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
+            self.neigh_map = np.zeros((*self.indexes, len(self.neigh_ids), 3),
+                                      dtype=int)
+            indexes = [range(x) for x in self.indexes]
+            nodes = list(itertools.product(*indexes))
+            for node in nodes:
+                self.neigh_map[node] = (neigh_ids + node) % self.indexes
+            return
         self.neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
 
     @staticmethod
     @numbautils.jit(parallel=True)
-    def getNeighborMap(indexes, neigh_ids, nopython=False):
+    def getNeighborMap(indexes, neigh_ids, nopython):
         """
         Get map between node id to neighbor node ids.
 
@@ -586,13 +594,13 @@ class DistanceCell:
         :return numpy.ndarray: map between node id to neighbor node ids
         """
         shape = (indexes[0], indexes[1], indexes[2], len(neigh_ids), 3)
-        neigh_map = np.empty(shape, dtype=numba.int32 if nopython else int)
+        neigh_mp = np.empty(shape, dtype=numba.int32 if nopython else np.int32)
         for xid in numba.prange(indexes[0]):
             for yid in numba.prange(indexes[1]):
                 for zid in numba.prange(indexes[2]):
                     id = np.array([xid, yid, zid])
-                    neigh_map[xid, yid, zid, :, :] = (neigh_ids + id) % indexes
-        return neigh_map
+                    neigh_mp[xid, yid, zid, :, :] = (neigh_ids + id) % indexes
+        return neigh_mp
 
     def setAtomCell(self):
         """
@@ -600,19 +608,21 @@ class DistanceCell:
 
         self.atom_cell.shape = [X index, Y index, Z index, all atom ids]
         """
-        # ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
-        # self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
-        #                           dtype=bool)
-        # for row in ids.loc[self.gids].itertuples():
-        #     self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
-        # The above code is sped up by the following
+        if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
+            ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
+            self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
+                                      dtype=bool)
+            for row in ids.loc[self.gids].itertuples():
+                self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
+            return
+
         atom_ids = numba.int32(self.frm.index)
         self.atom_cell = self.setAtomCellNumba(atom_ids, self.frm.values,
                                                self.grids, self.indexes_numba)
 
     @staticmethod
     @numbautils.jit
-    def setAtomCellNumba(atom_ids, xyzs, grids, indexes):
+    def setAtomCellNumba(atom_ids, xyzs, grids, indexes, nopython):
         """
         Put atom ids into the corresponding cells.
 
@@ -620,13 +630,15 @@ class DistanceCell:
         :param xyzs 'numpy.ndarray': xyz of atom coordinates
         :param grids 'numpy.ndarray': the length of the cell in each dimension
         :param indexes list of numba.int32: the number of the cell in each dimension
+        :param nopython bool: whether numba nopython mode is on
         :return 'numpy.ndarray': map between cell id to atom ids
             [X index, Y index, Z index, all atom ids]
         """
-
-        cids = np.round(xyzs / grids).astype(numba.int32) % indexes
+        int32 = numba.int32 if nopython else np.int32
+        cids = np.round(xyzs / grids).astype(int32) % indexes
         shape = (indexes[0], indexes[1], indexes[2], cids.shape[0] + 1)
-        atom_cell = np.zeros(shape, dtype=numba.boolean)
+        boolean = numba.boolean if nopython else bool
+        atom_cell = np.zeros(shape, dtype=boolean)
         for aid, cid in zip(atom_ids, cids):
             atom_cell[cid[0], cid[1], cid[2]][aid] = True
         return atom_cell
@@ -651,12 +663,18 @@ class DistanceCell:
         :param xyz 1x3 array of floats: xyz of one atom coordinates
         :return list int: the atom ids of the neighbor atoms
         """
+        if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
+            id = (xyz / self.grids).round().astype(int) % self.indexes
+            ids = self.neigh_map[tuple(id)]
+            return [
+                y for x in ids for y in self.atom_cell[tuple(x)].nonzero()[0]
+            ]
         return self.getNeighborsNumba(xyz, self.grids, self.indexes_numba,
                                       self.neigh_map, self.atom_cell)
 
     @staticmethod
     @numbautils.jit
-    def getNeighborsNumba(xyz, grids, indexes, neigh_map, atom_cell):
+    def getNeighborsNumba(xyz, grids, indexes, neigh_map, atom_cell, nopython):
         """
         Get the neighbor atom ids from the neighbor cells (including the current
         cell itself) via Numba.
@@ -666,14 +684,17 @@ class DistanceCell:
         :param indexes list of 'numba.int32': the number of the cell in each dimension
         :param neigh_map ixjxkxnx3 'numpy.ndarray': map between cell id to neighbor cell ids
         :param atom_cell ixjxkxn array of floats: map cell id into containing atom ids
+        :param nopython bool: whether numba nopython mode is on
         :return list int: the atom ids of the neighbor atoms
         """
         # The cell id for xyz
-        id = np.round(xyz / grids).astype(numba.int32) % indexes
+        int32 = numba.int32 if nopython else np.int32
+        id = np.round(xyz / grids).astype(int32) % indexes
         # Unique neighbor cell ids
         ids = neigh_map[id[0], id[1], id[2], :]
         mx = [np.max(ids[:, i]) + 1 for i in range(3)]
-        uids = np.zeros((mx[0], mx[1], mx[2]), dtype=numba.boolean)
+        boolean = numba.boolean if nopython else bool
+        uids = np.zeros((mx[0], mx[1], mx[2]), dtype=boolean)
         for x in ids:
             uids[x[0], x[1], x[2]] = True
         # The atom ids from all neighbor cells
