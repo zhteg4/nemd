@@ -1,0 +1,28 @@
+..........Command Options..........
+dir: /Users/tzhang/git/nemd/test/integration
+slow: None
+check_only: False
+interactive: False
+jobname: integration
+debug: False
+python: 2
+cpu: 4
+clean: False
+jtype: task
+JobStart: 16:31:15 05/15/24
+...................................
+31 tests found.
+31 / 31 completed jobs.
+25 succeed; 6 failed.
+id: 0004; dir: /Users/tzhang/git/nemd/test/integration/0004
+/Users/tzhang/git/nemd/test/integration/0004/polymer_builder.data and /Users/tzhang/git/nemd/test/integration/workspace/8c1d027dcd0056ad61c5542e7e694407/polymer_builder.data are different
+id: 0021; dir: /Users/tzhang/git/nemd/test/integration/0021
+/Users/tzhang/git/nemd/test/integration/0021/polymer_builder.data and /Users/tzhang/git/nemd/test/integration/workspace/e3562472a62ea8fb8ecd2ac28a5428cd/polymer_builder.data are different
+id: 0016; dir: /Users/tzhang/git/nemd/test/integration/0016
+/Users/tzhang/git/nemd/test/integration/0016/polymer_builder.data and /Users/tzhang/git/nemd/test/integration/workspace/4f566adc1f1d63d81117f6df07575e72/polymer_builder.data are different
+id: 0002; dir: /Users/tzhang/git/nemd/test/integration/0002
+/Users/tzhang/git/nemd/test/integration/0002/polymer_builder.data and /Users/tzhang/git/nemd/test/integration/workspace/3eff5f43638d55f0da983e7c7490a156/polymer_builder.data are different
+id: 0020; dir: /Users/tzhang/git/nemd/test/integration/0020
+/Users/tzhang/git/nemd/test/integration/0020/polymer_builder.data and /Users/tzhang/git/nemd/test/integration/workspace/03306ed8b79b76592ab12840b6817464/polymer_builder.data are different
+id: 0017; dir: /Users/tzhang/git/nemd/test/integration/0017
+/Users/tzhang/git/nemd/test/integration/0017/polymer_builder.data and /Users/tzhang/git/nemd/test/integration/workspace/3770d413750a6680d834e1c9b540d07e/polymer_builder.data are different

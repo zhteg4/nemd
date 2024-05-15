@@ -1,0 +1,47 @@
+Fetching status:   0%|          | 0/62 [00:00<?, ?it/s]Fetching status:  24%|██▍       | 15/62 [00:00<00:00, 135.10it/s]Fetching status:  47%|████▋     | 29/62 [00:00<00:00, 135.25it/s]Fetching status:  69%|██████▉   | 43/62 [00:00<00:00, 135.73it/s]Fetching status:  95%|█████████▌| 59/62 [00:00<00:00, 138.67it/s]Fetching status: 100%|██████████| 62/62 [00:00<00:00, 139.34it/s]
+
+Overview: 31 jobs/aggregates, 0 jobs/aggregates with eligible operations.
+
+operation/group
+-----------------
+
+
+Detailed View:
+
+job id                            operation/group    labels
+--------------------------------  -----------------  --------
+005f74d6988b4204a4c3bc0722b927f5  [ ]
+03306ed8b79b76592ab12840b6817464  [ ]
+08b9a1c7267fa9f4c92b6e8069180db9  [ ]
+181818c674c9fe8ce5dd740948761276  [ ]
+1cfc137ff9a3f005f3afa23b7cba9c3d  [ ]
+226a99155388c5a6e7b3fc811d3bb222  [ ]
+22fd547bc881e3bbc0f30ae15b270276  [ ]
+3740dfed913b633020cf7a01fc3a1651  [ ]
+3770d413750a6680d834e1c9b540d07e  [ ]
+3eff5f43638d55f0da983e7c7490a156  [ ]
+4f566adc1f1d63d81117f6df07575e72  [ ]
+57ba1c82d68e1edd2e562ca7f5a939f0  [ ]
+66279c9ee0bd736c0e8a49bb6f7286fd  [ ]
+6ae82625f7f206eb192cb948aaa96e70  [ ]
+7155619596b63d4ed3265524a23963b0  [ ]
+839ee2d33fe1e19ea029f94c946d06e7  [ ]
+8c1d027dcd0056ad61c5542e7e694407  [ ]
+8f5a7d4c7d780afe3c96a09709a8aacc  [ ]
+963cf28205293a1ed33c4609913a2b05  [ ]
+a8105ccb51d86a0b046da3554457a183  [ ]
+aa68d0f63eb94fd5a58fff8fd35ae2bf  [ ]
+b6a802dbe96ce5892fedcfd74d991734  [ ]
+be6b0736bf9550557e5c0317dc4e3e8d  [ ]
+d8ea6b088fb437786c58c76a9be206bc  [ ]
+e3562472a62ea8fb8ecd2ac28a5428cd  [ ]
+ec7f775857e5f41c792a0cd8cb693eef  [ ]
+eee08949e860708834857ead8e988dd8  [ ]
+f25402b30897aa769536dac361d67802  [ ]
+f7759c33e2f8984cefb923e2d62de5e8  [ ]
+f7c8b6a9961a805ad0c454c4762993fe  [ ]
+fcd9725b32108290c9f323292fbaec79  [ ]
+
+[U]:unknown [R]:registered [I]:inactive [S]:submitted [H]:held [Q]:queued [A]:active [E]:error [GR]:group_registered [GI]:group_inactive [GS]:group_submitted [GH]:group_held [GQ]:group_queued [GA]:group_active [GE]:group_error
+
+
