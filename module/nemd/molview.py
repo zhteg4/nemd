@@ -62,9 +62,8 @@ class FrameView:
         sz_clr = pd.DataFrame(ele_sz_clr, index=index)
         data = pd.concat((data, sz_clr), axis=1)
         box = self.data_reader.getBox()
-        self.data = traj.Frame(data,
-                               box=box,
-                               columns=traj.Frame.XYZU_ELE_SZ_CLR)
+        columns = traj.Frame.XYZU_ELE_SZ_CLR
+        self.data = traj.Frame(data, box=box, columns=columns, dtype=None)
 
     def updateDataWithFrm(self, frm):
         """
@@ -143,7 +142,8 @@ class FrameView:
         data = pd.concat((frm, sz_clr), axis=1)
         self.data = traj.Frame(data,
                                box=frm.getBox(),
-                               columns=traj.Frame.XYZU_ELE_SZ_CLR)
+                               columns=traj.Frame.XYZU_ELE_SZ_CLR,
+                               dtype=None)
         return frm
 
     def setScatters(self):

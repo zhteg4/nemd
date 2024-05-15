@@ -6,5 +6,7 @@ if [ -z "$SCRIPTS" ]; then
     SCRIPTS="$NEMD_SRC/test/module/*_test.py $NEMD_SRC/test/*_test.py"
 fi
 
+LD_LIBRARY_PATH=`pip3 show tbb | grep 'Location:' | sed 's/^.*: //;s/python.*\/site-packages//'`
+[[ -n "$LD_LIBRARY_PATH" ]] && export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}" && [[ -n "$DEBUG" ]] && echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 SCRIPT_ARGS="python3 -m pytest  -s --pdb $SCRIPTS"
 echo "$SCRIPT_ARGS" && $SCRIPT_ARGS

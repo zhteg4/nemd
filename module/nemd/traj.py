@@ -108,13 +108,15 @@ class Frame(pd.DataFrame):
                  box=None,
                  index=None,
                  columns=None,
-                 step=None):
+                 step=None,
+                 dtype=float):
         """
         :param xyz nx3 'numpy.ndarray' or 'DataFrame': xyz data
         :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
         :param index list: the atom indexes
         :param columns list: the data columns (e.g., xu, yu, zu, element)
         :param step int: the number of simulation step that this frame is at
+        :param dtype str: the data type of the frame
         """
         try:
             name = xyz.values.index.name
@@ -124,7 +126,7 @@ class Frame(pd.DataFrame):
             index = range(1, xyz.shape[0] + 1)
         if columns is None:
             columns = self.XYZU
-        super().__init__(data=xyz, index=index, columns=columns, dtype=float)
+        super().__init__(data=xyz, index=index, columns=columns, dtype=dtype)
         self.setBox(box)
         self.setStep(step)
 
