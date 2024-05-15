@@ -39,6 +39,7 @@ def get_pyplot(inav=None, name='the plot'):
         if inav:
             print(f"Showing {name}. Click X to close and continue..")
             plt.show(block=True)
+        plt.close('all')
         # Restore the backend
         matplotlib.use(obackend)
 

@@ -195,7 +195,9 @@ class FrameView:
             atom1 = self.data_reader.atoms[bond.id1]
             atom2 = self.data_reader.atoms[bond.id2]
             pnts = self.data.loc[[atom1.id, atom2.id]][self.XYZU]
-            pnts = pd.concat((pnts, pnts.mean().to_frame().transpose()))
+            mid = pnts.mean().to_frame().transpose()
+            pnts = np.concatenate((pnts.values, mid.values))
+            pnts = pd.DataFrame(pnts, columns=self.XYZU)
             self.setline(pnts[::2], atom1)
             self.setline(pnts[1::], atom2)
 
