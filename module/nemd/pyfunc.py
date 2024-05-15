@@ -35,7 +35,7 @@ class Press:
         Load data from the file.
         """
         self.data = pd.read_csv(self.filename,
-                                sep='\s+',
+                                sep=r'\s+',
                                 header=1,
                                 na_filter=False,
                                 escapechar='#',
