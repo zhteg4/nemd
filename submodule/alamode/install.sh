@@ -8,7 +8,7 @@ FFTW3_ROOT=/usr/local
 
 if command -v brew &> /dev/null
 then
-  SPGLIB_ROOT=$(brew --cellar spglib)/*
+  SPGLIB_ROOT=$(echo $(brew --cellar spglib)/*/lib* | sed 's/lib*$//')
   LLVM_PATH=$(brew info llvm | grep 'export PATH' | sed 's/^.*export PATH=//; s/:$PATH.*$//; s/\"//')
   [[ ":$PATH:" != *":$LLVM_PATH:"* ]] && export PATH="$LLVM_PATH${PATH:+":$PATH"}"
   CMAKE_C_COMPILER=$(which clang)
