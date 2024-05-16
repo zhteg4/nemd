@@ -93,33 +93,40 @@ class FixWriter:
     unfix after the run command.
     """
 
+    VOL = 'vol'
+    PRESS = 'press'
+    MODULUS = 'modulus'
+    AVE_PRESS = 'ave_press'
     TEMP_BERENDSEN = 'temp/berendsen'
-    PRESS_BERENDSEN = 'press/berendsen'
+    PRESS_BERENDSEN = f'{PRESS}/berendsen'
     FIX = 'fix'
+    SET_LABEL = "label %s"
+    DEL_VARIABLE = "variable %s delete"
 
     RUN_STEP = "run %i\n"
     UNFIX = "unfix %s\n"
     FIX_NVE = f"{FIX} %s all nve\n"
     FIX_NVT = f"{FIX} %s all nvt temp {{stemp}} {{temp}} {{tdamp}}\n"
     FIX_TEMP_BERENDSEN = f"{FIX} %s all {TEMP_BERENDSEN} {{stemp}} {{temp}} {{tdamp}}\n"
-    FIX_PRESS_BERENDSEN = f"{FIX} %s all {PRESS_BERENDSEN} iso {{spress}} {{press}} {{pdamp}} modulus {{modulus}}\n"
+    FIX_PRESS_BERENDSEN = f"{FIX} %s all {PRESS_BERENDSEN} iso {{spress}} {{press}} {{pdamp}} {MODULUS} {{modulus}}\n"
     PRESS_VOL_FILE = 'press_vol.data'
-    RECORD_PRESS_VOL = f"variable vol equal vol\n" \
+    RECORD_PRESS_VOL = f"variable {VOL} equal {VOL}\n" \
                    f"{FIX} %s all ave/time 1 {{period}} {{period}} " \
-                   f"c_thermo_press v_vol file {PRESS_VOL_FILE}\n"
+                   f"c_thermo_{PRESS} v_{VOL} file {PRESS_VOL_FILE}\n"
     WIGGLE_DIM = "%s wiggle ${{amp}} {period}"
-    VARIABLE_AMP = 'variable amp equal "0.05*vol^(1/3)"\n'
+    AMP = 'amp'
+    VARIABLE_AMP = f'variable {AMP} equal "0.05*{VOL}^(1/3)"\n'
     WIGGLE_VOL = f"{VARIABLE_AMP}{FIX} %s all deform 1 {{PARAM}}\n"
 
     SET_MODULUS = f"""
-    variable modulus python getModulus
-    python getModulus input 2 {PRESS_VOL_FILE} %s return v_modulus format sif here "from nemd.pyfunc import getModulus"
-    print "Modulus = ${{modulus}}"
+    variable {MODULUS} python getModulus
+    python getModulus input 2 {PRESS_VOL_FILE} %s return v_{MODULUS} format sif here "from nemd.pyfunc import getModulus"
+    print "{MODULUS.capitalize()} = ${{modulus}}"
     """
     SET_MODULUS = SET_MODULUS.replace('\n    ', '\n').lstrip('\n')
 
     SET_PRESS = f"""
-    variable ave_press python getPress
+    variable {AVE_PRESS} python getPress
     python getPress input 1 {PRESS_VOL_FILE} return v_ave_press format sf here "from nemd.pyfunc import getPress"
     print "Averaged Press = ${{ave_press}}"
     """
@@ -235,18 +242,42 @@ class FixWriter:
                      temp=self.temp,
                      press=self.press)
             return
+
         self.nvt(nstep=self.relax_step / 1E2, stemp=self.stemp, temp=self.temp)
-        nstep = self.relax_step / 1E1
-        pre, record_num = self.getCyclePre(nstep)
-        self.nvt(nstep=nstep, stemp=self.temp, temp=self.temp, pre=pre)
-        self.cmd.append(self.SET_MODULUS % record_num)
-        self.cmd.append(self.SET_PRESS)
+
+        self.cycleToPress()
+
         self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
                  temp=self.temp,
                  spress='${ave_press}',
                  press=self.press,
                  modulus="${modulus}")
+
+    def cycleToPress(self, max_loop=2):
+        """
+        Deform the box by cycles to get close to the target pressure.
+        Each big cycle contains 10 sinusoidal waves.
+
+        "param max_loop int: the maximum number of big cycles.
+        """
+        loop_deform, deform_id = 'loop_deform', 'deform_id'
+        self.cmd.append(self.SET_LABEL % loop_deform)
+        self.cmd.append(f"variable {deform_id} loop {max_loop}")
+        self.cmd.append("shell mkdir deform_${deform_id}")
+        self.cmd.append("shell cd deform_${deform_id}\n")
+        self.cmd.append(self.DEL_VARIABLE % self.VOL)
+        self.cmd.append(self.DEL_VARIABLE % self.AMP)
+        self.cmd.append(self.DEL_VARIABLE % self.MODULUS)
+        self.cmd.append(self.DEL_VARIABLE % self.AVE_PRESS)
+        nstep = self.relax_step / 1E1
+        pre, record_num = self.getCyclePre(nstep)
+        self.nvt(nstep=nstep, stemp=self.temp, temp=self.temp, pre=pre)
+        self.cmd.append(self.SET_MODULUS % record_num)
+        self.cmd.append(self.SET_PRESS)
+        self.cmd.append("shell cd ..")
+        self.cmd.append(f"next {deform_id}")
+        self.cmd.append(f"jump SELF {loop_deform}\n")
 
     def getCyclePre(self, nstep, cycle_num=10, record_num=100):
         """
