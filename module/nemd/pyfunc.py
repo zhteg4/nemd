@@ -12,6 +12,7 @@ class Press:
 
     DATA = 'Data'
     PRESS = 'press'
+    VOL = 'vol'
     PNG_EXT = '.png'
 
     def __init__(self, filename):
@@ -130,7 +131,6 @@ class Modulus(Press):
 
     MODULUS = 'modulus'
     DEFAULT = 10
-    VOL = 'vol'
     STD_DEV = '_(Std_Dev)'
     SMOOTHED = '_(Smoothed)'
 
@@ -215,6 +215,65 @@ class Modulus(Press):
         self.modulus = max([modulus, self.DEFAULT])
 
 
+class Scale(Press):
+
+    SCALE = 'scale'
+    FITTED = 'Fitted'
+
+    def __init__(self, press, *args, **kwargs):
+        """
+        :param filename str: the filename with path to load data from
+        :param record_num int: the recording number of each cycle.
+        """
+        self.press = press
+        super().__init__(*args, **kwargs)
+        self.vol = None
+        self.factor = None
+
+    def run(self):
+        """
+        Main method to run.
+        """
+        super().run()
+        self.setScalefactor()
+
+    def plot(self):
+        """
+        Plot the data and save the figure.
+        """
+        with plotutils.get_pyplot(inav=False) as plt:
+            fig, ax = plt.subplots(1, 1, sharex=True, figsize=(8, 6))
+            labels = {x: self.getLabel(x) for x in self.data.columns}
+            press_cl = [x for x in labels if x.endswith(self.PRESS)][0]
+            vol_cl = [x for x in labels if x.endswith(self.VOL)][0]
+            ax.plot(self.data[vol_cl],
+                    self.data[press_cl],
+                    '.',
+                    label=self.DATA)
+            coef = np.polyfit(self.data[vol_cl], self.data[press_cl], 1)
+            vmin, vmax = self.data[vol_cl].min(), self.data[vol_cl].max()
+            self.vol = np.linspace(vmin, vmax, 100)
+            self.fitted_press = np.poly1d(coef)(self.vol)
+            ax.plot(self.vol, self.fitted_press, '--', label=self.FITTED)
+            ax.set_title(
+                f"{self.VOL.capitalize()} vs {self.PRESS.capitalize()}")
+            basename = os.path.basename(self.filename)
+            name = symbols.PERIOD.join(basename.split(symbols.PERIOD)[:-1])
+            fig.savefig(f"{name}_{self.SCALE}{self.PNG_EXT}")
+
+    def setFactor(self):
+        """
+        Set the scale factor.
+        """
+        index = abs(self.fitted_press - self.press).argmin()
+        vol = self.vol[index]
+        delta = (self.vol[-1] - self.vol[0]) * 0.05
+        left, right = vol - delta, vol + delta
+        sel_ids = (self.vol > left) & (self.vol < right)
+        ratio = self.vol[sel_ids].shape[0] / self.vol.shape[0]
+        self.factor = 1 if ratio > 0.05 else vol / self.vol.mean()
+
+
 def getPress(filename):
     """
     Get the averaged pressure.
@@ -238,6 +297,20 @@ def getModulus(filename, record_num):
     modulus = Modulus(filename, record_num)
     modulus.run()
     return modulus.modulus
+
+
+def getScaleFactor(press, filename):
+    """
+    Get the scale factor of the volume. The scale factor is the ratio of the
+    volume at the closet target pressure to the volume at the average pressure.
+
+    :param press float: the target pressure.
+    :param filename str: the filename with path to load data from.
+    :return float: the scale factor of the volume.
+    """
+    scale = Scale(press, filename)
+    scale.run()
+    return scale.factor
 
 
 def getXL(filename):

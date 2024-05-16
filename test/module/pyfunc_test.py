@@ -73,3 +73,25 @@ class TestModulus:
             modulus.setAve()
             modulus.setModulus()
             np.testing.assert_almost_equal(1848.86, modulus.modulus, 2)
+
+
+class TestScale:
+
+    @pytest.fixture
+    def scale(self):
+        return pyfunc.Scale(1, os.path.join(BASE_DIR, 'press.data'))
+
+    def testPlot(self, scale, tmpdir):
+        with fileutils.chdir(tmpdir, rmtree=True):
+            scale.setData()
+            scale.setAve()
+            scale.plot()
+            assert os.path.isfile('press_scale.png')
+
+    def testSetFactor(self, scale, tmpdir):
+        with fileutils.chdir(tmpdir, rmtree=True):
+            scale.setData()
+            scale.setAve()
+            scale.plot()
+            scale.setFactor()
+            np.testing.assert_almost_equal(1.0, scale.factor, 2)
