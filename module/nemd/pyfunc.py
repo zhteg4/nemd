@@ -265,13 +265,21 @@ class Scale(Press):
         """
         Set the scale factor.
         """
+        if self.press > self.fitted_press.max():
+            # Compress the volume as the target pressure is larger
+            self.factor = self.vol[0] / self.vol.mean()
+            return
+        if self.fitted_press.min() > self.press:
+            # Expand the volume as the target pressure is smaller
+            self.factor = self.vol[-1] / self.vol.mean()
+            return
         index = abs(self.fitted_press - self.press).argmin()
         vol = self.vol[index]
         delta = (self.vol[-1] - self.vol[0]) * 0.05
         left, right = vol - delta, vol + delta
         sel_ids = (self.vol > left) & (self.vol < right)
         ratio = self.vol[sel_ids].shape[0] / self.vol.shape[0]
-        self.factor = 1 if ratio > 0.06 else vol / self.vol.mean()
+        self.factor = 1 if ratio > 0.09 else vol / self.vol.mean()
 
 
 def getPress(filename):

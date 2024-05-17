@@ -119,7 +119,7 @@ class FixWriter:
     WIGGLE_DIM = "%s wiggle ${{amp}} {period}"
     AMP = 'amp'
     VARIABLE_AMP = f'variable {AMP} equal "0.05*{VOL}^(1/3)"\n'
-    WIGGLE_VOL = f"{FIX} %s all deform 1 {{PARAM}}\n"
+    WIGGLE_VOL = f"{FIX} %s all deform 10 {{PARAM}}\n"
 
     SET_MODULUS = f"""
     variable {IMMED_MODULUS} python getModulus
@@ -275,12 +275,15 @@ class FixWriter:
         self.cmd.append(self.SET_MODULUS % record_num)
         self.cmd.append(self.SET_FACTOR % self.options.press)
         # Start loop and cd into sub-dir as some files are of the same name
-        loop_deform, deform_id, deform_break = 'loop_deform', 'deform_id', 'deform_break'
-        self.cmd.append(self.SET_LABEL % loop_deform)
-        self.cmd.append(f"variable {deform_id} loop {max_loop}")
-        self.cmd.append('print "Deform Id  = ${deform_id}"')
-        self.cmd.append("shell mkdir deform_${deform_id}")
-        self.cmd.append("shell cd deform_${deform_id}\n")
+        loop_defm, defm_id, defm_break = 'loop_defm', 'defm_id', 'defm_break'
+        self.cmd.append(self.SET_LABEL % loop_defm)
+        self.cmd.append(f"variable {defm_id} loop {max_loop}")
+        self.cmd.append('print "Deform Id  = ${defm_id}"')
+        self.cmd.append(
+            'if "${defm_id} < 10" then "variable id string 0${defm_id}" '
+            'else "variable id string ${defm_id}"')
+        self.cmd.append("shell mkdir defm_${id}")
+        self.cmd.append("shell cd defm_${id}\n")
         # Sinusoidal wave and print properties
         nstep = self.relax_step / 1E1
         pre = self.getCyclePre(nstep, record_num=record_num)
@@ -289,14 +292,13 @@ class FixWriter:
         self.cmd.append('print "Modulus = ${immed_modulus}"')
         self.cmd.append('print "Scale Factor  = ${factor}"\n')
         # If last loop or no scaling, break and record properties
-        self.cmd.append(
-            f'if "${{deform_id}} == {max_loop} || ${{factor}} == 1" '
-            f'then "jump SELF {deform_break}"\n')
+        self.cmd.append(f'if "${{defm_id}} == {max_loop} || ${{factor}} == 1" '
+                        f'then "jump SELF {defm_break}"\n')
         self.cmd.append(self.CHANGE_BOX)
         self.cmd.append("shell cd ..")
-        self.cmd.append(f"next {deform_id}")
-        self.cmd.append(f"jump SELF {loop_deform}\n")
-        self.cmd.append(f'label {deform_break}')
+        self.cmd.append(f"next {defm_id}")
+        self.cmd.append(f"jump SELF {loop_defm}\n")
+        self.cmd.append(f'label {defm_break}')
         self.cmd.append('variable ave_press equal ${immed_press}')
         self.cmd.append('variable modulus equal ${immed_modulus}')
         self.cmd.append('shell cd ..\n')
