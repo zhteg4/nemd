@@ -96,7 +96,10 @@ class FixWriter:
     VOL = 'vol'
     PRESS = 'press'
     MODULUS = 'modulus'
+    IMMED_MODULUS = 'immed_modulus'
     AVE_PRESS = 'ave_press'
+    IMMED_PRESS = 'immed_press'
+    FACTOR = 'factor'
     TEMP_BERENDSEN = 'temp/berendsen'
     PRESS_BERENDSEN = f'{PRESS}/berendsen'
     FIX = 'fix'
@@ -110,27 +113,31 @@ class FixWriter:
     FIX_TEMP_BERENDSEN = f"{FIX} %s all {TEMP_BERENDSEN} {{stemp}} {{temp}} {{tdamp}}\n"
     FIX_PRESS_BERENDSEN = f"{FIX} %s all {PRESS_BERENDSEN} iso {{spress}} {{press}} {{pdamp}} {MODULUS} {{modulus}}\n"
     PRESS_VOL_FILE = 'press_vol.data'
-    RECORD_PRESS_VOL = f"variable {VOL} equal {VOL}\n" \
-                   f"{FIX} %s all ave/time 1 {{period}} {{period}} " \
+    SET_VOL = f"variable {VOL} equal {VOL}"
+    RECORD_PRESS_VOL = f"{FIX} %s all ave/time 1 {{period}} {{period}} " \
                    f"c_thermo_{PRESS} v_{VOL} file {PRESS_VOL_FILE}\n"
     WIGGLE_DIM = "%s wiggle ${{amp}} {period}"
     AMP = 'amp'
     VARIABLE_AMP = f'variable {AMP} equal "0.05*{VOL}^(1/3)"\n'
-    WIGGLE_VOL = f"{VARIABLE_AMP}{FIX} %s all deform 1 {{PARAM}}\n"
+    WIGGLE_VOL = f"{FIX} %s all deform 1 {{PARAM}}\n"
 
     SET_MODULUS = f"""
-    variable {MODULUS} python getModulus
-    python getModulus input 2 {PRESS_VOL_FILE} %s return v_{MODULUS} format sif here "from nemd.pyfunc import getModulus"
-    print "{MODULUS.capitalize()} = ${{modulus}}"
+    variable {IMMED_MODULUS} python getModulus
+    python getModulus input 2 {PRESS_VOL_FILE} %s return v_{IMMED_MODULUS} format sif here "from nemd.pyfunc import getModulus"
     """
     SET_MODULUS = SET_MODULUS.replace('\n    ', '\n').lstrip('\n')
 
     SET_PRESS = f"""
-    variable {AVE_PRESS} python getPress
-    python getPress input 1 {PRESS_VOL_FILE} return v_ave_press format sf here "from nemd.pyfunc import getPress"
-    print "Averaged Press = ${{ave_press}}"
+    variable {IMMED_PRESS} python getPress
+    python getPress input 1 {PRESS_VOL_FILE} return v_{IMMED_PRESS} format sf here "from nemd.pyfunc import getPress"
     """
     SET_PRESS = SET_PRESS.replace('\n    ', '\n').lstrip('\n')
+
+    SET_FACTOR = f"""
+    variable {FACTOR} python getBdryFactor
+    python getBdryFactor input 2 %f press_vol.data return v_{FACTOR} format fsf here "from nemd.pyfunc import getBdryFactor"
+    """
+    SET_FACTOR = SET_FACTOR.replace('\n    ', '\n').lstrip('\n')
 
     XYZL_FILE = 'xyzl.data'
     RECORD_BDRY = f"""
@@ -141,6 +148,7 @@ class FixWriter:
     """
     RECORD_BDRY = RECORD_BDRY.replace('\n    ', '\n').lstrip('\n')
 
+    CHANGE_BOX = "change_box all x scale ${factor} y scale ${factor} z scale ${factor} remap\n"
     CHANGE_BDRY = f"""
     print "Final Boundary: xl = ${{xl}}, yl = ${{yl}}, zl = ${{zl}}"
     variable ave_xl python getXL
@@ -244,9 +252,7 @@ class FixWriter:
             return
 
         self.nvt(nstep=self.relax_step / 1E2, stemp=self.stemp, temp=self.temp)
-
         self.cycleToPress()
-
         self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
                  temp=self.temp,
@@ -254,30 +260,46 @@ class FixWriter:
                  press=self.press,
                  modulus="${modulus}")
 
-    def cycleToPress(self, max_loop=2):
+    def cycleToPress(self, max_loop=10, record_num=100):
         """
         Deform the box by cycles to get close to the target pressure.
         Each big cycle contains 10 sinusoidal waves.
 
-        "param max_loop int: the maximum number of big cycles.
+        :param max_loop int: the maximum number of big cycles.
+        :param record_num int: each sinusoidal wave records this number of data.
         """
-        loop_deform, deform_id = 'loop_deform', 'deform_id'
+        # The variables defined here will be evaluated by ${xxx}
+        self.cmd.append(self.SET_VOL)
+        self.cmd.append(self.VARIABLE_AMP)
+        self.cmd.append(self.SET_PRESS)
+        self.cmd.append(self.SET_MODULUS % record_num)
+        self.cmd.append(self.SET_FACTOR % self.options.press)
+        # Start loop and cd into sub-dir as some files are of the same name
+        loop_deform, deform_id, deform_break = 'loop_deform', 'deform_id', 'deform_break'
         self.cmd.append(self.SET_LABEL % loop_deform)
         self.cmd.append(f"variable {deform_id} loop {max_loop}")
+        self.cmd.append('print "Deform Id  = ${deform_id}"')
         self.cmd.append("shell mkdir deform_${deform_id}")
         self.cmd.append("shell cd deform_${deform_id}\n")
-        self.cmd.append(self.DEL_VARIABLE % self.VOL)
-        self.cmd.append(self.DEL_VARIABLE % self.AMP)
-        self.cmd.append(self.DEL_VARIABLE % self.MODULUS)
-        self.cmd.append(self.DEL_VARIABLE % self.AVE_PRESS)
+        # Sinusoidal wave and print properties
         nstep = self.relax_step / 1E1
-        pre, record_num = self.getCyclePre(nstep)
+        pre = self.getCyclePre(nstep, record_num=record_num)
         self.nvt(nstep=nstep, stemp=self.temp, temp=self.temp, pre=pre)
-        self.cmd.append(self.SET_MODULUS % record_num)
-        self.cmd.append(self.SET_PRESS)
+        self.cmd.append('print "Averaged Press = ${immed_press}"')
+        self.cmd.append('print "Modulus = ${immed_modulus}"')
+        self.cmd.append('print "Scale Factor  = ${factor}"\n')
+        # If last loop or no scaling, break and record properties
+        self.cmd.append(
+            f'if "${{deform_id}} == {max_loop} || ${{factor}} == 1" '
+            f'then "jump SELF {deform_break}"\n')
+        self.cmd.append(self.CHANGE_BOX)
         self.cmd.append("shell cd ..")
         self.cmd.append(f"next {deform_id}")
         self.cmd.append(f"jump SELF {loop_deform}\n")
+        self.cmd.append(f'label {deform_break}')
+        self.cmd.append('variable ave_press equal ${immed_press}')
+        self.cmd.append('variable modulus equal ${immed_modulus}')
+        self.cmd.append('shell cd ..\n')
 
     def getCyclePre(self, nstep, cycle_num=10, record_num=100):
         """
@@ -293,7 +315,7 @@ class FixWriter:
         wiggle_vol = self.WIGGLE_VOL.format(PARAM=params).format(period=period)
         record = int(nstep / cycle_num / record_num)
         record_press = self.RECORD_PRESS_VOL.format(period=int(record))
-        return record_press + wiggle_vol, record_num
+        return record_press + wiggle_vol
 
     def relaxAndDefrom(self):
         """

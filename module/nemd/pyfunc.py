@@ -235,7 +235,7 @@ class Scale(Press):
         Main method to run.
         """
         super().run()
-        self.setScalefactor()
+        self.setFactor()
 
     def plot(self):
         """
@@ -271,7 +271,7 @@ class Scale(Press):
         left, right = vol - delta, vol + delta
         sel_ids = (self.vol > left) & (self.vol < right)
         ratio = self.vol[sel_ids].shape[0] / self.vol.shape[0]
-        self.factor = 1 if ratio > 0.05 else vol / self.vol.mean()
+        self.factor = 1 if ratio > 0.06 else vol / self.vol.mean()
 
 
 def getPress(filename):
@@ -311,6 +311,20 @@ def getScaleFactor(press, filename):
     scale = Scale(press, filename)
     scale.run()
     return scale.factor
+
+
+def getBdryFactor(press, filename):
+    """
+    Get the scale factor of the volume. The scale factor is the ratio of the
+    volume at the closet target pressure to the volume at the average pressure.
+
+    :param press float: the target pressure.
+    :param filename str: the filename with path to load data from.
+    :return float: the scale factor of the volume.
+    """
+    scale = Scale(press, filename)
+    scale.run()
+    return getScaleFactor(press, filename)**(1 / 3)
 
 
 def getXL(filename):
