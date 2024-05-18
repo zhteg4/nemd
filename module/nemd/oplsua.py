@@ -119,7 +119,7 @@ class FixWriter:
                    f"c_thermo_{PRESS} v_{VOL} file {PRESS_VOL_FILE}\n"
     WIGGLE_DIM = "%s wiggle ${{amp}} {period}"
     AMP = 'amp'
-    VARIABLE_AMP = f'variable {AMP} equal "0.05*{VOL}^(1/3)"\n'
+    VARIABLE_AMP = f'variable {AMP} equal "0.01*{VOL}^(1/3)"\n'
     WIGGLE_VOL = f"{FIX} %s all deform 100 {{PARAM}}\n"
 
     SET_MODULUS = f"""
@@ -261,12 +261,13 @@ class FixWriter:
                  press=self.press,
                  modulus="${modulus}")
 
-    def cycleToPress(self, max_loop=20, record_num=100):
+    def cycleToPress(self, max_loop=100, cycle_num=2, record_num=100):
         """
         Deform the box by cycles to get close to the target pressure.
         Each big cycle contains 10 sinusoidal waves.
 
         :param max_loop int: the maximum number of big cycles.
+        :param cycle_num int: the number of cycles.
         :param record_num int: each sinusoidal wave records this number of data.
         """
         # The variables defined here will be evaluated by ${xxx}
@@ -285,9 +286,12 @@ class FixWriter:
             'else "variable id string ${defm_id}"')
         self.cmd.append("shell mkdir defm_${id}")
         self.cmd.append("shell cd defm_${id}\n")
-        # Sinusoidal wave and print properties
-        nstep = self.relax_step / 1E1
-        pre = self.getCyclePre(nstep, record_num=record_num)
+        # Sinusoidal wave, print properties, cycle deformation, cycle relaxation
+        # The max simulation time for the three stages is the regular relaxation
+        cycle_nstep = int(self.relax_step / max_loop / (cycle_num + 1))
+        cycle_nstep = int(cycle_nstep / record_num) * record_num
+        nstep = cycle_nstep * cycle_num
+        pre = self.getCyclePre(cycle_nstep, record_num=record_num)
         self.nvt(nstep=nstep, stemp=self.temp, temp=self.temp, pre=pre)
         self.cmd.append('print "Averaged Press = ${immed_press}"')
         self.cmd.append('print "Modulus = ${immed_modulus}"')
@@ -295,13 +299,11 @@ class FixWriter:
         # If last loop or no scaling, break and record properties
         self.cmd.append(f'if "${{defm_id}} == {max_loop} || ${{factor}} == 1" '
                         f'then "jump SELF {defm_break}"\n')
-        self.nvt(nstep=nstep / 1E1,
+        self.nvt(nstep=cycle_nstep / 2,
                  stemp=self.temp,
                  temp=self.temp,
                  pre=self.FIX_DEFORM)
-        self.nvt(nstep=nstep / 1E1,
-                 stemp=self.temp,
-                 temp=self.temp)
+        self.nvt(nstep=cycle_nstep / 2, stemp=self.temp, temp=self.temp)
         self.cmd.append("shell cd ..")
         self.cmd.append(f"next {defm_id}")
         self.cmd.append(f"jump SELF {loop_defm}\n")
@@ -310,21 +312,20 @@ class FixWriter:
         self.cmd.append('variable modulus equal ${immed_modulus}')
         self.cmd.append('shell cd ..\n')
 
-    def getCyclePre(self, nstep, cycle_num=5, record_num=100):
+    def getCyclePre(self, cycle_nstep, record_num=100):
         """
         Get the pre-stage str for the cycle simulation.
 
-        :param nstep int: the simulation steps of the whole stage (all cycles)
-        :param cycle_num int: the number of cycles
+        :param cycle_nstep int: the simulation steps of the one cycles
         :param record_num int: each cycle records this number of data
         :return str: the prefix string of the cycle stage.
         """
         params = ' '.join([self.WIGGLE_DIM % dim for dim in ['x', 'y', 'z']])
-        period = nstep / cycle_num * self.timestep
-        wiggle_vol = self.WIGGLE_VOL.format(PARAM=params).format(period=period)
-        record = int(nstep / cycle_num / record_num)
-        record_press = self.RECORD_PRESS_VOL.format(period=int(record))
-        return record_press + wiggle_vol
+        period = cycle_nstep * self.timestep
+        wiggle = self.WIGGLE_VOL.format(PARAM=params).format(period=period)
+        record_period = int(cycle_nstep / record_num)
+        record_press = self.RECORD_PRESS_VOL.format(period=record_period)
+        return record_press + wiggle
 
     def relaxAndDefrom(self):
         """

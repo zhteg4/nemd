@@ -1,3 +1,3 @@
 # Ar solid at 50K: density, 4 replica, 1000 Ar, last 20% pct, 1 ns relax and prod
-run_nemd pb_lmp_post_workflow.py [Ar] -mol_num 1000 -last_pct 0.2 -temp 50 -task density -cpu 4 -state_num 4 -relax_time 1 -prod_time 1
+run_nemd pb_lmp_post_workflow.py [Ar] -mol_num 1000 -density 1 -last_pct 0.2 -temp 50 -task density -cpu 4 -state_num 4 -relax_time 1 -prod_time 1
 # https://iopscience.iop.org/article/10.1088/0256-307X/18/1/325/meta

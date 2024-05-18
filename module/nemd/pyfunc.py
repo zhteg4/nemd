@@ -1,5 +1,6 @@
 import os
 import math
+import warnings
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_filter
@@ -161,8 +162,10 @@ class Modulus(Press):
             if mod:
                 col = np.concatenate(([np.nan], col))
             data = col.reshape(-1, self.record_num)
-            self.ave[column] = np.nanmean(data, axis=0)
-            self.ave[column + self.STD_DEV] = np.nanstd(data, axis=0)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                self.ave[column] = np.nanmean(data, axis=0)
+                self.ave[column + self.STD_DEV] = np.nanstd(data, axis=0)
             smoothed_lb = column + self.SMOOTHED
             window = int(self.record_num / 10)
             self.ave[smoothed_lb] = savgol_filter(self.ave[column], window, 3)
@@ -193,9 +196,14 @@ class Modulus(Press):
         smoothed_lb = column + self.SMOOTHED
         ax.plot(self.ave.index, self.ave[smoothed_lb], label="Smoothed")
         std_dev = self.ave[column + self.STD_DEV]
-        lbndry = self.ave[column] - std_dev
-        ubndry = self.ave[column] + std_dev
-        ax.fill_between(self.ave.index, lbndry, ubndry, alpha=0.5, label="SD")
+        if std_dev.any():
+            lbndry = self.ave[column] - std_dev
+            ubndry = self.ave[column] + std_dev
+            ax.fill_between(self.ave.index,
+                            lbndry,
+                            ubndry,
+                            alpha=0.5,
+                            label="SD")
         ax.set_xlabel(self.data.index.name)
         ax.set_ylabel(self.getLabel(column))
         handles, labels = ax.get_legend_handles_labels()
@@ -261,11 +269,12 @@ class Scale(Press):
             name = symbols.PERIOD.join(basename.split(symbols.PERIOD)[:-1])
             fig.savefig(f"{name}_{self.SCALE}{self.PNG_EXT}")
 
-    def setFactor(self, excluded_ratio=0.2):
+    def setFactor(self, excluded_ratio=0.4):
         """
         Set the scale factor.
 
-        :param excluded_ratio float: the ratio of the data to be excluded from the fit.
+        :param excluded_ratio float: the ratio of the data to be excluded from
+            the fit.
         """
         left_bound = int(self.fitted_press.shape[0] * excluded_ratio / 2)
         right_bound = int(self.fitted_press.shape[0] * (1 - excluded_ratio))
@@ -273,11 +282,11 @@ class Scale(Press):
         vol = self.vol[left_bound + 1:right_bound]
         if self.press < fitted_press.min():
             # Expand the volume as the target pressure is smaller
-            self.factor = vol.max() / vol.mean()
+            self.factor = self.vol.max() / vol.mean()
             return
         if self.press > fitted_press.max():
             # Compress the volume as the target pressure is larger
-            self.factor = vol.min() / vol.mean()
+            self.factor = self.vol.min() / vol.mean()
             return
 
 
