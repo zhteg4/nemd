@@ -228,7 +228,7 @@ class Scale(Press):
         self.press = press
         super().__init__(*args, **kwargs)
         self.vol = None
-        self.factor = None
+        self.factor = 1
 
     def run(self):
         """
@@ -261,25 +261,24 @@ class Scale(Press):
             name = symbols.PERIOD.join(basename.split(symbols.PERIOD)[:-1])
             fig.savefig(f"{name}_{self.SCALE}{self.PNG_EXT}")
 
-    def setFactor(self):
+    def setFactor(self, excluded_ratio=0.2):
         """
         Set the scale factor.
+
+        :param excluded_ratio float: the ratio of the data to be excluded from the fit.
         """
-        if self.press > self.fitted_press.max():
-            # Compress the volume as the target pressure is larger
-            self.factor = self.vol[0] / self.vol.mean()
-            return
-        if self.fitted_press.min() > self.press:
+        left_bound = int(self.fitted_press.shape[0] * excluded_ratio / 2)
+        right_bound = int(self.fitted_press.shape[0] * (1 - excluded_ratio))
+        fitted_press = self.fitted_press[left_bound + 1:right_bound]
+        vol = self.vol[left_bound + 1:right_bound]
+        if self.press < fitted_press.min():
             # Expand the volume as the target pressure is smaller
-            self.factor = self.vol[-1] / self.vol.mean()
+            self.factor = vol.max() / vol.mean()
             return
-        index = abs(self.fitted_press - self.press).argmin()
-        vol = self.vol[index]
-        delta = (self.vol[-1] - self.vol[0]) * 0.05
-        left, right = vol - delta, vol + delta
-        sel_ids = (self.vol > left) & (self.vol < right)
-        ratio = self.vol[sel_ids].shape[0] / self.vol.shape[0]
-        self.factor = 1 if ratio > 0.09 else vol / self.vol.mean()
+        if self.press > fitted_press.max():
+            # Compress the volume as the target pressure is larger
+            self.factor = vol.min() / vol.mean()
+            return
 
 
 def getPress(filename):

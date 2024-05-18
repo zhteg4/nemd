@@ -112,6 +112,7 @@ class FixWriter:
     FIX_NVT = f"{FIX} %s all nvt temp {{stemp}} {{temp}} {{tdamp}}\n"
     FIX_TEMP_BERENDSEN = f"{FIX} %s all {TEMP_BERENDSEN} {{stemp}} {{temp}} {{tdamp}}\n"
     FIX_PRESS_BERENDSEN = f"{FIX} %s all {PRESS_BERENDSEN} iso {{spress}} {{press}} {{pdamp}} {MODULUS} {{modulus}}\n"
+    FIX_DEFORM = f"{FIX} %s all deform 100 x scale ${{factor}} y scale ${{factor}} z scale ${{factor}} remap v\n"
     PRESS_VOL_FILE = 'press_vol.data'
     SET_VOL = f"variable {VOL} equal {VOL}"
     RECORD_PRESS_VOL = f"{FIX} %s all ave/time 1 {{period}} {{period}} " \
@@ -119,7 +120,7 @@ class FixWriter:
     WIGGLE_DIM = "%s wiggle ${{amp}} {period}"
     AMP = 'amp'
     VARIABLE_AMP = f'variable {AMP} equal "0.05*{VOL}^(1/3)"\n'
-    WIGGLE_VOL = f"{FIX} %s all deform 10 {{PARAM}}\n"
+    WIGGLE_VOL = f"{FIX} %s all deform 100 {{PARAM}}\n"
 
     SET_MODULUS = f"""
     variable {IMMED_MODULUS} python getModulus
@@ -260,7 +261,7 @@ class FixWriter:
                  press=self.press,
                  modulus="${modulus}")
 
-    def cycleToPress(self, max_loop=10, record_num=100):
+    def cycleToPress(self, max_loop=20, record_num=100):
         """
         Deform the box by cycles to get close to the target pressure.
         Each big cycle contains 10 sinusoidal waves.
@@ -276,8 +277,8 @@ class FixWriter:
         self.cmd.append(self.SET_FACTOR % self.options.press)
         # Start loop and cd into sub-dir as some files are of the same name
         loop_defm, defm_id, defm_break = 'loop_defm', 'defm_id', 'defm_break'
-        self.cmd.append(self.SET_LABEL % loop_defm)
         self.cmd.append(f"variable {defm_id} loop {max_loop}")
+        self.cmd.append(self.SET_LABEL % loop_defm)
         self.cmd.append('print "Deform Id  = ${defm_id}"')
         self.cmd.append(
             'if "${defm_id} < 10" then "variable id string 0${defm_id}" '
@@ -294,7 +295,13 @@ class FixWriter:
         # If last loop or no scaling, break and record properties
         self.cmd.append(f'if "${{defm_id}} == {max_loop} || ${{factor}} == 1" '
                         f'then "jump SELF {defm_break}"\n')
-        self.cmd.append(self.CHANGE_BOX)
+        self.nvt(nstep=nstep / 1E1,
+                 stemp=self.temp,
+                 temp=self.temp,
+                 pre=self.FIX_DEFORM)
+        self.nvt(nstep=nstep / 1E1,
+                 stemp=self.temp,
+                 temp=self.temp)
         self.cmd.append("shell cd ..")
         self.cmd.append(f"next {defm_id}")
         self.cmd.append(f"jump SELF {loop_defm}\n")
@@ -303,7 +310,7 @@ class FixWriter:
         self.cmd.append('variable modulus equal ${immed_modulus}')
         self.cmd.append('shell cd ..\n')
 
-    def getCyclePre(self, nstep, cycle_num=10, record_num=100):
+    def getCyclePre(self, nstep, cycle_num=5, record_num=100):
         """
         Get the pre-stage str for the cycle simulation.
 

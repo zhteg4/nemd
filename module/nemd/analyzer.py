@@ -102,7 +102,7 @@ class BaseAnalyzer:
         sidx = int(re.findall(cls.TIME_RE, data.index.name)[0])
         sel = data.iloc[sidx:]
         ave = sel.mean().iloc[0]
-        std = sel.std().iloc[0]
+        std = sel.std().iloc[0] if sel.shape[0] == 1 else sel.mean().iloc[1]
         log(f'{ave:.4g} {symbols.PLUS_MIN} {std:.4g} {cls.UNIT} '
             f'{symbols.ELEMENT_OF} [{data.index[sidx]:.4f}, '
             f'{data.index[-1]:.4f}] ps')
