@@ -264,10 +264,9 @@ class FixWriter:
     def cycleToPress(self, max_loop=100, cycle_num=2, record_num=100):
         """
         Deform the box by cycles to get close to the target pressure.
-        Each big cycle contains 10 sinusoidal waves.
 
-        :param max_loop int: the maximum number of big cycles.
-        :param cycle_num int: the number of cycles.
+        :param max_loop int: the maximum number of big cycle loops.
+        :param cycle_num int: the number of sinusoidal cycles.
         :param record_num int: each sinusoidal wave records this number of data.
         """
         # The variables defined here will be evaluated by ${xxx}
@@ -278,18 +277,15 @@ class FixWriter:
         self.cmd.append(self.SET_FACTOR % self.options.press)
         # Start loop and cd into sub-dir as some files are of the same name
         loop_defm, defm_id, defm_break = 'loop_defm', 'defm_id', 'defm_break'
-        self.cmd.append(f"variable {defm_id} loop {max_loop}")
+        self.cmd.append(f"variable {defm_id} loop {max_loop} pad")
         self.cmd.append(self.SET_LABEL % loop_defm)
         self.cmd.append('print "Deform Id  = ${defm_id}"')
-        self.cmd.append(
-            'if "${defm_id} < 10" then "variable id string 0${defm_id}" '
-            'else "variable id string ${defm_id}"')
         self.cmd.append("shell mkdir defm_${id}")
         self.cmd.append("shell cd defm_${id}\n")
         # Sinusoidal wave, print properties, cycle deformation, cycle relaxation
         # The max simulation time for the three stages is the regular relaxation
         cycle_nstep = int(self.relax_step / max_loop / (cycle_num + 1))
-        cycle_nstep = int(cycle_nstep / record_num) * record_num
+        cycle_nstep = max([int(cycle_nstep / record_num), 1000]) * record_num
         nstep = cycle_nstep * cycle_num
         pre = self.getCyclePre(cycle_nstep, record_num=record_num)
         self.nvt(nstep=nstep, stemp=self.temp, temp=self.temp, pre=pre)
