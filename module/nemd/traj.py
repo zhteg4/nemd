@@ -102,6 +102,7 @@ class Frame(pd.DataFrame):
     SIZE = 'size'
     COLOR = 'color'
     XYZU_ELE_SZ_CLR = XYZU + [ELEMENT, SIZE, COLOR]
+    ID_MAP = 'id_map'
 
     def __init__(self,
                  xyz=None,
@@ -129,6 +130,7 @@ class Frame(pd.DataFrame):
         super().__init__(data=xyz, index=index, columns=columns, dtype=dtype)
         self.setBox(box)
         self.setStep(step)
+        self.attrs[self.ID_MAP] = None
 
     @classmethod
     def read(cls, filename=None, contents=None, start=0):
@@ -334,21 +336,17 @@ class Frame(pd.DataFrame):
             return []
         return oplsua.DataFileReader.getEdgesFromList(box)
 
-    def getDists(self, ids, xyz, id_map=None, span=None):
+    def getDists(self, ids, xyz, span=None):
         """
         Get the distance between the xyz and the of the xyzs associated with the
         input atom ids.
 
         :param atom_id int: atom ids
         :param xyz (3,) 'pandas.core.series.Series': xyz coordinates and atom id
-        :param id_map 'numpy.ndarray': the map from atom id to xyz row id
         :param span 'numpy.ndarray': the span of box
         :return list of floats: distances
         """
-        if id_map is None:
-            dists = (self.getXYZ(ids) - xyz).values
-        else:
-            dists = self.values[id_map[ids], :] - np.array(xyz)
+        dists = self.values[self.id_map[ids], :] - np.array(xyz)
 
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
             for id, col in enumerate(self.XYZU):
@@ -392,16 +390,29 @@ class Frame(pd.DataFrame):
         if cut:
             dcell = DistanceCell(self, gids=ids, cut=cut, res=res)
             dcell.setUp()
-        id = {label: i for i, label in enumerate(self.index)}
-        id_map = np.array([id.get(x, -1) for x in range(self.index.max() + 1)])
         span = np.array(list(self.attrs[self.SPAN].values()))
         sel, dists = self.loc[ids], []
         for idx, (id, row) in enumerate(zip(sel.index, sel.values)):
             oids = [x for x in dcell.getNeighbors(row)
                     if x > id] if cut else ids[idx + 1:]
-            dist = self.getDists(oids, row, id_map=id_map, span=span)
+            dist = self.getDists(oids, row, span=span)
             dists.append(dist)
         return np.concatenate(dists)
+
+    @property
+    def id_map(self):
+        """
+        The map from atom id to xyz row id. This is much faster than iterrows or
+        iloc indexing.
+
+        :return 'numpy.ndarray': the map from atom id to xyz row id
+        """
+        if self.attrs[self.ID_MAP] is not None:
+            return self.attrs[self.ID_MAP]
+        id = {label: i for i, label in enumerate(self.index)}
+        id_map = np.array([id.get(x, -1) for x in range(self.index.max() + 1)])
+        self.attrs[self.ID_MAP] = id_map
+        return self.attrs[self.ID_MAP]
 
     def wrapCoords(self, broken_bonds=False, dreader=None):
         """
@@ -426,9 +437,9 @@ class Frame(pd.DataFrame):
 
         # The unwrapped xyz can directly perform molecule center operation
         for mol in dreader.mols.values():
-            center = self.loc[mol].mean(axis=0)
+            center = self.values[self.id_map[mol], :].mean(axis=0)
             delta = (center % span) - center
-            self.loc[mol] += delta
+            self.values[self.id_map[mol], :] += delta
 
     def glue(self, dreader=None):
         """

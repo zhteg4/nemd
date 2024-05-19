@@ -105,6 +105,8 @@ class FixWriter:
     FIX = 'fix'
     SET_LABEL = "label %s"
     DEL_VARIABLE = "variable %s delete"
+    DUMP_EVERY = "dump_modify {id} every {arg}"
+    DUMP_ID, DUMP_Q = 1, 1000
 
     RUN_STEP = "run %i\n"
     UNFIX = "unfix %s\n"
@@ -261,14 +263,20 @@ class FixWriter:
                  press=self.press,
                  modulus="${modulus}")
 
-    def cycleToPress(self, max_loop=50, cycle_num=3, record_num=100):
+    def cycleToPress(self, max_loop=50, num=3, record_num=100):
         """
         Deform the box by cycles to get close to the target pressure.
 
         :param max_loop int: the maximum number of big cycle loops.
-        :param cycle_num int: the number of sinusoidal cycles.
+        :param num int: the number of sinusoidal cycles.
         :param record_num int: each sinusoidal wave records this number of data.
         """
+        # Sinusoidal wave, print properties, cycle deformation, cycle relaxation
+        # The max simulation time for the three stages is the regular relaxation
+        nstep = int(self.relax_step / max_loop / (num + 1))
+        nstep = max([int(nstep / record_num), 10]) * record_num
+        self.cmd.append(
+            self.DUMP_EVERY.format(id=self.DUMP_ID, arg=nstep * (num + 1)))
         # The variables defined here will be evaluated by ${xxx}
         self.cmd.append(self.SET_VOL)
         self.cmd.append(self.VARIABLE_AMP)
@@ -282,44 +290,41 @@ class FixWriter:
         self.cmd.append('print "Deform Id  = ${defm_id}"')
         self.cmd.append("shell mkdir defm_${defm_id}")
         self.cmd.append("shell cd defm_${defm_id}\n")
-        # Sinusoidal wave, print properties, cycle deformation, cycle relaxation
-        # The max simulation time for the three stages is the regular relaxation
-        cycle_nstep = int(self.relax_step / max_loop / (cycle_num + 1))
-        cycle_nstep = max([int(cycle_nstep / record_num), 10]) * record_num
-        nstep = cycle_nstep * cycle_num
-        pre = self.getCyclePre(cycle_nstep, record_num=record_num)
-        self.nvt(nstep=nstep, stemp=self.temp, temp=self.temp, pre=pre)
+        pre = self.getCyclePre(nstep, record_num=record_num)
+        self.nvt(nstep=nstep * num, stemp=self.temp, temp=self.temp, pre=pre)
         self.cmd.append('print "Averaged Press = ${immed_press}"')
         self.cmd.append('print "Modulus = ${immed_modulus}"')
         self.cmd.append('print "Scale Factor  = ${factor}"\n')
         # If last loop or no scaling, break and record properties
         self.cmd.append(f'if "${{defm_id}} == {max_loop} || ${{factor}} == 1" '
                         f'then "jump SELF {defm_break}"\n')
-        self.nvt(nstep=cycle_nstep / 2,
+        self.nvt(nstep=nstep / 2,
                  stemp=self.temp,
                  temp=self.temp,
                  pre=self.FIX_DEFORM)
-        self.nvt(nstep=cycle_nstep / 2, stemp=self.temp, temp=self.temp)
+        self.nvt(nstep=nstep / 2, stemp=self.temp, temp=self.temp)
         self.cmd.append("shell cd ..")
         self.cmd.append(f"next {defm_id}")
         self.cmd.append(f"jump SELF {loop_defm}\n")
         self.cmd.append(f'label {defm_break}')
         self.cmd.append('variable ave_press equal ${immed_press}')
         self.cmd.append('variable modulus equal ${immed_modulus}')
+        self.cmd.append(
+            self.DUMP_EVERY.format(id=self.DUMP_ID, arg=self.DUMP_Q))
         self.cmd.append('shell cd ..\n')
 
-    def getCyclePre(self, cycle_nstep, record_num=100):
+    def getCyclePre(self, nstep, record_num=100):
         """
         Get the pre-stage str for the cycle simulation.
 
-        :param cycle_nstep int: the simulation steps of the one cycles
+        :param nstep int: the simulation steps of the one cycles
         :param record_num int: each cycle records this number of data
         :return str: the prefix string of the cycle stage.
         """
         params = ' '.join([self.WIGGLE_DIM % dim for dim in ['x', 'y', 'z']])
-        period = cycle_nstep * self.timestep
+        period = nstep * self.timestep
         wiggle = self.WIGGLE_VOL.format(PARAM=params).format(period=period)
-        record_period = int(cycle_nstep / record_num)
+        record_period = int(nstep / record_num)
         record_press = self.RECORD_PRESS_VOL.format(period=record_period)
         return record_press + wiggle
 
@@ -1180,6 +1185,7 @@ class LammpsIn(fileutils.LammpsInput):
     DEFAULT_CUT = 11.
     DEFAULT_LJ_CUT = DEFAULT_CUT
     DEFAULT_COUL_CUT = DEFAULT_CUT
+    DUMP_ID, DUMP_Q = FixWriter.DUMP_ID, FixWriter.DUMP_Q
 
     def __init__(self, jobname, options=None, concise=True):
         """
@@ -1276,8 +1282,8 @@ class LammpsIn(fileutils.LammpsInput):
         """
         if dump:
             self.in_fh.write(
-                f"{self.DUMP} 1 all custom 1000 dump{self.CUSTOM_EXT} id xu yu zu\n"
-            )
+                f"{self.DUMP} {self.DUMP_ID} all custom {self.DUMP_Q} "
+                f"dump{self.CUSTOM_EXT} id xu yu zu\n")
             self.in_fh.write("dump_modify 1 sort id\n")
         self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
         self.in_fh.write("minimize 1.0e-6 1.0e-8 1000000 10000000\n\n")
