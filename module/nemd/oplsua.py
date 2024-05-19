@@ -261,7 +261,7 @@ class FixWriter:
                  press=self.press,
                  modulus="${modulus}")
 
-    def cycleToPress(self, max_loop=100, cycle_num=2, record_num=100):
+    def cycleToPress(self, max_loop=50, cycle_num=3, record_num=100):
         """
         Deform the box by cycles to get close to the target pressure.
 
@@ -277,15 +277,15 @@ class FixWriter:
         self.cmd.append(self.SET_FACTOR % self.options.press)
         # Start loop and cd into sub-dir as some files are of the same name
         loop_defm, defm_id, defm_break = 'loop_defm', 'defm_id', 'defm_break'
-        self.cmd.append(f"variable {defm_id} loop {max_loop} pad")
+        self.cmd.append(f"variable {defm_id} loop 0 {max_loop - 1} pad")
         self.cmd.append(self.SET_LABEL % loop_defm)
         self.cmd.append('print "Deform Id  = ${defm_id}"')
-        self.cmd.append("shell mkdir defm_${id}")
-        self.cmd.append("shell cd defm_${id}\n")
+        self.cmd.append("shell mkdir defm_${defm_id}")
+        self.cmd.append("shell cd defm_${defm_id}\n")
         # Sinusoidal wave, print properties, cycle deformation, cycle relaxation
         # The max simulation time for the three stages is the regular relaxation
         cycle_nstep = int(self.relax_step / max_loop / (cycle_num + 1))
-        cycle_nstep = max([int(cycle_nstep / record_num), 1000]) * record_num
+        cycle_nstep = max([int(cycle_nstep / record_num), 10]) * record_num
         nstep = cycle_nstep * cycle_num
         pre = self.getCyclePre(cycle_nstep, record_num=record_num)
         self.nvt(nstep=nstep, stemp=self.temp, temp=self.temp, pre=pre)

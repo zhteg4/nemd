@@ -269,7 +269,7 @@ class Scale(Press):
             name = symbols.PERIOD.join(basename.split(symbols.PERIOD)[:-1])
             fig.savefig(f"{name}_{self.SCALE}{self.PNG_EXT}")
 
-    def setFactor(self, excluded_ratio=0.4):
+    def setFactor(self, excluded_ratio=0.5):
         """
         Set the scale factor.
 
