@@ -1459,6 +1459,7 @@ class LammpsData(LammpsDataBase):
         self.ang_types = {}
         self.dihe_types = {}
         self.impr_types = {}
+        self.nbr_charge = collections.defaultdict(float)
         self.total_charge = 0.
         self.data_fh = None
         self.density = None
@@ -1587,14 +1588,7 @@ class LammpsData(LammpsDataBase):
                         res_snacharge[nres_num] = snatom_charge
 
             for res, idx in res_atom.items():
-                atom = mol.GetAtomWithIdx(idx)
-                ncharge = res_charge[res]
-                try:
-                    # When the atom has multiple residue neighbors
-                    charge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
-                except KeyError:
-                    charge = 0.0
-                atom.SetDoubleProp(self.NEIGHBOR_CHARGE, charge - ncharge)
+                self.nbr_charge[idx] -= res_charge[res]
 
     def setBonds(self):
         """
@@ -2115,15 +2109,6 @@ class LammpsData(LammpsDataBase):
             sysmbol are written after each atom line
         """
 
-        def get_neigh_charge(atom):
-            try:
-                charge = atom.GetDoubleProp(self.NEIGHBOR_CHARGE)
-            except KeyError:
-                charge = 0
-            else:
-                atom.ClearProp(self.NEIGHBOR_CHARGE)
-            return charge
-
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
         for mol_id, mol in self.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 7))
@@ -2134,7 +2119,7 @@ class LammpsData(LammpsDataBase):
             data[:, 2] = [
                 self.atm_types[x] if self.concise else x for x in type_ids
             ]
-            charges = [get_neigh_charge(x) for x in mol.GetAtoms()]
+            charges = [self.nbr_charge[x.GetIdx()] for x in mol.GetAtoms()]
             data[:, 3] = [
                 x + self.ff.charges[y] for x, y in zip(charges, type_ids)
             ]

@@ -443,7 +443,7 @@ class Frame(pd.DataFrame):
 
     def vloc(self, gids):
         """
-        Fast access the values of rows by atom global ids.
+        Fast access to the values of rows by atom global ids.
 
         :return 'numpy.ndarray': the xyz values
         """
