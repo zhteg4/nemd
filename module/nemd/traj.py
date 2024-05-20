@@ -441,6 +441,14 @@ class Frame(pd.DataFrame):
             delta = (center % span) - center
             self.values[self.id_map[mol], :] += delta
 
+    def vloc(self, gids):
+        """
+        Fast access the values of rows by atom global ids.
+
+        :return 'numpy.ndarray': the xyz values
+        """
+        return self.values[self.id_map[gids], :]
+
     def glue(self, dreader=None):
         """
         Circular mean to compact the molecules. Good for molecules droplets in
@@ -657,16 +665,26 @@ class DistanceCell:
         return atom_cell
 
     def atomCellUpdate(self, gids):
-        ids = ((self.frm.loc[gids]) /
+        """
+        Add atoms cell to the atom cell.
+
+        :param gids list: global atom ids to be added to the atom cell
+        """
+        ids = (self.frm.vloc(gids) /
                self.grids).round().astype(int) % self.indexes
-        for row in ids.itertuples():
-            self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
+        for id, (ix, iy, iz) in zip(gids, ids):
+            self.atom_cell[ix, iy, iz][id] = True
 
     def atomCellRemove(self, gids):
-        ids = ((self.frm.loc[gids]) /
+        """
+        Remove atoms cell to the atom cell.
+
+        :param gids list: global atom ids to be removed from the atom cell
+        """
+        ids = (self.frm.vloc(gids) /
                self.grids).round().astype(int) % self.indexes
-        for row in ids.itertuples():
-            self.atom_cell[row.xu, row.yu, row.zu][row.Index] = False
+        for id, (ix, iy, iz) in zip(gids, ids):
+            self.atom_cell[ix, iy, iz][id] = False
 
     def getNeighbors(self, xyz):
         """
