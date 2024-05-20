@@ -851,6 +851,8 @@ class OplsParser:
         """
         Set bond parameters based on 'Bond Stretching Parameters' block.
         """
+        shape = len(self.atoms) + 1
+        self.bnd_map = np.zeros((shape, shape), dtype=np.int16)
         for id, line in enumerate(self.raw_content[self.BOND_MK], 1):
             # 'bond        104  107          386.00     1.4250'
             _, id1, id2, ene, dist = line.split()
@@ -859,11 +861,14 @@ class OplsParser:
                                   id2=int(id2),
                                   ene=float(ene),
                                   dist=float(dist))
+            self.bnd_map[int(id1), int(id2)] = id
 
     def setAngle(self):
         """
         Set angle parameters based on 'Angle Bending Parameters' block.
         """
+        shape = len(self.atoms) + 1
+        self.ang_map = np.zeros((shape, shape, shape), dtype=np.int16)
         for id, line in enumerate(self.raw_content[self.ANGLE_MK], 1):
             # 'angle        83  107  104      80.00     109.50'
             _, id1, id2, id3, ene, angle = line.split()
@@ -873,6 +878,7 @@ class OplsParser:
                                     id3=int(id3),
                                     ene=float(ene),
                                     angle=float(angle))
+            self.ang_map[int(id1), int(id2), int(id3)] = id
 
     def setUreyBradley(self):
         """
@@ -910,8 +916,8 @@ class OplsParser:
         """
         Set dihedral parameters based on 'Torsional Parameters' block.
         """
-        anum = len(self.atoms)
-        self.dihe_map = np.zeros((anum, anum, anum, anum), dtype=np.int16)
+        shape = len(self.atoms) + 1
+        self.dihe_map = np.zeros((shape, shape, shape, shape), dtype=np.int16)
         for id, line in enumerate(self.raw_content[self.TORSIONAL_MK], 1):
             # torsion       2    1    3    4            0.650    0.0  1      2.500  180.0  2
             line_splitted = line.split()
@@ -943,24 +949,32 @@ class OplsParser:
         :return list of 'oplsua.BOND': bond information
         """
 
-        atypes = [x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms]
+        atypes = sorted([x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms])
         try:
-            atypes = OplsTyper.BOND_ATOMS[tuple(sorted(atypes))]
+            atypes = OplsTyper.BOND_ATOMS[tuple(atypes)]
         except KeyError:
             # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
             pass
-        # Exact match between two atom type ids
-        matches = [x for x in self.bonds.values() if [x.id1, x.id2] == atypes]
-        if matches:
-            return matches
+        try:
+            # Exact match between two atom type ids
+            return [self.bonds[self.bnd_map[atypes[0], atypes[1]]]]
+        except KeyError:
+            pass
 
         msg = f"No exact params for bond between atom type {atypes[0]} and {atypes[1]}."
         log_debug(msg)
+
+        partial_matches = []
+        for atype in atypes:
+            matched = self.bnd_map[atype, :]
+            partial_matches += list(matched[matched != 0])
+            matched = self.bnd_map[:, atype]
+            partial_matches += list(matched[matched != 0])
+
         bond_score, type_set = {}, set(atypes)
-        for bond in self.bonds.values():
+        for bond_id in partial_matches:
+            bond = self.bonds[bond_id]
             matched = type_set.intersection([bond.id1, bond.id2])
-            if len(matched) != 1:
-                continue
             # Compare the unmatched and sore them
             try:
                 atom_id = set([bond.id1, bond.id2]).difference(matched).pop()
@@ -1052,12 +1066,10 @@ class OplsParser:
         except KeyError:
             # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
             pass
-        matches = [
-            x for x in self.angles.values()
-            if tids == tuple([x.id1, x.id2, x.id3])
-        ]
-        if matches:
-            return matches
+        try:
+            return [self.angles[self.ang_map[tids[0], tids[1], tids[2]]]]
+        except KeyError:
+            pass
         msg = f"No exact params for angle between atom {', '.join(map(str, tids))}."
         log_debug(msg)
 
@@ -1384,7 +1396,6 @@ class LammpsData(LammpsDataBase):
     TYPE_ID = TYPE_ID
     IMPLICIT_H = IMPLICIT_H
     RES_NUM = RES_NUM
-    NEIGHBOR_CHARGE = 'neighbor_charge'
     BOND_ATM_ID = OplsTyper.BOND_ATM_ID
 
     ATOMS = LammpsDataBase.ATOMS
@@ -1457,7 +1468,7 @@ class LammpsData(LammpsDataBase):
         self.ang_types = {}
         self.dihe_types = {}
         self.impr_types = {}
-        self.nbr_charge = collections.defaultdict(float)
+        self.nbr_charge = {}
         self.total_charge = 0.
         self.data_fh = None
         self.density = None
@@ -1559,7 +1570,8 @@ class LammpsData(LammpsDataBase):
         Balance the charge when residues are not neutral.
         """
 
-        for mol in self.mols.values():
+        for mol_id, mol in self.mols.items():
+            # residual num: residual charge
             res_charge = collections.defaultdict(float)
             for atom in mol.GetAtoms():
                 res_num = atom.GetIntProp(self.RES_NUM)
@@ -1574,19 +1586,22 @@ class LammpsData(LammpsDataBase):
                 eres_num = eatom.GetIntProp(self.RES_NUM)
                 if bres_num == eres_num:
                     continue
+                # Bonded atoms in different residuals
                 for atom, natom in [[batom, eatom], [eatom, batom]]:
                     nres_num = natom.GetIntProp(self.RES_NUM)
                     ncharge = res_charge[nres_num]
                     if not ncharge:
                         continue
+                    # The natom lives in nres with total charge
                     snatom_charge = abs(self.ff.charges[natom.GetIntProp(
                         self.TYPE_ID)])
                     if snatom_charge > res_snacharge[nres_num]:
                         res_atom[nres_num] = atom.GetIdx()
                         res_snacharge[nres_num] = snatom_charge
-
+            nbr_charge = collections.defaultdict(float)
             for res, idx in res_atom.items():
-                self.nbr_charge[idx] -= res_charge[res]
+                nbr_charge[idx] -= res_charge[res]
+            self.nbr_charge[mol_id] = nbr_charge
 
     def setBonds(self):
         """
@@ -2102,9 +2117,6 @@ class LammpsData(LammpsDataBase):
     def writeAtoms(self):
         """
         Write atom coefficients.
-
-        :param comments bool: If True, additional descriptions including element
-            sysmbol are written after each atom line
         """
 
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
@@ -2117,7 +2129,9 @@ class LammpsData(LammpsDataBase):
             data[:, 2] = [
                 self.atm_types[x] if self.concise else x for x in type_ids
             ]
-            charges = [self.nbr_charge[x.GetIdx()] for x in mol.GetAtoms()]
+            charges = [
+                self.nbr_charge[mol_id][x.GetIdx()] for x in mol.GetAtoms()
+            ]
             data[:, 3] = [
                 x + self.ff.charges[y] for x, y in zip(charges, type_ids)
             ]

@@ -597,7 +597,6 @@ class Polymer(object):
     TYPE_ID = oplsua.TYPE_ID
     BOND_ATM_ID = oplsua.BOND_ATM_ID
     RES_NUM = oplsua.RES_NUM
-    NEIGHBOR_CHARGE = oplsua.LammpsData.NEIGHBOR_CHARGE
     WATER_TIP3P = oplsua.OplsTyper.WATER_TIP3P
     IMPLICIT_H = oplsua.IMPLICIT_H
     MOL_NUM = 'mol_num'
