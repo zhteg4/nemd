@@ -910,19 +910,23 @@ class OplsParser:
         """
         Set dihedral parameters based on 'Torsional Parameters' block.
         """
+        anum = len(self.atoms)
+        self.dihe_map = np.zeros((anum, anum, anum, anum), dtype=np.int16)
         for id, line in enumerate(self.raw_content[self.TORSIONAL_MK], 1):
             # torsion       2    1    3    4            0.650    0.0  1      2.500  180.0  2
             line_splitted = line.split()
             ids, enes = line_splitted[1:5], line_splitted[5:]
+            ids = list(map(int, ids))
             ene_ang_ns = tuple(
                 ENE_ANG_N(ene=float(x), angle=float(y), n_parm=int(z))
                 for x, y, z in zip(enes[::3], enes[1::3], enes[2::3]))
             self.dihedrals[id] = DIHEDRAL(id=id,
-                                          id1=int(ids[0]),
-                                          id2=int(ids[1]),
-                                          id3=int(ids[2]),
-                                          id4=int(ids[3]),
+                                          id1=ids[0],
+                                          id2=ids[1],
+                                          id3=ids[2],
+                                          id4=ids[3],
                                           constants=ene_ang_ns)
+            self.dihe_map[ids[0], ids[1], ids[2], ids[3]] = id
 
     def getMatchedBonds(self, bonded_atoms):
         """
@@ -1119,23 +1123,16 @@ class OplsParser:
         if tids[1] > tids[2]:
             # Flip the direction due to middle torsion atom id order
             tids = tids[::-1]
-        matches = [
-            x for x in self.dihedrals.values()
-            if tids == [x.id1, x.id2, x.id3, x.id4]
-        ]
-        if matches:
-            return matches
+        match = self.dihe_map[tids[0], tids[1], tids[2], tids[3]]
+        if match:
+            return [self.dihedrals[match]]
 
-        partial_matches = [
-            x for x in self.dihedrals.values()
-            if x.id2 == tids[1] and x.id3 == tids[2]
-        ]
+        dihes = self.dihe_map[:, tids[1], tids[2], :]
+        partial_matches = [self.dihedrals[x] for x in dihes[dihes != 0]]
         if not partial_matches:
             rpm_ids = OplsTyper.DIHE_ATOMS[tuple(tids[1:3])]
-            partial_matches = [
-                x for x in self.dihedrals.values()
-                if set([x.id2, x.id3]) == set(rpm_ids)
-            ]
+            dihes = self.dihe_map[:, rpm_ids[0], rpm_ids[1], :]
+            partial_matches = [self.dihedrals[x] for x in dihes[dihes != 0]]
         if not partial_matches:
             err = f"No params for dihedral (middle bonded atom types {tids[1]}~{tids[2]})."
             raise ValueError(err)
@@ -1452,6 +1449,7 @@ class LammpsData(LammpsDataBase):
         self.rvrs_angles = {}
         self.angles = {}
         self.dihedrals = {}
+        self.dihe_map = None
         self.impropers = {}
         self.symbol_impropers = {}
         self.atm_types = {}
