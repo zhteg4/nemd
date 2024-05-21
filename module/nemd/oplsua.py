@@ -2548,16 +2548,16 @@ class DataFileReader(LammpsData):
         """
         if mix == LammpsData.GEOMETRIC:
             # LammpsData.GEOMETRIC is optimized for speed and is supported
-            radii = [0] + [
-                self.vdws[x.type_id].dist for x in self.atoms.values()
-            ]
-            shape = len(self.atoms) + 1
-            self.radii = np.full((shape, shape), radii, dtype='float16')
-            self.radii[:, 0] = self.radii[0, :]
-            self.radii *= self.radii.transpose()
-            self.radii = np.sqrt(self.radii)
-            self.radii *= pow(2, 1 / 6) * scale
-            self.radii[self.radii < self.min_dist] = self.min_dist
+            atom_types = sorted(set([x.type_id for x in self.atoms.values()]))
+            radii = [0] + [self.vdws[x].dist for x in atom_types]
+            radii = np.full((len(radii), len(radii)), radii, dtype='float16')
+            radii[:, 0] = radii[0, :]
+            radii *= radii.transpose()
+            radii = np.sqrt(radii)
+            radii *= pow(2, 1 / 6) * scale
+            radii[radii < self.min_dist] = self.min_dist
+            id_map = {x.id: x.type_id for x in self.atoms.values()}
+            self.radii = Radius(radii, id_map=id_map)
             return
 
         radii = collections.defaultdict(dict)
@@ -2581,3 +2581,14 @@ class DataFileReader(LammpsData):
                 self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
                     atom2.type_id]
         self.radii = dict(self.radii)
+
+
+class Radius(np.ndarray):
+
+    def __new__(cls, input_array, *args, id_map=None, **kwargs):
+        obj = np.asarray(input_array).view(cls)
+        obj.id_map = id_map
+        return obj
+
+    def getRadius(self, aid1, aid2):
+        return self[self.id_map[aid1], self.id_map[aid2]]
