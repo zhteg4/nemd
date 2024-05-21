@@ -747,7 +747,8 @@ class DistanceCell:
         :param row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
         :param included list of int: the atom ids included for the clash check
         :param excluded list of int: the atom ids excluded for the clash check
-        :param radii dict: the values are the radii smaller than which are clashes
+        :param radii oplsua.Radius: the values are the radii smaller than which
+            are clashes
         :param threshold clash radii: clash criteria when radii not defined
         :return list of tuple: clashed atom ids, distance, and threshold
         """
@@ -770,15 +771,21 @@ class DistanceCell:
         if radii is None:
             thresholds = [threshold] * len(neighbors)
         else:
-            thresholds = [radii[row.name][x] for x in neighbors]
+            thresholds = [radii.getRadius(row.name, x) for x in neighbors]
         clashes = [(row.name, x, y, z)
                    for x, y, z in zip(neighbors, dists, thresholds) if y < z]
         return clashes
 
     def removeGids(self, gids):
+        """
+        Remove one global id from the existing global ids.
+        """
         self.extg_gids = self.extg_gids.difference(gids)
 
     def addGids(self, gids):
+        """
+        Add one global id to the existing global ids.
+        """
         self.extg_gids.update(gids)
 
     def setGraph(self, mol_num, min_num=1000):

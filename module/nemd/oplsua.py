@@ -2584,11 +2584,25 @@ class DataFileReader(LammpsData):
 
 
 class Radius(np.ndarray):
+    """
+    Class to get vdw radius from atom id pair.
+    """
 
     def __new__(cls, input_array, *args, id_map=None, **kwargs):
+        """
+        :param input_array np.ndarray: the radius array with type id as row index
+        :param id_map dict: map atom id to type id
+        """
         obj = np.asarray(input_array).view(cls)
         obj.id_map = id_map
         return obj
 
     def getRadius(self, aid1, aid2):
+        """
+        Get the radius between atoms from two global ids.
+
+        :param aid1 int: one global atom id from the pair.
+        :param aid2 int: the other global atom id from the pair.
+        :return float: the vdw radius between the pair.
+        """
         return self[self.id_map[aid1], self.id_map[aid2]]
