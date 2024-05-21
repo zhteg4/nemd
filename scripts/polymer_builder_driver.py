@@ -196,7 +196,7 @@ class AmorphousCell(object):
         """
         if self.options.cell != GRID:
             return
-        cell = GridCell(self.polymers, self.options.mol_num)
+        cell = GridCell(self.polymers)
         cell.run()
         self.mols = cell.mols
 
@@ -283,13 +283,12 @@ class GridCell:
     Grid the space and place polymers into the sub-cells.
     """
 
-    def __init__(self, polymers, polym_nums):
+    def __init__(self, polymers):
         """
         :param polymers 'Polymer': one polymer object for each type
         :param polym_nums list: number of polymers per polymer type
         """
         self.polymers = polymers
-        self.polym_nums = polym_nums
         self.mols = {}
 
     def run(self):
@@ -314,8 +313,7 @@ class GridCell:
         """
         Set polymer translational vectors based on medium box size.
         """
-        for polym, mol_num in zip(self.polymers, self.polym_nums):
-            polym.mol_num = mol_num
+        for polym in self.polymers:
             mol_nums_per_mbox = np.floor(self.mbox / polym.box).astype(int)
             polym.mol_num_per_mbox = np.prod(mol_nums_per_mbox)
             polym.num_mbox = math.ceil(polym.mol_num / polym.mol_num_per_mbox)
@@ -342,15 +340,13 @@ class GridCell:
             np.random.shuffle(vectors)
             vector = vectors.pop()
             polymer = np.random.choice(polymers)
+            self.mols[mol_id] = polymer.polym
             for idx in range(min([polymer.mol_num, polymer.mol_num_per_mbox])):
                 polymer.mol_num -= 1
                 if polymer.mol_num == 0:
                     polymers.remove(polymer)
-                mol_id, mol = mol_id + 1, copy.copy(polymer.polym)
-                self.mols[mol_id] = mol
-                mol.SetIntProp(Polymer.MOL_NUM, mol_id)
-                conformerutils.translation(mol.GetConformer(0),
-                                           polymer.vecs[idx] + vector)
+                conf = polymer.polym.GetConformer(idx)
+                conformerutils.translation(conf, polymer.vecs[idx] + vector)
 
 
 class PackedCell:

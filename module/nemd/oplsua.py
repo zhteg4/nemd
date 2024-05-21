@@ -1226,6 +1226,11 @@ class LammpsIn(fileutils.LammpsInput):
         self.is_debug = environutils.is_debug()
 
     def resetFilenames(self, jobname):
+        """
+        Reset the filenames based on the new jobname.
+
+        "param jobname str: new jobname based on which out filenames are defined
+        """
         self.lammps_in = jobname + self.IN_EXT
         self.lammps_data = jobname + self.DATA_EXT
         self.lammps_dump = jobname + self.CUSTOM_EXT
@@ -1371,7 +1376,7 @@ class LammpsDataBase(LammpsIn):
     @property
     def molecule(self):
         """
-        Handy way to get all molecules.
+        Handy way to get all types of molecules.
 
         :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
         """
@@ -1381,7 +1386,7 @@ class LammpsDataBase(LammpsIn):
     @property
     def atom(self):
         """
-        Handy way to get all atoms.
+        Handy way to get atoms in all types of molecules.
 
         :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
         """
@@ -1389,7 +1394,7 @@ class LammpsDataBase(LammpsIn):
         return (atom for mol in self.molecule for atom in mol.GetAtoms())
 
 
-class LammpsData(LammpsDataBase):
+class LammpsDataOne(LammpsDataBase):
     """
     Class to write out LAMMPS data file.
     """
@@ -1397,51 +1402,9 @@ class LammpsData(LammpsDataBase):
     IMPLICIT_H = IMPLICIT_H
     RES_NUM = RES_NUM
     BOND_ATM_ID = OplsTyper.BOND_ATM_ID
-
-    ATOMS = LammpsDataBase.ATOMS
-    BONDS = 'bonds'
-    ANGLES = 'angles'
-    DIHEDRALS = 'dihedrals'
-    IMPROPERS = 'impropers'
-    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
-
-    ATOM_TYPES = LammpsDataBase.ATOM_TYPES
-    BOND_TYPES = 'bond types'
-    ANGLE_TYPES = 'angle types'
-    DIHEDRAL_TYPES = 'dihedral types'
-    IMPROPER_TYPES = 'improper types'
-    TYPE_DSP = [
-        ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHEDRAL_TYPES, IMPROPER_TYPES
-    ]
-
-    MASSES = LammpsDataBase.MASSES
-    PAIR_COEFFS = 'Pair Coeffs'
-    BOND_COEFFS = 'Bond Coeffs'
-    ANGLE_COEFFS = 'Angle Coeffs'
-    DIHEDRAL_COEFFS = 'Dihedral Coeffs'
-    IMPROPER_COEFFS = 'Improper Coeffs'
-    ATOMS_CAP = ATOMS.capitalize()
-    BONDS_CAP = BONDS.capitalize()
-    ANGLES_CAP = ANGLES.capitalize()
-    DIHEDRALS_CAP = DIHEDRALS.capitalize()
-    IMPROPERS_CAP = IMPROPERS.capitalize()
-
-    MARKERS = [
-        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
-        IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
-        IMPROPERS_CAP
-    ]
-
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
 
-    def __init__(self,
-                 mols,
-                 ff,
-                 jobname,
-                 *arg,
-                 concise=True,
-                 box=None,
-                 **kwarg):
+    def __init__(self, mols, ff, jobname, *arg, **kwarg):
         """
         :param mols dict: keys are the molecule ids, and values are
             'rdkit.Chem.rdchem.Mol'
@@ -1453,8 +1416,6 @@ class LammpsData(LammpsDataBase):
         :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
         """
         super().__init__(mols, ff, jobname, *arg, **kwarg)
-        self.concise = concise
-        self.box = box
         self.bonds = {}
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
@@ -1469,9 +1430,17 @@ class LammpsData(LammpsDataBase):
         self.dihe_types = {}
         self.impr_types = {}
         self.nbr_charge = {}
-        self.total_charge = 0.
-        self.data_fh = None
-        self.density = None
+
+    def run(self, adjust_coords=True):
+        self.setAtoms()
+        self.balanceCharge()
+        self.setBonds()
+        self.adjustBondLength(adjust_coords)
+        self.setAngles()
+        self.setDihedrals()
+        self.setImproperSymbols()
+        self.setImpropers()
+        self.removeAngles()
 
     def hasCharge(self):
         """
@@ -1481,89 +1450,6 @@ class LammpsData(LammpsDataBase):
             self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atom
         ]
         return any(charges)
-
-    def writeDumpModify(self):
-        """
-        Write dump modify commands so that dump command can write out element.
-        """
-        atoms = self.ff.atoms.values()
-        if self.concise:
-            atoms = [x for x in atoms if x.id in self.atm_types]
-        smbs = ' '.join(map(str, [x.symbol for x in atoms]))
-        self.in_fh.write(f"dump_modify 1 element {smbs}\n")
-
-    def writeFixShake(self):
-        """
-        Write the fix shake so that the bonds and angles associated with hydrogen
-        atoms keep constant.
-        """
-        fix_bonds = set()
-        for btype, btype_concise in self.bnd_types.items():
-            bond = self.ff.bonds[btype]
-            atoms = [self.ff.atoms[x] for x in [bond.id1, bond.id2]]
-            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
-            if has_h:
-                bond_type = btype_concise if self.concise else btype
-                fix_bonds.add(bond_type)
-
-        fix_angles = set()
-        for atype, atype_concise in self.ang_types.items():
-            angle = self.ff.angles[atype]
-            atoms = [
-                self.ff.atoms[x] for x in [angle.id1, angle.id2, angle.id3]
-            ]
-            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
-            if has_h:
-                angle_type = atype_concise if self.concise else atype
-                fix_angles.add(angle_type)
-        btype_ids = ' '.join(map(str, fix_bonds))
-        atype_ids = ' '.join(map(str, fix_angles))
-        if not any([btype_ids, atype_ids]):
-            return
-        self.in_fh.write(
-            f'fix rigid all shake 0.0001 10 10000 b {btype_ids} a {atype_ids}\n'
-        )
-
-    def writeRun(self, *arg, **kwarg):
-        """
-        Write command to further equilibrate the system.
-        """
-        super().writeRun(*arg, mols=self.mols, **kwarg)
-
-    def writeData(self, adjust_coords=True):
-        """
-        Write out LAMMPS data file.
-
-        :param adjust_coords bool: whether adjust coordinates of the molecules.
-            This only good for a small piece as clashes between non-bonded atoms
-            may be introduced.
-        """
-
-        with open(self.lammps_data, 'w') as self.data_fh:
-            self.setAtoms()
-            self.balanceCharge()
-            self.setBonds()
-            self.adjustBondLength(adjust_coords)
-            self.setAngles()
-            self.setDihedrals()
-            self.setImproperSymbols()
-            self.setImpropers()
-            self.removeAngles()
-            self.removeUnused()
-            self.writeDescription()
-            self.writeTopoType()
-            self.writeBox()
-            self.writeMasses()
-            self.writePairCoeffs()
-            self.writeBondCoeffs()
-            self.writeAngleCoeffs()
-            self.writeDihedralCoeffs()
-            self.writeImproperCoeffs()
-            self.writeAtoms()
-            self.writeBonds()
-            self.writeAngles()
-            self.writeDihedrals()
-            self.writeImpropers()
 
     def balanceCharge(self):
         """
@@ -1909,6 +1795,203 @@ class LammpsData(LammpsDataBase):
                     break
             self.angles.pop(self.rvrs_angles[angle_atom_ids])
 
+
+class LammpsData(LammpsDataBase):
+    TYPE_ID = TYPE_ID
+    ATOMS = LammpsDataBase.ATOMS
+    BONDS = 'bonds'
+    ANGLES = 'angles'
+    DIHEDRALS = 'dihedrals'
+    IMPROPERS = 'impropers'
+    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
+
+    ATOM_TYPES = LammpsDataBase.ATOM_TYPES
+    BOND_TYPES = 'bond types'
+    ANGLE_TYPES = 'angle types'
+    DIHEDRAL_TYPES = 'dihedral types'
+    IMPROPER_TYPES = 'improper types'
+    TYPE_DSP = [
+        ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHEDRAL_TYPES, IMPROPER_TYPES
+    ]
+
+    MASSES = LammpsDataBase.MASSES
+    PAIR_COEFFS = 'Pair Coeffs'
+    BOND_COEFFS = 'Bond Coeffs'
+    ANGLE_COEFFS = 'Angle Coeffs'
+    DIHEDRAL_COEFFS = 'Dihedral Coeffs'
+    IMPROPER_COEFFS = 'Improper Coeffs'
+    ATOMS_CAP = ATOMS.capitalize()
+    BONDS_CAP = BONDS.capitalize()
+    ANGLES_CAP = ANGLES.capitalize()
+    DIHEDRALS_CAP = DIHEDRALS.capitalize()
+    IMPROPERS_CAP = IMPROPERS.capitalize()
+
+    MARKERS = [
+        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
+        IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
+        IMPROPERS_CAP
+    ]
+
+    def __init__(self,
+                 mols,
+                 ff,
+                 jobname,
+                 *arg,
+                 concise=True,
+                 box=None,
+                 **kwarg):
+        """
+        :param mols dict: keys are the molecule ids, and values are
+            'rdkit.Chem.rdchem.Mol'
+        :param ff 'oplsua.OplsParser': the force field information
+        :param jobname str: jobname based on which out filenames are defined
+        :param concise bool: If False, all the atoms in the force field file
+            shows up in the force field section of the data file. If True, only
+            the present ones are writen into the data file.
+        :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
+        """
+        super().__init__(mols, ff, jobname, *arg, **kwarg)
+        self.concise = concise
+        self.box = box
+        self.mol_dat = {}
+        self.bonds = {}
+        self.rvrs_bonds = {}
+        self.rvrs_angles = {}
+        self.angles = {}
+        self.dihedrals = {}
+        self.dihe_map = None
+        self.impropers = {}
+        self.symbol_impropers = {}
+        self.atm_types = {}
+        self.bnd_types = {}
+        self.ang_types = {}
+        self.dihe_types = {}
+        self.impr_types = {}
+        self.nbr_charge = {}
+        self.total_charge = 0.
+        self.data_fh = None
+        self.density = None
+
+    def writeRun(self, *arg, **kwarg):
+        """
+        Write command to further equilibrate the system with molecules
+        information considered.
+        """
+        super().writeRun(*arg, mols=self.mols, **kwarg)
+
+    def writeDumpModify(self):
+        """
+        Write dump modify commands so that dump command can write out element.
+        """
+        atoms = self.ff.atoms.values()
+        if self.concise:
+            atoms = [x for x in atoms if x.id in self.atm_types]
+        smbs = ' '.join(map(str, [x.symbol for x in atoms]))
+        self.in_fh.write(f"dump_modify 1 element {smbs}\n")
+
+    def writeFixShake(self):
+        """
+        Write the fix shake so that the bonds and angles associated with hydrogen
+        atoms keep constant.
+        """
+        fix_bonds = set()
+        for btype, btype_concise in self.bnd_types.items():
+            bond = self.ff.bonds[btype]
+            atoms = [self.ff.atoms[x] for x in [bond.id1, bond.id2]]
+            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
+            if has_h:
+                bond_type = btype_concise if self.concise else btype
+                fix_bonds.add(bond_type)
+
+        fix_angles = set()
+        for atype, atype_concise in self.ang_types.items():
+            angle = self.ff.angles[atype]
+            atoms = [
+                self.ff.atoms[x] for x in [angle.id1, angle.id2, angle.id3]
+            ]
+            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
+            if has_h:
+                angle_type = atype_concise if self.concise else atype
+                fix_angles.add(angle_type)
+        btype_ids = ' '.join(map(str, fix_bonds))
+        atype_ids = ' '.join(map(str, fix_angles))
+        if not any([btype_ids, atype_ids]):
+            return
+        self.in_fh.write(
+            f'fix rigid all shake 0.0001 10 10000 b {btype_ids} a {atype_ids}\n'
+        )
+
+    def adjustCoords(self, adjust_coords=True):
+        """
+        Adjust the coordinates based bond length etc.
+        """
+        self.setOneMolData()
+        self.adjustBondLength(adjustBondLength=adjust_coords)
+
+    def adjustBondLength(self, adjustBondLength=True):
+        for mol_dat in self.mol_dat.values():
+            mol_dat.adjustBondLength(adjust_bond_legnth=adjustBondLength)
+
+    def setOneMolData(self):
+        for mol_id, mol in self.mols.items():
+            mol_dat = LammpsDataOne({mol_id: mol}, self.ff, self.jobname)
+            mol_dat.run()
+            self.mol_dat[mol_id] = mol_dat
+
+    def writeData(self, adjust_coords=True):
+        """
+        Write out LAMMPS data file.
+
+        :param adjust_coords bool: whether adjust coordinates of the molecules.
+            This only good for a small piece as clashes between non-bonded atoms
+            may be introduced.
+        """
+
+        with open(self.lammps_data, 'w') as self.data_fh:
+            self.setOneMolData()
+            self.setBADI()
+            self.adjustBondLength(adjust_coords)
+            self.removeUnused()
+            self.writeDescription()
+            self.writeTopoType()
+            self.writeBox()
+            self.writeMasses()
+            self.writePairCoeffs()
+            self.writeBondCoeffs()
+            self.writeAngleCoeffs()
+            self.writeDihedralCoeffs()
+            self.writeImproperCoeffs()
+            self.writeAtoms()
+            self.writeBonds()
+            self.writeAngles()
+            self.writeDihedrals()
+            self.writeImpropers()
+
+    def setBADI(self):
+
+        mol_id, bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 6
+        for tpl_id, tpl_dat in self.mol_dat.items():
+            self.nbr_charge[mol_id] = tpl_dat.nbr_charge[tpl_id]
+            for _ in range(tpl_dat.mols[tpl_id].GetNumConformers()):
+                for id in tpl_dat.bonds.values():
+                    bond_id += 1
+                    bond = tuple([id[0]] + [x + atom_num for x in id[1:]])
+                    self.bonds[bond_id] = bond
+                for id in tpl_dat.angles.values():
+                    angle_id += 1
+                    angle = tuple([id[0]] + [x + atom_num for x in id[1:]])
+                    self.angles[angle_id] = angle
+                for id in tpl_dat.dihedrals.values():
+                    dihedral_id += 1
+                    dihedral = tuple([id[0]] + [x + atom_num for x in id[1:]])
+                    self.dihedrals[dihedral_id] = dihedral
+                for id in tpl_dat.impropers.values():
+                    improper_id += 1
+                    improper = tuple([id[0]] + [x + atom_num for x in id[1:]])
+                    self.impropers[improper_id] = improper
+                atom_num += tpl_dat.mols[tpl_id].GetNumAtoms()
+                mol_id += 1
+
     def removeUnused(self):
         """
         Remove used force field information so that the data file is minimal.
@@ -1936,7 +2019,7 @@ class LammpsData(LammpsDataBase):
             raise ValueError(f"Mols are not set.")
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.data_fh.write(f"{lmp_dsp}\n\n")
-        atom_nums = [len(x.GetAtoms()) for x in self.mols.values()]
+        atom_nums = [len(x.GetAtoms()) * x.GetNumConformers() for x in self.mols.values()]
         self.data_fh.write(f"{sum(atom_nums)} {self.ATOMS}\n")
         self.data_fh.write(f"{len(self.bonds)} {self.BONDS}\n")
         self.data_fh.write(f"{len(self.angles)} {self.ANGLES}\n")
@@ -2122,7 +2205,6 @@ class LammpsData(LammpsDataBase):
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
         for mol_id, mol in self.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 7))
-            conformer = mol.GetConformer()
             data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]
             data[:, 1] = mol_id
             type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
@@ -2136,9 +2218,13 @@ class LammpsData(LammpsDataBase):
                 x + self.ff.charges[y] for x, y in zip(charges, type_ids)
             ]
             self.total_charge += data[:, 3].sum()
-            data[:, 4:] = conformer.GetPositions()
-            np.savetxt(self.data_fh, data, fmt='%i %i %i %.4f %.3f %.3f %.3f')
-        self.data_fh.write(f"\n")
+
+            for conformer in mol.GetConformers():
+                data[:, 4:] = conformer.GetPositions()
+                np.savetxt(self.data_fh,
+                           data,
+                           fmt='%i %i %i %.4f %.3f %.3f %.3f')
+            self.data_fh.write(f"\n")
 
     def writeBonds(self):
         """
