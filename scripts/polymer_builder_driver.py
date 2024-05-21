@@ -183,8 +183,10 @@ class AmorphousCell(object):
         """
         Build polymer from monomers if provided.
         """
-        for cru, cru_num, in zip(self.options.cru, self.options.cru_num):
-            polym = Polymer(cru, cru_num, options=self.options)
+        for cru, cru_num, mol_num in zip(self.options.cru,
+                                         self.options.cru_num,
+                                         self.options.mol_num):
+            polym = Polymer(cru, cru_num, mol_num, options=self.options)
             polym.run()
             self.polymers.append(polym)
 
@@ -315,7 +317,7 @@ class GridCell:
         for polym, mol_num in zip(self.polymers, self.polym_nums):
             polym.mol_num = mol_num
             mol_nums_per_mbox = np.floor(self.mbox / polym.box).astype(int)
-            polym.mol_num_per_mbox = np.product(mol_nums_per_mbox)
+            polym.mol_num_per_mbox = np.prod(mol_nums_per_mbox)
             polym.num_mbox = math.ceil(polym.mol_num / polym.mol_num_per_mbox)
             percent = [
                 np.linspace(-0.5, 0.5, x, endpoint=False)
@@ -606,21 +608,24 @@ class Polymer(object):
     POLYM_HT = prop_names.POLYM_HT
     IS_MONO = prop_names.IS_MONO
     MONO_ID = prop_names.MONO_ID
+    CONFORMER_NUM = 'conformer_num'
 
-    def __init__(self, cru, cru_num, options=None):
+    def __init__(self, cru, cru_num, mol_num, options=None):
         """
         :param cru str: the smiles string for monomer
         :param cru_num int: the number of monomers per polymer
+        :param mol_num int: the number of molecules of this type of polymer
         :param options 'argparse.Namespace': command line options
         """
         self.cru = cru
         self.cru_num = cru_num
+        self.mol_num = mol_num
         self.options = options
         self.polym = None
         self.polym_Hs = None
         self.box = None
         self.cru_mol = None
-        self.molecules = []
+        self.smiles = None
         self.buffer = oplsua.LammpsData.BUFFER
         self.ff = oplsua.get_opls_parser()
 
@@ -719,6 +724,7 @@ class Polymer(object):
             orgin_atom_num = polym.GetNumAtoms()
             polym = Chem.DeleteSubstructs(
                 polym, Chem.MolFromSmiles(symbols.WILD_CARD))
+        polym.SetIntProp(self.CONFORMER_NUM, self.mol_num)
         self.polym = polym
         log(f"Polymer SMILES: {Chem.MolToSmiles(self.polym)}")
 
@@ -743,7 +749,9 @@ class Polymer(object):
                 # Mg+2 triggers
                 # WARNING UFFTYPER: Warning: hybridization set to SP3 for atom 0
                 # ERROR UFFTYPER: Unrecognized charge state for atom: 0
-                AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
+                AllChem.EmbedMultipleConfs(self.polym,
+                                           numConfs=self.mol_num,
+                                           useRandomCoords=True)
                 [log_debug(f'{x} {y}') for x, y in logs.items()]
             Chem.GetSymmSSSR(self.polym)
             return
@@ -775,6 +783,7 @@ class Conformer(object):
     MONO_ATOM_IDX = Polymer.MONO_ATOM_IDX
     MONO_ID = Polymer.MONO_ID
     OUT_EXTN = '.sdf'
+    CONFORMER_NUM = Polymer.CONFORMER_NUM
 
     def __init__(self,
                  polym,
@@ -971,7 +980,12 @@ class Conformer(object):
                 mono_atom_id = atom.GetIntProp(self.MONO_ATOM_IDX)
                 xyz = self.xyzs[mono_atom_id] + vect
                 conformer.SetAtomPosition(atom.GetIdx(), xyz)
-        self.polym.AddConformer(conformer)
+        self.polym.AddConformer(conformer, assignId=True)
+        for _ in range(self.polym.GetIntProp(self.CONFORMER_NUM) - 1):
+            # copy.copy(self.polym.GetConformer(0)) raise RuntimeError
+            # Pickling of "rdkit.Chem.rdchem.Conformer" instances is not enabled
+            conf = copy.deepcopy(self.polym).GetConformer(0)
+            self.polym.AddConformer(conf, assignId=True)
         Chem.GetSymmSSSR(self.polym)
 
     def adjustConformer(self):
