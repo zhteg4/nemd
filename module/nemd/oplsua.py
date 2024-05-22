@@ -6,6 +6,7 @@
 This module handles opls-ua related typing, parameterization, assignment,
 datafile, and in-script.
 """
+import io
 import math
 import scipy
 import types
@@ -1206,7 +1207,7 @@ class LammpsIn(fileutils.LammpsInput):
         self.options = options
         self.concise = concise
         self.lammps_in = self.jobname + self.IN_EXT
-        self.lammps_data = self.jobname + self.DATA_EXT
+        self.datafile = self.jobname + self.DATA_EXT
         self.lammps_dump = self.jobname + self.CUSTOM_EXT
         self.units = self.REAL
         self.atom_style = self.FULL
@@ -1232,7 +1233,7 @@ class LammpsIn(fileutils.LammpsInput):
         "param jobname str: new jobname based on which out filenames are defined
         """
         self.lammps_in = jobname + self.IN_EXT
-        self.lammps_data = jobname + self.DATA_EXT
+        self.datafile = jobname + self.DATA_EXT
         self.lammps_dump = jobname + self.CUSTOM_EXT
 
     def writeLammpsIn(self):
@@ -1285,7 +1286,7 @@ class LammpsIn(fileutils.LammpsInput):
         """
         Write data file related information.
         """
-        self.in_fh.write(f"{self.READ_DATA} {self.lammps_data}\n\n")
+        self.in_fh.write(f"{self.READ_DATA} {self.datafile}\n\n")
 
     def writeMinimize(self, min_style=FIRE, dump=True):
         """
@@ -1876,7 +1877,7 @@ class LammpsData(LammpsDataBase):
         self.impr_types = {}
         self.nbr_charge = {}
         self.total_charge = 0.
-        self.data_fh = None
+        self.data_hdl = None
         self.density = None
 
     def writeRun(self, *arg, **kwarg):
@@ -1941,16 +1942,18 @@ class LammpsData(LammpsDataBase):
             mol_dat.run(adjust_coords=adjust_coords)
             self.mol_dat[mol_id] = mol_dat
 
-    def writeData(self, adjust_coords=True):
+    def writeData(self, adjust_coords=True, nofile=False):
         """
         Write out LAMMPS data file.
 
         :param adjust_coords bool: whether adjust coordinates of the molecules.
             This only good for a small piece as clashes between non-bonded atoms
             may be introduced.
+        :param nofile bool: return the string instead of writing to a file if True
         """
 
-        with open(self.lammps_data, 'w') as self.data_fh:
+        with io.StringIO() if nofile else open(self.datafile,
+                                               'w') as self.data_hdl:
             self.setOneMolData(adjust_coords=adjust_coords)
             self.setBADI()
             self.removeUnused()
@@ -1968,6 +1971,7 @@ class LammpsData(LammpsDataBase):
             self.writeAngles()
             self.writeDihedrals()
             self.writeImpropers()
+            return self.getContents() if nofile else None
 
     def setBADI(self):
         bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 5
@@ -2018,31 +2022,31 @@ class LammpsData(LammpsDataBase):
         if self.mols is None:
             raise ValueError(f"Mols are not set.")
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
-        self.data_fh.write(f"{lmp_dsp}\n\n")
+        self.data_hdl.write(f"{lmp_dsp}\n\n")
         atom_nums = [
             len(x.GetAtoms()) * x.GetNumConformers()
             for x in self.mols.values()
         ]
-        self.data_fh.write(f"{sum(atom_nums)} {self.ATOMS}\n")
-        self.data_fh.write(f"{len(self.bonds)} {self.BONDS}\n")
-        self.data_fh.write(f"{len(self.angles)} {self.ANGLES}\n")
-        self.data_fh.write(f"{len(self.dihedrals)} {self.DIHEDRALS}\n")
-        self.data_fh.write(f"{len(self.impropers)} {self.IMPROPERS}\n\n")
+        self.data_hdl.write(f"{sum(atom_nums)} {self.ATOMS}\n")
+        self.data_hdl.write(f"{len(self.bonds)} {self.BONDS}\n")
+        self.data_hdl.write(f"{len(self.angles)} {self.ANGLES}\n")
+        self.data_hdl.write(f"{len(self.dihedrals)} {self.DIHEDRALS}\n")
+        self.data_hdl.write(f"{len(self.impropers)} {self.IMPROPERS}\n\n")
 
     def writeTopoType(self):
         """
         Write topologic data. e.g. number of atoms, angles...
         """
         atom_num = len(self.atm_types) if self.concise else len(self.ff.atoms)
-        self.data_fh.write(f"{atom_num} {self.ATOM_TYPES}\n")
+        self.data_hdl.write(f"{atom_num} {self.ATOM_TYPES}\n")
         bond_num = len(self.bnd_types) if self.concise else len(self.ff.bonds)
-        self.data_fh.write(f"{bond_num} {self.BOND_TYPES}\n")
+        self.data_hdl.write(f"{bond_num} {self.BOND_TYPES}\n")
         ang_num = len(self.ang_types) if self.concise else len(self.ff.angles)
-        self.data_fh.write(f"{ang_num} {self.ANGLE_TYPES}\n")
+        self.data_hdl.write(f"{ang_num} {self.ANGLE_TYPES}\n")
         dnum = len(self.dihe_types) if self.concise else len(self.ff.dihedrals)
-        self.data_fh.write(f"{dnum} {self.DIHEDRAL_TYPES}\n")
+        self.data_hdl.write(f"{dnum} {self.DIHEDRAL_TYPES}\n")
         inum = len(self.impr_types) if self.concise else len(self.ff.impropers)
-        self.data_fh.write(f"{inum} {self.IMPROPER_TYPES}\n\n")
+        self.data_hdl.write(f"{inum} {self.IMPROPER_TYPES}\n\n")
 
     def writeBox(self, min_box=None, buffer=None):
         """
@@ -2063,8 +2067,8 @@ class LammpsData(LammpsDataBase):
             box = [[*x, symbols.POUND, *y] for x, y in boxes]
         for line in box:
             line = [f'{x:.2f}' if isinstance(x, float) else x for x in line]
-            self.data_fh.write(f"{' '.join(line)}\n")
-        self.data_fh.write("\n")
+            self.data_hdl.write(f"{' '.join(line)}\n")
+        self.data_hdl.write("\n")
         # Calculate density as the revised box may alter the box size.
         weight = sum([self.ff.molecular_weight(x) for x in self.molecule])
         edges = [
@@ -2105,27 +2109,27 @@ class LammpsData(LammpsDataBase):
         """
         Write out mass information.
         """
-        self.data_fh.write(f"{self.MASSES}\n\n")
+        self.data_hdl.write(f"{self.MASSES}\n\n")
         for atom_id, atom in self.ff.atoms.items():
             if self.concise and atom_id not in self.atm_types:
                 continue
             atm_id = self.atm_types[atom_id] if self.concise else atom_id
             dscrptn = f"{atom.description} {atom.symbol} {atom_id}" if self.concise else atom.description
-            self.data_fh.write(f"{atm_id} {atom.mass} # {dscrptn}\n")
-        self.data_fh.write(f"\n")
+            self.data_hdl.write(f"{atm_id} {atom.mass} # {dscrptn}\n")
+        self.data_hdl.write(f"\n")
 
     def writePairCoeffs(self):
         """
         Write pair coefficients.
         """
-        self.data_fh.write(f"{self.PAIR_COEFFS}\n\n")
+        self.data_hdl.write(f"{self.PAIR_COEFFS}\n\n")
         for atom in self.ff.atoms.values():
             if self.concise and atom.id not in self.atm_types:
                 continue
             vdw = self.ff.vdws[atom.id]
             atom_id = self.atm_types[atom.id] if self.concise else atom.id
-            self.data_fh.write(f"{atom_id} {vdw.ene:.4f} {vdw.dist:.4f}\n")
-        self.data_fh.write("\n")
+            self.data_hdl.write(f"{atom_id} {vdw.ene:.4f} {vdw.dist:.4f}\n")
+        self.data_hdl.write("\n")
 
     def writeBondCoeffs(self):
         """
@@ -2135,13 +2139,13 @@ class LammpsData(LammpsDataBase):
         if not self.bnd_types:
             return
 
-        self.data_fh.write(f"{self.BOND_COEFFS}\n\n")
+        self.data_hdl.write(f"{self.BOND_COEFFS}\n\n")
         for bond in self.ff.bonds.values():
             if self.concise and bond.id not in self.bnd_types:
                 continue
             bond_id = self.bnd_types[bond.id] if self.concise else bond.id
-            self.data_fh.write(f"{bond_id}  {bond.ene} {bond.dist}\n")
-        self.data_fh.write("\n")
+            self.data_hdl.write(f"{bond_id}  {bond.ene} {bond.dist}\n")
+        self.data_hdl.write("\n")
 
     def writeAngleCoeffs(self):
         """
@@ -2150,13 +2154,13 @@ class LammpsData(LammpsDataBase):
         if not self.ang_types:
             return
 
-        self.data_fh.write(f"{self.ANGLE_COEFFS}\n\n")
+        self.data_hdl.write(f"{self.ANGLE_COEFFS}\n\n")
         for angle in self.ff.angles.values():
             if self.concise and angle.id not in self.ang_types:
                 continue
             angle_id = self.ang_types[angle.id] if self.concise else angle.id
-            self.data_fh.write(f"{angle_id} {angle.ene} {angle.angle}\n")
-        self.data_fh.write("\n")
+            self.data_hdl.write(f"{angle_id} {angle.ene} {angle.angle}\n")
+        self.data_hdl.write("\n")
 
     def writeDihedralCoeffs(self):
         """
@@ -2165,7 +2169,7 @@ class LammpsData(LammpsDataBase):
         if not self.dihe_types:
             return
 
-        self.data_fh.write(f"{self.DIHEDRAL_COEFFS}\n\n")
+        self.data_hdl.write(f"{self.DIHEDRAL_COEFFS}\n\n")
         for dihe in self.ff.dihedrals.values():
             if self.concise and dihe.id not in self.dihe_types:
                 continue
@@ -2179,9 +2183,9 @@ class LammpsData(LammpsDataBase):
                 if params[ene_ang_n.n_parm] and ((ene_ang_n.angle == 180.) ^
                                                  (not ene_ang_n.n_parm % 2)):
                     params[ene_ang_n.n_parm] *= -1
-            self.data_fh.write(
+            self.data_hdl.write(
                 f"{dihedral_id}  {' '.join(map(str, params))}\n")
-        self.data_fh.write("\n")
+        self.data_hdl.write("\n")
 
     def writeImproperCoeffs(self):
         """
@@ -2190,7 +2194,7 @@ class LammpsData(LammpsDataBase):
         if not self.impr_types:
             return
 
-        self.data_fh.write(f"{self.IMPROPER_COEFFS}\n\n")
+        self.data_hdl.write(f"{self.IMPROPER_COEFFS}\n\n")
         for impr in self.ff.impropers.values():
             if self.concise and impr.id not in self.impr_types:
                 continue
@@ -2198,16 +2202,16 @@ class LammpsData(LammpsDataBase):
             # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
             sign = 1 if impr.angle == 0. else -1
-            self.data_fh.write(
+            self.data_hdl.write(
                 f"{improper_id} {impr.ene} {sign} {impr.n_parm}\n")
-        self.data_fh.write("\n")
+        self.data_hdl.write("\n")
 
     def writeAtoms(self):
         """
         Write atom coefficients.
         """
 
-        self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
+        self.data_hdl.write(f"{self.ATOMS.capitalize()}\n\n")
         pre_mols, pre_atoms = 0, 0
         for tpl_id, mol in self.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 7))
@@ -2226,7 +2230,7 @@ class LammpsData(LammpsDataBase):
             ]
             for conformer in mol.GetConformers():
                 data[:, 4:] = conformer.GetPositions()
-                np.savetxt(self.data_fh,
+                np.savetxt(self.data_hdl,
                            data,
                            fmt='%i %i %i %.4f %.3f %.3f %.3f')
                 data[:, 0] += mol.GetNumAtoms()
@@ -2234,7 +2238,7 @@ class LammpsData(LammpsDataBase):
                 pre_mols += 1
                 pre_atoms += mol.GetNumAtoms()
                 self.total_charge += data[:, 3].sum()
-        self.data_fh.write(f"\n")
+        self.data_hdl.write(f"\n")
 
     def writeBonds(self):
         """
@@ -2244,11 +2248,11 @@ class LammpsData(LammpsDataBase):
         if not self.bonds:
             return
 
-        self.data_fh.write(f"{self.BONDS.capitalize()}\n\n")
+        self.data_hdl.write(f"{self.BONDS.capitalize()}\n\n")
         for bond_id, (bond_type, id1, id2) in self.bonds.items():
             bond_type = self.bnd_types[bond_type] if self.concise else bond_type
-            self.data_fh.write(f"{bond_id} {bond_type} {id1} {id2}\n")
-        self.data_fh.write(f"\n")
+            self.data_hdl.write(f"{bond_id} {bond_type} {id1} {id2}\n")
+        self.data_hdl.write(f"\n")
 
     def writeAngles(self):
         """
@@ -2256,13 +2260,13 @@ class LammpsData(LammpsDataBase):
         """
         if not self.angles:
             return
-        self.data_fh.write(f"{self.ANGLES.capitalize()}\n\n")
+        self.data_hdl.write(f"{self.ANGLES.capitalize()}\n\n")
         # Some angles may be filtered out by improper
         for angle_id, value in enumerate(self.angles.items(), start=1):
             _, (type_id, id1, id2, id3) = value
             angle_type = self.ang_types[type_id] if self.concise else type_id
-            self.data_fh.write(f"{angle_id} {angle_type} {id1} {id2} {id3}\n")
-        self.data_fh.write(f"\n")
+            self.data_hdl.write(f"{angle_id} {angle_type} {id1} {id2} {id3}\n")
+        self.data_hdl.write(f"\n")
 
     def writeDihedrals(self):
         """
@@ -2271,12 +2275,12 @@ class LammpsData(LammpsDataBase):
         if not self.dihedrals:
             return
 
-        self.data_fh.write(f"{self.DIHEDRALS.capitalize()}\n\n")
+        self.data_hdl.write(f"{self.DIHEDRALS.capitalize()}\n\n")
         for dihe_id, (type_id, id1, id2, id3, id4) in self.dihedrals.items():
             type_id = self.dihe_types[type_id] if self.concise else type_id
-            self.data_fh.write(
+            self.data_hdl.write(
                 f"{dihe_id} {type_id} {id1} {id2} {id3} {id4}\n")
-        self.data_fh.write(f"\n")
+        self.data_hdl.write(f"\n")
 
     def writeImpropers(self):
         """
@@ -2285,13 +2289,23 @@ class LammpsData(LammpsDataBase):
         if not self.impropers:
             return
 
-        self.data_fh.write(f"{self.IMPROPERS.capitalize()}\n\n")
+        self.data_hdl.write(f"{self.IMPROPERS.capitalize()}\n\n")
         for improper_id, (type_id, id1, id2, id3,
                           id4) in self.impropers.items():
             type_id = self.impr_types[type_id] if self.concise else type_id
-            self.data_fh.write(
+            self.data_hdl.write(
                 f"{improper_id} {type_id} {id1} {id2} {id3} {id4}\n")
-        self.data_fh.write(f"\n")
+        self.data_hdl.write(f"\n")
+
+    def getContents(self):
+        """
+        Return datafile contents in base64 encoding.
+
+        :return `bytes`: the contents of the data file in base64 encoding.
+        """
+        self.data_hdl.seek(0)
+        contents = base64.b64encode(self.data_hdl.read().encode("utf-8"))
+        return b','.join([b'lammps_datafile', contents])
 
 
 class DataFileReader(LammpsData):
@@ -2364,7 +2378,7 @@ class DataFileReader(LammpsData):
             with open(self.data_file, 'r') as df_fh:
                 self.lines = df_fh.readlines()
         else:
-            content_type, content_string = self.contents.split(',')
+            content_type, content_string = self.contents.split(b',')
             decoded = base64.b64decode(content_string)
             self.lines = decoded.decode("utf-8").splitlines()
 

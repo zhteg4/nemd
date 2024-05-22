@@ -235,7 +235,6 @@ class AmorphousCell(object):
         cell = cell_builder(self.polymers, self.options)
         cell.setMols()
         cell.setDataReader()
-        cell.setAtomMapNum()
         density = self.options.density
         mini_density = min([mini_density, density / 5.])
         delta = min([0.1, (density - mini_density) / 4])
@@ -270,9 +269,9 @@ class AmorphousCell(object):
             log_warning(
                 f'The system has a net charge of {lmw.total_charge:.4f}')
         lmw.writeLammpsIn()
-        log(f'Data file written into {lmw.lammps_data}')
+        log(f'Data file written into {lmw.datafile}')
         log(f'In script written into {lmw.lammps_in}')
-        jobutils.add_outfile(lmw.lammps_data, jobname=self.options.jobname)
+        jobutils.add_outfile(lmw.datafile, jobname=self.options.jobname)
         jobutils.add_outfile(lmw.lammps_in,
                              jobname=self.options.jobname,
                              set_file=True)
@@ -379,7 +378,6 @@ class PackedCell:
         self.setBoxes()
         self.setMols()
         self.setDataReader()
-        self.setAtomMapNum()
         self.setFrameAndDcell()
         self.placeMols()
 
@@ -413,14 +411,10 @@ class PackedCell:
         """
         Set molecules.
         """
-        # mols = [
-        #     copy.copy(x.polym)
-        #     for x in self.polymers
-        #     for _ in range(x.polym.GetNumConformers())
-        # ]
         self.mols = {i: x.polym for i, x in enumerate(self.polymers, start=1)}
-        # for mol_id, mol in self.mols.items():
-        #     mol.SetIntProp(prop_names.MOL_ID, mol_id)
+        confs = [y for x in self.mols.values() for y in x.GetConformers()]
+        for mol_id, conf in enumerate(confs, start=1):
+            conf.SetIntProp(prop_names.MOL_ID, mol_id)
 
     def setDataReader(self):
         """
@@ -431,22 +425,10 @@ class PackedCell:
                                 self.polymers[0].ff,
                                 'tmp',
                                 options=self.options)
-        lmw.writeData()
-        self.df_reader = oplsua.DataFileReader('tmp.data')
+        contents = lmw.writeData(nofile=True)
+        self.df_reader = oplsua.DataFileReader(contents=contents)
         self.df_reader.run()
         self.df_reader.setClashParams()
-        import pdb
-        pdb.set_trace()
-
-    def setAtomMapNum(self):
-        """
-        Set atom force field id.
-        """
-        for mol_id in self.mols.keys():
-            mol = self.mols[mol_id]
-            atom_fids = self.df_reader.mols[mol_id]
-            for atom, atom_fid in zip(mol.GetAtoms(), atom_fids):
-                atom.SetAtomMapNum(atom_fid)
 
     def setFrameAndDcell(self):
         """
@@ -470,9 +452,10 @@ class PackedCell:
         tenth, threshold, = mol_num / 10., 0
         while trial_num <= max_trial:
             self.extg_aids = set()
-            for mol_id in self.df_reader.mols.keys():
+            for conf in self.conformers:
+                mol_id = conf.GetIntProp(prop_names.MOL_ID)
                 try:
-                    self.placeMol(mol_id)
+                    self.placeMol(mol_id, conf)
                 except MolError:
                     log_debug(f'{trial_num} trail fails. '
                               f'(Only {mol_id - 1} / {len(self.mols)} '
@@ -489,7 +472,16 @@ class PackedCell:
                 return
         raise DensityError
 
-    def placeMol(self, mol_id, max_trial=MAX_TRIAL_PER_MOL):
+    @property
+    def conformers(self):
+        """
+        Return all conformers of all molecules.
+
+        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all molecules.
+        """
+        return [y for x in self.mols.values() for y in x.GetConformers()]
+
+    def placeMol(self, mol_id, conf, max_trial=MAX_TRIAL_PER_MOL):
         """
         Place molecules one molecule into the cell without clash.
 
@@ -501,7 +493,7 @@ class PackedCell:
         aids = self.df_reader.mols[mol_id]
         trial_per_mol = 1
         while trial_per_mol <= max_trial:
-            self.translateMol(mol_id)
+            self.translateMol(conf, aids=aids)
             if not self.hasClashes(aids):
                 self.extg_aids.update(aids)
                 # Only update the distance cell after one molecule successful
@@ -513,7 +505,7 @@ class PackedCell:
         if trial_per_mol > max_trial:
             raise MolError
 
-    def translateMol(self, mol_id, aids=None):
+    def translateMol(self, conf, aids=None):
         """
         Do translation and rotation to the molecule so that the centroid will be
         randomly point in the cell and the orientation is also randomly picked.
@@ -522,13 +514,10 @@ class PackedCell:
             cell.
         :param aids list: list of atom ids whose centroid is translated.
         """
-        mol = self.mols[mol_id]
-        conf = mol.GetConformer()
-        centroid = np.array(conformerutils.centroid(conf, aids=aids))
+        centroid = np.array(conformerutils.centroid(conf))
         conformerutils.translation(conf, -centroid)
         conformerutils.rand_rotate(conf)
         conformerutils.translation(conf, self.frm.getPoint())
-        aids = [x.GetAtomMapNum() for x in mol.GetAtoms()]
         self.frm.loc[aids] = conf.GetPositions()
 
     def hasClashes(self, aids):
