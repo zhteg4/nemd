@@ -402,8 +402,7 @@ class PackedCell:
         """
         Set periodic boundary box size.
         """
-        weight = sum(x.mw * y
-                     for x, y in zip(self.polymers, self.options.mol_num))
+        weight = sum(x.mw * x.polym.GetNumConformers() for x in self.polymers)
         vol = weight / self.density / scipy.constants.Avogadro
         edge = math.pow(vol, 1 / 3)  # centimeter
         edge *= scipy.constants.centi / scipy.constants.angstrom
@@ -414,14 +413,14 @@ class PackedCell:
         """
         Set molecules.
         """
-        mols = [
-            copy.copy(x.polym)
-            for x, y in zip(self.polymers, self.options.mol_num)
-            for _ in range(y)
-        ]
-        self.mols = {i: x for i, x in enumerate(mols, start=1)}
-        for mol_id, mol in self.mols.items():
-            mol.SetIntProp(prop_names.MOL_ID, mol_id)
+        # mols = [
+        #     copy.copy(x.polym)
+        #     for x in self.polymers
+        #     for _ in range(x.polym.GetNumConformers())
+        # ]
+        self.mols = {i: x.polym for i, x in enumerate(self.polymers, start=1)}
+        # for mol_id, mol in self.mols.items():
+        #     mol.SetIntProp(prop_names.MOL_ID, mol_id)
 
     def setDataReader(self):
         """
@@ -436,6 +435,8 @@ class PackedCell:
         self.df_reader = oplsua.DataFileReader('tmp.data')
         self.df_reader.run()
         self.df_reader.setClashParams()
+        import pdb
+        pdb.set_trace()
 
     def setAtomMapNum(self):
         """

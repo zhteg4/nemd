@@ -1520,14 +1520,21 @@ class LammpsDataOne(LammpsDataBase):
             return
 
         for mol in self.molecule:
-            conformer = mol.GetConformer()
-            for bond in mol.GetBonds():
-                bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
-                ids = set([x.GetIntProp(self.ATOM_ID) for x in bonded_atoms])
-                bond_type = self.rvrs_bonds[tuple(sorted(ids))]
-                dist = self.ff.bonds[bond_type].dist
-                idxs = [x.GetIdx() for x in bonded_atoms]
-                Chem.rdMolTransforms.SetBondLength(conformer, *idxs, dist)
+            tpl = None
+            for conf in mol.GetConformers():
+                if tpl:
+                    for aid in range(mol.GetNumAtoms()):
+                        conf.SetAtomPosition(aid, tpl.GetAtomPosition(aid))
+                    continue
+
+                for bond in mol.GetBonds():
+                    bnd_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
+                    ids = set([x.GetIntProp(self.ATOM_ID) for x in bnd_atoms])
+                    bond_type = self.rvrs_bonds[tuple(sorted(ids))]
+                    dist = self.ff.bonds[bond_type].dist
+                    idxs = [x.GetIdx() for x in bnd_atoms]
+                    Chem.rdMolTransforms.SetBondLength(conf, *idxs, dist)
+                tpl = conf
 
     def adjustCoords(self):
         """
