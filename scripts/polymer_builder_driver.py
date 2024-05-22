@@ -412,8 +412,7 @@ class PackedCell:
         Set molecules.
         """
         self.mols = {i: x.polym for i, x in enumerate(self.polymers, start=1)}
-        confs = [y for x in self.mols.values() for y in x.GetConformers()]
-        for mol_id, conf in enumerate(confs, start=1):
+        for mol_id, conf in enumerate(self.conformers, start=1):
             conf.SetIntProp(prop_names.MOL_ID, mol_id)
 
     def setDataReader(self):

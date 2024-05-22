@@ -24,6 +24,7 @@ from nemd import symbols
 from nemd import logutils
 from nemd import fileutils
 from nemd import constants as nconstants
+from nemd import prop_names
 from nemd import environutils
 
 FLAG_TIMESTEP = '-timestep'
@@ -2206,18 +2207,18 @@ class LammpsData(LammpsDataBase):
                 f"{improper_id} {impr.ene} {sign} {impr.n_parm}\n")
         self.data_hdl.write("\n")
 
-    def writeAtoms(self):
+    def writeAtoms(self, fmt='%i %i %i %.4f %.3f %.3f %.3f'):
         """
         Write atom coefficients.
+
+        :param fmt str: the format of atom line in LAMMPS data file.
         """
 
         self.data_hdl.write(f"{self.ATOMS.capitalize()}\n\n")
-        pre_mols, pre_atoms = 0, 0
+        pre_atoms = 0
         for tpl_id, mol in self.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 7))
             data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]
-            data[:, 0] += pre_atoms
-            data[:, 1] = tpl_id + pre_mols
             type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
             data[:, 2] = [
                 self.atm_types[x] if self.concise else x for x in type_ids
@@ -2228,16 +2229,17 @@ class LammpsData(LammpsDataBase):
             data[:, 3] = [
                 x + self.ff.charges[y] for x, y in zip(charges, type_ids)
             ]
+            data[:, 0] += pre_atoms
             for conformer in mol.GetConformers():
+                data[:, 1] = conformer.GetIntProp(prop_names.MOL_ID)
                 data[:, 4:] = conformer.GetPositions()
-                np.savetxt(self.data_hdl,
-                           data,
-                           fmt='%i %i %i %.4f %.3f %.3f %.3f')
+                np.savetxt(self.data_hdl, data, fmt=fmt)
+                # Increment atom ids by atom number in this conformer so that
+                # the next writing starts from the atoms in previous conformers
                 data[:, 0] += mol.GetNumAtoms()
-                data[:, 1] += 1
-                pre_mols += 1
-                pre_atoms += mol.GetNumAtoms()
                 self.total_charge += data[:, 3].sum()
+            # Atom ids in starts from atom ids in previous template molecules
+            pre_atoms += mol.GetNumAtoms() * mol.GetNumConformers()
         self.data_hdl.write(f"\n")
 
     def writeBonds(self):
