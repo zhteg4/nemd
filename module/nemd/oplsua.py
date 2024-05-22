@@ -2695,3 +2695,13 @@ class Radius(np.ndarray):
         :return float: the vdw radius between the pair.
         """
         return self[self.id_map[aid1], self.id_map[aid2]]
+
+    def setRadius(self, aid1, aid2, val):
+        """
+        Get the radius between atoms from two global ids.
+
+        :param aid1 int: one global atom id from the pair.
+        :param aid2 int: the other global atom id from the pair.
+        :val float: the vdw radius between the pair to be set.
+        """
+        self[self.id_map[aid1], self.id_map[aid2]] = val

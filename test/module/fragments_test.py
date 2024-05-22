@@ -90,7 +90,7 @@ class TestFragMol:
         assert has_pre == bool(frags[-1].pfrag)
 
     @pytest.mark.parametrize(('smiles_str', 'data_file', 'num'),
-                             [(BUTANE, BUTANE_DATA, 5)])
+                             [(BUTANE, BUTANE_DATA, 3)])
     def testReadData(self, fmol, num):
         fmol.readData()
         assert num == len(fmol.data_reader.radii)
@@ -139,9 +139,9 @@ class TestFragMol:
         fmol.setCoords()
         fmol.setFrm()
         fmol.setDcell()
-        fmol.data_reader.radii[4][1] = 4
+        fmol.data_reader.radii.setRadius(1, 4, 4)
         assert fmol.hasClashes([3])
-        fmol.data_reader.radii[4][1] = 2
+        fmol.data_reader.radii.setRadius(1, 4, 2)
         assert not fmol.hasClashes([3])
 
     @pytest.mark.parametrize(('smiles_str', 'data_file'),
