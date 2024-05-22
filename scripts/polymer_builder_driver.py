@@ -345,7 +345,6 @@ class GridCell:
                 id = polymer.polym.GetNumConformers() - polymer.mol_num
                 conf = polymer.polym.GetConformer(id)
                 conformerutils.translation(conf, polymer.vecs[idx] + vector)
-                print(polymer.vecs[idx] + vector)
                 polymer.mol_num -= 1
                 if polymer.mol_num == 0:
                     polymers.remove(polymer)
@@ -998,7 +997,7 @@ class Conformer(object):
                                      options=self.options)
         if self.minimization:
             return
-        self.lmw.adjustCoords()
+        self.lmw.setOneMolData(adjust_coords=True)
 
     def minimize(self):
         """

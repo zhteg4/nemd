@@ -1921,21 +1921,17 @@ class LammpsData(LammpsDataBase):
             f'fix rigid all shake 0.0001 10 10000 b {btype_ids} a {atype_ids}\n'
         )
 
-    def adjustCoords(self, adjust_coords=True):
+    def setOneMolData(self, adjust_coords=True):
         """
-        Adjust the coordinates based bond length etc.
+        Set one molecule for each molecule type.
+
+        :param adjust_coords bool: whether adjust coordinates of the molecules.
+            This only good for a small piece as clashes between non-bonded atoms
+            may be introduced.
         """
-        self.setOneMolData()
-        self.adjustBondLength(adjustBondLength=adjust_coords)
-
-    def adjustBondLength(self, adjustBondLength=True):
-        for mol_dat in self.mol_dat.values():
-            mol_dat.adjustBondLength(adjust_bond_legnth=adjustBondLength)
-
-    def setOneMolData(self):
         for mol_id, mol in self.mols.items():
             mol_dat = LammpsDataOne({mol_id: mol}, self.ff, self.jobname)
-            mol_dat.run()
+            mol_dat.run(adjust_coords=adjust_coords)
             self.mol_dat[mol_id] = mol_dat
 
     def writeData(self, adjust_coords=True):
@@ -1948,9 +1944,8 @@ class LammpsData(LammpsDataBase):
         """
 
         with open(self.lammps_data, 'w') as self.data_fh:
-            self.setOneMolData()
+            self.setOneMolData(adjust_coords=adjust_coords)
             self.setBADI()
-            self.adjustBondLength(adjust_coords)
             self.removeUnused()
             self.writeDescription()
             self.writeTopoType()
