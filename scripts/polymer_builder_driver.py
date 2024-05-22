@@ -335,18 +335,20 @@ class GridCell:
             math.ceil(math.pow(sum(x.num_mbox for x in self.polymers),
                                1. / 3)))
         vectors = [x * self.mbox for x in itertools.product(idxs, idxs, idxs)]
-        mol_id, polymers = 0, self.polymers[:]
+        mol_id, polymers = 1, self.polymers[:]
         while polymers:
             np.random.shuffle(vectors)
             vector = vectors.pop()
             polymer = np.random.choice(polymers)
             self.mols[mol_id] = polymer.polym
             for idx in range(min([polymer.mol_num, polymer.mol_num_per_mbox])):
+                id = polymer.polym.GetNumConformers() - polymer.mol_num
+                conf = polymer.polym.GetConformer(id)
+                conformerutils.translation(conf, polymer.vecs[idx] + vector)
+                print(polymer.vecs[idx] + vector)
                 polymer.mol_num -= 1
                 if polymer.mol_num == 0:
                     polymers.remove(polymer)
-                conf = polymer.polym.GetConformer(idx)
-                conformerutils.translation(conf, polymer.vecs[idx] + vector)
 
 
 class PackedCell:

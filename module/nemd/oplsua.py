@@ -1969,7 +1969,8 @@ class LammpsData(LammpsDataBase):
 
     def setBADI(self):
 
-        mol_id, bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 6
+        mol_id = 1
+        bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 5
         for tpl_id, tpl_dat in self.mol_dat.items():
             self.nbr_charge[mol_id] = tpl_dat.nbr_charge[tpl_id]
             for _ in range(tpl_dat.mols[tpl_id].GetNumConformers()):
@@ -2203,28 +2204,33 @@ class LammpsData(LammpsDataBase):
         """
 
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
-        for mol_id, mol in self.mols.items():
+        pre_mols, pre_atoms = 0, 0
+        for tpl_id, mol in self.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 7))
             data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]
-            data[:, 1] = mol_id
+            data[:, 0] += pre_atoms
+            data[:, 1] = tpl_id + pre_mols
             type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
             data[:, 2] = [
                 self.atm_types[x] if self.concise else x for x in type_ids
             ]
             charges = [
-                self.nbr_charge[mol_id][x.GetIdx()] for x in mol.GetAtoms()
+                self.nbr_charge[tpl_id][x.GetIdx()] for x in mol.GetAtoms()
             ]
             data[:, 3] = [
                 x + self.ff.charges[y] for x, y in zip(charges, type_ids)
             ]
-            self.total_charge += data[:, 3].sum()
-
             for conformer in mol.GetConformers():
                 data[:, 4:] = conformer.GetPositions()
                 np.savetxt(self.data_fh,
                            data,
                            fmt='%i %i %i %.4f %.3f %.3f %.3f')
-            self.data_fh.write(f"\n")
+                data[:, 0] += mol.GetNumAtoms()
+                data[:, 1] += 1
+                pre_mols += 1
+                pre_atoms += mol.GetNumAtoms()
+                self.total_charge += data[:, 3].sum()
+        self.data_fh.write(f"\n")
 
     def writeBonds(self):
         """
