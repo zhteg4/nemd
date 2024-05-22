@@ -155,7 +155,7 @@ class TestFragMol:
         fmol.setCoords()
         fmol.setFrm()
         fmol.setDcell()
-        fmol.data_reader.radii[4][1] = 3
+        fmol.data_reader.radii.setRadius(1, 4, 3)
         assert fmol.hasClashes([3])
         fmol.setConformer()
         assert not fmol.hasClashes([3])

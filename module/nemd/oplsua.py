@@ -2705,3 +2705,4 @@ class Radius(np.ndarray):
         :val float: the vdw radius between the pair to be set.
         """
         self[self.id_map[aid1], self.id_map[aid2]] = val
+        self[self.id_map[aid2], self.id_map[aid1]] = val

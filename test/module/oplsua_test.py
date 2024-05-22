@@ -72,6 +72,7 @@ class TestOplsParser:
     def raw_prsr(self):
         raw_prsr = oplsua.OplsParser()
         raw_prsr.setRawContent()
+        raw_prsr.setAtomType()
         return raw_prsr
 
     def testSetRawContent(self, nprsr):
@@ -121,6 +122,57 @@ class TestLammpsIn:
             assert os.path.exists('lmp.in')
 
 
+class TestLammpsDataOne:
+
+    @pytest.fixture
+    def lmp_data(self):
+        mol = rdkitutils.get_mol_from_smiles(CC3COOH)
+        oplsua.OplsTyper(mol).run()
+        ff = oplsua.get_opls_parser()
+        options = get_options()
+        return oplsua.LammpsDataOne({1: mol}, ff, 'lmp', options=options)
+
+    def testBalanceCharge(self, lmp_data):
+        assert all([not x.HasProp('neighbor_charge') for x in lmp_data.atom])
+        lmp_data.balanceCharge()
+        charge = [round(x, 2) for x in lmp_data.nbr_charge[1].values()]
+        assert 3 == charge.count(0.08)
+
+    def testSetBonds(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setBonds()
+        assert 17 == len(lmp_data.bonds)
+
+    def testAdjustBondLength(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setBonds()
+        lmp_data.adjustBondLength()
+        conf = lmp_data.mols[1].GetConformer()
+        # O-H bond length
+        np.testing.assert_almost_equal(
+            0.945, Chem.rdMolTransforms.GetBondLength(conf, 0, 1))
+
+    def testSetAngles(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setAngles()
+        assert 21 == len(lmp_data.angles)
+
+    def testSetDihedrals(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setDihedrals()
+        assert 23 == len(lmp_data.dihedrals)
+
+    def testSetImproperSymbols(self, lmp_data):
+        lmp_data.setImproperSymbols()
+        assert 11 == len(lmp_data.symbol_impropers)
+
+    def testSetImpropers(self, lmp_data):
+        lmp_data.setAtoms()
+        lmp_data.setImproperSymbols()
+        lmp_data.setImpropers()
+        assert 5 == len(lmp_data.impropers)
+
+
 class TestLammpsData:
 
     @pytest.fixture
@@ -155,46 +207,6 @@ class TestLammpsData:
     def testSetAtoms(self, lmp_data):
         lmp_data.setAtoms()
         assert 22 == len(set([x.GetIntProp('atom_id') for x in lmp_data.atom]))
-
-    def testBalanceCharge(self, lmp_data):
-        assert all([not x.HasProp('neighbor_charge') for x in lmp_data.atom])
-        lmp_data.balanceCharge()
-        atoms = [x for x in lmp_data.atom if x.HasProp('neighbor_charge')]
-        nchrgs = [round(x.GetDoubleProp('neighbor_charge'), 4) for x in atoms]
-        assert 3 == nchrgs.count(0.08)
-
-    def testSetBonds(self, lmp_data):
-        lmp_data.setAtoms()
-        lmp_data.setBonds()
-        assert 20 == len(lmp_data.bonds)
-
-    def testAdjustBondLength(self, lmp_data):
-        lmp_data.setAtoms()
-        lmp_data.setBonds()
-        lmp_data.adjustBondLength()
-        conf = lmp_data.mols[1].GetConformer()
-        np.testing.assert_almost_equal(
-            1.526, Chem.rdMolTransforms.GetBondLength(conf, 0, 1))
-
-    def testSetAngles(self, lmp_data):
-        lmp_data.setAtoms()
-        lmp_data.setAngles()
-        assert 23 == len(lmp_data.angles)
-
-    def testSetDihedrals(self, lmp_data):
-        lmp_data.setAtoms()
-        lmp_data.setDihedrals()
-        assert 24 == len(lmp_data.dihedrals)
-
-    def testSetImproperSymbols(self, lmp_data):
-        lmp_data.setImproperSymbols()
-        assert 11 == len(lmp_data.symbol_impropers)
-
-    def testSetImpropers(self, lmp_data):
-        lmp_data.setAtoms()
-        lmp_data.setImproperSymbols()
-        lmp_data.setImpropers()
-        assert 5 == len(lmp_data.impropers)
 
     def testRemoveAngles(self, lmp_data):
         lmp_data.setAtoms()
@@ -292,4 +304,4 @@ class TestDataFileReader:
         df_reader.setPairCoeffs()
         df_reader.setVdwRadius()
         # gid starts from 1 but there is one placeholder at index 0 for speeding
-        assert 31 == len(df_reader.radii)
+        assert 9 == len(df_reader.radii)
