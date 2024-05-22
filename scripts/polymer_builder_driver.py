@@ -332,17 +332,17 @@ class GridCell:
         """
         Duplicate molecules and set coordinates.
         """
+        self.mols = {x: y.polym for x, y in enumerate(self.polymers, 1)}
         idxs = range(
             math.ceil(math.pow(sum(x.num_mbox for x in self.polymers),
                                1. / 3)))
         # vectors shifts molecules by the largest box
         vectors = [x * self.mbox for x in itertools.product(idxs, idxs, idxs)]
-        mol_id, polymers = 1, self.polymers[:]
+        polymers = self.polymers[:]
         while polymers:
             np.random.shuffle(vectors)
             vector = vectors.pop()
             polymer = np.random.choice(polymers)
-            self.mols[mol_id] = polymer.polym
             for idx in range(min([polymer.mol_num, polymer.mol_num_per_mbox])):
                 id = polymer.polym.GetNumConformers() - polymer.mol_num
                 conf = polymer.polym.GetConformer(id)
@@ -638,6 +638,7 @@ class Polymer(object):
         self.polymerize()
         self.assignAtomType()
         self.embedMol()
+        self.setConformers()
 
     def setCruMol(self):
         """
@@ -724,7 +725,6 @@ class Polymer(object):
             orgin_atom_num = polym.GetNumAtoms()
             polym = Chem.DeleteSubstructs(
                 polym, Chem.MolFromSmiles(symbols.WILD_CARD))
-        polym.SetIntProp(self.CONFORMER_NUM, self.mol_num)
         self.polym = polym
         log(f"Polymer SMILES: {Chem.MolToSmiles(self.polym)}")
 
@@ -749,9 +749,7 @@ class Polymer(object):
                 # Mg+2 triggers
                 # WARNING UFFTYPER: Warning: hybridization set to SP3 for atom 0
                 # ERROR UFFTYPER: Unrecognized charge state for atom: 0
-                AllChem.EmbedMultipleConfs(self.polym,
-                                           numConfs=self.mol_num,
-                                           useRandomCoords=True)
+                AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
                 [log_debug(f'{x} {y}') for x, y in logs.items()]
             Chem.GetSymmSSSR(self.polym)
             return
@@ -761,6 +759,17 @@ class Polymer(object):
                                options=self.options,
                                trans=trans)
         trans_conf.run()
+
+    def setConformers(self):
+        """
+        Set multiple conformers based on the first one.
+        """
+        self.polym.SetIntProp(self.CONFORMER_NUM, self.mol_num)
+        for _ in range(self.polym.GetIntProp(self.CONFORMER_NUM) - 1):
+            # copy.copy(self.polym.GetConformer(0)) raise RuntimeError
+            # Pickling of "rdkit.Chem.rdchem.Conformer" instances is not enabled
+            conf = copy.deepcopy(self.polym).GetConformer(0)
+            self.polym.AddConformer(conf, assignId=True)
 
     @property
     def molecular_weight(self):
@@ -830,7 +839,6 @@ class Conformer(object):
         self.adjustConformer()
         self.minimize()
         self.foldPolym()
-        self.setConformers()
 
     def setCruMol(self):
         """
@@ -1036,16 +1044,6 @@ class Conformer(object):
         fmol = fragments.FragMol(self.polym, data_file=data_file)
         fmol.run()
         log('An entangled conformer set.')
-
-    def setConformers(self):
-        """
-        Set multiple conformers based on the first one.
-        """
-        for _ in range(self.polym.GetIntProp(self.CONFORMER_NUM) - 1):
-            # copy.copy(self.polym.GetConformer(0)) raise RuntimeError
-            # Pickling of "rdkit.Chem.rdchem.Conformer" instances is not enabled
-            conf = copy.deepcopy(self.polym).GetConformer(0)
-            self.polym.AddConformer(conf, assignId=True)
 
     @classmethod
     def write(cls, mol, filename):

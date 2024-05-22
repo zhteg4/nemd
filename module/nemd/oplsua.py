@@ -1963,11 +1963,9 @@ class LammpsData(LammpsDataBase):
             self.writeImpropers()
 
     def setBADI(self):
-
-        mol_id = 1
         bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 5
         for tpl_id, tpl_dat in self.mol_dat.items():
-            self.nbr_charge[mol_id] = tpl_dat.nbr_charge[tpl_id]
+            self.nbr_charge[tpl_id] = tpl_dat.nbr_charge[tpl_id]
             for _ in range(tpl_dat.mols[tpl_id].GetNumConformers()):
                 for id in tpl_dat.bonds.values():
                     bond_id += 1
@@ -1986,7 +1984,6 @@ class LammpsData(LammpsDataBase):
                     improper = tuple([id[0]] + [x + atom_num for x in id[1:]])
                     self.impropers[improper_id] = improper
                 atom_num += tpl_dat.mols[tpl_id].GetNumAtoms()
-                mol_id += 1
 
     def removeUnused(self):
         """
