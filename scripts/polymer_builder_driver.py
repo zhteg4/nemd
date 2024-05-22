@@ -290,6 +290,7 @@ class GridCell:
         """
         self.polymers = polymers
         self.mols = {}
+        self.mbox = None
 
     def run(self):
         """
@@ -334,6 +335,7 @@ class GridCell:
         idxs = range(
             math.ceil(math.pow(sum(x.num_mbox for x in self.polymers),
                                1. / 3)))
+        # vectors shifts molecules by the largest box
         vectors = [x * self.mbox for x in itertools.product(idxs, idxs, idxs)]
         mol_id, polymers = 1, self.polymers[:]
         while polymers:
@@ -344,6 +346,7 @@ class GridCell:
             for idx in range(min([polymer.mol_num, polymer.mol_num_per_mbox])):
                 id = polymer.polym.GetNumConformers() - polymer.mol_num
                 conf = polymer.polym.GetConformer(id)
+                # polymer.vecs[x] is the shift within one large box (self.mbox)
                 conformerutils.translation(conf, polymer.vecs[idx] + vector)
                 polymer.mol_num -= 1
                 if polymer.mol_num == 0:
@@ -827,6 +830,7 @@ class Conformer(object):
         self.adjustConformer()
         self.minimize()
         self.foldPolym()
+        self.setConformers()
 
     def setCruMol(self):
         """
@@ -978,18 +982,12 @@ class Conformer(object):
                 xyz = self.xyzs[mono_atom_id] + vect
                 conformer.SetAtomPosition(atom.GetIdx(), xyz)
         self.polym.AddConformer(conformer, assignId=True)
-        for _ in range(self.polym.GetIntProp(self.CONFORMER_NUM) - 1):
-            # copy.copy(self.polym.GetConformer(0)) raise RuntimeError
-            # Pickling of "rdkit.Chem.rdchem.Conformer" instances is not enabled
-            conf = copy.deepcopy(self.polym).GetConformer(0)
-            self.polym.AddConformer(conf, assignId=True)
         Chem.GetSymmSSSR(self.polym)
 
     def adjustConformer(self):
         """
         Adjust the conformer coordinates based on the force field.
         """
-
         mols = {1: self.polym}
         self.lmw = oplsua.LammpsData(mols,
                                      self.ff,
@@ -1038,6 +1036,16 @@ class Conformer(object):
         fmol = fragments.FragMol(self.polym, data_file=data_file)
         fmol.run()
         log('An entangled conformer set.')
+
+    def setConformers(self):
+        """
+        Set multiple conformers based on the first one.
+        """
+        for _ in range(self.polym.GetIntProp(self.CONFORMER_NUM) - 1):
+            # copy.copy(self.polym.GetConformer(0)) raise RuntimeError
+            # Pickling of "rdkit.Chem.rdchem.Conformer" instances is not enabled
+            conf = copy.deepcopy(self.polym).GetConformer(0)
+            self.polym.AddConformer(conf, assignId=True)
 
     @classmethod
     def write(cls, mol, filename):

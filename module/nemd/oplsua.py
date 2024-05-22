@@ -2015,7 +2015,10 @@ class LammpsData(LammpsDataBase):
             raise ValueError(f"Mols are not set.")
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.data_fh.write(f"{lmp_dsp}\n\n")
-        atom_nums = [len(x.GetAtoms()) * x.GetNumConformers() for x in self.mols.values()]
+        atom_nums = [
+            len(x.GetAtoms()) * x.GetNumConformers()
+            for x in self.mols.values()
+        ]
         self.data_fh.write(f"{sum(atom_nums)} {self.ATOMS}\n")
         self.data_fh.write(f"{len(self.bonds)} {self.BONDS}\n")
         self.data_fh.write(f"{len(self.angles)} {self.ANGLES}\n")
@@ -2044,8 +2047,10 @@ class LammpsData(LammpsDataBase):
         :param min_box list: minimum box size
         :param buffer list: buffer in three dimensions
         """
-        xyzs = np.concatenate(
-            [x.GetConformer(0).GetPositions() for x in self.mols.values()])
+        xyzs = np.concatenate([
+            y.GetPositions() for x in self.mols.values()
+            for y in x.GetConformers()
+        ])
         ctr = xyzs.mean(axis=0)
         box_hf = self.getHalfBox(xyzs, min_box=min_box, buffer=buffer)
         box = [[x - y, x + y, z] for x, y, z in zip(ctr, box_hf, self.LO_HI)]
@@ -2086,7 +2091,7 @@ class LammpsData(LammpsDataBase):
         if self.box is not None:
             box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        if len(self.mols) != 1:
+        if sum([x.GetNumConformers() for x in self.mols.values()]) != 1:
             return box_hf
         # All-trans single molecule with internal tension runs into clashes
         # across PBCs and thus larger box is used.
