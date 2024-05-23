@@ -15,7 +15,6 @@ import math
 import copy
 import scipy
 import lammps
-import itertools
 import functools
 import collections
 import numpy as np
@@ -186,9 +185,9 @@ class AmorphousCell(object):
         for cru, cru_num, mol_num in zip(self.options.cru,
                                          self.options.cru_num,
                                          self.options.mol_num):
-            polym = Polymer(cru, cru_num, mol_num, options=self.options)
-            polym.run()
-            self.polymers.append(polym)
+            polymer = Polymer(cru, cru_num, mol_num, options=self.options)
+            polymer.run()
+            self.polymers.append(polymer)
 
     def setGriddedCell(self):
         """
@@ -196,9 +195,9 @@ class AmorphousCell(object):
         """
         if self.options.cell != GRID:
             return
-        cell = GridCell(self.polymers)
-        cell.run()
-        self.mols = cell.mols
+        struct = structutils.GridStruct([x.polym for x in self.polymers])
+        struct.run()
+        self.mols = struct.mols
 
     def setPackedCell(self, mini_density=MINIMUM_DENSITY):
         """
@@ -275,98 +274,6 @@ class AmorphousCell(object):
         jobutils.add_outfile(lmw.lammps_in,
                              jobname=self.options.jobname,
                              set_file=True)
-
-
-class GridCell:
-    """
-    Grid the space and place polymers into the sub-cells.
-    """
-
-    def __init__(self, polymers):
-        """
-        :param polymers 'Polymer': one polymer object for each type
-        :param polym_nums list: number of polymers per polymer type
-        """
-        self.polymers = polymers
-        self.mols = {}
-        self.mbox = None
-
-    def run(self):
-        """
-        Create gridded amorphous cell.
-        """
-        self.setBoxes()
-        self.setPolymVectors()
-        self.setMols()
-        self.placeMols()
-
-    def setBoxes(self):
-        """
-        Set the minimum box for each molecule.
-        """
-
-        for polymer in self.polymers:
-            xyzs = polymer.polym.GetConformer(0).GetPositions()
-            polymer.box = xyzs.max(axis=0) - xyzs.min(axis=0) + polymer.buffer
-        self.mbox = np.array([x.box for x in self.polymers]).max(axis=0)
-
-    def setPolymVectors(self):
-        """
-        Set polymer translational vectors based on medium box size.
-        """
-        for polym in self.polymers:
-            mol_nums_per_mbox = np.floor(self.mbox / polym.box).astype(int)
-            polym.mol_num_per_mbox = np.prod(mol_nums_per_mbox)
-            polym.num_mbox = math.ceil(polym.mol_num / polym.mol_num_per_mbox)
-            percent = [
-                np.linspace(-0.5, 0.5, x, endpoint=False)
-                for x in mol_nums_per_mbox
-            ]
-            percent = [x - x.mean() for x in percent]
-            polym.vecs = [
-                x * self.mbox
-                for x in itertools.product(*[[y for y in x] for x in percent])
-            ]
-
-    def setMols(self):
-        """
-        Set molecules.
-        """
-        self.mols = {i: x.polym for i, x in enumerate(self.polymers, start=1)}
-        for mol_id, conf in enumerate(self.conformers, start=1):
-            conf.SetIntProp(pnames.MOL_ID, mol_id)
-
-    @property
-    def conformers(self):
-        """
-        Return all conformers of all molecules.
-
-        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all molecules.
-        """
-        return [y for x in self.mols.values() for y in x.GetConformers()]
-
-    def placeMols(self):
-        """
-        Duplicate molecules and set coordinates.
-        """
-        idxs = range(
-            math.ceil(math.pow(sum(x.num_mbox for x in self.polymers),
-                               1. / 3)))
-        # vectors shifts molecules by the largest box
-        vectors = [x * self.mbox for x in itertools.product(idxs, idxs, idxs)]
-        polymers = self.polymers[:]
-        while polymers:
-            np.random.shuffle(vectors)
-            vector = vectors.pop()
-            polymer = np.random.choice(polymers)
-            for idx in range(min([polymer.mol_num, polymer.mol_num_per_mbox])):
-                id = polymer.polym.GetNumConformers() - polymer.mol_num
-                conf = polymer.polym.GetConformer(id)
-                # polymer.vecs[x] is the shift within one large box (self.mbox)
-                conformerutils.translation(conf, polymer.vecs[idx] + vector)
-                polymer.mol_num -= 1
-                if polymer.mol_num == 0:
-                    polymers.remove(polymer)
 
 
 class PackedCell:

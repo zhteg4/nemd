@@ -218,13 +218,13 @@ class TestFragment:
         fmol.addNxtFrags()
         fmol.setPreFrags()
         # frag with no previous
-        assert fmol.init_frag.getPreAvailFrag() is None
+        assert fmol.ifrag.getPreAvailFrag() is None
         # frag without dihedral vals return one available previous
-        second_frag = fmol.init_frag.nfrags[0]
+        second_frag = fmol.ifrag.nfrags[0]
         second_frag.vals = []
         assert 0 == second_frag.getPreAvailFrag().dihe[0]
         # No available previous
-        fmol.init_frag.vals = []
+        fmol.ifrag.vals = []
         assert second_frag.getPreAvailFrag() is None
 
     @pytest.mark.parametrize(('smiles_str', 'data_file'), [(CC3COOH, None)])
@@ -232,7 +232,7 @@ class TestFragment:
         fmol = frag.fmol
         fmol.addNxtFrags()
         fmol.setPreFrags()
-        second_frag = fmol.init_frag.nfrags[0]
+        second_frag = fmol.ifrag.nfrags[0]
         second_frag.vals = []
         frag = second_frag.getPreAvailFrag()
         assert 0 == frag.dihe[0]
@@ -246,7 +246,7 @@ class TestFragment:
     def testGetNxtFrags(self, frag):
         fmol = frag.fmol
         fmol.run()
-        frag = fmol.init_frag
+        frag = fmol.ifrag
         oval = frag.getDihedralDeg()
         frag.setConformer()
         assert oval != frag.getDihedralDeg()
