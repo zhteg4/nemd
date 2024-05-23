@@ -5,7 +5,7 @@
 """
 Fragmentize molecules into the smallest rigid bodies.
 """
-import math
+import copy
 import itertools
 import numpy as np
 from rdkit import Chem
@@ -13,7 +13,7 @@ from rdkit import Chem
 from nemd import traj
 from nemd import oplsua
 from nemd import logutils
-from nemd import prop_names
+from nemd import pnames
 from nemd import structutils
 from nemd import conformerutils
 
@@ -213,9 +213,11 @@ class FragMixIn:
         """
         Read data  file and set clash parameters.
         """
-        self.data_reader = oplsua.DataFileReader(self.data_file)
-        self.data_reader.run()
-        self.data_reader.setClashParams(include14=include14)
+        if self.df_reader is not None:
+            return
+        self.df_reader = oplsua.DataFileReader(self.data_file)
+        self.df_reader.run()
+        self.df_reader.setClashParams(include14=include14)
 
     def setDCellParams(self):
         """
@@ -223,7 +225,7 @@ class FragMixIn:
         """
 
         # memory saving flaot16 to regular float32
-        self.max_clash_dist = float(self.data_reader.radii.max())
+        self.max_clash_dist = float(self.df_reader.radii.max())
         # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
         # Separated by 1 max_clash_dist, meaning no clashes.
         self.cell_cut = self.max_clash_dist
@@ -237,26 +239,50 @@ class FragMol(FragMixIn):
     # https://ctr.fandom.com/wiki/Break_rotatable_bonds_and_report_the_fragments
     PATT = Chem.MolFromSmarts(
         '[!$([NH]!@C(=O))&!D1&!$(*#*)]-&!@[!$([NH]!@C(=O))&!D1&!$(*#*)]')
-    IS_MONO = prop_names.IS_MONO
-    MONO_ID = prop_names.MONO_ID
-    POLYM_HT = prop_names.POLYM_HT
-    MOL_ID = prop_names.MOL_ID
+    IS_MONO = pnames.IS_MONO
+    MONO_ID = pnames.MONO_ID
+    POLYM_HT = pnames.POLYM_HT
+    MOL_ID = pnames.MOL_ID
 
-    def __init__(self, mol, data_file=None):
+    def __init__(self, mol, conf=None, data_file=None, df_reader=None):
         """
         :param mol 'rdkit.Chem.rdchem.Mol': the molecule to fragmentize
         :param data_file str: filename path to get force field information
         """
 
         self.mol = mol
+        self.conf = conf
         self.data_file = data_file
-        self.conf = self.mol.GetConformer(0)
+        self.df_reader = df_reader
+        if conf is None:
+            self.conf = self.mol.GetConformer(0)
         self.graph = structutils.getGraph(mol)
         self.rotatable_bonds = self.mol.GetSubstructMatches(self.PATT,
                                                             maxMatches=1000000)
         self.init_frag = None
         self.extg_aids = None
         self.frm = None
+
+    def copy(self, conf):
+        fmol = FragMol(self.mol, conf=conf, data_file=self.data_file, df_reader=self.df_reader)
+        fmol.graph = self.graph
+        fmol.rotatable_bonds = self.rotatable_bonds
+        fmol.init_frag = copy.copy(self.init_frag)
+        fmol.extg_aids = copy.copy(self.extg_aids)
+        fmol.frm = self.frm
+        if fmol.init_frag is None:
+            return fmol
+        all_nfrags = [fmol.init_frag]
+        while (all_nfrags):
+            frag = all_nfrags.pop()
+            frag.fmol = fmol
+            frag.vals = copy.copy(frag.vals)
+            nfrags = [copy.copy(x) for x in frag.nfrags]
+            frag.nfrags = nfrags
+            for nfrag in nfrags:
+                nfrag.pfrag = frag
+            all_nfrags += nfrags
+        return fmol
 
     def isRotatable(self, bond):
         """
@@ -382,32 +408,31 @@ class FragMol(FragMixIn):
         self.extg_aids = set(
             [x for x in range(self.mol.GetNumAtoms()) if x not in aids_set])
 
-    def setGlobalAtomIds(self):
+    def setGlobalAtomIds(self, gids):
         """
         Set Global atom ids for each fragment and existing atoms.
         """
-        self.gids = [x.GetAtomMapNum() for x in self.mol.GetAtoms()]
-        self.extg_gids = set([
-            self.mol.GetAtomWithIdx(x).GetAtomMapNum() for x in self.extg_aids
-        ])
+        self.gids = gids
+        id_map = {
+            x.GetIdx(): y
+            for x, y in zip(self.mol.GetAtoms(), self.gids)
+        }
+        self.extg_gids = set([id_map[x] for x in self.extg_aids])
         for frag in self.fragments():
-            frag.gids = [
-                self.mol.GetAtomWithIdx(x).GetAtomMapNum() for x in frag.aids
-            ]
+            frag.gids = [id_map[x] for x in frag.aids]
 
     def setCoords(self):
         """
         Set conformer coordinates from data file.
         """
-        for atom in self.data_reader.atoms.values():
+        for atom in self.df_reader.atoms.values():
             self.conf.SetAtomPosition(atom.id - 1, np.array(atom.xyz))
 
     def setFrm(self):
         """
         Set traj frame.
         """
-        box = np.array(
-            [y for x in self.data_reader.box_dsp.values() for y in x])
+        box = np.array([y for x in self.df_reader.box_dsp.values() for y in x])
         xyz = self.conf.GetPositions()
         self.frm = traj.Frame(xyz=xyz, box=box)
 
@@ -426,7 +451,7 @@ class FragMol(FragMixIn):
         :param aids list of ints: list of atom ids
         :return bool: clashes exist or not.
         """
-        # frm and self.data_reader.radii use gid starting from 1
+        # frm and self.df_reader.radii use gid starting from 1
         # while aid starts from 0.
         self.frm.loc[:] = self.conf.GetPositions()
         frag_rows = [self.frm.iloc[x] for x in aids]
@@ -434,8 +459,8 @@ class FragMol(FragMixIn):
             clashes = self.dcell.getClashes(
                 row,
                 included=[x + 1 for x in self.extg_aids],
-                radii=self.data_reader.radii,
-                excluded=self.data_reader.excluded)
+                radii=self.df_reader.radii,
+                excluded=self.df_reader.excluded)
             if clashes:
                 return True
         return False
@@ -473,7 +498,7 @@ class FragMol(FragMixIn):
 
         :return int: the molecule id.
         """
-        return self.mol.GetIntProp(self.MOL_ID)
+        return self.conf.GetIntProp(self.MOL_ID)
 
     def run(self):
         """
@@ -491,10 +516,16 @@ class FragMol(FragMixIn):
 
 class FragMols(FragMixIn):
 
-    def __init__(self, mols, data_file=None, box=None, logger=logger):
+    def __init__(self,
+                 mols,
+                 data_file=None,
+                 df_reader=None,
+                 box=None,
+                 logger=logger):
 
         self.mols = mols
         self.data_file = data_file
+        self.df_reader = df_reader
         self.box = box
         self.logger = logger
         self.confs = None
@@ -518,8 +549,8 @@ class FragMols(FragMixIn):
         """
         Main method to fragmentize and set conformer.
         """
-        self.fragmentize()
         self.readData()
+        self.fragmentize()
         self.setDCellParams()
         self.setCoords()
         self.setFrm()
@@ -529,12 +560,20 @@ class FragMols(FragMixIn):
         """
         Break the molecule into the smallest rigid fragments.
         """
-        self.fmols = {i: FragMol(x) for i, x in self.mols.items()}
-        for fmol in self.fmols.values():
-            fmol.addNxtFrags()
-            fmol.setPreFrags()
-            fmol.setInitAtomIds()
-            fmol.setGlobalAtomIds()
+        tpl_fmols = {i: FragMol(x) for i, x in self.mols.items()}
+        for tpl_fmol in tpl_fmols.values():
+            tpl_fmol.addNxtFrags()
+            tpl_fmol.setPreFrags()
+            tpl_fmol.setInitAtomIds()
+
+        self.fmols = {}
+        for id, tpl_fmol in tpl_fmols.items():
+            tpl_fmol.conf = None # conformer doesn't support copy
+            for conf in tpl_fmol.mol.GetConformers():
+                fmol = tpl_fmol.copy(conf)
+                mol_id = conf.GetIntProp(pnames.MOL_ID)
+                fmol.setGlobalAtomIds(self.df_reader.mols[mol_id])
+                self.fmols[mol_id] = fmol
         total_frag_num = sum([x.getNumFrags() for x in self.fmols.values()])
         log_debug(f"{total_frag_num} fragments in total.")
 
@@ -543,25 +582,34 @@ class FragMols(FragMixIn):
         Set conformer coordinates from data file.
         """
 
-        for mol in self.mols.values():
-            for atom in mol.GetAtoms():
-                xyz = self.data_reader.atoms[atom.GetAtomMapNum()].xyz
-                mol.GetConformer().SetAtomPosition(atom.GetIdx(),
-                                                   np.array(xyz))
-        self.confs = {i: x.GetConformer() for i, x in self.mols.items()}
+        for conf in self.conformers:
+            mol = conf.GetOwningMol()
+            aids = self.df_reader.mols[conf.GetIntProp(pnames.MOL_ID)]
+            for aid, atom in zip(aids, mol.GetAtoms()):
+                xyz = self.df_reader.atoms[aid].xyz
+                conf.SetAtomPosition(atom.GetIdx(), np.array(xyz))
+
+    @property
+    def conformers(self):
+        """
+        Return all conformers of all molecules.
+
+        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all molecules.
+        """
+        return [y for x in self.mols.values() for y in x.GetConformers()]
 
     def setFrm(self):
         """
         Set traj frame.
         """
-        xyz = np.array([x.xyz for x in self.data_reader.atoms.values()])
+        xyz = np.array([x.xyz for x in self.df_reader.atoms.values()])
         self.frm = traj.Frame(xyz=xyz, box=self.box)
 
     def updateFrm(self):
         """
         Update the coordinate frame based on the current conformer.
         """
-        pos = [x.GetPositions() for x in self.confs.values()]
+        pos = [x.GetPositions() for x in self.conformers]
         self.frm.loc[:] = np.concatenate(pos, axis=0)
 
     def setDcell(self):
@@ -613,7 +661,6 @@ class FragMols(FragMixIn):
         """
         Set conformer coordinates without clashes.
         """
-
         frags = [x.init_frag for x in self.fmols.values()]
         self.setInitFrm(frags)
         self.setDcell()
@@ -676,7 +723,6 @@ class FragMols(FragMixIn):
 
         :param frags list of 'fragments.Fragment': fragment from each molecule
         """
-
         data = np.full((len(frags), 3), np.inf)
         index = [x.fmol.molecule_id for x in frags]
         self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
@@ -695,13 +741,14 @@ class FragMols(FragMixIn):
         self.dcell.rmClashNodes()
         points = self.dcell.getVoids()
         for point in points:
-            conf = frag.fmol.mol.GetConformer()
+            conf = frag.fmol.conf
             aids = list(frag.fmol.extg_aids)
             centroid = np.array(conformerutils.centroid(conf, aids=aids))
             conformerutils.translation(conf, -centroid)
             conformerutils.rand_rotate(conf)
             conformerutils.translation(conf, point)
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
+
             if self.hasClashes(frag.fmol.extg_gids):
                 continue
             # Only update the distance cell after one molecule successful
@@ -713,7 +760,7 @@ class FragMols(FragMixIn):
 
         with open('placeInitFrag.xyz', 'w') as out_fh:
             self.frm.write(out_fh,
-                           dreader=self.data_reader,
+                           dreader=self.df_reader,
                            visible=list(self.dcell.extg_gids),
                            points=points)
         raise ValueError(f'Failed to relocate the dead molecule. '
@@ -768,8 +815,8 @@ class FragMols(FragMixIn):
         for row in frag_rows:
             clashes = self.dcell.getClashes(row,
                                             included=self.dcell.extg_gids,
-                                            radii=self.data_reader.radii,
-                                            excluded=self.data_reader.excluded)
+                                            radii=self.df_reader.radii,
+                                            excluded=self.df_reader.excluded)
             if clashes:
                 return True
         return False

@@ -15,6 +15,7 @@ from rdkit import rdBase
 from rdkit import RDLogger
 from rdkit.Chem import AllChem
 from contextlib import contextmanager
+from nemd import pnames
 from nemd import constants
 
 
@@ -55,13 +56,14 @@ class Mol(Chem.rdchem.Mol):
         return np.array(param) * self.dimensions
 
 
-def get_mol_from_smiles(smiles_str, embeded=True):
+def get_mol_from_smiles(smiles_str, embeded=True, mol_id=1):
     with rdkit_preserve_hs() as ps:
         mol = Chem.MolFromSmiles(smiles_str, ps)
     if not embeded:
         return mol
     with rdkit_warnings_ignored():
         AllChem.EmbedMolecule(mol, useRandomCoords=True)
+    mol.GetConformer().SetIntProp(pnames.MOL_ID, mol_id)
     return mol
 
 

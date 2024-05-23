@@ -105,7 +105,7 @@ class CustomDump(object):
         self.timestep = timestep
         self.frms = None
         self.gids = None
-        self.data_reader = None
+        self.df_reader = None
         self.radii = None
 
     def run(self):
@@ -123,21 +123,20 @@ class CustomDump(object):
         """
         if not self.options.data_file:
             return
-        self.data_reader = oplsua.DataFileReader(self.options.data_file)
-        self.data_reader.run()
+        self.df_reader = oplsua.DataFileReader(self.options.data_file)
+        self.df_reader.run()
 
     def setAtoms(self):
         """
         set the atom selection for analysis.
         """
-        if not self.data_reader:
+        if not self.df_reader:
             return
         if self.options.sel is None:
-            self.gids = [x.id for x in self.data_reader.atom]
+            self.gids = [x.id for x in self.df_reader.atom]
         else:
             self.gids = [
-                x.id for x in self.data_reader.atom
-                if x.ele in self.options.sel
+                x.id for x in self.df_reader.atom if x.ele in self.options.sel
             ]
         log(f"{len(self.gids)} atoms selected.")
 
@@ -189,7 +188,7 @@ class CustomDump(object):
             anl = Analyzer(self.time,
                            self.frms,
                            sidx=self.sidx,
-                           data_reader=self.data_reader,
+                           df_reader=self.df_reader,
                            gids=self.gids,
                            options=self.options,
                            logger=logger)

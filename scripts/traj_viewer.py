@@ -148,13 +148,13 @@ class App(dash.Dash):
         self.frm_vw.clearData()
         if contents is None:
             return self.frm_vw.fig
-        data_reader = oplsua.DataFileReader(contents=contents)
+        df_reader = oplsua.DataFileReader(contents=contents)
         try:
-            data_reader.run()
+            df_reader.run()
         except ValueError:
             # Accidentally load xyz into the datafile holder
             return self.frm_vw.fig
-        self.frm_vw.data_reader = data_reader
+        self.frm_vw.df_reader = df_reader
         self.frm_vw.setData()
         self.frm_vw.setEdges()
         self.frm_vw.setEleSz()

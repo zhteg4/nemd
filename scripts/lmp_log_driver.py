@@ -94,7 +94,7 @@ class LmpLog(object):
         :param options 'argparse.ArgumentParser': Parsed command-line options
         """
         self.options = options
-        self.data_reader = None
+        self.df_reader = None
 
     def run(self):
         """
@@ -111,8 +111,8 @@ class LmpLog(object):
         if not self.options.data_file:
             return
 
-        self.data_reader = stillinger.get_data_Reader(self.options.data_file)
-        self.data_reader.run()
+        self.df_reader = stillinger.get_df_reader(self.options.data_file)
+        self.df_reader.run()
 
     def setThermo(self):
         """

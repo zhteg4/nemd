@@ -16,16 +16,16 @@ class TestTransConformer(object):
 
     @pytest.fixture
     def frm_vw(self, datafile):
-        data_reader = oplsua.DataFileReader(datafile)
-        data_reader.run()
-        frm_vw = molview.FrameView(data_reader)
+        df_reader = oplsua.DataFileReader(datafile)
+        df_reader.run()
+        frm_vw = molview.FrameView(df_reader)
         return frm_vw
 
     @pytest.fixture
     def frm_df(self, datafile, traj_path):
-        data_reader = oplsua.DataFileReader(datafile)
-        data_reader.run()
-        frm_df = molview.FrameView(data_reader)
+        df_reader = oplsua.DataFileReader(datafile)
+        df_reader.run()
+        frm_df = molview.FrameView(df_reader)
         frm_df.setData()
         frm_df.setEleSz()
         frm_df.setScatters()

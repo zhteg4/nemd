@@ -21,13 +21,13 @@ class FrameView:
     COLOR = 'color'
     ELE_SZ_CLR = dict(element=None, size=None, color=None)
 
-    def __init__(self, data_reader=None, scale=5.):
+    def __init__(self, df_reader=None, scale=5.):
         """
-        :param data_reader `nemd.oplsua.DataFileReader`: datafile reader with
+        :param df_reader `nemd.oplsua.DataFileReader`: datafile reader with
             atom, bond, element and other info.
         :param scale float: scale the LJ dist by this to obtain marker size.
         """
-        self.data_reader = data_reader
+        self.df_reader = df_reader
         self.fig = graph_objects.Figure()
         self.scale = scale
         self.data = None
@@ -39,20 +39,20 @@ class FrameView:
         """
         Set data frame with coordinates, elements, marker sizes, and color info.
         """
-        if not self.data_reader:
+        if not self.df_reader:
             return
         # Index, XU, YU, ZU
-        index = list(self.data_reader.atoms.keys())
-        xyz = np.array([x.xyz for x in self.data_reader.atom])
+        index = list(self.df_reader.atoms.keys())
+        xyz = np.array([x.xyz for x in self.df_reader.atom])
         data = pd.DataFrame(xyz, index, columns=self.XYZU)
         # Element, Size, Color
         ele_sz_clr = self.ELE_SZ_CLR.copy()
-        self.data_reader.setMinimumDist()
-        type_ids = [x.type_id for x in self.data_reader.atom]
-        element = {x: y.ele for x, y in self.data_reader.masses.items()}
+        self.df_reader.setMinimumDist()
+        type_ids = [x.type_id for x in self.df_reader.atom]
+        element = {x: y.ele for x, y in self.df_reader.masses.items()}
         ele_sz_clr[self.ELEMENT] = [element[x] for x in type_ids]
         ele_sz_clr[self.SIZE] = [
-            self.data_reader.vdws[x].dist * self.scale for x in type_ids
+            self.df_reader.vdws[x].dist * self.scale for x in type_ids
         ]
         color = {
             x: nmendeleev.element(y).cpk_color
@@ -61,7 +61,7 @@ class FrameView:
         ele_sz_clr[self.COLOR] = [color[x] for x in type_ids]
         sz_clr = pd.DataFrame(ele_sz_clr, index=index)
         data = pd.concat((data, sz_clr), axis=1)
-        box = self.data_reader.getBox()
+        box = self.df_reader.getBox()
         columns = traj.Frame.XYZU_ELE_SZ_CLR
         self.data = traj.Frame(data, box=box, columns=columns, dtype=None)
 
@@ -188,12 +188,12 @@ class FrameView:
         :return markers list of 'plotly.graph_objs._scatter3d.Scatter3d':
             the line markers to represent bonds.
         """
-        if self.data_reader is None:
+        if self.df_reader is None:
             return
         self.lines = []
-        for bond in self.data_reader.bonds.values():
-            atom1 = self.data_reader.atoms[bond.id1]
-            atom2 = self.data_reader.atoms[bond.id2]
+        for bond in self.df_reader.bonds.values():
+            atom1 = self.df_reader.atoms[bond.id1]
+            atom2 = self.df_reader.atoms[bond.id2]
             pnts = self.data.loc[[atom1.id, atom2.id]][self.XYZU]
             mid = pnts.mean().to_frame().transpose()
             pnts = np.concatenate((pnts.values, mid.values))

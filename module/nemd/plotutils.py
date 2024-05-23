@@ -433,7 +433,7 @@ class DispersionPlotter:
         data = pd.read_csv(self.filename,
                            header=None,
                            skiprows=3,
-                           delim_whitespace=True)
+                           sep=b'\s+')
         self.data = data.set_index(0)
         if self.unit == self.THZ:
             self.data *= constants.CM_INV_THZ

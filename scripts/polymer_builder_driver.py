@@ -31,7 +31,7 @@ from nemd import logutils
 from nemd import fragments
 from nemd import fileutils
 from nemd import rdkitutils
-from nemd import prop_names
+from nemd import pnames
 from nemd import structutils
 from nemd import parserutils
 from nemd import environutils
@@ -297,6 +297,7 @@ class GridCell:
         """
         self.setBoxes()
         self.setPolymVectors()
+        self.setMols()
         self.placeMols()
 
     def setBoxes(self):
@@ -327,11 +328,27 @@ class GridCell:
                 for x in itertools.product(*[[y for y in x] for x in percent])
             ]
 
+    def setMols(self):
+        """
+        Set molecules.
+        """
+        self.mols = {i: x.polym for i, x in enumerate(self.polymers, start=1)}
+        for mol_id, conf in enumerate(self.conformers, start=1):
+            conf.SetIntProp(pnames.MOL_ID, mol_id)
+
+    @property
+    def conformers(self):
+        """
+        Return all conformers of all molecules.
+
+        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all molecules.
+        """
+        return [y for x in self.mols.values() for y in x.GetConformers()]
+
     def placeMols(self):
         """
         Duplicate molecules and set coordinates.
         """
-        self.mols = {x: y.polym for x, y in enumerate(self.polymers, 1)}
         idxs = range(
             math.ceil(math.pow(sum(x.num_mbox for x in self.polymers),
                                1. / 3)))
@@ -413,7 +430,7 @@ class PackedCell:
         """
         self.mols = {i: x.polym for i, x in enumerate(self.polymers, start=1)}
         for mol_id, conf in enumerate(self.conformers, start=1):
-            conf.SetIntProp(prop_names.MOL_ID, mol_id)
+            conf.SetIntProp(pnames.MOL_ID, mol_id)
 
     def setDataReader(self):
         """
@@ -424,8 +441,10 @@ class PackedCell:
                                 self.polymers[0].ff,
                                 'tmp',
                                 options=self.options)
-        contents = lmw.writeData(nofile=True)
-        self.df_reader = oplsua.DataFileReader(contents=contents)
+        # contents = lmw.writeData(nofile=True)
+        # self.df_reader = oplsua.DataFileReader(contents=contents)
+        lmw.writeData()
+        self.df_reader = oplsua.DataFileReader('tmp.data')
         self.df_reader.run()
         self.df_reader.setClashParams()
 
@@ -452,9 +471,9 @@ class PackedCell:
         while trial_num <= max_trial:
             self.extg_aids = set()
             for conf in self.conformers:
-                mol_id = conf.GetIntProp(prop_names.MOL_ID)
+                mol_id = conf.GetIntProp(pnames.MOL_ID)
                 try:
-                    self.placeMol(mol_id, conf)
+                    self.placeMol(conf)
                 except MolError:
                     log_debug(f'{trial_num} trail fails. '
                               f'(Only {mol_id - 1} / {len(self.mols)} '
@@ -480,19 +499,17 @@ class PackedCell:
         """
         return [y for x in self.mols.values() for y in x.GetConformers()]
 
-    def placeMol(self, mol_id, conf, max_trial=MAX_TRIAL_PER_MOL):
+    def placeMol(self, conf, max_trial=MAX_TRIAL_PER_MOL):
         """
         Place molecules one molecule into the cell without clash.
 
-        :param mol_id int: the molecule id of the molecule to be placed into the
-            cell.
         :param max_trial int: the max trial number for each molecule to be placed
             into the cell.
         """
-        aids = self.df_reader.mols[mol_id]
+        aids = self.df_reader.mols[conf.GetIntProp(pnames.MOL_ID)]
         trial_per_mol = 1
         while trial_per_mol <= max_trial:
-            self.translateMol(conf, aids=aids)
+            self.translateMol(conf, aids)
             if not self.hasClashes(aids):
                 self.extg_aids.update(aids)
                 # Only update the distance cell after one molecule successful
@@ -504,7 +521,7 @@ class PackedCell:
         if trial_per_mol > max_trial:
             raise MolError
 
-    def translateMol(self, conf, aids=None):
+    def translateMol(self, conf, aids):
         """
         Do translation and rotation to the molecule so that the centroid will be
         randomly point in the cell and the orientation is also randomly picked.
@@ -594,9 +611,9 @@ class Polymer(object):
     MONO_ATOM_IDX = 'mono_atom_idx'
     CAP = 'cap'
     HT = 'ht'
-    POLYM_HT = prop_names.POLYM_HT
-    IS_MONO = prop_names.IS_MONO
-    MONO_ID = prop_names.MONO_ID
+    POLYM_HT = pnames.POLYM_HT
+    IS_MONO = pnames.IS_MONO
+    MONO_ID = pnames.MONO_ID
     CONFORMER_NUM = 'conformer_num'
 
     def __init__(self, cru, cru_num, mol_num, options=None):

@@ -134,7 +134,7 @@ class Dispersion(object):
                                              self.options.jobname,
                                              tasks=tasks)
         self.lmp_dat.writeData()
-        self.orig_lammps_dat = self.lmp_dat.lammps_data
+        self.orig_lammps_dat = self.lmp_dat.datafile
         log(f"LAMMPS data file written as {self.orig_lammps_dat}")
 
     def writeDisplacement(self):
@@ -148,7 +148,7 @@ class Dispersion(object):
             raise ValueError(info.stderr)
         with open(f'{self.options.jobname}{self.DSP_LOG}', 'wb') as fh:
             fh.write(info.stdout)
-        name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
+        name = self.lmp_dat.datafile[:-len(self.lmp_dat.DATA_EXT)]
         self.datafiles = glob.glob(f"{name}*{self.LAMMPS_EXT}")
         log(f"Data files with displacements are written as: {self.datafiles}")
 
@@ -156,13 +156,13 @@ class Dispersion(object):
         """
         Run LAMMPS to calculate the force on the atoms.
         """
-        name = self.lmp_dat.lammps_data[:-len(self.lmp_dat.DATA_EXT)]
+        name = self.lmp_dat.datafile[:-len(self.lmp_dat.DATA_EXT)]
         pattern = f"{name}(.*){self.LAMMPS_EXT}"
         for datafile in self.datafiles:
             index = re.search(pattern, datafile).groups()[0]
             jobname = f"{self.options.jobname}{index}"
             self.lmp_dat.resetFilenames(jobname)
-            self.lmp_dat.lammps_data = f"{jobname}{self.LAMMPS_EXT}"
+            self.lmp_dat.datafile = f"{jobname}{self.LAMMPS_EXT}"
             self.lmp_dat.writeLammpsIn()
             self.dumpfiles.append(self.lmp_dat.lammps_dump)
             lmp_log = f"{self.options.jobname}{index}{task.Lammps_Driver.DRIVER_LOG}"

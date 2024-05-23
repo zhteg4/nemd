@@ -31,7 +31,7 @@ class BaseAnalyzer:
                  time,
                  frms,
                  sidx=None,
-                 data_reader=None,
+                 df_reader=None,
                  gids=None,
                  options=None,
                  logger=None):
@@ -42,8 +42,8 @@ class BaseAnalyzer:
         :type frms: list of 'nemd.traj.Frame'
         :param sidx: the starting frame index after excluding the first xxx pct
         :type sidx: int
-        :param data_reader: data file reader containing structural information
-        :type data_reader: 'nemd.oplsua.DataFileReader'
+        :param df_reader: data file reader containing structural information
+        :type df_reader: 'nemd.oplsua.DataFileReader'
         :param gids: global ids for the selected atom
         :type gids: list of int
         :param options: parsed commandline options
@@ -54,7 +54,7 @@ class BaseAnalyzer:
         self.time = time
         self.frms = frms
         self.sidx = sidx
-        self.data_reader = data_reader
+        self.df_reader = df_reader
         self.gids = gids
         self.options = options
         self.logger = logger
@@ -234,7 +234,7 @@ class Density(BaseAnalyzer):
         """
         Set the time vs density data.
         """
-        mass = self.data_reader.molecular_weight / constants.Avogadro
+        mass = self.df_reader.molecular_weight / constants.Avogadro
         mass_scaled = mass / (constants.angstrom / constants.centi)**3
         data = [mass_scaled / x.getVolume() for x in self.frms]
         self.data = pd.DataFrame({self.LABEL: data}, index=self.time)
@@ -339,8 +339,7 @@ class MSD(BaseAnalyzer):
         """
 
         masses = [
-            self.data_reader.masses[x.type_id].mass
-            for x in self.data_reader.atom
+            self.df_reader.masses[x.type_id].mass for x in self.df_reader.atom
         ]
         frms = self.frms[self.sidx:]
         msd, num = [0], len(frms)
@@ -395,7 +394,7 @@ class Clash(BaseAnalyzer):
         """
         Main method to run clash analysis.
         """
-        self.data_reader.setClashParams()
+        self.df_reader.setClashParams()
         super().run()
 
     def setData(self):
@@ -419,8 +418,8 @@ class Clash(BaseAnalyzer):
         dcell.setUp()
         for _, row in frm.iterrows():
             clashes += dcell.getClashes(row,
-                                        radii=self.data_reader.radii,
-                                        excluded=self.data_reader.excluded)
+                                        radii=self.df_reader.radii,
+                                        excluded=self.df_reader.excluded)
         return clashes
 
 
@@ -452,10 +451,10 @@ class XYZ(BaseAnalyzer):
             # XYZ analyzer may change the coordinates
             for frm in self.frms:
                 if wrapped:
-                    frm.wrapCoords(broken_bonds, dreader=self.data_reader)
+                    frm.wrapCoords(broken_bonds, dreader=self.df_reader)
                 if glue:
-                    frm.glue(dreader=self.data_reader)
-                frm.write(self.out_fh, dreader=self.data_reader)
+                    frm.glue(dreader=self.df_reader)
+                frm.write(self.out_fh, dreader=self.df_reader)
         self.log(f"{self.DESCR} coordinates are written into {outfile}")
 
 
@@ -492,7 +491,7 @@ class View(BaseAnalyzer):
         Main method to run the visualization.
         """
 
-        frm_vw = molview.FrameView(data_reader=self.data_reader)
+        frm_vw = molview.FrameView(df_reader=self.df_reader)
         frm_vw.setData()
         frm_vw.setEleSz()
         frm_vw.setScatters()

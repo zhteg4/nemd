@@ -17,9 +17,9 @@ BASE_DIR = testutils.test_file(POLYM_BUILDER)
 BUTANE_DATA = os.path.join(BASE_DIR, 'butane.data')
 
 
-def getMol(smiles_str):
+def getMol(smiles_str, mol_id=1):
     real_smiles_str = CC3COOH if smiles_str == COOHPOLYM else smiles_str
-    mol = rdkitutils.get_mol_from_smiles(real_smiles_str)
+    mol = rdkitutils.get_mol_from_smiles(real_smiles_str, mol_id=mol_id)
     if smiles_str == COOHPOLYM:
         markPolymProps(mol)
     return mol
@@ -45,7 +45,7 @@ class TestFragMol:
     @pytest.fixture
     def fmol(self, smiles_str, data_file):
         mol = getMol(smiles_str)
-        return fragments.FragMol(mol, data_file)
+        return fragments.FragMol(mol, data_file=data_file)
 
     @pytest.mark.parametrize(('smiles_str', 'data_file', 'rotatable'),
                              [(BUTANE, None, True), (BUTENE, None, False),
@@ -93,7 +93,7 @@ class TestFragMol:
                              [(BUTANE, BUTANE_DATA, 3)])
     def testReadData(self, fmol, num):
         fmol.readData()
-        assert num == len(fmol.data_reader.radii)
+        assert num == len(fmol.df_reader.radii)
 
     @pytest.mark.parametrize(('smiles_str', 'data_file'),
                              [(BUTANE, BUTANE_DATA)])
@@ -139,9 +139,9 @@ class TestFragMol:
         fmol.setCoords()
         fmol.setFrm()
         fmol.setDcell()
-        fmol.data_reader.radii.setRadius(1, 4, 4)
+        fmol.df_reader.radii.setRadius(1, 4, 4)
         assert fmol.hasClashes([3])
-        fmol.data_reader.radii.setRadius(1, 4, 2)
+        fmol.df_reader.radii.setRadius(1, 4, 2)
         assert not fmol.hasClashes([3])
 
     @pytest.mark.parametrize(('smiles_str', 'data_file'),
@@ -155,7 +155,7 @@ class TestFragMol:
         fmol.setCoords()
         fmol.setFrm()
         fmol.setDcell()
-        fmol.data_reader.radii.setRadius(1, 4, 3)
+        fmol.df_reader.radii.setRadius(1, 4, 3)
         assert fmol.hasClashes([3])
         fmol.setConformer()
         assert not fmol.hasClashes([3])
@@ -166,7 +166,7 @@ class TestFragment:
     @pytest.fixture
     def frag(self, smiles_str, data_file):
         mol = getMol(smiles_str)
-        fmol = fragments.FragMol(mol, data_file)
+        fmol = fragments.FragMol(mol, data_file=data_file)
         frag = fragments.Fragment([], fmol)
         return frag
 
@@ -259,9 +259,9 @@ class TestFragMols:
 
     @pytest.fixture
     def fmols(self):
-        mol1 = getMol(self.SMILES1)
-        mol2 = getMol(self.SMILES2)
-        mol3 = getMol(self.SMILES3)
+        mol1 = getMol(self.SMILES1, mol_id=1)
+        mol2 = getMol(self.SMILES2, mol_id=2)
+        mol3 = getMol(self.SMILES3, mol_id=3)
         data_file = testutils.test_file(
             os.path.join('polym_builder', 'cooh6x3.data'))
         box = [
@@ -277,6 +277,7 @@ class TestFragMols:
         return fmols
 
     def testFragmentize(self, fmols):
+        fmols.readData()
         fmols.fragmentize()
         str_fmols_1st = str(fmols.fmols[1].fragments())
         assert str_fmols_1st == str(fmols.fmols[2].fragments())

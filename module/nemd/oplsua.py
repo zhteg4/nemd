@@ -24,7 +24,7 @@ from nemd import symbols
 from nemd import logutils
 from nemd import fileutils
 from nemd import constants as nconstants
-from nemd import prop_names
+from nemd import pnames
 from nemd import environutils
 
 FLAG_TIMESTEP = '-timestep'
@@ -2231,7 +2231,7 @@ class LammpsData(LammpsDataBase):
             ]
             data[:, 0] += pre_atoms
             for conformer in mol.GetConformers():
-                data[:, 1] = conformer.GetIntProp(prop_names.MOL_ID)
+                data[:, 1] = conformer.GetIntProp(pnames.MOL_ID)
                 data[:, 4:] = conformer.GetPositions()
                 np.savetxt(self.data_hdl, data, fmt=fmt)
                 # Increment atom ids by atom number in this conformer so that

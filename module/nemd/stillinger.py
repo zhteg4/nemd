@@ -56,7 +56,7 @@ class LammpsData(oplsua.LammpsDataBase):
         self.in_fh.write("run 0\n")
 
     def writeData(self, *args, **kwargs):
-        with open(self.lammps_data, 'w') as self.data_fh:
+        with open(self.datafile, 'w') as self.data_fh:
             self.setAtoms()
             self.writeDescription()
             self.writeTopoType()
@@ -154,7 +154,7 @@ class DataFileReader(oplsua.DataFileReader):
                 ele=self.masses[int(type_id)].ele)
 
 
-def get_data_Reader(data_file):
+def get_df_reader(data_file):
     line = sh.grep(oplsua.LammpsDataBase.LAMMPS_DESCRIPTION[:-2], data_file)
     if line.split(symbols.POUND)[1].strip() == oplsua.LammpsDataBase.ATOMIC:
         return DataFileReader(data_file)
