@@ -264,7 +264,18 @@ class FragMol(FragMixIn):
         self.frm = None
 
     def copy(self, conf):
-        fmol = FragMol(self.mol, conf=conf, data_file=self.data_file, df_reader=self.df_reader)
+        """
+        Copy the current FragMol object and set the new conformer.
+        NOTE: dihedral value candidates, existing atom ids, and fragment references
+        are copied. Other attributes such as the graph, rotatable bonds, and frame
+        are just referred to the original object.
+
+        :param conf 'rdkit.Chem.rdchem.Conformer': the new conformer.
+        """
+        fmol = FragMol(self.mol,
+                       conf=conf,
+                       data_file=self.data_file,
+                       df_reader=self.df_reader)
         fmol.graph = self.graph
         fmol.rotatable_bonds = self.rotatable_bonds
         fmol.init_frag = copy.copy(self.init_frag)
@@ -522,6 +533,15 @@ class FragMols(FragMixIn):
                  df_reader=None,
                  box=None,
                  logger=logger):
+        """
+        :param mols dict: keys are the molecule ids, and values are
+            'rdkit.Chem.rdchem.Mol'
+        :param data_file str: filename path to get force field information
+        :param df_reader `nemd.oplsua.DataFileReader`: datafile reader with
+            atom, bond, element and other info.
+        :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
+        :param logger 'logging.Logger':  print to this logger
+        """
 
         self.mols = mols
         self.data_file = data_file
@@ -568,7 +588,7 @@ class FragMols(FragMixIn):
 
         self.fmols = {}
         for id, tpl_fmol in tpl_fmols.items():
-            tpl_fmol.conf = None # conformer doesn't support copy
+            tpl_fmol.conf = None  # conformer doesn't support copy
             for conf in tpl_fmol.mol.GetConformers():
                 fmol = tpl_fmol.copy(conf)
                 mol_id = conf.GetIntProp(pnames.MOL_ID)

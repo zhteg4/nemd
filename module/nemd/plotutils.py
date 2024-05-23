@@ -430,10 +430,7 @@ class DispersionPlotter:
         """
         Read the data from the file with unit conversion and range set.
         """
-        data = pd.read_csv(self.filename,
-                           header=None,
-                           skiprows=3,
-                           sep=b'\s+')
+        data = pd.read_csv(self.filename, header=None, skiprows=3, sep=b'\s+')
         self.data = data.set_index(0)
         if self.unit == self.THZ:
             self.data *= constants.CM_INV_THZ
