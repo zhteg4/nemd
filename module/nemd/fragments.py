@@ -48,6 +48,41 @@ class Fragment:
         self.fval = True
         self.resetVals()
 
+    def copy(self, fmol):
+        """
+        Copy the current fragment to a new one.
+
+        :param fmol FragMol: the fragMol object this fragment belongs to.
+        :return Fragment: the copied fragment.
+        """
+        frag = Fragment(self.dihe, fmol)
+        frag.aids = self.aids[:]
+        frag.pfrag = self.pfrag
+        frag.nfrags = self.nfrags
+        frag.vals = self.vals[:]
+        frag.val = self.val
+        frag.val = self.fval
+        return frag
+
+    def copyInit(self, fmol):
+        """
+        Copy the current initial fragment and all the fragments retrieved by it
+        The connections between all new fragments are established as well.
+
+        :param fmol FragMol: the fragMol object this initial fragment belongs to
+        :return Fragment: the copied initial fragment.
+        """
+        ifrag = self.copy(fmol=fmol)
+        all_nfrags = [ifrag]
+        while (all_nfrags):
+            frag = all_nfrags.pop()
+            nfrags = [x.copy(fmol=fmol) for x in frag.nfrags]
+            frag.nfrags = nfrags
+            for nfrag in nfrags:
+                nfrag.pfrag = frag
+            all_nfrags += nfrags
+        return ifrag
+
     def resetVals(self):
         """
         Reset the dihedral angle values and state.
@@ -254,20 +289,20 @@ class FragMol(FragMixIn):
         self.conf = conf
         self.data_file = data_file
         self.df_reader = df_reader
+        self.ifrag = None
+        self.extg_aids = set()
+        self.frm = None
         if conf is None:
             self.conf = self.mol.GetConformer(0)
         self.graph = structutils.getGraph(mol)
         self.rotatable_bonds = self.mol.GetSubstructMatches(self.PATT,
                                                             maxMatches=1000000)
-        self.init_frag = None
-        self.extg_aids = None
-        self.frm = None
 
     def copy(self, conf):
         """
         Copy the current FragMol object and set the new conformer.
         NOTE: dihedral value candidates, existing atom ids, and fragment references
-        are copied. Other attributes such as the graph, rotatable bonds, and frame
+        are copied. Other attributes such as the graph, rotatable bonds, and frames
         are just referred to the original object.
 
         :param conf 'rdkit.Chem.rdchem.Conformer': the new conformer.
@@ -276,23 +311,11 @@ class FragMol(FragMixIn):
                        conf=conf,
                        data_file=self.data_file,
                        df_reader=self.df_reader)
+        fmol.ifrag = self.ifrag.copyInit(fmol=fmol) if self.ifrag else None
+        fmol.extg_aids = self.extg_aids.copy()
+        fmol.frm = self.frm
         fmol.graph = self.graph
         fmol.rotatable_bonds = self.rotatable_bonds
-        fmol.init_frag = copy.copy(self.init_frag)
-        fmol.extg_aids = copy.copy(self.extg_aids)
-        fmol.frm = self.frm
-        if fmol.init_frag is None:
-            return fmol
-        all_nfrags = [fmol.init_frag]
-        while (all_nfrags):
-            frag = all_nfrags.pop()
-            frag.fmol = fmol
-            frag.vals = copy.copy(frag.vals)
-            nfrags = [copy.copy(x) for x in frag.nfrags]
-            frag.nfrags = nfrags
-            for nfrag in nfrags:
-                nfrag.pfrag = frag
-            all_nfrags += nfrags
         return fmol
 
     def isRotatable(self, bond):
@@ -369,8 +392,8 @@ class FragMol(FragMixIn):
         fragment and adding the newly generated ones to be fragmentized until
         no fragments can be further fragmentized.
         """
-        self.init_frag = Fragment([], self)
-        to_be_fragmentized = self.init_frag.setFrags()
+        self.ifrag = Fragment([], self)
+        to_be_fragmentized = self.ifrag.setFrags()
         while (to_be_fragmentized):
             frag = to_be_fragmentized.pop(0)
             nfrags = frag.setFrags()
@@ -392,9 +415,9 @@ class FragMol(FragMixIn):
         :return list: each of the item is one fragment.
         """
         all_frags = []
-        if self.init_frag is None:
+        if self.ifrag is None:
             return all_frags
-        nfrags = [self.init_frag]
+        nfrags = [self.ifrag]
         while (nfrags):
             all_frags += nfrags
             nfrags = [y for x in nfrags for y in x.nfrags]
@@ -481,7 +504,7 @@ class FragMol(FragMixIn):
         Set conformer coordinates without clashes.
         """
         log_debug(f"{self.getNumFrags()} fragments found.")
-        frags = [self.init_frag]
+        frags = [self.ifrag]
         while (frags):
             frag = frags.pop(0)
             success = frag.setConformer()
@@ -681,7 +704,7 @@ class FragMols(FragMixIn):
         """
         Set conformer coordinates without clashes.
         """
-        frags = [x.init_frag for x in self.fmols.values()]
+        frags = [x.ifrag for x in self.fmols.values()]
         self.setInitFrm(frags)
         self.setDcell()
         self.log(f'Placing {len(frags)} initiators into the cell...')
@@ -698,7 +721,7 @@ class FragMols(FragMixIn):
         while frags:
             frag = frags.pop(0)
             if not frag.dihe:
-                # init_frag without dihe means rigid body
+                # ifrag without dihe means rigid body
                 continue
             while frag.vals:
                 frag.setDihedralDeg()
@@ -809,7 +832,7 @@ class FragMols(FragMixIn):
         # 1）Find the previous fragment with available dihedral candidates.
         pfrag = frag.getPreAvailFrag()
         found = bool(pfrag)
-        frag = pfrag if found else frag.fmol.init_frag
+        frag = pfrag if found else frag.fmol.ifrag
         # 2）Find the next fragments who have been placed into the cell.
         nxt_frags = frag.getNxtFrags()
         [x.resetVals() for x in nxt_frags]
