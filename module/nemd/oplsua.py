@@ -1198,7 +1198,7 @@ class LammpsIn(fileutils.LammpsInput):
     DEFAULT_COUL_CUT = DEFAULT_CUT
     DUMP_ID, DUMP_Q = FixWriter.DUMP_ID, FixWriter.DUMP_Q
 
-    def __init__(self, jobname, options=None, concise=True):
+    def __init__(self, jobname='tmp', options=None, concise=True):
         """
         :param jobname str: jobname based on which out filenames are defined
         :param options 'argparse.Namespace': command line options
@@ -1353,14 +1353,14 @@ class LammpsDataBase(LammpsIn):
 
     ATOM_ID = 'atom_id'
 
-    def __init__(self, mols, ff, jobname, *arg, **kwarg):
+    def __init__(self, mols, *arg, ff=None, jobname='tmp', **kwarg):
         """
         :param mols dict: keys are the molecule ids, and values are
             'rdkit.Chem.rdchem.Mol'
         :param ff 'oplsua.OplsParser': the force field information
         :param jobname str: jobname based on which out filenames are defined
         """
-        super().__init__(jobname, *arg, **kwarg)
+        super().__init__(jobname=jobname, *arg, **kwarg)
         self.ff = ff
         self.mols = mols
         self.jobname = jobname
@@ -1406,7 +1406,7 @@ class LammpsDataOne(LammpsDataBase):
     BOND_ATM_ID = OplsTyper.BOND_ATM_ID
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
 
-    def __init__(self, mols, ff, jobname, *arg, **kwarg):
+    def __init__(self, mols, *arg, ff=None, jobname=None, **kwarg):
         """
         :param mols dict: keys are the molecule ids, and values are
             'rdkit.Chem.rdchem.Mol'
@@ -1417,7 +1417,7 @@ class LammpsDataOne(LammpsDataBase):
             the present ones are writen into the data file.
         :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
         """
-        super().__init__(mols, ff, jobname, *arg, **kwarg)
+        super().__init__(mols, *arg, ff=ff, jobname=jobname, **kwarg)
         self.bonds = {}
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
@@ -1843,9 +1843,9 @@ class LammpsData(LammpsDataBase):
 
     def __init__(self,
                  mols,
-                 ff,
-                 jobname,
                  *arg,
+                 ff=None,
+                 jobname='tmp',
                  concise=True,
                  box=None,
                  **kwarg):
@@ -1859,7 +1859,7 @@ class LammpsData(LammpsDataBase):
             the present ones are writen into the data file.
         :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
         """
-        super().__init__(mols, ff, jobname, *arg, **kwarg)
+        super().__init__(mols, *arg, ff=ff, jobname=jobname, **kwarg)
         self.concise = concise
         self.box = box
         self.mol_dat = {}
@@ -1939,7 +1939,9 @@ class LammpsData(LammpsDataBase):
             may be introduced.
         """
         for mol_id, mol in self.mols.items():
-            mol_dat = LammpsDataOne({mol_id: mol}, self.ff, self.jobname)
+            mol_dat = LammpsDataOne({mol_id: mol},
+                                    ff=self.ff,
+                                    jobname=self.jobname)
             mol_dat.run(adjust_coords=adjust_coords)
             self.mol_dat[mol_id] = mol_dat
 
@@ -2231,7 +2233,7 @@ class LammpsData(LammpsDataBase):
             ]
             data[:, 0] += pre_atoms
             for conformer in mol.GetConformers():
-                data[:, 1] = conformer.GetIntProp(pnames.MOL_ID)
+                data[:, 1] = conformer.GetId()
                 data[:, 4:] = conformer.GetPositions()
                 np.savetxt(self.data_hdl, data, fmt=fmt)
                 # Increment atom ids by atom number in this conformer so that

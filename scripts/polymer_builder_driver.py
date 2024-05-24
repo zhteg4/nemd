@@ -230,9 +230,10 @@ class AmorphousCell(object):
         :param mini_density float: the minium density for liquid and solid when
             reducing it automatically.
         """
-        cell_builder = PackedCell if cell_type == PACK else GrowedCell
-        cell = cell_builder(self.polymers, self.options)
-        cell.setMols()
+        cell_builder = structutils.PackedCell if cell_type == PACK else GrowedCell
+        cell = cell_builder([x.polym for x in self.polymers],
+                            ff=self.polymers[0].ff,
+                            options=self.options)
         cell.setDataReader()
         density = self.options.density
         mini_density = min([mini_density, density / 5.])
@@ -255,8 +256,8 @@ class AmorphousCell(object):
         Write amorphous cell into data file
         """
         lmw = oplsua.LammpsData(self.mols,
-                                self.ff,
-                                self.options.jobname,
+                                ff=self.ff,
+                                jobname=self.options.jobname,
                                 box=self.box,
                                 options=self.options)
         lmw.writeData(adjust_coords=False)
@@ -276,196 +277,6 @@ class AmorphousCell(object):
                              set_file=True)
 
 
-class PackedCell:
-    """
-    Pack polymer by random rotation and translation.
-    """
-
-    MAX_TRIAL_PER_DENSITY = 100
-    MAX_TRIAL_PER_MOL = 10000
-
-    def __init__(self, polymers, options):
-        """
-        :param polymers 'Polymer': one polymer object for each type
-        :param options 'argparse.Namespace': command line options
-        """
-        self.polymers = polymers
-        self.options = options
-        self.box = None
-        self.mols = {}
-
-    def run(self):
-        """
-        Create amorphous cell by randomly placing molecules with random
-        orientations.
-        """
-        self.setBoxes()
-        self.setMols()
-        self.setDataReader()
-        self.setFrameAndDcell()
-        self.placeMols()
-
-    def runWithDensity(self, density):
-        """
-        Create amorphous cell of the target density by randomly placing
-        molecules with random orientations.
-
-        NOTE: the final density of the output cell may be smaller than the
-        target if the max number of trial attempt is reached.
-
-        :param density float: the target density
-        """
-        self.density = density
-        self.setBoxes()
-        self.setFrameAndDcell()
-        self.placeMols()
-
-    def setBoxes(self):
-        """
-        Set periodic boundary box size.
-        """
-        weight = sum(x.mw * x.polym.GetNumConformers() for x in self.polymers)
-        vol = weight / self.density / scipy.constants.Avogadro
-        edge = math.pow(vol, 1 / 3)  # centimeter
-        edge *= scipy.constants.centi / scipy.constants.angstrom
-        self.box = [0, edge, 0, edge, 0, edge]
-        log(f'Cubic box of size {edge:.2f} angstrom is created.')
-
-    def setMols(self):
-        """
-        Set molecules.
-        """
-        self.mols = {i: x.polym for i, x in enumerate(self.polymers, start=1)}
-        for mol_id, conf in enumerate(self.conformers, start=1):
-            conf.SetIntProp(pnames.MOL_ID, mol_id)
-
-    def setDataReader(self):
-        """
-        Set data reader with clash parameters.
-        """
-
-        lmw = oplsua.LammpsData(self.mols,
-                                self.polymers[0].ff,
-                                'tmp',
-                                options=self.options)
-        # contents = lmw.writeData(nofile=True)
-        # self.df_reader = oplsua.DataFileReader(contents=contents)
-        lmw.writeData()
-        self.df_reader = oplsua.DataFileReader('tmp.data')
-        self.df_reader.run()
-        self.df_reader.setClashParams()
-
-    def setFrameAndDcell(self):
-        """
-        Set the trajectory frame and distance cell.
-        """
-        index = [atom.id for atom in self.df_reader.atoms.values()]
-        xyz = [atom.xyz for atom in self.df_reader.atoms.values()]
-        self.frm = traj.Frame(xyz=xyz, index=index, box=self.box)
-        self.dcell = traj.DistanceCell(self.frm)
-        self.dcell.setUp()
-
-    def placeMols(self, max_trial=MAX_TRIAL_PER_DENSITY):
-        """
-        Place all molecules into the cell at certain density.
-
-        :param max_trial int: the max number of trials at one density.
-        :raise DensityError: if the max number of trials at this density is
-            reached.
-        """
-        trial_num, mol_num = 1, len(self.df_reader.molecule)
-        tenth, threshold, = mol_num / 10., 0
-        while trial_num <= max_trial:
-            self.extg_aids = set()
-            for conf in self.conformers:
-                mol_id = conf.GetIntProp(pnames.MOL_ID)
-                try:
-                    self.placeMol(conf)
-                except MolError:
-                    log_debug(f'{trial_num} trail fails. '
-                              f'(Only {mol_id - 1} / {len(self.mols)} '
-                              f'molecules placed in the cell.)')
-                    trial_num += 1
-                    break
-                else:
-                    if mol_id >= threshold:
-                        new_line = "" if mol_id == mol_num else ", [!n]"
-                        log(f"{int(mol_id / mol_num * 100)}%{new_line}")
-                        threshold = round(threshold + tenth, 1)
-            else:
-                # All molecules successfully placed (no break)
-                return
-        raise DensityError
-
-    @property
-    def conformers(self):
-        """
-        Return all conformers of all molecules.
-
-        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all molecules.
-        """
-        return [y for x in self.mols.values() for y in x.GetConformers()]
-
-    def placeMol(self, conf, max_trial=MAX_TRIAL_PER_MOL):
-        """
-        Place molecules one molecule into the cell without clash.
-
-        :param max_trial int: the max trial number for each molecule to be placed
-            into the cell.
-        """
-        aids = self.df_reader.mols[conf.GetIntProp(pnames.MOL_ID)]
-        trial_per_mol = 1
-        while trial_per_mol <= max_trial:
-            self.translateMol(conf, aids)
-            if not self.hasClashes(aids):
-                self.extg_aids.update(aids)
-                # Only update the distance cell after one molecule successful
-                # placed into the cell as only inter-molecular clashes are
-                # checked for packed cell.
-                self.dcell.setUp()
-                return
-            trial_per_mol += 1
-        if trial_per_mol > max_trial:
-            raise MolError
-
-    def translateMol(self, conf, aids):
-        """
-        Do translation and rotation to the molecule so that the centroid will be
-        randomly point in the cell and the orientation is also randomly picked.
-
-        :param mol_id int: the molecule id of the molecule to be placed into the
-            cell.
-        :param aids list: list of atom ids whose centroid is translated.
-        """
-        centroid = np.array(conformerutils.centroid(conf))
-        conformerutils.translation(conf, -centroid)
-        conformerutils.rand_rotate(conf)
-        conformerutils.translation(conf, self.frm.getPoint())
-        self.frm.loc[aids] = conf.GetPositions()
-
-    def hasClashes(self, aids):
-        """
-        Whether these atoms have any clashes with the existing atoms in the cell.
-
-        :param aids list of int: the atom ids to check clashes
-        """
-        for id, row in self.frm.loc[aids].iterrows():
-            clashes = self.dcell.getClashes(row,
-                                            included=self.extg_aids,
-                                            radii=self.df_reader.radii,
-                                            excluded=self.df_reader.excluded)
-            if clashes:
-                return True
-        return False
-
-
-class MolError(RuntimeError):
-    """
-    When max number of the failure for this molecule has been reached.
-    """
-    pass
-
-
 class DensityError(RuntimeError):
     """
     When max number of the failure at this density has been reached.
@@ -473,7 +284,7 @@ class DensityError(RuntimeError):
     pass
 
 
-class GrowedCell(PackedCell):
+class GrowedCell(structutils.PackedCell):
     """
     Grow the polymers from bit to full.
     """
@@ -683,17 +494,6 @@ class Polymer(object):
             # Pickling of "rdkit.Chem.rdchem.Conformer" instances is not enabled
             conf = copy.deepcopy(self.polym).GetConformer(0)
             self.polym.AddConformer(conf, assignId=True)
-
-    @property
-    def molecular_weight(self):
-        """
-        The molecular weight of the polymer.
-
-        :return float: the total weight.
-        """
-        return self.ff.molecular_weight(self.polym)
-
-    mw = molecular_weight
 
 
 class Conformer(object):
