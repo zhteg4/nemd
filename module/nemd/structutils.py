@@ -22,7 +22,6 @@ from nemd import traj
 from nemd import oplsua
 from nemd import pnames
 from nemd import logutils
-from nemd import conformerutils
 
 EDGES = 'edges'
 WEIGHT = 'weight'
@@ -663,6 +662,17 @@ class GrownMol(PackedMol):
         """
         return super().initConformers(ConfClass=ConfClass)
 
+    def run(self):
+        """
+        Main method for fragmentation and conformer search.
+        """
+        self.fragmentize()
+        self.readData()
+        self.setDCellParams()
+        self.setCoords()
+        self.setFrm()
+        self.setConformer()
+
     def fragmentize(self):
         """
         Break the molecule into the smallest rigid fragments.
@@ -994,11 +1004,10 @@ class GrownStruct(PackedCell):
         points = self.dcell.getVoids()
         for point in points:
             conf = frag.fmol.conf
-            aids = list(frag.fmol.extg_aids)
-            centroid = np.array(conformerutils.centroid(conf, aids=aids))
-            conformerutils.translation(conf, -centroid)
-            conformerutils.rand_rotate(conf)
-            conformerutils.translation(conf, point)
+            centroid = np.array(conf.centroid(aids=list(frag.fmol.extg_aids)))
+            conf.translate(-centroid)
+            conf.rotateRandomly()
+            conf.translate(point)
             self.frm.loc[frag.fmol.gids] = conf.GetPositions()
 
             if self.hasClashes(frag.fmol.extg_gids):
