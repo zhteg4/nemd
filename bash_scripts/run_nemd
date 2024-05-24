@@ -58,6 +58,8 @@ fi
 
 LD_LIBRARY_PATH=`pip3 show tbb | grep 'Location:' | sed 's/^.*: //;s/python.*\/site-packages//'`
 [[ -n "$LD_LIBRARY_PATH" ]] && export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}" && [[ -n "$DEBUG" ]] && echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+LAMMPS_PATH=`pip3 show lammps | grep 'Location:' | sed 's/^.*: //'`/lammps
+[[ -n "$LAMMPS_PATH" ]] && export PYTHONPATH="${PYTHONPATH}:$LAMMPS_PATH" && [[ -n "$DEBUG" ]] && echo "PYTHONPATH: $PYTHONPATH"
 # Finalize the command so that Python script is of absolute path
 SCRIPT_ARGS="python3 ${*:1:$FILE_IDX-1} $SPATH ${*:$FILE_IDX+1}"
 echo "Running $SCRIPT_ARGS" && $SCRIPT_ARGS

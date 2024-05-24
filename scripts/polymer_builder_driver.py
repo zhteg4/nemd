@@ -226,7 +226,7 @@ class AmorphousCell(object):
         :param mini_density float: the minium density for liquid and solid when
             reducing it automatically.
         """
-        Struct = structutils.PackedCell if cell_type == PACK else structutils.GrownStruct
+        Struct = structutils.PackedStruct if cell_type == PACK else structutils.GrownStruct
         struct = Struct([x.polym for x in self.polymers],
                         ff=self.polymers[0].ff,
                         options=self.options)
@@ -472,7 +472,7 @@ class Conformer(object):
                  options=None,
                  trans=True,
                  jobname=None,
-                 minimization=False):
+                 minimization=True):
         """
         :param polym 'rdkit.Chem.rdchem.Mol': the polymer to set conformer
         :param original_cru_mol 'rdkit.Chem.rdchem.Mol': the monomer mol
@@ -531,7 +531,7 @@ class Conformer(object):
         Set the cru conformer.
         """
         AllChem.EmbedMolecule(self.cru_mol)
-        self.cru_conf = structutils.PackedStruct(self.cru_mol).GetConformer(0)
+        self.cru_conf = structutils.PackedMol(self.cru_mol).GetConformer(0)
 
     def setCruBackbone(self):
         """
@@ -686,6 +686,7 @@ class Conformer(object):
         with fileutils.chdir(self.relax_dir):
             self.lmw.writeData()
             self.lmw.writeLammpsIn()
+            import pdb; pdb.set_trace()
             lmp = lammps.lammps(cmdargs=['-screen', 'none'])
             lmp.file(self.lmw.lammps_in)
             lmp.command(f'write_data {self.data_file}')
@@ -709,9 +710,8 @@ class Conformer(object):
 
         if self.trans or not self.minimization:
             return
-
         data_file = os.path.join(self.relax_dir, self.data_file)
-        fmol = fragments.FragMol(self.polym, data_file=data_file)
+        fmol = structutils.GrownMol(self.polym, data_file=data_file)
         fmol.run()
         log('An entangled conformer set.')
 

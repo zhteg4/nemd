@@ -507,7 +507,7 @@ class DensityError(RuntimeError):
     pass
 
 
-class PackedCell(Struct):
+class PackedStruct(Struct):
     """
     Pack molecules by random rotation and translation.
     """
@@ -843,7 +843,7 @@ class GrownMol(PackedMol):
         return self.conf.GetId()
 
 
-class GrownStruct(PackedCell):
+class GrownStruct(PackedStruct):
 
     MAX_TRIAL_PER_DENSITY = 10
 
