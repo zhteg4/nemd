@@ -654,7 +654,7 @@ class GrownMol(PackedMol):
         self.conf = None
         self.graph = getGraph(self)
         self.rotatable_bonds = self.GetSubstructMatches(self.PATT,
-                                                            maxMatches=1000000)
+                                                        maxMatches=1000000)
 
     def initConformers(self, ConfClass=GrownConf):
         """
@@ -828,10 +828,7 @@ class GrownMol(PackedMol):
         Set Global atom ids for each fragment and existing atoms.
         """
         self.gids = gids
-        id_map = {
-            x.GetIdx(): y
-            for x, y in zip(self.GetAtoms(), self.gids)
-        }
+        id_map = {x.GetIdx(): y for x, y in zip(self.GetAtoms(), self.gids)}
         self.extg_gids = set([id_map[x] for x in self.extg_aids])
         for frag in self.fragments():
             frag.gids = [id_map[x] for x in frag.aids]
@@ -1119,6 +1116,7 @@ class GrownStruct(PackedCell):
         frags = [frag] + [x for x in frags if x not in nnxt_frags]
         log_debug(f"{len(self.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
         return frags, found
+
 
 class Fragment:
 

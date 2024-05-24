@@ -11,9 +11,7 @@ molecules into condensed phase amorphous cell.
 """
 import os
 import sys
-import math
 import copy
-import scipy
 import lammps
 import functools
 import collections
@@ -22,7 +20,6 @@ import networkx as nx
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-from nemd import traj
 from nemd import oplsua
 from nemd import symbols
 from nemd import jobutils
@@ -34,7 +31,6 @@ from nemd import pnames
 from nemd import structutils
 from nemd import parserutils
 from nemd import environutils
-from nemd import conformerutils
 
 FlAG_CRU = 'cru'
 FlAG_CRU_NUM = '-cru_num'
@@ -232,8 +228,8 @@ class AmorphousCell(object):
         """
         Struct = structutils.PackedCell if cell_type == PACK else structutils.GrownStruct
         struct = Struct([x.polym for x in self.polymers],
-                            ff=self.polymers[0].ff,
-                            options=self.options)
+                        ff=self.polymers[0].ff,
+                        options=self.options)
         struct.setDataReader()
         density = self.options.density
         mini_density = min([mini_density, density / 5.])
@@ -241,7 +237,7 @@ class AmorphousCell(object):
         while density >= mini_density:
             try:
                 struct.runWithDensity(density)
-            except DensityError:
+            except structutils.DensityError:
                 density -= delta if density > mini_density else mini_density
                 log(f'Density is reduced to {density:.4f} g/cm^3')
             else:
@@ -275,43 +271,6 @@ class AmorphousCell(object):
         jobutils.add_outfile(lmw.lammps_in,
                              jobname=self.options.jobname,
                              set_file=True)
-
-
-class DensityError(RuntimeError):
-    """
-    When max number of the failure at this density has been reached.
-    """
-    pass
-
-
-class GrowedCell(structutils.PackedCell):
-    """
-    Grow the polymers from bit to full.
-    """
-
-    MAX_TRIAL_PER_DENSITY = 10
-    MAX_TRIAL_PER_MOL = 10
-
-    def __init__(self, *arg, **kwarg):
-        """
-        :param polymers 'Polymer': one polymer object for each type
-        :param polym_nums list: number of polymers per polymer type
-        """
-        super().__init__(*arg, **kwarg)
-
-    def placeMols(self, max_trial=MAX_TRIAL_PER_DENSITY):
-        """
-        Place all molecules into the cell at certain density.
-
-        :param max_trial int: the max number of trials at one density.
-        :raise DensityError: if the max number of trials at this density is
-            reached.
-        """
-        frag_mols = fragments.FragMols(self.mols,
-                                       data_file='tmp.data',
-                                       box=self.box,
-                                       logger=logger)
-        frag_mols.run()
 
 
 class Polymer(object):
@@ -572,7 +531,7 @@ class Conformer(object):
         Set the cru conformer.
         """
         AllChem.EmbedMolecule(self.cru_mol)
-        self.cru_conformer = self.cru_mol.GetConformer(0)
+        self.cru_conf = structutils.PackedStruct(self.cru_mol).GetConformer(0)
 
     def setCruBackbone(self):
         """
@@ -593,15 +552,13 @@ class Conformer(object):
 
         for dihe in zip(self.cru_bk_aids[:-3], self.cru_bk_aids[1:-2],
                         self.cru_bk_aids[2:-1], self.cru_bk_aids[3:]):
-            Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer, *dihe, 180)
+            Chem.rdMolTransforms.SetDihedralDeg(self.cru_conf, *dihe, 180)
 
-        cntrd = conformerutils.centroid(self.cru_conformer,
-                                        aids=self.cru_bk_aids)
-
-        conformerutils.translation(self.cru_conformer, -np.array(cntrd))
+        cntrd = self.cru_conf.centroid(aids=self.cru_bk_aids)
+        self.cru_conf.translate(-np.array(cntrd))
         abc_norms = self.getABCVectors()
         abc_targeted = np.eye(3)
-        conformerutils.rotate(self.cru_conformer, abc_norms, abc_targeted)
+        self.cru_conf.rotate(abc_norms, abc_targeted)
 
     def getABCVectors(self):
         """
@@ -622,7 +579,7 @@ class Conformer(object):
             return vect
 
         bh_xyzs = np.array(
-            [self.cru_conformer.GetAtomPosition(x) for x in self.cru_bk_aids])
+            [self.cru_conf.GetAtomPosition(x) for x in self.cru_bk_aids])
         bvectors = (bh_xyzs[1:, :] - bh_xyzs[:-1, :])
         nc_vector = get_norm(bvectors[::2].mean(axis=0))
         nm_mvector = get_norm(bvectors[1::2].mean(axis=0))
@@ -665,7 +622,7 @@ class Conformer(object):
             id4 = get_other_atom(id3, id2)
             side_dihes.append([id1, id2, id3, id4])
         for dihe in side_dihes:
-            Chem.rdMolTransforms.SetDihedralDeg(self.cru_conformer, *dihe, 90)
+            Chem.rdMolTransforms.SetDihedralDeg(self.cru_conf, *dihe, 90)
 
     def setXYZAndVect(self):
         """
@@ -676,14 +633,14 @@ class Conformer(object):
         cap_ht = [x for x in self.cru_mol.GetAtoms() if x.HasProp(self.CAP)]
         cap_ht = [(x.GetIdx(), x.GetNeighbors()[0].GetIdx()) for x in cap_ht]
         middle_points = np.array([
-            np.mean([self.cru_conformer.GetAtomPosition(y) for y in x], axis=0)
+            np.mean([self.cru_conf.GetAtomPosition(y) for y in x], axis=0)
             for x in cap_ht
         ])
 
         self.vector = middle_points[1, :] - middle_points[0, :]
         self.xyzs = {
             x.GetIntProp(self.MONO_ATOM_IDX):
-            np.array(self.cru_conformer.GetAtomPosition(x.GetIdx()))
+            np.array(self.cru_conf.GetAtomPosition(x.GetIdx()))
             for x in self.cru_mol.GetAtoms() if x.HasProp(self.MONO_ATOM_IDX)
         }
 
@@ -712,7 +669,7 @@ class Conformer(object):
         mols = {1: self.polym}
         self.lmw = oplsua.LammpsData(mols,
                                      ff=self.ff,
-                                     jobname =self.jobname,
+                                     jobname=self.jobname,
                                      options=self.options)
         if self.minimization:
             return
