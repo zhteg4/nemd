@@ -195,7 +195,7 @@ class AmorphousCell(object):
         """
         if self.options.cell != GRID:
             return
-        struct = structutils.GridStruct([x.polym for x in self.polymers])
+        struct = structutils.GriddedStruct([x.polym for x in self.polymers])
         struct.run()
         self.mols = struct.mols
 
@@ -230,17 +230,17 @@ class AmorphousCell(object):
         :param mini_density float: the minium density for liquid and solid when
             reducing it automatically.
         """
-        cell_builder = structutils.PackedCell if cell_type == PACK else GrowedCell
-        cell = cell_builder([x.polym for x in self.polymers],
+        Struct = structutils.PackedCell if cell_type == PACK else structutils.GrownStruct
+        struct = Struct([x.polym for x in self.polymers],
                             ff=self.polymers[0].ff,
                             options=self.options)
-        cell.setDataReader()
+        struct.setDataReader()
         density = self.options.density
         mini_density = min([mini_density, density / 5.])
         delta = min([0.1, (density - mini_density) / 4])
         while density >= mini_density:
             try:
-                cell.runWithDensity(density)
+                struct.runWithDensity(density)
             except DensityError:
                 density -= delta if density > mini_density else mini_density
                 log(f'Density is reduced to {density:.4f} g/cm^3')
@@ -248,8 +248,8 @@ class AmorphousCell(object):
                 break
 
         self.density = density
-        self.box = cell.box
-        self.mols = cell.mols
+        self.box = struct.box
+        self.mols = struct.mols
 
     def write(self):
         """
@@ -711,8 +711,8 @@ class Conformer(object):
         """
         mols = {1: self.polym}
         self.lmw = oplsua.LammpsData(mols,
-                                     self.ff,
-                                     self.jobname,
+                                     ff=self.ff,
+                                     jobname =self.jobname,
                                      options=self.options)
         if self.minimization:
             return

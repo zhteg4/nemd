@@ -2058,6 +2058,7 @@ class LammpsData(LammpsDataBase):
         :param min_box list: minimum box size
         :param buffer list: buffer in three dimensions
         """
+
         xyzs = np.concatenate([
             y.GetPositions() for x in self.mols.values()
             for y in x.GetConformers()

@@ -130,8 +130,8 @@ class Dispersion(object):
         mol = self.xbuild.getMol()
         tasks = [stillinger.LammpsData.XYZ, stillinger.LammpsData.FORCE]
         self.lmp_dat = stillinger.LammpsData({1: mol},
-                                             self.SI_FF,
-                                             self.options.jobname,
+                                             ff=self.SI_FF,
+                                             jobname=self.options.jobname,
                                              tasks=tasks)
         self.lmp_dat.writeData()
         self.orig_lammps_dat = self.lmp_dat.datafile

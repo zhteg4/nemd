@@ -260,10 +260,9 @@ class FragMixIn:
         """
 
         # memory saving flaot16 to regular float32
-        self.max_clash_dist = float(self.df_reader.radii.max())
         # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
         # Separated by 1 max_clash_dist, meaning no clashes.
-        self.cell_cut = self.max_clash_dist
+        self.cell_cut = float(self.df_reader.radii.max())
 
 
 class FragMol(FragMixIn):
@@ -330,22 +329,6 @@ class FragMol(FragMixIn):
         single = tuple(sorted(bond)) in self.rotatable_bonds
         return not in_ring and single
 
-    def getSwingAtoms(self, *dihe):
-        """
-        Get the swing atoms when the dihedral angle changes.
-
-        :param dihe list of four ints: the atom ids that form a dihedral angle
-        :return list of ints: the swing atom ids when the dihedral angle changes.
-        """
-
-        oxyz = self.conf.GetPositions()
-        oval = Chem.rdMolTransforms.GetDihedralDeg(self.conf, *dihe)
-        Chem.rdMolTransforms.SetDihedralDeg(self.conf, *dihe, oval + 5)
-        xyz = self.conf.GetPositions()
-        changed = np.isclose(oxyz, xyz)
-        Chem.rdMolTransforms.SetDihedralDeg(self.conf, *dihe, oval)
-        return [i for i, x in enumerate(changed) if not all(x)]
-
     def findPath(self, source=None, target=None):
         """
         Find the shortest path between source and target. If source and target
@@ -386,43 +369,6 @@ class FragMol(FragMixIn):
 
         return itertools.product(sources, targets)
 
-    def addNxtFrags(self):
-        """
-        Starting from the initial fragment, keep fragmentizing the current
-        fragment and adding the newly generated ones to be fragmentized until
-        no fragments can be further fragmentized.
-        """
-        self.ifrag = Fragment([], self)
-        to_be_fragmentized = self.ifrag.setFrags()
-        while (to_be_fragmentized):
-            frag = to_be_fragmentized.pop(0)
-            nfrags = frag.setFrags()
-            to_be_fragmentized += nfrags
-
-    def setPreFrags(self):
-        """
-        Set previous fragment.
-        """
-        all_frags = self.fragments()
-        for frag in all_frags:
-            for nfrag in frag.nfrags:
-                nfrag.pfrag = frag
-
-    def fragments(self):
-        """
-        Return all fragments.
-
-        :return list: each of the item is one fragment.
-        """
-        all_frags = []
-        if self.ifrag is None:
-            return all_frags
-        nfrags = [self.ifrag]
-        while (nfrags):
-            all_frags += nfrags
-            nfrags = [y for x in nfrags for y in x.nfrags]
-        return all_frags
-
     def getNumFrags(self):
         """
         Return the number of the total fragments.
@@ -430,17 +376,6 @@ class FragMol(FragMixIn):
         :return int: number of the total fragments.
         """
         return len(self.fragments())
-
-    def setInitAtomIds(self):
-        """
-        Set initial atom ids that don't belong to any fragments.
-        """
-        frags = self.fragments()
-        aids = [y for x in frags for y in x.aids]
-        aids_set = set(aids)
-        assert len(aids) == len(aids_set)
-        self.extg_aids = set(
-            [x for x in range(self.mol.GetNumAtoms()) if x not in aids_set])
 
     def setGlobalAtomIds(self, gids):
         """
@@ -532,7 +467,7 @@ class FragMol(FragMixIn):
 
         :return int: the molecule id.
         """
-        return self.conf.GetIntProp(self.MOL_ID)
+        return self.conf.GetId()
 
     def run(self):
         """
@@ -614,7 +549,7 @@ class FragMols(FragMixIn):
             tpl_fmol.conf = None  # conformer doesn't support copy
             for conf in tpl_fmol.mol.GetConformers():
                 fmol = tpl_fmol.copy(conf)
-                mol_id = conf.GetIntProp(pnames.MOL_ID)
+                mol_id = conf.GetId()
                 fmol.setGlobalAtomIds(self.df_reader.mols[mol_id])
                 self.fmols[mol_id] = fmol
         total_frag_num = sum([x.getNumFrags() for x in self.fmols.values()])
@@ -627,7 +562,7 @@ class FragMols(FragMixIn):
 
         for conf in self.conformers:
             mol = conf.GetOwningMol()
-            aids = self.df_reader.mols[conf.GetIntProp(pnames.MOL_ID)]
+            aids = self.df_reader.mols[conf.GetId()]
             for aid, atom in zip(aids, mol.GetAtoms()):
                 xyz = self.df_reader.atoms[aid].xyz
                 conf.SetAtomPosition(atom.GetIdx(), np.array(xyz))
