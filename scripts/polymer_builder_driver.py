@@ -24,7 +24,6 @@ from nemd import oplsua
 from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
-from nemd import fragments
 from nemd import fileutils
 from nemd import rdkitutils
 from nemd import pnames
@@ -472,7 +471,7 @@ class Conformer(object):
                  options=None,
                  trans=True,
                  jobname=None,
-                 minimization=True):
+                 minimization=False):
         """
         :param polym 'rdkit.Chem.rdchem.Mol': the polymer to set conformer
         :param original_cru_mol 'rdkit.Chem.rdchem.Mol': the monomer mol
@@ -536,6 +535,8 @@ class Conformer(object):
     def setCruBackbone(self):
         """
         Set the cru backbone atom ids.
+
+        :raise ValueError: if the number of capping atoms is not 2.
         """
         cap_idxs = [
             x.GetIdx() for x in self.cru_mol.GetAtoms() if x.HasProp(self.CAP)
@@ -581,10 +582,10 @@ class Conformer(object):
         bh_xyzs = np.array(
             [self.cru_conf.GetAtomPosition(x) for x in self.cru_bk_aids])
         bvectors = (bh_xyzs[1:, :] - bh_xyzs[:-1, :])
-        nc_vector = get_norm(bvectors[::2].mean(axis=0))
-        nm_mvector = get_norm(bvectors[1::2].mean(axis=0))
-        avect = get_norm(nc_vector + nm_mvector).reshape(1, -1)
-        bvect = get_norm(nc_vector - nm_mvector).reshape(1, -1)
+        nc_vec = get_norm(bvectors[::2].mean(axis=0))
+        nm_mvec = get_norm(bvectors[1::2].mean(axis=0))
+        avect = get_norm(nc_vec + nm_mvec).reshape(1, -1)
+        bvect = get_norm(nc_vec - nm_mvec).reshape(1, -1)
         cvect = get_norm(np.cross(avect, bvect)).reshape(1, -1)
         abc_norms = np.concatenate([avect, bvect, cvect], axis=0)
         return abc_norms
@@ -686,7 +687,6 @@ class Conformer(object):
         with fileutils.chdir(self.relax_dir):
             self.lmw.writeData()
             self.lmw.writeLammpsIn()
-            import pdb; pdb.set_trace()
             lmp = lammps.lammps(cmdargs=['-screen', 'none'])
             lmp.file(self.lmw.lammps_in)
             lmp.command(f'write_data {self.data_file}')

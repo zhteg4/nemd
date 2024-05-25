@@ -19,19 +19,6 @@ class TestTransConformer(object):
         return raw_conf
 
     def testFoldPolym(self, raw_conf):
-        return
         raw_conf.setCruMol()
         raw_conf.setCruBackbone()
         raw_conf.foldPolym()
-        # import pdb;
-        # pdb.set_trace()
-        # return
-        # assert panel.log_file is None
-        # with mock.patch.object(gui, 'os') as os_mock:
-        #     os.path.isfile.return_value=True
-        #     with mock.patch.object(gui, 'QtWidgets') as dlg_mock:
-        #         panel.setLogFilePath(None)
-        #         assert dlg_mock.QFileDialog.called is True
-        #     assert panel.log_file is not None
-        #     panel.setLogFilePath('afilename')
-        #     assert panel.log_file == 'afilename'

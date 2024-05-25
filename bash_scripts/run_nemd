@@ -25,7 +25,7 @@ COUNTER=0
 for var in "$@"
 do
     COUNTER=$((COUNTER+1))
-    if [[ "$var" == *.py ]]; then
+    if [[ "$var" == *.py* ]]; then
       FILE_IDX=$COUNTER
       break
     fi
@@ -36,7 +36,8 @@ if [ -z $FILE_IDX ]; then
 fi
 
 # Search for python filename in the user, source, and installation folders
-FILE=${!FILE_IDX} && [[ -n "$DEBUG" ]] && echo "Python file: $FILE"
+FILE_WITH_ARGS=${!FILE_IDX} && [[ -n "$DEBUG" ]] && echo "Python file with arguments: $FILE_WITH_ARGS"
+FILE=`echo $FILE_WITH_ARGS | sed 's/::.*$//'` && [[ -n "$DEBUG" ]] && echo "Python file: $FILE"
 DIR="$(dirname $FILE)" && [[ -n "$DEBUG" ]] && echo "File dir: $DIR"
 BASENAME="$(basename $FILE)" && [[ -n "$DEBUG" ]] && echo "Filename: $BASENAME"
 # Assume that the file come with absolute or relative path (curdir implicitly)
@@ -55,11 +56,14 @@ if [ -z "$SPATH" ]; then
     echo "Please install $BASENAME, or source the premake in the source code."
     exit 2
 fi
+echo $FILE_WITH_ARGS
+FILE_ARGS=`echo $FILE_WITH_ARGS | sed "s/^.*.py//;s/^:://"` && [[ -n "$DEBUG" ]] && echo "File arguments: $FILE_ARGS"
+[[ -n "$FILE_ARGS" ]] && SPATH="$SPATH::$FILE_ARGS" && [[ -n "$DEBUG" ]] && echo "Final file with arguments: $SPATH"
 
 LD_LIBRARY_PATH=`pip3 show tbb | grep 'Location:' | sed 's/^.*: //;s/python.*\/site-packages//'`
 [[ -n "$LD_LIBRARY_PATH" ]] && export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}" && [[ -n "$DEBUG" ]] && echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 LAMMPS_PATH=`pip3 show lammps | grep 'Location:' | sed 's/^.*: //'`/lammps
-[[ -n "$LAMMPS_PATH" ]] && export PYTHONPATH="${PYTHONPATH}:$LAMMPS_PATH" && [[ -n "$DEBUG" ]] && echo "PYTHONPATH: $PYTHONPATH"
+[[ -n "$LAMMPS_PATH" ]] && [[ ":$PYTHONPATH:" != *":$LAMMPS_PATH:"* ]] && export PYTHONPATH="${PYTHONPATH}:$LAMMPS_PATH" && [[ -n "$DEBUG" ]] && echo "PYTHONPATH: $PYTHONPATH"
 # Finalize the command so that Python script is of absolute path
 SCRIPT_ARGS="python3 ${*:1:$FILE_IDX-1} $SPATH ${*:$FILE_IDX+1}"
 echo "Running $SCRIPT_ARGS" && $SCRIPT_ARGS
