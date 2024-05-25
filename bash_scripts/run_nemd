@@ -1,8 +1,13 @@
+: '
+This script is used to run a python script with specified arguments. Jobcontrol
+flags are set as environment variables and passed to the python script as well.
+
+Usage:
+    run_nemd polymer_builder_driver.py C -cru_num 10 -mol_num 10 -seed 5678 -DEBUG
+'
+
 #!/bin/bash
 
-# run_nemd polymer_builder_driver.py C -cru_num 10 -mol_num 10 -seed 5678 -DEBUG
-# Set environment variables based on jobcontrol flags
-# This block has to be on top as debug flag debugs the shell as well
 for ((i=0; i<=$#; i++)); do
   arg=${!i}
   if [ "$arg" == '-JOBNAME' ]; then
@@ -61,9 +66,11 @@ FILE_ARGS=`echo $FILE_WITH_ARGS | sed "s/^.*.py//;s/^:://"` && [[ -n "$DEBUG" ]]
 [[ -n "$FILE_ARGS" ]] && SPATH="$SPATH::$FILE_ARGS" && [[ -n "$DEBUG" ]] && echo "Final file with arguments: $SPATH"
 
 LD_LIBRARY_PATH=`pip3 show tbb | grep 'Location:' | sed 's/^.*: //;s/python.*\/site-packages//'`
-[[ -n "$LD_LIBRARY_PATH" ]] && export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}" && [[ -n "$DEBUG" ]] && echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+[[ -n "$LD_LIBRARY_PATH" ]] && export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}" &&
+  [[ -n "$DEBUG" ]] && echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 LAMMPS_PATH=`pip3 show lammps | grep 'Location:' | sed 's/^.*: //'`/lammps
-[[ -n "$LAMMPS_PATH" ]] && [[ ":$PYTHONPATH:" != *":$LAMMPS_PATH:"* ]] && export PYTHONPATH="${PYTHONPATH}:$LAMMPS_PATH" && [[ -n "$DEBUG" ]] && echo "PYTHONPATH: $PYTHONPATH"
+[[ -n "$LAMMPS_PATH" ]] && [[ ":$PYTHONPATH:" != *":$LAMMPS_PATH:"* ]] &&
+  export PYTHONPATH="${PYTHONPATH}:$LAMMPS_PATH" && [[ -n "$DEBUG" ]] && echo "PYTHONPATH: $PYTHONPATH"
 # Finalize the command so that Python script is of absolute path
 SCRIPT_ARGS="python3 ${*:1:$FILE_IDX-1} $SPATH ${*:$FILE_IDX+1}"
 echo "Running $SCRIPT_ARGS" && $SCRIPT_ARGS
