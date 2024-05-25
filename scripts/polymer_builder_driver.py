@@ -229,7 +229,6 @@ class AmorphousCell(object):
         struct = Struct(self.polymers,
                         ff=self.polymers[0].ff,
                         options=self.options)
-        struct.setDataReader()
         density = self.options.density
         mini_density = min([mini_density, density / 5.])
         delta = min([0.1, (density - mini_density) / 4])

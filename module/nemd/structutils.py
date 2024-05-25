@@ -529,6 +529,7 @@ class PackedStruct(Struct):
         super().__init__(*args, MolClass=MolClass, **kwargs)
         self.ff = ff
         self.options = options
+        self.df_reader = None
         self.extg_gids = set()
 
     def run(self):
@@ -538,9 +539,10 @@ class PackedStruct(Struct):
         """
         self.setBoxes()
         self.setDataReader()
+        self.fragmentize()
         self.setFrameAndDcell()
-        self.setMolStructRefs()
-        self.placeMols()
+        self.setReferences()
+        self.setConformers()
 
     def runWithDensity(self, density):
         """
@@ -553,10 +555,10 @@ class PackedStruct(Struct):
         :param density float: the target density
         """
         self.density = density
-        self.setBoxes()
-        self.setFrameAndDcell()
-        self.setReferences()
-        self.placeMols()
+        self.run()
+
+    def fragmentize(self):
+        ...
 
     def setBoxes(self):
         """
@@ -573,6 +575,8 @@ class PackedStruct(Struct):
         """
         Set data reader with clash parameters.
         """
+        if self.df_reader is not None:
+            return
         lmw = oplsua.LammpsData(self.mols, ff=self.ff, options=self.options)
         contents = lmw.writeData(nofile=True)
         self.df_reader = oplsua.DataFileReader(contents=contents)
@@ -603,7 +607,7 @@ class PackedStruct(Struct):
             for conf in mol.GetConformers():
                 conf.setReferences()
 
-    def placeMols(self, max_trial=MAX_TRIAL_PER_DENSITY):
+    def setConformers(self, max_trial=MAX_TRIAL_PER_DENSITY):
         """
         Place all molecules into the cell at certain density.
 
@@ -853,24 +857,12 @@ class GrownStruct(PackedStruct):
         self.failed_num = 0  # The failed attempts in growing molecules
         self.mol_num = None  # the last reported growing molecule number
 
-    def placeMols(self, max_trial=MAX_TRIAL_PER_DENSITY):
-        """
-        Place all molecules into the cell at certain density.
-
-        :param max_trial int: the max number of trials at one density.
-        :raise DensityError: if the max number of trials at this density is
-            reached.
-        """
-        self.fragmentize()
-        self.setDCellParams()
-        self.setCoords()
-        self.setFrm()
-        self.setConformer()
-
     def fragmentize(self):
         """
         Break the molecule into the smallest rigid fragments.
         """
+        if self.fmols is None:
+            return
         for mol in self.mols.values():
             mol.fragmentize()
 
@@ -885,20 +877,20 @@ class GrownStruct(PackedStruct):
         total_frag_num = sum([x.getNumFrags() for x in self.fmols.values()])
         log_debug(f"{total_frag_num} fragments in total.")
 
-    def setDCellParams(self):
+    def setFrameAndDcell(self):
         """
         Set distance cell parameters.
         """
 
         # memory saving flaot16 to regular float32
-        self.max_clash_dist = float(self.df_reader.radii.max())
         # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
         # Separated by 1 max_clash_dist, meaning no clashes.
-        self.cell_cut = self.max_clash_dist
+        self.cell_cut = float(self.df_reader.radii.max())
+        super().setFrameAndDcell()
 
-    def setCoords(self):
+    def setConformers(self):
         """
-        Set conformer coordinates from data file.
+        Set conformer coordinates without clashes.
         """
 
         for conf in self.conformers:
@@ -908,17 +900,6 @@ class GrownStruct(PackedStruct):
                 xyz = self.df_reader.atoms[aid].xyz
                 conf.SetAtomPosition(atom.GetIdx(), np.array(xyz))
 
-    def setFrm(self):
-        """
-        Set traj frame.
-        """
-        xyz = np.array([x.xyz for x in self.df_reader.atoms.values()])
-        self.frm = traj.Frame(xyz=xyz, box=self.box)
-
-    def setConformer(self):
-        """
-        Set conformer coordinates without clashes.
-        """
         frags = [x.ifrag for x in self.fmols.values()]
         self.setInitFrm(frags)
         self.setDcell()

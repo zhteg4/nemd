@@ -1400,6 +1400,15 @@ class LammpsDataBase(LammpsIn):
 
         return (atom for mol in self.molecule for atom in mol.GetAtoms())
 
+    def hasCharge(self):
+        """
+        Whether any atom has charge.
+        """
+        charges = [
+            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atom
+        ]
+        return any(charges)
+
 
 class LammpsDataOne(LammpsDataBase):
     """
