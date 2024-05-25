@@ -596,7 +596,8 @@ class OplsTyper:
         res_num = 1
         for sml in self.SMILES:
             frag = Chem.MolFromSmiles(sml.sml)
-            matches = self.mol.GetSubstructMatches(frag, maxMatches=self.LARGE_NUM)
+            matches = self.mol.GetSubstructMatches(frag,
+                                                   maxMatches=self.LARGE_NUM)
             matches = [self.filterMatch(x, frag) for x in matches]
             res_num, matom_ids = self.markMatches(matches, sml, res_num)
             if not matom_ids:
