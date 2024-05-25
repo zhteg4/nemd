@@ -588,13 +588,15 @@ class OplsTyper:
         self.reassignResnum()
 
     def doTyping(self):
+        """
+        Match the substructure with SMILES and assign atom type.
+        """
         marked_smiles = {}
         marked_atom_ids = []
         res_num = 1
         for sml in self.SMILES:
             frag = Chem.MolFromSmiles(sml.sml)
-            matches = self.mol.GetSubstructMatches(frag,
-                                                   maxMatches=self.LARGE_NUM)
+            matches = self.mol.GetSubstructMatches(frag, maxMatches=self.LARGE_NUM)
             matches = [self.filterMatch(x, frag) for x in matches]
             res_num, matom_ids = self.markMatches(matches, sml, res_num)
             if not matom_ids:
@@ -613,6 +615,9 @@ class OplsTyper:
         [log_debug(f'{x}: {y}') for x, y in marked_smiles.items()]
 
     def reassignResnum(self):
+        """
+        Reassign residue number based on the fragments (SMILES match results).
+        """
         res_atom = collections.defaultdict(list)
         for atom in self.mol.GetAtoms():
             try:

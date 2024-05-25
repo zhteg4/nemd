@@ -26,6 +26,7 @@ from nemd import jobutils
 from nemd import logutils
 from nemd import fileutils
 from nemd import rdkitutils
+from nemd import structutils
 from nemd import pnames
 from nemd import structutils
 from nemd import parserutils
@@ -180,9 +181,8 @@ class AmorphousCell(object):
         for cru, cru_num, mol_num in zip(self.options.cru,
                                          self.options.cru_num,
                                          self.options.mol_num):
-            polymer = Polymer(cru, cru_num, mol_num, options=self.options)
-            polymer.run()
-            self.polymers.append(polymer)
+            mol = Mol(cru, cru_num, mol_num, options=self.options)
+            self.polymers.append(mol)
 
     def setGriddedCell(self):
         """
@@ -190,7 +190,7 @@ class AmorphousCell(object):
         """
         if self.options.cell != GRID:
             return
-        struct = structutils.GriddedStruct([x.polym for x in self.polymers])
+        struct = structutils.GriddedStruct(self.polymers)
         struct.run()
         self.mols = struct.mols
 
@@ -226,7 +226,7 @@ class AmorphousCell(object):
             reducing it automatically.
         """
         Struct = structutils.PackedStruct if cell_type == PACK else structutils.GrownStruct
-        struct = Struct([x.polym for x in self.polymers],
+        struct = Struct(self.polymers,
                         ff=self.polymers[0].ff,
                         options=self.options)
         struct.setDataReader()
@@ -272,9 +272,9 @@ class AmorphousCell(object):
                              set_file=True)
 
 
-class Polymer(object):
+class Mol(structutils.Mol):
     """
-    Class to build a polymer from monomers.
+    Class to hold a regular molecule or a polymer built from monomers.
     """
 
     ATOM_ID = oplsua.LammpsData.ATOM_ID
@@ -290,28 +290,31 @@ class Polymer(object):
     POLYM_HT = pnames.POLYM_HT
     IS_MONO = pnames.IS_MONO
     MONO_ID = pnames.MONO_ID
-    CONFORMER_NUM = 'conformer_num'
 
-    def __init__(self, cru, cru_num, mol_num, options=None):
+    def __init__(self, cru, cru_num, mol_num, options=None, delay=False):
         """
         :param cru str: the smiles string for monomer
         :param cru_num int: the number of monomers per polymer
         :param mol_num int: the number of molecules of this type of polymer
         :param options 'argparse.Namespace': command line options
+        :delay bool: if True, the object is initialized without building the
+            polymer (base class __init__ is called in the setUp method).
         """
         self.cru = cru
         self.cru_num = cru_num
         self.mol_num = mol_num
         self.options = options
-        self.polym = None
         self.polym_Hs = None
         self.box = None
         self.cru_mol = None
         self.smiles = None
         self.buffer = oplsua.LammpsData.BUFFER
         self.ff = oplsua.get_opls_parser()
+        if delay:
+            return
+        self.setUp()
 
-    def run(self):
+    def setUp(self):
         """
         Main method to build one polymer.
         """
@@ -332,10 +335,12 @@ class Polymer(object):
                 continue
             atom.SetIntProp(self.IMPLICIT_H, atom.GetNumImplicitHs())
             atom.SetNoImplicit(True)
-        # FIXME: support monomers of different chiralties
+        # FIXME: support different chiralties for monomers
         chiralty_info = Chem.FindMolChiralCenters(cru_mol,
                                                   includeUnassigned=True)
         for chiralty in chiralty_info:
+            # CIP stereochemistry assignment for the molecule’s atoms (R/S)
+            # and double bonds (Z/E)
             cru_mol.GetAtomWithIdx(chiralty[0]).SetProp('_CIPCode', 'R')
 
         self.cru_mol = Chem.AddHs(cru_mol)
@@ -367,7 +372,7 @@ class Polymer(object):
         """
 
         if not self.cru_mol.GetBoolProp(self.IS_MONO):
-            self.polym = self.cru_mol
+            super().__init__(self.cru_mol)
             return
         # Duplicate and index monomers
         mols = []
@@ -407,15 +412,15 @@ class Polymer(object):
             orgin_atom_num = polym.GetNumAtoms()
             polym = Chem.DeleteSubstructs(
                 polym, Chem.MolFromSmiles(symbols.WILD_CARD))
-        self.polym = polym
-        log(f"Polymer SMILES: {Chem.MolToSmiles(self.polym)}")
+        super().__init__(polym)
+        log(f"Polymer SMILES: {Chem.MolToSmiles(self)}")
 
     def assignAtomType(self):
         """
         Assign atom types to the structure.
         """
         wmodel = self.options.force_field.model
-        ff_typer = oplsua.OplsTyper(self.polym, wmodel=wmodel)
+        ff_typer = oplsua.OplsTyper(self, wmodel=wmodel)
         ff_typer.run()
 
     def embedMol(self, trans=False):
@@ -426,17 +431,17 @@ class Polymer(object):
             built.
         """
 
-        if self.polym.GetNumAtoms() <= 200 and not trans:
+        if self.GetNumAtoms() <= 200 and not trans:
             with rdkitutils.CaptureLogger() as logs:
                 # Mg+2 triggers
                 # WARNING UFFTYPER: Warning: hybridization set to SP3 for atom 0
                 # ERROR UFFTYPER: Unrecognized charge state for atom: 0
-                AllChem.EmbedMolecule(self.polym, useRandomCoords=True)
+                AllChem.EmbedMolecule(self, useRandomCoords=True)
                 [log_debug(f'{x} {y}') for x, y in logs.items()]
-            Chem.GetSymmSSSR(self.polym)
+            Chem.GetSymmSSSR(self)
             return
 
-        trans_conf = Conformer(self.polym,
+        trans_conf = Conformer(self,
                                self.cru_mol,
                                options=self.options,
                                trans=trans)
@@ -446,12 +451,9 @@ class Polymer(object):
         """
         Set multiple conformers based on the first one.
         """
-        self.polym.SetIntProp(self.CONFORMER_NUM, self.mol_num)
-        for _ in range(self.polym.GetIntProp(self.CONFORMER_NUM) - 1):
-            # copy.copy(self.polym.GetConformer(0)) raise RuntimeError
-            # Pickling of "rdkit.Chem.rdchem.Conformer" instances is not enabled
-            conf = copy.deepcopy(self.polym).GetConformer(0)
-            self.polym.AddConformer(conf, assignId=True)
+        for _ in range(self.mol_num - 1):
+            conf = Chem.rdchem.Conformer(self.GetConformer(0))
+            self.AddConformer(conf, assignId=True)
 
 
 class Conformer(object):
@@ -459,11 +461,10 @@ class Conformer(object):
     Conformer coordinate assignment.
     """
 
-    CAP = Polymer.CAP
-    MONO_ATOM_IDX = Polymer.MONO_ATOM_IDX
-    MONO_ID = Polymer.MONO_ID
+    CAP = Mol.CAP
+    MONO_ATOM_IDX = Mol.MONO_ATOM_IDX
+    MONO_ID = Mol.MONO_ID
     OUT_EXTN = '.sdf'
-    CONFORMER_NUM = Polymer.CONFORMER_NUM
 
     def __init__(self,
                  polym,
