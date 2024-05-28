@@ -39,72 +39,6 @@ def log_debug(msg):
     logger.debug(msg)
 
 
-def getGraph(mol):
-    """
-    Get the networkx graph on the input molecule.
-    :param mol `rdkit.Chem.rdchem.Mol`: the input molecule with/without bonds
-
-    :return `networkx.classes.graph.Graph`: graph with nodes and edges.
-    """
-    graph = nx.Graph()
-    edges = [(
-        x.GetBeginAtom().GetIdx(),
-        x.GetEndAtom().GetIdx(),
-    ) for x in mol.GetBonds()]
-    if not edges:
-        # When bonds don't exist, just add the atom.
-        for atom in mol.GetAtoms():
-            graph.add_node(atom.GetIdx())
-        return graph
-    # When bonds exist, add edges and the associated atoms, assuming atoms in
-    # one molecule are bonded.
-    graph.add_edges_from(edges)
-    for edge in edges:
-        for idx in range(2):
-            node = graph.nodes[edge[idx]]
-            try:
-                node[EDGES].append(edge)
-            except KeyError:
-                node[EDGES] = [edge]
-    return graph
-
-
-def findPath(graph=None, mol=None, source=None, target=None, **kwarg):
-    """
-    Find the path in a molecule.
-
-    :param graph 'networkx.classes.graph.Graph': molecular networkx graph
-    :param mol `rdkit.Chem.rdchem.Mol`: molecule to find path on
-    :param source int: the input source node
-    :param target int: the input target node
-    :return int, int, list: source node, target node, and the path inbetween
-    """
-
-    if graph is None:
-        graph = getGraph(mol)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        shortest_path = nx.shortest_path(graph,
-                                         source=source,
-                                         target=target,
-                                         **kwarg)
-
-    if target is not None:
-        shortest_path = {target: shortest_path}
-    if source is not None:
-        shortest_path = {source: shortest_path}
-    path_length, path = -1, None
-    for a_source_node, target_path in shortest_path.items():
-        for a_target_node, a_path in target_path.items():
-            if path_length >= len(a_path):
-                continue
-            source_node = a_source_node
-            target_node = a_target_node
-            path = a_path
-            path_length = len(a_path)
-    return source_node, target_node, path
-
-
 class Conformer(rdkit.Chem.rdchem.Conformer):
     """
     A subclass of rdkit.Chem.rdchem.Conformer with additional attributes and methods.
@@ -268,6 +202,21 @@ class PackedConf(Conformer):
             if clashes:
                 return True
         return False
+
+
+class GrownConf(PackedConf):
+
+    def __init__(self, *args, **kwargs):
+        super(GrownConf, self).__init__(*args, **kwargs)
+
+    def setPositions(self, xyz):
+        """
+        Reset the positions of the atoms to the original xyz coordinates.
+
+        :return xyz np.ndarray: the xyz coordinates of the molecule.
+        """
+        for id in range(xyz.shape[0]):
+            self.SetAtomPosition(id, xyz[id, :])
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -682,10 +631,6 @@ class PackedStruct(Struct):
         raise DensityError
 
 
-class GrownConf(PackedConf):
-    pass
-
-
 class GrownMol(PackedMol):
 
     # https://ctr.fandom.com/wiki/Break_rotatable_bonds_and_report_the_fragments
@@ -698,7 +643,7 @@ class GrownMol(PackedMol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.conf = None
-        self.graph = getGraph(self)
+        self.setGraph()
         self.rotatable_bonds = self.GetSubstructMatches(self.PATT,
                                                         maxMatches=1000000)
 
@@ -707,6 +652,31 @@ class GrownMol(PackedMol):
         See parant class for details.
         """
         return super().initConformers(ConfClass=ConfClass)
+
+    def setGraph(self):
+        """
+        Get the networkx graph on the molecule.
+        """
+        self.graph = nx.Graph()
+        edges = [(
+            x.GetBeginAtom().GetIdx(),
+            x.GetEndAtom().GetIdx(),
+        ) for x in self.GetBonds()]
+        if not edges:
+            # When bonds don't exist, just add the atom.
+            for atom in self.GetAtoms():
+                self.graph.add_node(atom.GetIdx())
+            return
+        # When bonds exist, add edges and the associated atoms, assuming atoms in
+        # one molecule are bonded.
+        self.graph.add_edges_from(edges)
+        for edge in edges:
+            for idx in range(2):
+                node = self.graph.nodes[edge[idx]]
+                try:
+                    node[EDGES].append(edge)
+                except KeyError:
+                    node[EDGES] = [edge]
 
     def fragmentize(self):
         """
@@ -724,7 +694,7 @@ class GrownMol(PackedMol):
         """
         self.ifrag = Fragment([], self)
         to_be_fragmentized = self.ifrag.setFrags()
-        while (to_be_fragmentized):
+        while to_be_fragmentized:
             frag = to_be_fragmentized.pop(0)
             nfrags = frag.setFrags()
             to_be_fragmentized += nfrags
@@ -753,6 +723,7 @@ class GrownMol(PackedMol):
             nfrags = [y for x in nfrags for y in x.nfrags]
         return all_frags
 
+    @functools.lru_cache(maxsize=None)
     def getNumFrags(self):
         """
         Return the number of the total fragments.
@@ -772,9 +743,9 @@ class GrownMol(PackedMol):
         self.extg_aids = set(
             [x for x in range(self.GetNumAtoms()) if x not in aids_set])
 
-    def findPolymPair(self):
+    def findHeadTailPair(self):
         """
-        If the molecule is built from momomers, the atom pairs from
+        If the molecule is built from monomers, the atom pairs from
         selected from the first and last monomers.
 
         :return list or iterator of int tuple: each tuple is an atom id pair
@@ -810,7 +781,26 @@ class GrownMol(PackedMol):
         :return list of ints: the atom ids that form the shortest path.
         """
 
-        return findPath(self.graph, source=source, target=target)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            shortest_path = nx.shortest_path(self.graph,
+                                             source=source,
+                                             target=target)
+
+        if target is not None:
+            shortest_path = {target: shortest_path}
+        if source is not None:
+            shortest_path = {source: shortest_path}
+        path_length, path = -1, None
+        for a_source_node, target_path in shortest_path.items():
+            for a_target_node, a_path in target_path.items():
+                if path_length >= len(a_path):
+                    continue
+                source_node = a_source_node
+                target_node = a_target_node
+                path = a_path
+                path_length = len(a_path)
+        return source_node, target_node, path
 
     def isRotatable(self, bond):
         """
@@ -924,13 +914,6 @@ class GrownStruct(PackedStruct):
         Set conformer coordinates without clashes.
         """
 
-        for conf in self.conformers:
-            mol = conf.GetOwningMol()
-            aids = self.df_reader.mols[conf.GetId()]
-            for aid, atom in zip(aids, mol.GetAtoms()):
-                xyz = self.df_reader.atoms[aid].xyz
-                conf.SetAtomPosition(atom.GetIdx(), np.array(xyz))
-
         frags = [x.ifrag for x in self.fmols.values()]
         self.setInitFrm(frags)
         self.setDcell()
@@ -971,6 +954,11 @@ class GrownStruct(PackedStruct):
                     self.placeInitFrag(frags[0])
                     self.reportRelocation(frags[0])
             log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
+
+    def setXYZ(self):
+        for conf in self.conformers:
+            xyz = self.df_reader.getMolXYZ(conf.GetId())
+            conf.setPositions(xyz)
 
     def setInitFrm(self, frags):
         """
@@ -1231,7 +1219,7 @@ class Fragment:
         if self.dihe:
             pairs = zip([self.dihe[1]] * len(self.aids), self.aids)
         else:
-            pairs = self.mol.findPolymPair()
+            pairs = self.mol.findHeadTailPair()
 
         dihes, num = [], 0
         for source, target in pairs:
@@ -1338,7 +1326,7 @@ class Fragment:
             current dihedral angle and atom ids.
         """
         self.mol.setDcell()
-        while (self.vals):
+        while self.vals:
             self.setDihedralDeg()
             if not self.hasClashes():
                 return True

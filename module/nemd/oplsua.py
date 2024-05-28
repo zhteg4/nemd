@@ -2712,6 +2712,16 @@ class DataFileReader(LammpsData):
                     atom2.type_id]
         self.radii = dict(self.radii)
 
+    def getMolXYZ(self, id):
+        """
+        Get the xyz coordinates of a molecule.
+
+        :param id int: the molecule id.
+        :return np.ndarray: the xyz coordinates of the molecule.
+        """
+
+        return np.array([self.atoms[x].xyz for x in self.mols[id]])
+
 
 class Radius(np.ndarray):
     """

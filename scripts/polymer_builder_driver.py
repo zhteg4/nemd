@@ -522,14 +522,15 @@ class Conformer(object):
         for atom, catom in zip(atoms, neighbors):
             atom.SetAtomicNum(catom.GetAtomicNum())
             atom.SetBoolProp(self.CAP, True)
-        self.cru_mol = cru_mol
+        self.cru_mol = structutils.GrownMol(cru_mol)
 
     def setCruConformer(self):
         """
         Set the cru conformer.
         """
         AllChem.EmbedMolecule(self.cru_mol)
-        self.cru_conf = structutils.PackedMol(self.cru_mol).GetConformer(0)
+
+        self.cru_conf = self.cru_mol.GetConformer(0)
 
     def setCruBackbone(self):
         """
@@ -542,8 +543,7 @@ class Conformer(object):
         ]
         if len(cap_idxs) != 2:
             raise ValueError(f'{len(cap_idxs)} capping atoms are found.')
-        graph = structutils.getGraph(self.cru_mol)
-        self.cru_bk_aids = nx.shortest_path(graph, *cap_idxs)
+        self.cru_bk_aids = nx.shortest_path(self.cru_mol.graph, *cap_idxs)
 
     def transAndRotate(self):
         """
