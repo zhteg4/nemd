@@ -1,4 +1,3 @@
-import os
 import pytest
 from nemd import testutils
 

@@ -275,8 +275,12 @@ class Mol(rdkit.Chem.rdchem.Mol):
     A subclass of rdkit.Chem.rdchem.Mol with additional attributes and methods.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, ff=None, **kwargs):
+        """
+        :param ff 'OplsParser': the force field class.
+        """
         super().__init__(*args, **kwargs)
+        self.ff = ff
         self.conf_id = 0
         self.confs = None
 
@@ -322,6 +326,17 @@ class Mol(rdkit.Chem.rdchem.Mol):
         confs = super().GetConformers()
         self.confs = {i: ConfClass(x, mol=self) for i, x in enumerate(confs)}
 
+    @property
+    def molecular_weight(self):
+        """
+        The molecular weight of the polymer.
+
+        :return float: the total weight.
+        """
+        return self.ff.molecular_weight(self)
+
+    mw = molecular_weight
+
 
 class GriddedMol(Mol):
     """
@@ -349,29 +364,31 @@ class GriddedMol(Mol):
     @property
     def box_num(self):
         """
-        Return the number of boxes needed to place all molecules.
+        Return the number of boxes (the largest molecule size) needed to place
+            all conformers.
         """
         return math.ceil(self.GetNumConformers() / np.prod(self.mol_num))
 
-    def setMolNumPerEdge(self, box):
+    def setConfNumPerEdge(self, size):
         """
         Set the number of molecules per edge of the box.
 
-        :param box np.ndarray: the box size to place this molecule in.
+        :param size np.ndarray: the box size (the largest molecule size) to
+            place this conformer in.
         """
-        self.mol_num = np.floor(box / self.size).astype(int)
+        self.mol_num = np.floor(size / self.size).astype(int)
 
-    def setVecs(self, box):
+    def setVecs(self, size):
         """
-        Set the translational vectors for this molecule so that this molecule
-        can be placed in the given box.
+        Set the translational vectors for this conformer so that this conformer
+        can be placed in the given box (the largest molecule size).
 
-        :param box np.ndarray: the box size to place this molecule in.
+        :param size np.ndarray: the box size to place this molecule in.
         """
         ptc = [np.linspace(-0.5, 0.5, x, endpoint=False) for x in self.mol_num]
         ptc = [x - x.mean() for x in ptc]
         self.vecs = [
-            x * box for x in itertools.product(*[[y for y in x] for x in ptc])
+            x * size for x in itertools.product(*[[y for y in x] for x in ptc])
         ]
 
     def setConformers(self, vector):
@@ -394,6 +411,9 @@ class PackedMol(Mol):
     """
 
     def __init__(self, *args, ff=None, **kwargs):
+        """
+        :param ff 'OplsParser': the force field class.
+        """
         super().__init__(*args, **kwargs)
         self.ff = ff
         self.id_map = None
@@ -409,34 +429,34 @@ class PackedMol(Mol):
         """
         return super().initConformers(ConfClass=ConfClass)
 
-    @property
-    def molecular_weight(self):
-        """
-        The molecular weight of the polymer.
-
-        :return float: the total weight.
-        """
-        return self.ff.molecular_weight(self)
-
-    mw = molecular_weight
-
 
 class Struct:
     """
     A class to handle multiple molecules and their conformers.
     """
 
-    def __init__(self, mols, MolClass=Mol, **kwargs):
-        self.mols = {i: MolClass(x) for i, x in enumerate(mols, start=1)}
+    def __init__(self, mols, MolClass=Mol, ff=None, **kwargs):
+        """
+        :param mols list of rdkit.Chem.rdchem.Mol: the molecules to be handled.
+        :param MolClass subclass of 'rdkit.Chem.rdchem.Mol': the customized
+            molecule class
+        :param ff 'OplsParser': the force field class.
+        """
+        self.mols = {
+            i: MolClass(x, ff=ff)
+            for i, x in enumerate(mols, start=1)
+        }
         for mol_id, conf in enumerate(self.conformers, start=1):
             conf.SetId(mol_id)
+        self.density = None
 
     @property
     def conformers(self):
         """
         Return all conformers of all molecules.
 
-        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all molecules.
+        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all
+            molecules.
         """
         return [x for y in self.molecules for x in y.GetConformers()]
 
@@ -445,7 +465,8 @@ class Struct:
         """
         Return all conformers of all molecules.
 
-        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all molecules.
+        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all
+            molecules.
         """
         return [x for x in self.mols.values()]
 
@@ -457,47 +478,67 @@ class GriddedStruct(Struct):
 
     def __init__(self, *args, MolClass=GriddedMol, **kwargs):
         super().__init__(*args, MolClass=MolClass, **kwargs)
-        self.box = np.zeros([3])
+        self.size = np.zeros([3])
 
     def run(self):
         """
         Set conformers for all molecules.
         """
-        self.setBox()
+        self.setSize()
         self.setVectors()
+        self.setBox()
         self.setConformers()
+        self.setDensity()
 
-    def setBox(self):
+    def setSize(self):
         """
-        Set the box as the maximum size over all molecules.
+        Set the size as the maximum size over all molecules.
         """
-        self.box = np.array([x.size for x in self.molecules]).max(axis=0)
+        self.size = np.array([x.size for x in self.molecules]).max(axis=0)
 
     def setVectors(self):
         """
         Set translational vectors based on the box for all molecules.
         """
         for mol in self.molecules:
-            mol.setMolNumPerEdge(self.box)
-            mol.setVecs(self.box)
+            mol.setConfNumPerEdge(self.size)
+            mol.setVecs(self.size)
+
+    def setBox(self):
+        """
+        Set the periodic boundary box size.
+        """
+        # vectors shifts molecules by the largest box size
+        total_box_num = sum(x.box_num for x in self.molecules)
+        edges = self.size * math.ceil(math.pow(total_box_num, 1. / 3))
+        self.box = [0, edges[0], 0, edges[1], 0, edges[2]]
+        log_debug(f'Cubic box of size {self.box[0]:.2f} angstrom is created.')
 
     def setConformers(self):
         """
         Set coordinates.
         """
+        idxes = [list(range(x)) for x in map(int, self.box[1::2] / self.size)]
         # vectors shifts molecules by the largest box size
-        box_total = sum(x.box_num for x in self.molecules)
-        idxs = range(math.ceil(math.pow(box_total, 1. / 3)))
-        vectors = [x * self.box for x in itertools.product(idxs, idxs, idxs)]
+        self.vectors = [x * self.size for x in itertools.product(*idxes)]
         # boxes are filled in random order with all molecules in random order
         molecules = self.molecules[:]
         while molecules:
             mol = np.random.choice(molecules)
-            np.random.shuffle(vectors)
-            vector = vectors.pop()
+            np.random.shuffle(self.vectors)
+            vector = self.vectors.pop()
             mol.setConformers(vector)
             if mol.conf_id == mol.GetNumConformers():
                 molecules.remove(mol)
+
+    def setDensity(self):
+        """
+        Set the density of the structure.
+        """
+        weight = sum(x.mw * x.GetNumConformers() for x in self.molecules)
+        vol = np.prod(self.box[1::2])
+        vol *= math.pow(scipy.constants.centi / scipy.constants.angstrom, 3)
+        self.density = weight * scipy.constants.Avogadro / vol
 
 
 class DensityError(RuntimeError):
@@ -522,11 +563,12 @@ class PackedStruct(Struct):
                  **kwargs):
         """
         :param polymers 'Polymer': one polymer object for each type
+        :param ff 'OplsParser': the force field class.
         :param options 'argparse.Namespace': command line options
         """
         # Force field -> Molecular weight -> Box -> Frame -> Distance cell
         MolClass = functools.partial(MolClass, ff=ff)
-        super().__init__(*args, MolClass=MolClass, **kwargs)
+        super().__init__(*args, MolClass=MolClass, ff=ff, **kwargs)
         self.ff = ff
         self.options = options
         self.df_reader = None
@@ -537,7 +579,7 @@ class PackedStruct(Struct):
         Create amorphous cell by randomly placing molecules with random
         orientations.
         """
-        self.setBoxes()
+        self.setBox()
         self.setDataReader()
         self.fragmentize()
         self.setFrameAndDcell()
@@ -560,7 +602,7 @@ class PackedStruct(Struct):
     def fragmentize(self):
         ...
 
-    def setBoxes(self):
+    def setBox(self):
         """
         Set periodic boundary box size.
         """

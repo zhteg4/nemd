@@ -20,14 +20,13 @@ import networkx as nx
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
+from nemd import pnames
 from nemd import oplsua
 from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
 from nemd import fileutils
 from nemd import rdkitutils
-from nemd import structutils
-from nemd import pnames
 from nemd import structutils
 from nemd import parserutils
 from nemd import environutils
@@ -144,7 +143,7 @@ def validate_options(argv):
 
 class AmorphousCell(object):
     """
-    Build amorphous cell from molecules. (polymers may be built from monomers first)
+    Build amorphous structure from molecules.
     """
 
     MINIMUM_DENSITY = 0.001
@@ -152,15 +151,11 @@ class AmorphousCell(object):
     def __init__(self, options, ff=None):
         """
         :param options 'argparse.ArgumentParser':  Parsed command-line options
-        :param ff str: the force field filepath
+        :param ff 'OplsParser': the force field class.
         """
         self.options = options
-        self.polymers = []
-        self.molecules = {}
-        self.mols = {}
         self.ff = ff
-        self.box = None
-        self.density = None
+        self.mols = []
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
 
@@ -181,8 +176,8 @@ class AmorphousCell(object):
         for cru, cru_num, mol_num in zip(self.options.cru,
                                          self.options.cru_num,
                                          self.options.mol_num):
-            mol = Mol(cru, cru_num, mol_num, options=self.options)
-            self.polymers.append(mol)
+            mol = Mol(cru, cru_num, mol_num, options=self.options, ff=self.ff)
+            self.mols.append(mol)
 
     def setGriddedCell(self):
         """
@@ -190,9 +185,8 @@ class AmorphousCell(object):
         """
         if self.options.cell != GRID:
             return
-        struct = structutils.GriddedStruct(self.polymers)
-        struct.run()
-        self.mols = struct.mols
+        self.struct = structutils.GriddedStruct(self.mols, ff=self.ff)
+        self.struct.run()
 
     def setPackedCell(self, mini_density=MINIMUM_DENSITY):
         """
@@ -203,7 +197,8 @@ class AmorphousCell(object):
         """
         if self.options.cell != PACK:
             return
-        self.createCell(cell_type=PACK, mini_density=mini_density)
+        self.createCell(ClassStruct=structutils.PackedStruct,
+                        mini_density=mini_density)
 
     def setGrowedCell(self, mini_density=0.01):
         """
@@ -214,48 +209,43 @@ class AmorphousCell(object):
         """
         if self.options.cell != GROW:
             return
-        self.createCell(cell_type=GROW, mini_density=mini_density)
+        self.createCell(ClassStruct=structutils.GrownStruct,
+                        mini_density=mini_density)
 
-    def createCell(self, cell_type=PACK, mini_density=MINIMUM_DENSITY):
+    def createCell(self,
+                   ClassStruct=structutils.PackedStruct,
+                   mini_density=MINIMUM_DENSITY):
         """
         Create amorphous cell.
 
-        :param cell_type: the algorithm type for amorphous cell.
-        :type cell_type: str
+        :param ClassStruct 'Struct': the structure class
         :param mini_density float: the minium density for liquid and solid when
             reducing it automatically.
         """
-        Struct = structutils.PackedStruct if cell_type == PACK else structutils.GrownStruct
-        struct = Struct(self.polymers,
-                        ff=self.polymers[0].ff,
-                        options=self.options)
+        self.struct = ClassStruct(self.mols, ff=self.ff, options=self.options)
         density = self.options.density
         mini_density = min([mini_density, density / 5.])
         delta = min([0.1, (density - mini_density) / 4])
         while density >= mini_density:
             try:
-                struct.runWithDensity(density)
+                self.struct.runWithDensity(density)
             except structutils.DensityError:
                 density -= delta if density > mini_density else mini_density
                 log(f'Density is reduced to {density:.4f} g/cm^3')
-            else:
-                break
-
-        self.density = density
-        self.box = struct.box
-        self.mols = struct.mols
+                continue
+            return
 
     def write(self):
         """
-        Write amorphous cell into data file
+        Write amorphous cell into data file.
         """
-        lmw = oplsua.LammpsData(self.mols,
+        lmw = oplsua.LammpsData(self.struct.mols,
                                 ff=self.ff,
                                 jobname=self.options.jobname,
-                                box=self.box,
+                                box=self.struct.box,
                                 options=self.options)
         lmw.writeData(adjust_coords=False)
-        if self.density is None or not np.isclose(lmw.density, self.density):
+        if not np.isclose(lmw.density, self.struct.density):
             log_warning(
                 f'The density of the final data file is {lmw.density:.4g} kg/cm^3'
             )
@@ -290,11 +280,18 @@ class Mol(structutils.Mol):
     IS_MONO = pnames.IS_MONO
     MONO_ID = pnames.MONO_ID
 
-    def __init__(self, cru, cru_num, mol_num, options=None, delay=False):
+    def __init__(self,
+                 cru,
+                 cru_num,
+                 mol_num,
+                 ff=None,
+                 options=None,
+                 delay=False):
         """
         :param cru str: the smiles string for monomer
         :param cru_num int: the number of monomers per polymer
         :param mol_num int: the number of molecules of this type of polymer
+        :param ff 'OplsParser': the force field class.
         :param options 'argparse.Namespace': command line options
         :delay bool: if True, the object is initialized without building the
             polymer (base class __init__ is called in the setUp method).
@@ -302,13 +299,15 @@ class Mol(structutils.Mol):
         self.cru = cru
         self.cru_num = cru_num
         self.mol_num = mol_num
+        self.ff = ff
         self.options = options
         self.polym_Hs = None
         self.box = None
         self.cru_mol = None
         self.smiles = None
         self.buffer = oplsua.LammpsData.BUFFER
-        self.ff = oplsua.get_opls_parser()
+        if self.ff is None:
+            self.ff = oplsua.get_opls_parser()
         if delay:
             return
         self.setUp()
@@ -371,7 +370,7 @@ class Mol(structutils.Mol):
         """
 
         if not self.cru_mol.GetBoolProp(self.IS_MONO):
-            super().__init__(self.cru_mol)
+            super().__init__(self.cru_mol, ff=self.ff)
             return
         # Duplicate and index monomers
         mols = []
@@ -411,7 +410,7 @@ class Mol(structutils.Mol):
             orgin_atom_num = polym.GetNumAtoms()
             polym = Chem.DeleteSubstructs(
                 polym, Chem.MolFromSmiles(symbols.WILD_CARD))
-        super().__init__(polym)
+        super().__init__(polym, ff=self.ff)
         log(f"Polymer SMILES: {Chem.MolToSmiles(self)}")
 
     def assignAtomType(self):
