@@ -218,6 +218,10 @@ class GrownConf(PackedConf):
         for id in range(xyz.shape[0]):
             self.SetAtomPosition(id, xyz[id, :])
 
+    def fragmentize(self):
+        self.GetOwningMol().fragmentize()
+
+
 
 class Mol(rdkit.Chem.rdchem.Mol):
     """
@@ -643,6 +647,7 @@ class GrownMol(PackedMol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.conf = None
+        self.ifrag = None
         self.setGraph()
         self.rotatable_bonds = self.GetSubstructMatches(self.PATT,
                                                         maxMatches=1000000)
@@ -682,6 +687,8 @@ class GrownMol(PackedMol):
         """
         Break the molecule into the smallest rigid fragments.
         """
+        if self.ifrag is not None:
+            return
         self.addNxtFrags()
         self.setPreFrags()
         self.setInitAtomIds()
@@ -884,13 +891,12 @@ class GrownStruct(PackedStruct):
         """
         if self.fmols is not None:
             return
-        for mol in self.mols.values():
-            mol.fragmentize()
 
         self.fmols = {}
         for id, mol in self.mols.items():
             mol.conf = None  # conformer doesn't support copy
             for conf in mol.GetConformers():
+                conf.fragmentize()
                 mol = mol.copy(conf)
                 mol_id = conf.GetId()
                 mol.setGlobalAtomIds(self.df_reader.mols[mol_id])
