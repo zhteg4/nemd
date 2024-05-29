@@ -208,6 +208,7 @@ class GrownConf(PackedConf):
 
     def __init__(self, *args, **kwargs):
         super(GrownConf, self).__init__(*args, **kwargs)
+        self.ifrag = None
 
     def setPositions(self, xyz):
         """
@@ -220,7 +221,13 @@ class GrownConf(PackedConf):
 
     def fragmentize(self):
         self.GetOwningMol().fragmentize()
-
+        mol = self.GetOwningMol().copy(self)
+        mol.gids = self.gids
+        id_map = {x.GetIdx(): y for x, y in zip(mol.GetAtoms(), self.gids)}
+        mol.extg_gids = set([id_map[x] for x in mol.extg_aids])
+        for frag in mol.fragments():
+            frag.gids = [id_map[x] for x in frag.aids]
+        return mol
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -534,9 +541,9 @@ class PackedStruct(Struct):
         """
         self.setBox()
         self.setDataReader()
-        self.fragmentize()
         self.setFrameAndDcell()
         self.setReferences()
+        self.fragmentize()
         self.setConformers()
 
     def runWithDensity(self, density):
@@ -855,16 +862,6 @@ class GrownMol(PackedMol):
         mol.rotatable_bonds = self.rotatable_bonds
         return mol
 
-    def setGlobalAtomIds(self, gids):
-        """
-        Set Global atom ids for each fragment and existing atoms.
-        """
-        self.gids = gids
-        id_map = {x.GetIdx(): y for x, y in zip(self.GetAtoms(), self.gids)}
-        self.extg_gids = set([id_map[x] for x in self.extg_aids])
-        for frag in self.fragments():
-            frag.gids = [id_map[x] for x in frag.aids]
-
     @property
     def molecule_id(self):
         """
@@ -896,10 +893,8 @@ class GrownStruct(PackedStruct):
         for id, mol in self.mols.items():
             mol.conf = None  # conformer doesn't support copy
             for conf in mol.GetConformers():
-                conf.fragmentize()
-                mol = mol.copy(conf)
                 mol_id = conf.GetId()
-                mol.setGlobalAtomIds(self.df_reader.mols[mol_id])
+                mol = conf.fragmentize()
                 self.fmols[mol_id] = mol
         total_frag_num = sum([x.getNumFrags() for x in self.fmols.values()])
         log_debug(f"{total_frag_num} fragments in total.")
