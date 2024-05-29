@@ -1018,22 +1018,10 @@ class GrownStruct(PackedStruct):
         """
         Set conformer coordinates without clashes.
         """
-        # self.setXYZ()
+        self.setXYZ()
         self.setInitFrm()
         self.setDcell()
-        log_debug(
-            f'Placing {len(self.conformers)} initiators into the cell...')
-
-        tenth, threshold, = len(self.conformers) / 10., 0
-        for index, conf in enumerate(self.conformers, start=1):
-            conf.placeInitFrag()
-            self.extg_gids
-            if index >= threshold:
-                new_line = "" if index == len(self.conformers) else ", [!n]"
-                log_debug(
-                    f"{int(index / len(self.conformers) * 100)}%{new_line}")
-                threshold = round(threshold + tenth, 1)
-        self.logInitFragsPlaced()
+        self.placeInitFrags()
 
         frags = [x.ifrag for x in self.conformers]
         while frags:
@@ -1092,6 +1080,20 @@ class GrownStruct(PackedStruct):
         """
         pos = [x.GetPositions() for x in self.conformers]
         self.frm.loc[:] = np.concatenate(pos, axis=0)
+
+    def placeInitFrags(self):
+        log_debug(
+            f'Placing {len(self.conformers)} initiators into the cell...')
+
+        tenth, threshold, = len(self.conformers) / 10., 0
+        for index, conf in enumerate(self.conformers, start=1):
+            conf.placeInitFrag()
+            if index >= threshold:
+                new_line = "" if index == len(self.conformers) else ", [!n]"
+                log_debug(
+                    f"{int(index / len(self.conformers) * 100)}%{new_line}")
+                threshold = round(threshold + tenth, 1)
+        self.logInitFragsPlaced()
 
     def hasClashes(self, gids):
         """
