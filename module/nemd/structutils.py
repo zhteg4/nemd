@@ -878,7 +878,7 @@ class GrownStruct(PackedStruct):
 
     def __init__(self, *args, MolClass=GrownMol, **kwargs):
         super().__init__(*args, MolClass=MolClass, **kwargs)
-        self.fmols = None
+        self.fmols = []
         self.failed_num = 0  # The failed attempts in growing molecules
         self.mol_num = None  # the last reported growing molecule number
 
@@ -886,17 +886,15 @@ class GrownStruct(PackedStruct):
         """
         Break the molecule into the smallest rigid fragments.
         """
-        if self.fmols is not None:
+        if self.fmols:
             return
 
-        self.fmols = {}
         for id, mol in self.mols.items():
             mol.conf = None  # conformer doesn't support copy
             for conf in mol.GetConformers():
-                mol_id = conf.GetId()
                 mol = conf.fragmentize()
-                self.fmols[mol_id] = mol
-        total_frag_num = sum([x.getNumFrags() for x in self.fmols.values()])
+                self.fmols.append(mol)
+        total_frag_num = sum([x.getNumFrags() for x in self.fmols])
         log_debug(f"{total_frag_num} fragments in total.")
 
     def setFrameAndDcell(self):
@@ -915,7 +913,7 @@ class GrownStruct(PackedStruct):
         Set conformer coordinates without clashes.
         """
 
-        frags = [x.ifrag for x in self.fmols.values()]
+        frags = [x.ifrag for x in self.fmols]
         self.setInitFrm(frags)
         self.setDcell()
         log_debug(f'Placing {len(frags)} initiators into the cell...')
