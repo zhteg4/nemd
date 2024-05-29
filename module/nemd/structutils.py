@@ -209,6 +209,7 @@ class GrownConf(PackedConf):
     def __init__(self, *args, **kwargs):
         super(GrownConf, self).__init__(*args, **kwargs)
         self.ifrag = None
+        self.frags = []
 
     def setPositions(self, xyz):
         """
@@ -239,7 +240,9 @@ class GrownConf(PackedConf):
         :param conf 'rdkit.Chem.rdchem.Conformer': the new conformer.
         """
         mol = self.GetOwningMol()
-        self.ifrag = mol.ifrag.copyInit(self) if mol.ifrag else None
+        if mol.ifrag:
+            self.ifrag = mol.ifrag.copyInit(self)
+            self.frags = [self.ifrag]
         self.init_aids = mol.init_aids.copy()
         self.frm = mol.frm
 
@@ -339,6 +342,25 @@ class GrownConf(PackedConf):
             if clashes:
                 return True
         return False
+
+    def placeFrags(self):
+        frags = []
+        for frag in self.frags:
+            if not frag.dihe:
+                # ifrag without dihe means rigid body
+                continue
+
+            try:
+                frag.place(frags)
+            except ConfError:
+                pass
+            else:
+                continue
+
+            frags, success = frag.backMove(frags)
+            if success:
+                continue
+        self.frags = frags
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -1022,34 +1044,21 @@ class GrownStruct(PackedStruct):
         self.setInitFrm()
         self.setDcell()
         self.placeInitFrags()
-
-        frags = [x.ifrag for x in self.conformers]
-        while frags:
-            frag = frags.pop(0)
-            if not frag.dihe:
-                # ifrag without dihe means rigid body
+        conformers = [x for x in self.conformers]
+        while conformers:
+            conf = conformers.pop(0)
+            if not conf.frags:
                 continue
-            while frag.vals:
-                frag.setDihedralDeg()
-                self.updateFrm()
-                if self.hasClashes(frag.gids):
-                    continue
-                # Successfully grew one fragment
-                frags += frag.nfrags
-                self.add(frag.gids)
-                self.reportStatus(frags)
-                break
-            else:
-                frags, success = self.backMove(frag, frags)
-                if not success:
-                    # The molecule has grown to a dead end (no break)
-                    self.failed_num += 1
-                    frags[0].resetVals()
-                    # The method backmove() deletes some extg_gids
-                    self.dcell.setGraph(len(self.mols))
-                    self.placeInitFrag(frags[0])
-                    self.reportRelocation(frags[0])
-            log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
+            conf.placeFrags()
+            conformers.append(conf)
+            # # The molecule has grown to a dead end (no break)
+            # self.failed_num += 1
+            # frags[0].resetVals()
+            # # The method backmove() deletes some extg_gids
+            # self.dcell.setGraph(len(self.mols))
+            # self.placeInitFrag(frags[0])
+            # self.reportRelocation(frags[0])
+            # log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
 
     def setXYZ(self):
         for conf in self.conformers:
@@ -1131,23 +1140,6 @@ class GrownStruct(PackedStruct):
         self.dcell.atomCellRemove(gids)
         self.dcell.removeGids(gids)
 
-    def reportStatus(self, frags):
-        """
-        Report the growing and failed molecule status.
-
-        :param frags list of 'fragments.Fragment': the growing fragments
-        """
-
-        cur_mol_num = len(set([x.conf.GetId() for x in frags]))
-        if cur_mol_num == self.mol_num:
-            # No change of the growing molecule number from previous report
-            return
-
-        self.mol_num = cur_mol_num
-        finished_num = len(self.conformers) - self.mol_num
-        log_debug(f'{finished_num} finished; {self.failed_num} failed.')
-        return cur_mol_num
-
     def logInitFragsPlaced(self):
         """
         Log the initiator fragments status after the first placements.
@@ -1161,31 +1153,6 @@ class GrownStruct(PackedStruct):
         log_debug(
             f'({self.init_tf.pairDists().min():.2f} as the minimum pair distance)'
         )
-
-    def backMove(self, frag, frags):
-        """
-        Back move fragment so that the obstacle can be walked around later.
-
-        :param frag 'fragments.Fragment': fragment to perform back move
-        :param frags list: growing fragments
-        """
-        # 1）Find the previous fragment with available dihedral candidates.
-        pfrag = frag.getPreAvailFrag()
-        found = bool(pfrag)
-        frag = pfrag if found else frag.mol.ifrag
-        # 2）Find the next fragments who have been placed into the cell.
-        nxt_frags = frag.getNxtFrags()
-        [x.resetVals() for x in nxt_frags]
-        ratom_gids = [y for x in nxt_frags for y in x.gids]
-        if not found:
-            ratom_gids += frag.mol.extg_gids
-        self.remove(ratom_gids)
-        # 3）Fragment after the next fragments were added to the growing
-        # frags before this backmove step.
-        nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
-        frags = [frag] + [x for x in frags if x not in nnxt_frags]
-        log_debug(f"{len(self.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
-        return frags, found
 
 
 class Fragment:
@@ -1382,19 +1349,62 @@ class Fragment:
             all_nfrags += nfrags
         return all_nfrags
 
-    def setConformer(self):
-        """
-        Try out dihedral angle values to avoid clashes.
-
-        :return bool: True on the first no-clash conformer with respect to the
-            current dihedral angle and atom ids.
-        """
-        self.GetOwningMol().setDcell()
-        while self.vals:
-            self.setDihedralDeg()
-            if not self.hasClashes():
-                return True
-        return False
-
     def GetOwningMol(self):
         return self.conf.GetOwningMol()
+
+    def place(self, frags):
+        while self.vals:
+            self.setDihedralDeg()
+            self.conf.updateFrm()
+            if self.conf.hasClashes(self.gids):
+                continue
+            # Successfully grew one fragment
+            frags += self.nfrags
+            self.conf.add(self.gids)
+            # self.reportStatus(frags)
+            return frags
+        raise ConfError
+
+    def backMove(self, frags):
+        """
+        Back move fragment so that the obstacle can be walked around later.
+
+        :param frag 'fragments.Fragment': fragment to perform back move
+        :param frags list: growing fragments
+        """
+        # 1）Find the previous fragment with available dihedral candidates.
+        pfrag = self.getPreAvailFrag()
+        found = bool(pfrag)
+        frag = pfrag if found else self.conf.ifrag
+        # 2）Find the next fragments who have been placed into the cell.
+        nxt_frags = frag.getNxtFrags()
+        [x.resetVals() for x in nxt_frags]
+        ratom_gids = [y for x in nxt_frags for y in x.gids]
+        if not found:
+            ratom_gids += frag.conf.init_gids
+        self.conf.remove(ratom_gids)
+        # 3）Fragment after the next fragments were added to the growing
+        # frags before this backmove step.
+        nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
+        frags = [frag] + [x for x in frags if x not in nnxt_frags]
+        log_debug(
+            f"{len(self.conf.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
+        return frags, found
+
+    def reportStatus(self, frags):
+        """
+        Report the growing and failed molecule status.
+
+        :param frags list of 'fragments.Fragment': the growing fragments
+        """
+
+        cur_mol_num = len(set([x.conf.GetId() for x in frags]))
+        if cur_mol_num == self.mol_num:
+            # No change of the growing molecule number from previous report
+            return
+        import pdb
+        pdb.set_trace()
+        self.mol_num = cur_mol_num
+        finished_num = len(self.conformers) - self.mol_num
+        log_debug(f'{finished_num} finished; {self.failed_num} failed.')
+        return cur_mol_num
