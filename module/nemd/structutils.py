@@ -221,13 +221,42 @@ class GrownConf(PackedConf):
 
     def fragmentize(self):
         self.GetOwningMol().fragmentize()
-        mol = self.GetOwningMol().copy(self)
-        mol.gids = self.gids
+        self.setFrags()
+        self.setGids()
+        return self
+
+    def setFrags(self):
+        """
+        Copy the current GrownMol object and set the new conformer.
+        NOTE: dihedral value candidates, existing atom ids, and fragment references
+        are copied. Other attributes such as the graph, rotatable bonds, and frames
+        are just referred to the original object.
+
+        :param conf 'rdkit.Chem.rdchem.Conformer': the new conformer.
+        """
+        mol = self.GetOwningMol()
+        self.ifrag = mol.ifrag.copyInit(self) if mol.ifrag else None
+        self.extg_aids = mol.extg_aids.copy()
+        self.frm = mol.frm
+
+    def setGids(self):
+        mol = self.GetOwningMol()
         id_map = {x.GetIdx(): y for x, y in zip(mol.GetAtoms(), self.gids)}
-        mol.extg_gids = set([id_map[x] for x in mol.extg_aids])
-        for frag in mol.fragments():
+        self.extg_gids = set([id_map[x] for x in mol.extg_aids])
+        for frag in self.fragments():
             frag.gids = [id_map[x] for x in frag.aids]
-        return mol
+
+    def fragments(self):
+        return self.GetOwningMol().fragments(ifrag=self.ifrag)
+
+    @functools.lru_cache(maxsize=None)
+    def getNumFrags(self):
+        """
+        Return the number of the total fragments.
+
+        :return int: number of the total fragments.
+        """
+        return len(self.fragments())
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -653,7 +682,6 @@ class GrownMol(PackedMol):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.conf = None
         self.ifrag = None
         self.setGraph()
         self.rotatable_bonds = self.GetSubstructMatches(self.PATT,
@@ -706,7 +734,7 @@ class GrownMol(PackedMol):
         fragment and adding the newly generated ones to be fragmentized until
         no fragments can be further fragmentized.
         """
-        self.ifrag = Fragment([], self)
+        self.ifrag = Fragment([], self.GetConformer())
         to_be_fragmentized = self.ifrag.setFrags()
         while to_be_fragmentized:
             frag = to_be_fragmentized.pop(0)
@@ -722,29 +750,22 @@ class GrownMol(PackedMol):
             for nfrag in frag.nfrags:
                 nfrag.pfrag = frag
 
-    def fragments(self):
+    def fragments(self, ifrag=None):
         """
         Return all fragments.
 
         :return list: each of the item is one fragment.
         """
+        if ifrag is None:
+            ifrag = self.ifrag
         all_frags = []
-        if self.ifrag is None:
+        if ifrag is None:
             return all_frags
-        nfrags = [self.ifrag]
+        nfrags = [ifrag]
         while (nfrags):
             all_frags += nfrags
             nfrags = [y for x in nfrags for y in x.nfrags]
         return all_frags
-
-    @functools.lru_cache(maxsize=None)
-    def getNumFrags(self):
-        """
-        Return the number of the total fragments.
-
-        :return int: number of the total fragments.
-        """
-        return len(self.fragments())
 
     def setInitAtomIds(self):
         """
@@ -890,7 +911,6 @@ class GrownStruct(PackedStruct):
             return
 
         for id, mol in self.mols.items():
-            mol.conf = None  # conformer doesn't support copy
             for conf in mol.GetConformers():
                 mol = conf.fragmentize()
                 self.fmols.append(mol)
@@ -966,7 +986,7 @@ class GrownStruct(PackedStruct):
         :param frags list of 'fragments.Fragment': fragment from each molecule
         """
         data = np.full((len(frags), 3), np.inf)
-        index = [x.mol.molecule_id for x in frags]
+        index = [x.conf.GetId() for x in frags]
         self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
 
     def setDcell(self):
@@ -999,20 +1019,20 @@ class GrownStruct(PackedStruct):
         self.dcell.rmClashNodes()
         points = self.dcell.getVoids()
         for point in points:
-            conf = frag.mol.conf
-            centroid = np.array(conf.centroid(aids=list(frag.mol.extg_aids)))
-            conf.translate(-centroid)
-            conf.rotateRandomly()
-            conf.translate(point)
-            self.frm.loc[frag.mol.gids] = conf.GetPositions()
+            centroid = np.array(
+                frag.conf.centroid(aids=list(frag.conf.extg_aids)))
+            frag.conf.translate(-centroid)
+            frag.conf.rotateRandomly()
+            frag.conf.translate(point)
+            self.frm.loc[frag.conf.gids] = frag.conf.GetPositions()
 
-            if self.hasClashes(frag.mol.extg_gids):
+            if self.hasClashes(frag.conf.extg_gids):
                 continue
             # Only update the distance cell after one molecule successful
             # placed into the cell as only inter-molecular clashes are
             # checked for packed cell.
-            self.add(list(frag.mol.extg_gids))
-            self.init_tf.loc[frag.mol.molecule_id] = point
+            self.add(list(frag.conf.extg_gids))
+            self.init_tf.loc[frag.conf.GetId()] = point
             return
 
         with open('placeInitFrag.xyz', 'w') as out_fh:
@@ -1066,13 +1086,13 @@ class GrownStruct(PackedStruct):
         :param frags list of 'fragments.Fragment': the growing fragments
         """
 
-        cur_mol_num = len(set([x.mol.molecule_id for x in frags]))
+        cur_mol_num = len(set([x.conf.GetId() for x in frags]))
         if cur_mol_num == self.mol_num:
             # No change of the growing molecule number from previous report
             return
 
         self.mol_num = cur_mol_num
-        finished_num = len(self.mols) - self.mol_num
+        finished_num = len(self.conformers) - self.mol_num
         log_debug(f'{finished_num} finished; {self.failed_num} failed.')
         return cur_mol_num
 
@@ -1122,14 +1142,14 @@ class Fragment:
     def __repr__(self):
         return f"{self.dihe}: {self.aids}"
 
-    def __init__(self, dihe, mol):
+    def __init__(self, dihe, conf):
         """
         :param dihe list of dihedral atom ids: the dihedral that changes the
             atom position in this fragment.
         :param mol 'GrownMol': the GrownMol that this fragment belongs to
         """
         self.dihe = dihe
-        self.mol = mol
+        self.conf = conf
         self.aids = []
         self.pfrag = None
         self.nfrags = []
@@ -1138,14 +1158,14 @@ class Fragment:
         self.fval = True
         self.resetVals()
 
-    def copy(self, mol):
+    def copy(self, conf):
         """
         Copy the current fragment to a new one.
 
         :param mol GrownMol: the fragMol object this fragment belongs to.
         :return Fragment: the copied fragment.
         """
-        frag = Fragment(self.dihe, mol)
+        frag = Fragment(self.dihe, conf)
         frag.aids = self.aids[:]
         frag.pfrag = self.pfrag
         frag.nfrags = self.nfrags
@@ -1154,7 +1174,7 @@ class Fragment:
         frag.val = self.fval
         return frag
 
-    def copyInit(self, mol):
+    def copyInit(self, conf):
         """
         Copy the current initial fragment and all the fragments retrieved by it
         The connections between all new fragments are established as well.
@@ -1162,11 +1182,11 @@ class Fragment:
         :param mol GrownMol: the fragMol object this initial fragment belongs to
         :return Fragment: the copied initial fragment.
         """
-        ifrag = self.copy(mol=mol)
+        ifrag = self.copy(conf)
         all_nfrags = [ifrag]
         while (all_nfrags):
             frag = all_nfrags.pop()
-            nfrags = [x.copy(mol=mol) for x in frag.nfrags]
+            nfrags = [x.copy(conf) for x in frag.nfrags]
             frag.nfrags = nfrags
             for nfrag in nfrags:
                 nfrag.pfrag = frag
@@ -1191,7 +1211,7 @@ class Fragment:
         dihes = self.getNewDihes()
         if not dihes:
             return []
-        nfrags = [Fragment(x, self.mol) for x in dihes]
+        nfrags = [Fragment(x, self.conf) for x in dihes]
         if self.dihe:
             nfrags = [self] + nfrags
         else:
@@ -1218,13 +1238,16 @@ class Fragment:
         if self.dihe:
             pairs = zip([self.dihe[1]] * len(self.aids), self.aids)
         else:
-            pairs = self.mol.findHeadTailPair()
+            pairs = self.GetOwningMol().findHeadTailPair()
 
         dihes, num = [], 0
         for source, target in pairs:
-            _, _, path = self.mol.findPath(source=source, target=target)
+            _, _, path = self.GetOwningMol().findPath(source=source,
+                                                      target=target)
             a_dihes = zip(path[:-3], path[1:-2], path[2:-1], path[3:])
-            a_dihes = [x for x in a_dihes if self.mol.isRotatable(x[1:-1])]
+            a_dihes = [
+                x for x in a_dihes if self.GetOwningMol().isRotatable(x[1:-1])
+            ]
             if len(a_dihes) < num:
                 continue
             num = len(a_dihes)
@@ -1235,7 +1258,7 @@ class Fragment:
         """
         Set up the fragment.
         """
-        self.aids = self.mol.getSwingAtoms(*self.dihe)
+        self.aids = self.GetOwningMol().getSwingAtoms(*self.dihe)
 
     def addFrag(self, nfrag):
         """
@@ -1256,8 +1279,7 @@ class Fragment:
         if val is None:
             val = self.popVal()
         self.val = val
-        Chem.rdMolTransforms.SetDihedralDeg(self.mol.conf, *self.dihe,
-                                            self.val)
+        Chem.rdMolTransforms.SetDihedralDeg(self.conf, *self.dihe, self.val)
 
     def getDihedralDeg(self):
         """
@@ -1266,7 +1288,7 @@ class Fragment:
         :return float: the dihedral angle degree
         """
 
-        return Chem.rdMolTransforms.GetDihedralDeg(self.mol.conf, *self.dihe)
+        return Chem.rdMolTransforms.GetDihedralDeg(self.conf, *self.dihe)
 
     def popVal(self):
         """
@@ -1315,7 +1337,7 @@ class Fragment:
 
         :return bool: clash exists or not.
         """
-        return self.mol.hasClashes(self.aids)
+        return self.GetOwningMol().hasClashes(self.aids)
 
     def setConformer(self):
         """
@@ -1324,9 +1346,12 @@ class Fragment:
         :return bool: True on the first no-clash conformer with respect to the
             current dihedral angle and atom ids.
         """
-        self.mol.setDcell()
+        self.GetOwningMol().setDcell()
         while self.vals:
             self.setDihedralDeg()
             if not self.hasClashes():
                 return True
         return False
+
+    def GetOwningMol(self):
+        return self.conf.GetOwningMol()

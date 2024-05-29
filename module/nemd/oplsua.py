@@ -2089,7 +2089,10 @@ class LammpsData(LammpsDataBase):
             self.data_hdl.write(f"{' '.join(line)}\n")
         self.data_hdl.write("\n")
         # Calculate density as the revised box may alter the box size.
-        weight = sum([self.ff.molecular_weight(x) for x in self.molecule])
+        weight = sum([
+            self.ff.molecular_weight(x) * x.GetNumConformers()
+            for x in self.molecule
+        ])
         edges = [
             x * 2 * scipy.constants.angstrom / scipy.constants.centi
             for x in box_hf
