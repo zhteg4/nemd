@@ -811,6 +811,9 @@ class DistanceCell:
                 self.graph.add_edge(neighbor, node)
 
     def rmClashNodes(self):
+        """
+        Remove nodes cocupied by existing atoms.
+        """
         xyzs = self.frm.loc[list(self.extg_gids)]
         nodes = (xyzs / self.ggrids).round().astype(int)
         nodes = set([tuple(x[1]) for x in nodes.iterrows()])

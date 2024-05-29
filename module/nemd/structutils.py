@@ -219,6 +219,10 @@ class GrownConf(PackedConf):
         for id in range(xyz.shape[0]):
             self.SetAtomPosition(id, xyz[id, :])
 
+    def setReferences(self):
+        super().setReferences()
+        self.init_tf = self.mol.init_tf
+
     def fragmentize(self):
         self.GetOwningMol().fragmentize()
         self.setFrags()
@@ -236,13 +240,13 @@ class GrownConf(PackedConf):
         """
         mol = self.GetOwningMol()
         self.ifrag = mol.ifrag.copyInit(self) if mol.ifrag else None
-        self.extg_aids = mol.extg_aids.copy()
+        self.init_aids = mol.init_aids.copy()
         self.frm = mol.frm
 
     def setGids(self):
         mol = self.GetOwningMol()
         id_map = {x.GetIdx(): y for x, y in zip(mol.GetAtoms(), self.gids)}
-        self.extg_gids = set([id_map[x] for x in mol.extg_aids])
+        self.init_gids = set([id_map[x] for x in mol.init_aids])
         for frag in self.fragments():
             frag.gids = [id_map[x] for x in frag.aids]
 
@@ -257,6 +261,84 @@ class GrownConf(PackedConf):
         :return int: number of the total fragments.
         """
         return len(self.fragments())
+
+    def placeInitFrag(self):
+        """
+        Place the initiator fragment into the cell with random position, random
+        orientation, and large separation.
+
+        :param frag 'fragments.Fragment': the fragment to place
+
+        :raise ValueError: when no void to place the initiator fragment of the
+            dead molecule.
+        """
+
+        self.dcell.rmClashNodes()
+        points = self.dcell.getVoids()
+        for point in points:
+            centroid = np.array(self.centroid(aids=list(self.init_aids)))
+            self.translate(-centroid)
+            self.rotateRandomly()
+            self.translate(point)
+            self.frm.loc[self.gids] = self.GetPositions()
+
+            if self.hasClashes(self.init_gids):
+                continue
+            # Only update the distance cell after one molecule successful
+            # placed into the cell as only inter-molecular clashes are
+            # checked for packed cell.
+            self.add(list(self.init_gids))
+            self.init_tf.loc[self.GetId()] = point
+            return
+
+        # with open('placeInitFrag.xyz', 'w') as out_fh:
+        #     self.frm.write(out_fh,
+        #                    dreader=self.df_reader,
+        #                    visible=list(self.dcell.extg_gids),
+        #                    points=points)
+        raise ValueError(f'Failed to relocate the dead molecule. '
+                         f'({len(self.dcell.extg_gids)}/{len(self.mols)})')
+
+    def add(self, gids):
+        """
+        Update trajectory frame, add atoms to the atom cell and existing record.
+
+        :param gids list: gids of the atoms to be added
+        """
+        self.updateFrm()
+        self.dcell.atomCellUpdate(gids)
+        self.dcell.addGids(gids)
+
+    def updateFrm(self):
+        """
+        Update the coordinate frame based on the current conformer.
+        """
+        self.frm.loc[self.gids] = self.GetPositions()
+
+    def remove(self, gids):
+        """
+        Remove atoms from the atom cell and existing record.
+
+        :param gids list: gids of the atoms to be removed
+        """
+        self.dcell.atomCellRemove(gids)
+        self.dcell.removeGids(gids)
+
+    def hasClashes(self, gids):
+        """
+        Whether the atoms has clashes with existing atoms in the cell.
+
+        :param gids list: golabal atom ids to check clashes against.
+        :return bool: True if clashes are found.
+        """
+        for row in [self.frm.loc[x] for x in gids]:
+            clashes = self.dcell.getClashes(row,
+                                            included=self.dcell.extg_gids,
+                                            radii=self.radii,
+                                            excluded=self.excluded)
+            if clashes:
+                return True
+        return False
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -628,6 +710,7 @@ class PackedStruct(Struct):
         """
         Set references to all molecular and conformers.
         """
+
         for mol in self.mols.values():
             mol.id_map = self.df_reader.mols
             mol.radii = self.df_reader.radii
@@ -775,7 +858,7 @@ class GrownMol(PackedMol):
         aids = [y for x in frags for y in x.aids]
         aids_set = set(aids)
         assert len(aids) == len(aids_set)
-        self.extg_aids = set(
+        self.init_aids = set(
             [x for x in range(self.GetNumAtoms()) if x not in aids_set])
 
     def findHeadTailPair(self):
@@ -899,23 +982,9 @@ class GrownStruct(PackedStruct):
 
     def __init__(self, *args, MolClass=GrownMol, **kwargs):
         super().__init__(*args, MolClass=MolClass, **kwargs)
-        self.fmols = []
         self.failed_num = 0  # The failed attempts in growing molecules
         self.mol_num = None  # the last reported growing molecule number
-
-    def fragmentize(self):
-        """
-        Break the molecule into the smallest rigid fragments.
-        """
-        if self.fmols:
-            return
-
-        for id, mol in self.mols.items():
-            for conf in mol.GetConformers():
-                mol = conf.fragmentize()
-                self.fmols.append(mol)
-        total_frag_num = sum([x.getNumFrags() for x in self.fmols])
-        log_debug(f"{total_frag_num} fragments in total.")
+        self.init_tf = None
 
     def setFrameAndDcell(self):
         """
@@ -928,25 +997,45 @@ class GrownStruct(PackedStruct):
         self.cell_cut = float(self.df_reader.radii.max())
         super().setFrameAndDcell()
 
+    def setReferences(self):
+        for mol in self.mols.values():
+            mol.init_tf = self.init_tf
+        super().setReferences()
+
+    def fragmentize(self):
+        """
+        Break the molecule into the smallest rigid fragments.
+        """
+        if all([x.ifrag for x in self.conformers]):
+            return
+
+        for conf in self.conformers:
+            conf.fragmentize()
+        total_frag_num = sum([x.getNumFrags() for x in self.conformers])
+        log_debug(f"{total_frag_num} fragments in total.")
+
     def setConformers(self):
         """
         Set conformer coordinates without clashes.
         """
-
-        frags = [x.ifrag for x in self.fmols]
-        self.setInitFrm(frags)
+        # self.setXYZ()
+        self.setInitFrm()
         self.setDcell()
-        log_debug(f'Placing {len(frags)} initiators into the cell...')
+        log_debug(
+            f'Placing {len(self.conformers)} initiators into the cell...')
 
-        tenth, threshold, = len(frags) / 10., 0
-        for index, frag in enumerate(frags, start=1):
-            self.placeInitFrag(frag)
+        tenth, threshold, = len(self.conformers) / 10., 0
+        for index, conf in enumerate(self.conformers, start=1):
+            conf.placeInitFrag()
+            self.extg_gids
             if index >= threshold:
-                new_line = "" if index == len(frags) else ", [!n]"
-                log_debug(f"{int(index / len(frags) * 100)}%{new_line}")
+                new_line = "" if index == len(self.conformers) else ", [!n]"
+                log_debug(
+                    f"{int(index / len(self.conformers) * 100)}%{new_line}")
                 threshold = round(threshold + tenth, 1)
-        self.logInitFragsPlaced(frags)
+        self.logInitFragsPlaced()
 
+        frags = [x.ifrag for x in self.conformers]
         while frags:
             frag = frags.pop(0)
             if not frag.dihe:
@@ -979,14 +1068,12 @@ class GrownStruct(PackedStruct):
             xyz = self.df_reader.getMolXYZ(conf.GetId())
             conf.setPositions(xyz)
 
-    def setInitFrm(self, frags):
+    def setInitFrm(self):
         """
         Set the traj frame for initiators.
-
-        :param frags list of 'fragments.Fragment': fragment from each molecule
         """
-        data = np.full((len(frags), 3), np.inf)
-        index = [x.conf.GetId() for x in frags]
+        data = np.full((len(self.conformers), 3), np.inf)
+        index = [x.GetId() for x in self.conformers]
         self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
 
     def setDcell(self):
@@ -997,6 +1084,7 @@ class GrownStruct(PackedStruct):
         self.dcell = traj.DistanceCell(frm=self.frm, cut=self.cell_cut)
         self.dcell.setUp()
         self.dcell.setGraph(len(self.mols))
+        self.setReferences()
 
     def updateFrm(self):
         """
@@ -1004,44 +1092,6 @@ class GrownStruct(PackedStruct):
         """
         pos = [x.GetPositions() for x in self.conformers]
         self.frm.loc[:] = np.concatenate(pos, axis=0)
-
-    def placeInitFrag(self, frag):
-        """
-        Place the initiator fragment into the cell with random position, random
-        orientation, and large separation.
-
-        :param frag 'fragments.Fragment': the fragment to place
-
-        :raise ValueError: when no void to place the initiator fragment of the
-            dead molecule.
-        """
-
-        self.dcell.rmClashNodes()
-        points = self.dcell.getVoids()
-        for point in points:
-            centroid = np.array(
-                frag.conf.centroid(aids=list(frag.conf.extg_aids)))
-            frag.conf.translate(-centroid)
-            frag.conf.rotateRandomly()
-            frag.conf.translate(point)
-            self.frm.loc[frag.conf.gids] = frag.conf.GetPositions()
-
-            if self.hasClashes(frag.conf.extg_gids):
-                continue
-            # Only update the distance cell after one molecule successful
-            # placed into the cell as only inter-molecular clashes are
-            # checked for packed cell.
-            self.add(list(frag.conf.extg_gids))
-            self.init_tf.loc[frag.conf.GetId()] = point
-            return
-
-        with open('placeInitFrag.xyz', 'w') as out_fh:
-            self.frm.write(out_fh,
-                           dreader=self.df_reader,
-                           visible=list(self.dcell.extg_gids),
-                           points=points)
-        raise ValueError(f'Failed to relocate the dead molecule. '
-                         f'({len(self.dcell.extg_gids)}/{len(self.mols)})')
 
     def hasClashes(self, gids):
         """
@@ -1096,15 +1146,14 @@ class GrownStruct(PackedStruct):
         log_debug(f'{finished_num} finished; {self.failed_num} failed.')
         return cur_mol_num
 
-    def logInitFragsPlaced(self, frags):
+    def logInitFragsPlaced(self):
         """
         Log the initiator fragments status after the first placements.
-
-        :param frags list of 'fragments.Fragment': the initiator of each frag
-            has been placed into the cell.
         """
 
-        log_debug(f'{len(frags)} initiators have been placed into the cell.')
+        log_debug(
+            f'{len(self.conformers)} initiators have been placed into the cell.'
+        )
         if len(self.mols) == 1:
             return
         log_debug(
@@ -1151,6 +1200,7 @@ class Fragment:
         self.dihe = dihe
         self.conf = conf
         self.aids = []
+        self.gids = set()
         self.pfrag = None
         self.nfrags = []
         self.vals = []
@@ -1329,15 +1379,6 @@ class Fragment:
             nfrags = [y for x in nfrags for y in x.nfrags if not y.fval]
             all_nfrags += nfrags
         return all_nfrags
-
-    def hasClashes(self):
-        """
-        Whether the atoms in current fragment has clashes with other atoms in
-        the molecue that are set as existing atoms
-
-        :return bool: clash exists or not.
-        """
-        return self.GetOwningMol().hasClashes(self.aids)
 
     def setConformer(self):
         """
