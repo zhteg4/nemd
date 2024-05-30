@@ -234,32 +234,48 @@ class GrownConf(PackedConf):
 
     def fragmentize(self):
         """
-        Break the molecule into the smallest rigid fragments, copy to current
-        conformer, and set up the fragment objects.
+        Break the molecule into the smallest rigid fragments if not, copy to
+        current conformer, and set up the fragment objects.
         """
         self.GetOwningMol().fragmentize()
-        self.setUpFragments()
-
-    def setUpFragments(self):
-        """
-        Copy the initiator fragment object from the owning molecule, and update
-        to the current conformer.
-        """
         mol = self.GetOwningMol()
         self.init_aids = mol.init_aids.copy()
         self.init_gids = [self.id_map[x] for x in self.init_aids]
-        if not mol.ifrag:
-            return
         self.ifrag = mol.ifrag.copyInit(self)
         self.frags = [self.ifrag]
 
-    def fragments(self):
+    def getSwingAtoms(self, *dihe):
         """
-        Return all fragments starting from the initiator fragment.
+        Get the swing atoms when the dihedral angle changes.
 
-        :return list of Fragment: all fragment of this conformer.
+        :param dihe list of four ints: the atom ids that form a dihedral angle
+        :return list of ints: the swing atom ids when the dihedral angle changes.
         """
-        return self.GetOwningMol().fragments(ifrag=self.ifrag)
+        oxyz = self.GetPositions()
+        oval = self.getDihedralDeg(dihe)
+        self.setDihedralDeg(dihe, oval + 5)
+        xyz = self.GetPositions()
+        changed = np.isclose(oxyz, xyz)
+        self.setDihedralDeg(dihe, oval)
+        return [i for i, x in enumerate(changed) if not all(x)]
+
+    def setDihedralDeg(self, dihe, val):
+        """
+        Set angle degree of the given dihedral.
+
+        :param dihe tuple of int: the dihedral atom indices.
+        :param val float: the angle degree.
+        """
+        Chem.rdMolTransforms.SetDihedralDeg(self, *dihe, val)
+
+    def getDihedralDeg(self, dihe):
+        """
+        Get the angle degree of the given dihedral.
+
+        :param dihe tuple of int: the dihedral atom indices.
+        :param return float: the angle degree.
+        """
+        return Chem.rdMolTransforms.GetDihedralDeg(self, *dihe)
 
     @functools.lru_cache(maxsize=None)
     def getNumFrags(self):
@@ -268,7 +284,7 @@ class GrownConf(PackedConf):
 
         :return int: number of the total fragments.
         """
-        return len(self.fragments())
+        return len(self.ifrag.fragments()) if self.ifrag else 0
 
     def placeInitFrag(self):
         """
@@ -374,24 +390,6 @@ class GrownConf(PackedConf):
             # self.reportRelocation(frags[0])
             log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
         self.frags = frags
-
-    def setDihedralDeg(self, dihe, val):
-        """
-        Set angle degree of the given dihedral.
-
-        :param dihe tuple of int: the dihedral atom indices.
-        :param val float: the angle degree.
-        """
-        Chem.rdMolTransforms.SetDihedralDeg(self, *dihe, val)
-
-    def getDihedralDeg(self, dihe):
-        """
-        Get the angle degree of the given dihedral.
-
-        :param dihe tuple of int: the dihedral atom indices.
-        :param return float: the angle degree.
-        """
-        Chem.rdMolTransforms.GetDihedralDeg(self, *dihe)
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -861,60 +859,13 @@ class GrownMol(PackedMol):
         """
         if self.ifrag is not None:
             return
-        self.addNxtFrags()
-        self.setPreFrags()
-        self.setInitAtomIds()
-
-    def addNxtFrags(self):
-        """
-        Starting from the initial fragment, keep fragmentizing the current
-        fragment and adding the newly generated ones to be fragmentized until
-        no fragments can be further fragmentized.
-        """
-        # dihe is not known and will be handled in setFrags()
+        # dihe is not known and will be handled in setFragments()
         self.ifrag = Fragment([], self.GetConformer(), delay=True)
-        to_be_fragmentized = self.ifrag.setFrags()
-        while to_be_fragmentized:
-            frag = to_be_fragmentized.pop(0)
-            nfrags = frag.setFrags()
-            to_be_fragmentized += nfrags
-
-    def setPreFrags(self):
-        """
-        Set previous fragment.
-        """
-        all_frags = self.fragments()
-        for frag in all_frags:
-            for nfrag in frag.nfrags:
-                nfrag.pfrag = frag
-
-    def fragments(self, ifrag=None):
-        """
-        Return all fragments.
-
-        :return list of Fragment: all fragment of this conformer.
-        """
-        if ifrag is None:
-            ifrag = self.ifrag
-        all_frags = []
-        if ifrag is None:
-            return all_frags
-        nfrags = [ifrag]
-        while (nfrags):
-            all_frags += nfrags
-            nfrags = [y for x in nfrags for y in x.nfrags]
-        return all_frags
-
-    def setInitAtomIds(self):
-        """
-        Set initial atom ids that don't belong to any fragments.
-        """
-        frags = self.fragments()
-        aids = [y for x in frags for y in x.aids]
-        aids_set = set(aids)
-        assert len(aids) == len(aids_set)
-        init_aids = [x for x in range(self.GetNumAtoms()) if x not in aids_set]
-        self.init_aids = list(set(init_aids))
+        self.ifrag.setFragments()
+        frags = self.ifrag.fragments()
+        frag_aids_set = set([y for x in frags for y in x.aids])
+        all_aids = set([x.GetIdx() for x in self.GetAtoms()])
+        self.init_aids = list(all_aids.difference(frag_aids_set))
 
     def findHeadTailPair(self):
         """
@@ -986,22 +937,6 @@ class GrownMol(PackedMol):
         in_ring = self.GetBondBetweenAtoms(*bond).IsInRing()
         single = tuple(sorted(bond)) in self.rotatable_bonds
         return not in_ring and single
-
-    def getSwingAtoms(self, *dihe):
-        """
-        Get the swing atoms when the dihedral angle changes.
-
-        :param dihe list of four ints: the atom ids that form a dihedral angle
-        :return list of ints: the swing atom ids when the dihedral angle changes.
-        """
-        conf = self.GetConformer()
-        oxyz = conf.GetPositions()
-        oval = Chem.rdMolTransforms.GetDihedralDeg(conf, *dihe)
-        Chem.rdMolTransforms.SetDihedralDeg(conf, *dihe, oval + 5)
-        xyz = conf.GetPositions()
-        changed = np.isclose(oxyz, xyz)
-        Chem.rdMolTransforms.SetDihedralDeg(conf, *dihe, oval)
-        return [i for i, x in enumerate(changed) if not all(x)]
 
     def copy(self, conf):
         """
@@ -1196,6 +1131,7 @@ class Fragment:
         :param dihe list of dihedral atom ids: the dihedral that changes the
             atom position in this fragment.
         :param mol 'GrownMol': the GrownMol that this fragment belongs to
+        :param delay bool: whether to delay the initialization of the fragment.
         """
         self.dihe = dihe  # dihedral angle four-atom ids
         self.conf = conf  # Conformer object this fragment belongs to
@@ -1210,23 +1146,27 @@ class Fragment:
             return
         self.setUp()
 
-    def copy(self, conf):
+    def setUp(self):
         """
-        Copy the current fragment to a new one.
+        Set up the fragment.
+        """
+        self.resetVals()
+        self.aids = self.conf.getSwingAtoms(*self.dihe)
 
-        :param conf GrownConf: the conformer object this fragment belongs to.
-        :return Fragment: the copied fragment.
+    def resetVals(self):
         """
-        frag = Fragment(self.dihe, conf, delay=True)
-        frag.aids = self.aids
-        frag.gids = [conf.id_map[x] for x in frag.aids]
-        frag.pfrag = self.pfrag
-        frag.nfrags = self.nfrags
-        # Another conformer may have different value and candidates
-        frag.vals = self.vals[:]
-        frag.val = self.val
-        frag.val = self.fval
-        return frag
+        Reset the dihedral angle values and state.
+        """
+        self.val, self.fval = None, True
+        self.vals = list(np.linspace(0, 360, 36, endpoint=False))
+
+    def getOwningMol(self):
+        """
+        Get the owning GrownMol object.
+
+        :return GrownMol: get the molecule this fragment belongs to.
+        """
+        return self.conf.GetOwningMol()
 
     def copyInit(self, conf):
         """
@@ -1247,14 +1187,42 @@ class Fragment:
             all_nfrags += nfrags
         return ifrag
 
-    def resetVals(self):
+    def copy(self, conf):
         """
-        Reset the dihedral angle values and state.
-        """
-        self.val, self.fval = None, True
-        self.vals = list(np.linspace(0, 360, 36, endpoint=False))
+        Copy the current fragment to a new one.
 
-    def setFrags(self):
+        :param conf GrownConf: the conformer object this fragment belongs to.
+        :return Fragment: the copied fragment.
+        """
+        frag = Fragment(self.dihe, conf, delay=True)
+        frag.aids = self.aids
+        frag.gids = [conf.id_map[x] for x in frag.aids]
+        frag.pfrag = self.pfrag
+        frag.nfrags = self.nfrags
+        # Another conformer may have different value and candidates
+        frag.vals = self.vals[:]
+        frag.val = self.val
+        frag.val = self.fval
+        return frag
+
+    def setFragments(self):
+        """
+        Set up fragments by iteratively searching for rotatable bond path and
+        adding them as next fragments.
+        """
+        # Finish up the ifrag setup and set next fragments
+        frags = self.setNextFrags()
+        # Set next fragments
+        while frags:
+            frag = frags.pop(0)
+            nfrags = frag.setNextFrags()
+            frags += nfrags
+        # Set previous fragments
+        for frag in self.fragments():
+            for nfrag in frag.nfrags:
+                nfrag.pfrag = frag
+
+    def setNextFrags(self):
         """
         Set fragments by searching for rotatable bond path and adding them as
         next fragments.
@@ -1272,7 +1240,8 @@ class Fragment:
             self.setUp()
         frags = [self] + [Fragment(x, self.conf) for x in dihes]
         for frag, nfrag in zip(frags[:-1], frags[1:]):
-            frag.addFrag(nfrag)
+            frag.aids = sorted(set(frag.aids).difference(nfrag.aids))
+            frag.nfrags.append(nfrag)
         return frags
 
     def getNewDihes(self):
@@ -1289,15 +1258,15 @@ class Fragment:
         if self.dihe:
             pairs = zip([self.dihe[1]] * len(self.aids), self.aids)
         else:
-            pairs = self.GetOwningMol().findHeadTailPair()
+            pairs = self.getOwningMol().findHeadTailPair()
 
         dihes, num = [], 0
         for source, target in pairs:
-            _, _, path = self.GetOwningMol().findPath(source=source,
+            _, _, path = self.getOwningMol().findPath(source=source,
                                                       target=target)
             a_dihes = zip(path[:-3], path[1:-2], path[2:-1], path[3:])
             a_dihes = [
-                x for x in a_dihes if self.GetOwningMol().isRotatable(x[1:-1])
+                x for x in a_dihes if self.getOwningMol().isRotatable(x[1:-1])
             ]
             if len(a_dihes) < num:
                 continue
@@ -1305,21 +1274,21 @@ class Fragment:
             dihes = a_dihes
         return dihes
 
-    def setUp(self):
+    def place(self, frags):
         """
-        Set up the fragment.
+        Set part of the conformer by rotating the dihedral angle.
         """
-        self.resetVals()
-        self.aids = self.GetOwningMol().getSwingAtoms(*self.dihe)
-
-    def addFrag(self, nfrag):
-        """
-        Add the next fragment to the current one's new fragments.
-
-        :param nfrag 'Fragment': the next fragment to be added.
-        """
-        self.aids = sorted(set(self.aids).difference(nfrag.aids))
-        self.nfrags.append(nfrag)
+        while self.vals:
+            self.setDihedralDeg()
+            self.conf.updateFrm()
+            if self.conf.hasClashes(self.gids):
+                continue
+            # Successfully grew one fragment
+            frags += self.nfrags
+            self.conf.add(self.gids)
+            # self.reportStatus(frags)
+            return frags
+        raise ConfError
 
     def setDihedralDeg(self, val=None):
         """
@@ -1329,7 +1298,9 @@ class Fragment:
         :param val float: the dihedral angle value to be set.
         """
         if val is None:
-            val = self.popVal()
+            val = np.random.choice(self.vals)
+            self.vals.remove(val)
+            self.fval = False
         self.val = val
         self.conf.setDihedralDeg(self.dihe, self.val)
 
@@ -1341,16 +1312,31 @@ class Fragment:
         """
         return self.conf.getDihedralDeg(self.dihe)
 
-    def popVal(self):
+    def backMove(self, frags):
         """
-        Randomly pop one val from dihedral value candidates.
+        Back move fragment so that the obstacle can be walked around later.
 
-        :return float: the picked dihedral value
+        :param frag 'fragments.Fragment': fragment to perform back move
+        :param frags list: growing fragments
         """
-        val = np.random.choice(self.vals)
-        self.vals.remove(val)
-        self.fval = False
-        return val
+        # 1）Find the previous fragment with available dihedral candidates.
+        pfrag = self.getPreAvailFrag()
+        found = bool(pfrag)
+        frag = pfrag if found else self.conf.ifrag
+        # 2）Find the next fragments who have been placed into the cell.
+        nxt_frags = frag.getNxtFrags()
+        [x.resetVals() for x in nxt_frags]
+        ratom_gids = [y for x in nxt_frags for y in x.gids]
+        if not found:
+            ratom_gids += frag.conf.init_gids
+        self.conf.remove(ratom_gids)
+        # 3）Fragment after the next fragments were added to the growing
+        # frags before this backmove step.
+        nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
+        frags = [frag] + [x for x in frags if x not in nnxt_frags]
+        log_debug(
+            f"{len(self.conf.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
+        return frags, found
 
     def getPreAvailFrag(self):
         """
@@ -1381,48 +1367,6 @@ class Fragment:
             all_nfrags += nfrags
         return all_nfrags
 
-    def GetOwningMol(self):
-        return self.conf.GetOwningMol()
-
-    def place(self, frags):
-        while self.vals:
-            self.setDihedralDeg()
-            self.conf.updateFrm()
-            if self.conf.hasClashes(self.gids):
-                continue
-            # Successfully grew one fragment
-            frags += self.nfrags
-            self.conf.add(self.gids)
-            # self.reportStatus(frags)
-            return frags
-        raise ConfError
-
-    def backMove(self, frags):
-        """
-        Back move fragment so that the obstacle can be walked around later.
-
-        :param frag 'fragments.Fragment': fragment to perform back move
-        :param frags list: growing fragments
-        """
-        # 1）Find the previous fragment with available dihedral candidates.
-        pfrag = self.getPreAvailFrag()
-        found = bool(pfrag)
-        frag = pfrag if found else self.conf.ifrag
-        # 2）Find the next fragments who have been placed into the cell.
-        nxt_frags = frag.getNxtFrags()
-        [x.resetVals() for x in nxt_frags]
-        ratom_gids = [y for x in nxt_frags for y in x.gids]
-        if not found:
-            ratom_gids += frag.conf.init_gids
-        self.conf.remove(ratom_gids)
-        # 3）Fragment after the next fragments were added to the growing
-        # frags before this backmove step.
-        nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
-        frags = [frag] + [x for x in frags if x not in nnxt_frags]
-        log_debug(
-            f"{len(self.conf.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
-        return frags, found
-
     def reportStatus(self, frags):
         """
         Report the growing and failed molecule status.
@@ -1440,3 +1384,16 @@ class Fragment:
         finished_num = len(self.conformers) - self.mol_num
         log_debug(f'{finished_num} finished; {self.failed_num} failed.')
         return cur_mol_num
+
+    def fragments(self):
+        """
+        Return all fragments.
+
+        :return list of Fragment: all fragment of this conformer.
+        """
+        frags = []
+        nfrags = [self]
+        while nfrags:
+            frags += nfrags
+            nfrags = [y for x in nfrags for y in x.nfrags]
+        return frags
