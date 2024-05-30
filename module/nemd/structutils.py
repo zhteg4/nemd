@@ -284,7 +284,8 @@ class GrownConf(PackedConf):
 
         :return int: number of the total fragments.
         """
-        return len(self.ifrag.fragments()) if self.ifrag else 0
+        # ifrag without dihe means rigid body and counts as 1 fragment
+        return len(self.ifrag.fragments()) + 1 if self.ifrag.dihe else 1
 
     def placeInitFrag(self):
         """
@@ -1304,14 +1305,6 @@ class Fragment:
         self.val = val
         self.conf.setDihedralDeg(self.dihe, self.val)
 
-    def getDihedralDeg(self):
-        """
-        Measure and return the dihedral angle value
-
-        :return float: the dihedral angle degree
-        """
-        return self.conf.getDihedralDeg(self.dihe)
-
     def backMove(self, frags):
         """
         Back move fragment so that the obstacle can be walked around later.
@@ -1360,12 +1353,11 @@ class Fragment:
 
         :return list: list of next fragments
         """
-        all_nfrags = []
-        nfrags = [self]
-        while (nfrags):
+        frags, nfrags = [], [self]
+        while nfrags:
             nfrags = [y for x in nfrags for y in x.nfrags if not y.fval]
-            all_nfrags += nfrags
-        return all_nfrags
+            frags += nfrags
+        return frags
 
     def reportStatus(self, frags):
         """
@@ -1391,8 +1383,7 @@ class Fragment:
 
         :return list of Fragment: all fragment of this conformer.
         """
-        frags = []
-        nfrags = [self]
+        frags, nfrags = [], [self]
         while nfrags:
             frags += nfrags
             nfrags = [y for x in nfrags for y in x.nfrags]
