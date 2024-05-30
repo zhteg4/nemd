@@ -148,7 +148,8 @@ class PackedConf(Conformer):
         """
         Set the references to the conformer.
         """
-        self.id_map = self.mol.id_map
+        atoms, gids = self.mol.GetAtoms(), self.mol.id_map[self.GetId()]
+        self.id_map = {x.GetIdx(): y for x, y in zip(atoms, gids)}
         self.radii = self.mol.radii
         self.excluded = self.mol.excluded
         self.frm = self.mol.frm
@@ -156,13 +157,14 @@ class PackedConf(Conformer):
         self.extg_gids = self.mol.extg_gids
 
     @property
+    @functools.lru_cache(maxsize=None)
     def gids(self):
         """
         Return the global atom ids of this conformer.
 
         :return list of int: the global atom ids of this conformer.
         """
-        return self.id_map[self.GetId()]
+        return list(self.id_map.values())
 
     def setConformer(self, max_trial=MAX_TRIAL_PER_CONF):
         """
@@ -209,6 +211,8 @@ class GrownConf(PackedConf):
     def __init__(self, *args, **kwargs):
         super(GrownConf, self).__init__(*args, **kwargs)
         self.ifrag = None
+        self.init_aids = None
+        self.init_gids = None
         self.frags = []
 
     def setPositions(self, xyz):
@@ -221,39 +225,40 @@ class GrownConf(PackedConf):
             self.SetAtomPosition(id, xyz[id, :])
 
     def setReferences(self):
+        """
+        Pass aid-to-gid map, radii, excluded atoms, and distance cell from the
+        molecule object to this conformer.
+        """
         super().setReferences()
         self.init_tf = self.mol.init_tf
 
     def fragmentize(self):
+        """
+        Break the molecule into the smallest rigid fragments, copy to current
+        conformer, and set up the fragment objects.
+        """
         self.GetOwningMol().fragmentize()
-        self.setFrags()
-        self.setGids()
-        return self
+        self.setUpFragments()
 
-    def setFrags(self):
+    def setUpFragments(self):
         """
-        Copy the current GrownMol object and set the new conformer.
-        NOTE: dihedral value candidates, existing atom ids, and fragment references
-        are copied. Other attributes such as the graph, rotatable bonds, and frames
-        are just referred to the original object.
-
-        :param conf 'rdkit.Chem.rdchem.Conformer': the new conformer.
+        Copy the initiator fragment object from the owning molecule, and update
+        to the current conformer.
         """
         mol = self.GetOwningMol()
-        if mol.ifrag:
-            self.ifrag = mol.ifrag.copyInit(self)
-            self.frags = [self.ifrag]
         self.init_aids = mol.init_aids.copy()
-        self.frm = mol.frm
-
-    def setGids(self):
-        mol = self.GetOwningMol()
-        id_map = {x.GetIdx(): y for x, y in zip(mol.GetAtoms(), self.gids)}
-        self.init_gids = set([id_map[x] for x in mol.init_aids])
-        for frag in self.fragments():
-            frag.gids = [id_map[x] for x in frag.aids]
+        self.init_gids = set([self.id_map[x] for x in self.init_aids])
+        if not mol.ifrag:
+            return
+        self.ifrag = mol.ifrag.copyInit(self)
+        self.frags = [self.ifrag]
 
     def fragments(self):
+        """
+        Return all fragments starting from the initiator fragment.
+
+        :return list of Fragment: all fragment of this conformer.
+        """
         return self.GetOwningMol().fragments(ifrag=self.ifrag)
 
     @functools.lru_cache(maxsize=None)
@@ -369,6 +374,24 @@ class GrownConf(PackedConf):
             # self.reportRelocation(frags[0])
             log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
         self.frags = frags
+
+    def setDihedralDeg(self, dihe, val):
+        """
+        Set angle degree of the given dihedral.
+
+        :param dihe tuple of int: the dihedral atom indices.
+        :param val float: the angle degree.
+        """
+        Chem.rdMolTransforms.SetDihedralDeg(self, *dihe, val)
+
+    def getDihedralDeg(self, dihe):
+        """
+        Get the angle degree of the given dihedral.
+
+        :param dihe tuple of int: the dihedral atom indices.
+        :param return float: the angle degree.
+        """
+        Chem.rdMolTransforms.GetDihedralDeg(self, *dihe)
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -796,6 +819,7 @@ class GrownMol(PackedMol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ifrag = None
+        self.init_aids = None
         self.setGraph()
         self.rotatable_bonds = self.GetSubstructMatches(self.PATT,
                                                         maxMatches=1000000)
@@ -867,7 +891,7 @@ class GrownMol(PackedMol):
         """
         Return all fragments.
 
-        :return list: each of the item is one fragment.
+        :return list of Fragment: all fragment of this conformer.
         """
         if ifrag is None:
             ifrag = self.ifrag
@@ -1156,8 +1180,14 @@ class GrownStruct(PackedStruct):
 
 
 class Fragment:
+    """
+    Class to set a portion of the conformer by rotating the dihedral angle.
+    """
 
     def __str__(self):
+        """
+        Print the dihedral angle four-atom ids and the swing atom ids.
+        """
         return f"{self.dihe}: {self.aids}"
 
     def __init__(self, dihe, conf):
@@ -1166,28 +1196,30 @@ class Fragment:
             atom position in this fragment.
         :param mol 'GrownMol': the GrownMol that this fragment belongs to
         """
-        self.dihe = dihe
-        self.conf = conf
-        self.aids = []
-        self.gids = set()
-        self.pfrag = None
-        self.nfrags = []
-        self.vals = []
-        self.val = None
-        self.fval = True
+        self.dihe = dihe  # dihedral angle four-atom ids
+        self.conf = conf  # Conformer object this fragment belongs to
+        self.aids = []  # Atom ids of the swing atoms
+        self.gids = set()  # Global atom ids of the swing atoms
+        self.pfrag = None  # Previous fragment
+        self.nfrags = []  # Next fragments
+        self.vals = []  # Available dihedral values candidates
+        self.val = None  # Chosen dihedral angle value
+        self.fval = True  # All dihedral values are available (new frag)
         self.resetVals()
 
     def copy(self, conf):
         """
         Copy the current fragment to a new one.
 
-        :param mol GrownMol: the fragMol object this fragment belongs to.
+        :param conf GrownConf: the conformer object this fragment belongs to.
         :return Fragment: the copied fragment.
         """
         frag = Fragment(self.dihe, conf)
-        frag.aids = self.aids[:]
+        frag.aids = self.aids
+        frag.gids = [conf.id_map[x] for x in frag.aids]
         frag.pfrag = self.pfrag
         frag.nfrags = self.nfrags
+        # Another conformer may have different value and candidates
         frag.vals = self.vals[:]
         frag.val = self.val
         frag.val = self.fval
@@ -1195,15 +1227,15 @@ class Fragment:
 
     def copyInit(self, conf):
         """
-        Copy the current initial fragment and all the fragments retrieved by it
+        Copy the current initial fragment and all the fragments retrieved by it.
         The connections between all new fragments are established as well.
 
-        :param mol GrownMol: the fragMol object this initial fragment belongs to
+        :param mol GrownConf: the conformer object this initial fragment belongs to
         :return Fragment: the copied initial fragment.
         """
         ifrag = self.copy(conf)
         all_nfrags = [ifrag]
-        while (all_nfrags):
+        while all_nfrags:
             frag = all_nfrags.pop()
             nfrags = [x.copy(conf) for x in frag.nfrags]
             frag.nfrags = nfrags
@@ -1216,7 +1248,7 @@ class Fragment:
         """
         Reset the dihedral angle values and state.
         """
-        self.fval, self.val = True, None
+        self.val, self.fval = None, True
         self.vals = list(np.linspace(0, 360, 36, endpoint=False))
 
     def setFrags(self):
@@ -1298,7 +1330,7 @@ class Fragment:
         if val is None:
             val = self.popVal()
         self.val = val
-        Chem.rdMolTransforms.SetDihedralDeg(self.conf, *self.dihe, self.val)
+        self.conf.setDihedralDeg(self.dihe, self.val)
 
     def getDihedralDeg(self):
         """
@@ -1306,8 +1338,7 @@ class Fragment:
 
         :return float: the dihedral angle degree
         """
-
-        return Chem.rdMolTransforms.GetDihedralDeg(self.conf, *self.dihe)
+        return self.conf.getDihedralDeg(self.dihe)
 
     def popVal(self):
         """
@@ -1329,7 +1360,7 @@ class Fragment:
         frag = self.pfrag
         if frag is None:
             return None
-        while (frag.pfrag and not frag.vals):
+        while frag.pfrag and not frag.vals:
             frag = frag.pfrag
         if frag.pfrag is None and not frag.vals:
             # FIXME: Failed conformer search should try to reduce clash criteria
