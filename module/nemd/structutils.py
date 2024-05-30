@@ -366,31 +366,72 @@ class GrownConf(PackedConf):
         return False
 
     def placeFrags(self):
-        frags = []
-        for frag in self.frags:
-            if not frag.dihe:
-                # ifrag without dihe means rigid body
-                continue
+        frag = self.frags.pop(0)
 
-            try:
-                frag.place(frags)
-            except ConfError:
-                pass
-            else:
-                continue
+        if not frag.dihe:
+            # ifrag without dihe means rigid body
+            return
 
-            frags, success = frag.backMove(frags)
-            if success:
+        try:
+            self.place(frag)
+        except ConfError:
+            pass
+        else:
+            return
+
+        success = self.backMove(frag)
+        if success:
+            return
+        # The molecule has grown to a dead end
+        # self.failed_num += 1
+        self.ifrag.resetVals()
+        # The method backmove() deletes some extg_gids
+        self.dcell.resetGraph()
+        self.placeInitFrag()
+        # self.reportRelocation(frags[0])
+        log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
+
+    def place(self, frag):
+        """
+        Set part of the conformer by rotating the dihedral angle.
+        """
+        while frag.vals:
+            frag.setDihedralDeg()
+            self.updateFrm()
+            if self.hasClashes(frag.gids):
                 continue
-            # The molecule has grown to a dead end
-            # self.failed_num += 1
-            self.ifrag.resetVals()
-            # The method backmove() deletes some extg_gids
-            self.dcell.resetGraph()
-            self.placeInitFrag()
-            # self.reportRelocation(frags[0])
-            log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
-        self.frags = frags
+            # Successfully grew one fragment
+            self.frags += frag.nfrags
+            self.add(frag.gids)
+            # self.reportStatus(frags)
+            return
+        raise ConfError
+
+    def backMove(self, frag):
+        """
+        Back move fragment so that the obstacle can be walked around later.
+
+        :param frag 'fragments.Fragment': fragment to perform back move
+        :param frags list: growing fragments
+        """
+        # 1）Find the previous fragment with available dihedral candidates.
+        pfrag = frag.getPreAvailFrag()
+        found = bool(pfrag)
+        frag = pfrag if found else self.ifrag
+        # 2）Find the next fragments who have been placed into the cell.
+        nxt_frags = frag.getNxtFrags()
+        [x.resetVals() for x in nxt_frags]
+        ratom_gids = [y for x in nxt_frags for y in x.gids]
+        if not found:
+            ratom_gids += frag.conf.init_gids
+        self.remove(ratom_gids)
+        # 3）Fragment after the next fragments were added to the growing
+        # frags before this backmove step.
+        nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
+        self.frags = [frag] + [x for x in self.frags if x not in nnxt_frags]
+        log_debug(
+            f"{len(self.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
+        return found
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -1275,22 +1316,6 @@ class Fragment:
             dihes = a_dihes
         return dihes
 
-    def place(self, frags):
-        """
-        Set part of the conformer by rotating the dihedral angle.
-        """
-        while self.vals:
-            self.setDihedralDeg()
-            self.conf.updateFrm()
-            if self.conf.hasClashes(self.gids):
-                continue
-            # Successfully grew one fragment
-            frags += self.nfrags
-            self.conf.add(self.gids)
-            # self.reportStatus(frags)
-            return frags
-        raise ConfError
-
     def setDihedralDeg(self, val=None):
         """
         Set the dihedral angle of the current fragment. If val is not provided,
@@ -1304,32 +1329,6 @@ class Fragment:
             self.fval = False
         self.val = val
         self.conf.setDihedralDeg(self.dihe, self.val)
-
-    def backMove(self, frags):
-        """
-        Back move fragment so that the obstacle can be walked around later.
-
-        :param frag 'fragments.Fragment': fragment to perform back move
-        :param frags list: growing fragments
-        """
-        # 1）Find the previous fragment with available dihedral candidates.
-        pfrag = self.getPreAvailFrag()
-        found = bool(pfrag)
-        frag = pfrag if found else self.conf.ifrag
-        # 2）Find the next fragments who have been placed into the cell.
-        nxt_frags = frag.getNxtFrags()
-        [x.resetVals() for x in nxt_frags]
-        ratom_gids = [y for x in nxt_frags for y in x.gids]
-        if not found:
-            ratom_gids += frag.conf.init_gids
-        self.conf.remove(ratom_gids)
-        # 3）Fragment after the next fragments were added to the growing
-        # frags before this backmove step.
-        nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
-        frags = [frag] + [x for x in frags if x not in nnxt_frags]
-        log_debug(
-            f"{len(self.conf.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
-        return frags, found
 
     def getPreAvailFrag(self):
         """

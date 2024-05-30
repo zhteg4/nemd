@@ -271,6 +271,7 @@ def main(argv):
     logutils.logOptions(logger, options)
     integration = Integration(options, logger=logger)
     integration.run()
+    log('Finished.', timestamp=True)
 
 
 if __name__ == "__main__":
