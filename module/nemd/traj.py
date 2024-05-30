@@ -537,6 +537,8 @@ class DistanceCell:
         self.span = None
         self.neigh_ids = None
         self.atom_cell = None
+        self.graph = None
+        self.orig_graph = None
         self.extg_gids = set()
         if self.gids is None:
             self.gids = list(range(1, self.frm.shape[0] + 1))
@@ -809,6 +811,10 @@ class DistanceCell:
                     (x + y) % z for x, y, z in zip(node, ids, self.gindexes)
                 ])
                 self.graph.add_edge(neighbor, node)
+        self.orig_graph = self.graph.copy()
+
+    def resetGraph(self):
+        self.graph = self.orig_graph.copy()
 
     def rmClashNodes(self):
         """

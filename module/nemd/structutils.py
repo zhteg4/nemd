@@ -360,6 +360,14 @@ class GrownConf(PackedConf):
             frags, success = frag.backMove(frags)
             if success:
                 continue
+            # The molecule has grown to a dead end
+            # self.failed_num += 1
+            self.ifrag.resetVals()
+            # The method backmove() deletes some extg_gids
+            self.dcell.resetGraph()
+            self.placeInitFrag()
+            # self.reportRelocation(frags[0])
+            log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
         self.frags = frags
 
 
@@ -1051,14 +1059,6 @@ class GrownStruct(PackedStruct):
                 continue
             conf.placeFrags()
             conformers.append(conf)
-            # # The molecule has grown to a dead end (no break)
-            # self.failed_num += 1
-            # frags[0].resetVals()
-            # # The method backmove() deletes some extg_gids
-            # self.dcell.setGraph(len(self.mols))
-            # self.placeInitFrag(frags[0])
-            # self.reportRelocation(frags[0])
-            # log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
 
     def setXYZ(self):
         for conf in self.conformers:
@@ -1080,7 +1080,7 @@ class GrownStruct(PackedStruct):
         self.updateFrm()
         self.dcell = traj.DistanceCell(frm=self.frm, cut=self.cell_cut)
         self.dcell.setUp()
-        self.dcell.setGraph(len(self.mols))
+        self.dcell.setGraph(len(self.conformers))
         self.setReferences()
 
     def updateFrm(self):
@@ -1157,7 +1157,7 @@ class GrownStruct(PackedStruct):
 
 class Fragment:
 
-    def __repr__(self):
+    def __str__(self):
         return f"{self.dihe}: {self.aids}"
 
     def __init__(self, dihe, conf):

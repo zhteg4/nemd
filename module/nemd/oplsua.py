@@ -2338,11 +2338,11 @@ class DataFileReader(LammpsData):
 
     SCALE = 0.45
 
-    def __init__(self, data_file=None, min_dist=1.2, contents=None):
+    def __init__(self, data_file=None, min_dist=1.4, contents=None):
         """
         :param data_file str: data file with path
         :param min_dist: the minimum distance as clash (some h-bond has zero vdw
-            params)
+            params and the water O..H hydrogen bond is above 1.4)
         :param contents `bytes`: parse the contents if data_file not provided.
         """
         self.data_file = data_file
