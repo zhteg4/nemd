@@ -247,7 +247,7 @@ class GrownConf(PackedConf):
         """
         mol = self.GetOwningMol()
         self.init_aids = mol.init_aids.copy()
-        self.init_gids = set([self.id_map[x] for x in self.init_aids])
+        self.init_gids = [self.id_map[x] for x in self.init_aids]
         if not mol.ifrag:
             return
         self.ifrag = mol.ifrag.copyInit(self)
@@ -284,7 +284,7 @@ class GrownConf(PackedConf):
         self.dcell.rmClashNodes()
         points = self.dcell.getVoids()
         for point in points:
-            centroid = np.array(self.centroid(aids=list(self.init_aids)))
+            centroid = np.array(self.centroid(aids=self.init_aids))
             self.translate(-centroid)
             self.rotateRandomly()
             self.translate(point)
@@ -871,7 +871,8 @@ class GrownMol(PackedMol):
         fragment and adding the newly generated ones to be fragmentized until
         no fragments can be further fragmentized.
         """
-        self.ifrag = Fragment([], self.GetConformer())
+        # dihe is not known and will be handled in setFrags()
+        self.ifrag = Fragment([], self.GetConformer(), delay=True)
         to_be_fragmentized = self.ifrag.setFrags()
         while to_be_fragmentized:
             frag = to_be_fragmentized.pop(0)
@@ -912,8 +913,8 @@ class GrownMol(PackedMol):
         aids = [y for x in frags for y in x.aids]
         aids_set = set(aids)
         assert len(aids) == len(aids_set)
-        self.init_aids = set(
-            [x for x in range(self.GetNumAtoms()) if x not in aids_set])
+        init_aids = [x for x in range(self.GetNumAtoms()) if x not in aids_set]
+        self.init_aids = list(set(init_aids))
 
     def findHeadTailPair(self):
         """
@@ -1190,7 +1191,7 @@ class Fragment:
         """
         return f"{self.dihe}: {self.aids}"
 
-    def __init__(self, dihe, conf):
+    def __init__(self, dihe, conf, delay=False):
         """
         :param dihe list of dihedral atom ids: the dihedral that changes the
             atom position in this fragment.
@@ -1205,7 +1206,9 @@ class Fragment:
         self.vals = []  # Available dihedral values candidates
         self.val = None  # Chosen dihedral angle value
         self.fval = True  # All dihedral values are available (new frag)
-        self.resetVals()
+        if delay:
+            return
+        self.setUp()
 
     def copy(self, conf):
         """
@@ -1214,7 +1217,7 @@ class Fragment:
         :param conf GrownConf: the conformer object this fragment belongs to.
         :return Fragment: the copied fragment.
         """
-        frag = Fragment(self.dihe, conf)
+        frag = Fragment(self.dihe, conf, delay=True)
         frag.aids = self.aids
         frag.gids = [conf.id_map[x] for x in frag.aids]
         frag.pfrag = self.pfrag
@@ -1256,24 +1259,21 @@ class Fragment:
         Set fragments by searching for rotatable bond path and adding them as
         next fragments.
 
-        :return list of 'Fragment': newly added fragments with the first being itself
+        :return list of 'Fragment': fragment self and newly added fragments.
             (the atom ids of the current fragments changed)
         """
         dihes = self.getNewDihes()
         if not dihes:
+            # This removes self frag out of the to_be_fragmentized list
             return []
-        nfrags = [Fragment(x, self.conf) for x in dihes]
-        if self.dihe:
-            nfrags = [self] + nfrags
-        else:
-            # Manually set self.dihe for the initial fragment
-            self.dihe = dihes[0]
+        if not self.dihe:
+            # This is an initial fragment with unknown dihedral angle
+            self.dihe = dihes.pop(0)
             self.setUp()
-            nfrags[0] = self
-        [x.setUp() for x in nfrags[1:]]
-        for frag, nfrag in zip(nfrags[:-1], nfrags[1:]):
+        frags = [self] + [Fragment(x, self.conf) for x in dihes]
+        for frag, nfrag in zip(frags[:-1], frags[1:]):
             frag.addFrag(nfrag)
-        return nfrags
+        return frags
 
     def getNewDihes(self):
         """
@@ -1309,6 +1309,7 @@ class Fragment:
         """
         Set up the fragment.
         """
+        self.resetVals()
         self.aids = self.GetOwningMol().getSwingAtoms(*self.dihe)
 
     def addFrag(self, nfrag):
