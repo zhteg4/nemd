@@ -213,6 +213,7 @@ class GrownConf(PackedConf):
         self.ifrag = None
         self.init_aids = None
         self.init_gids = None
+        self.failed_num = 0
         self.frags = []
 
     def setPositions(self, xyz):
@@ -370,6 +371,7 @@ class GrownConf(PackedConf):
         Set part of the conformer by rotating the dihedral angle, back moving,
         and relocation.
         """
+
         frag = self.frags.pop(0)
 
         if not frag.dihe:
@@ -381,13 +383,14 @@ class GrownConf(PackedConf):
 
         if self.backMove(frag):
             return
+
         # The molecule has grown to a dead end
-        # self.failed_num += 1
+        self.failed_num += 1
         self.ifrag.resetVals()
         # The method backmove() deletes some extg_gids
         self.dcell.resetGraph()
         self.placeInitFrag()
-        # self.reportRelocation(frags[0])
+        self.reportRelocation()
         log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
 
     def setDihedral(self, frag):
@@ -405,7 +408,7 @@ class GrownConf(PackedConf):
             # Successfully grew one fragment
             self.frags += frag.nfrags
             self.add(frag.gids)
-            # self.reportStatus(frags)
+            # self.reportStatus()
             return True
 
         return False
@@ -434,6 +437,19 @@ class GrownConf(PackedConf):
         self.frags = [frag] + [x for x in self.frags if x not in nnxt_frags]
         log_debug(f"{len(self.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
         return found
+
+    def reportRelocation(self):
+        """
+        Report the status after relocate an initiator fragment.
+
+        :param frag 'fragments.Fragment': the relocated fragment
+        """
+
+        idists = self.init_tf.pairDists()
+        dists = self.dcell.getDistsWithIds(self.init_gids)
+        log_debug(f"Relocate the initiator of {self.GetId()} conformer "
+                 f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
+                 f"close contact: {dists.min():.2f}) ")
 
 
 class Mol(rdkit.Chem.rdchem.Mol):

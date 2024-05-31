@@ -860,8 +860,9 @@ class DistanceCell:
         ]
 
     def getDistsWithIds(self, ids):
-        dists = [
-            self.frm.getDists(list(self.extg_gids),
-                              self.frm.loc[x]).reshape(-1, 1) for x in ids
-        ]
-        return np.concatenate(dists, axis=1)
+        """
+        Get the distances between existing atoms with the given ids.
+        """
+        oids = list(self.extg_gids.difference(ids))
+        dists = [self.frm.getDists(oids, self.frm.loc[x]) for x in ids]
+        return np.concatenate(dists)
