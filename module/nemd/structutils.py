@@ -141,7 +141,6 @@ class PackedConf(Conformer):
         self.id_map = None
         self.frm = None
         self.dcell = None
-        self.extg_gids = None
         self.radii = None
         self.excluded = None
 
@@ -155,7 +154,16 @@ class PackedConf(Conformer):
         self.excluded = self.mol.excluded
         self.frm = self.mol.frm
         self.dcell = self.mol.dcell
-        self.extg_gids = self.mol.extg_gids
+
+    @property
+    @functools.lru_cache(maxsize=None)
+    def aids(self):
+        """
+        Return the atom ids of this conformer.
+
+        :return list of int: the global atom ids of this conformer.
+        """
+        return list(self.id_map.keys())
 
     @property
     @functools.lru_cache(maxsize=None)
@@ -180,31 +188,53 @@ class PackedConf(Conformer):
             self.translate(-np.array(self.centroid()))
             self.rotateRandomly()
             self.translate(self.frm.getPoint())
-            self.frm.loc[self.gids] = self.GetPositions()
+            self.updateFrm()
             if self.hasClashes():
                 continue
-            self.extg_gids.update(self.gids)
-            # Only update the distance cell after one molecule successful
-            # placed into the cell as only inter-molecular clashes are
-            # checked for packed cell.
-            self.dcell.setUp()
+            self.updateDcell()
             return
         raise ConfError
 
-    def hasClashes(self):
+    def hasClashes(self, gids=None):
         """
         Whether the conformer has any clashes with the existing atoms in the cell.
 
         :param bool: the conformer has clashes or not.
+        :return bool: True if clashes are found.
         """
-        for id, row in self.frm.loc[self.gids].iterrows():
+        gids = self.gids if gids is None else gids
+        for row in [self.frm.loc[x] for x in gids]:
             clashes = self.dcell.getClashes(row,
-                                            included=self.extg_gids,
+                                            included=self.dcell.extg_gids,
                                             radii=self.radii,
                                             excluded=self.excluded)
             if clashes:
                 return True
         return False
+
+    def updateFrm(self, aids=None, gids=None):
+        """
+        Update the coordinate frame based on the current conformer.
+
+        :param aids list: the atom ids whose coordinates are used.
+        :param gids list: the global atom ids to be updated with.
+        """
+        if aids is None:
+            aids, gids = self.aids, self.gids
+        if aids is not None and gids is None:
+            gids = [self.id_map[x] for x in aids]
+        self.frm.update(gids, self.GetPositions()[aids, :])
+
+    def updateDcell(self, gids=None):
+        """
+        Update the distance cell based on the current conformer.
+
+        :param gids list: the global atom ids to be updated with.
+        """
+        if gids is None:
+            gids = self.gids
+        self.dcell.atomCellUpdate(gids)
+        self.dcell.addGids(gids)
 
 
 class GrownConf(PackedConf):
@@ -307,14 +337,10 @@ class GrownConf(PackedConf):
             self.translate(-centroid)
             self.rotateRandomly()
             self.translate(point)
-            self.frm.loc[self.gids] = self.GetPositions()
-
+            self.updateFrm()
             if self.hasClashes(self.init_gids):
                 continue
-            # Only update the distance cell after one molecule successful
-            # placed into the cell as only inter-molecular clashes are
-            # checked for packed cell.
-            self.add(list(self.init_gids))
+            self.updateDcell(self.init_gids)
             self.init_tf.loc[self.GetId()] = point
             return
 
@@ -326,22 +352,6 @@ class GrownConf(PackedConf):
         raise ValueError(f'Failed to relocate the dead molecule. '
                          f'({len(self.dcell.extg_gids)}/{len(self.mols)})')
 
-    def add(self, gids):
-        """
-        Update trajectory frame, add atoms to the atom cell and existing record.
-
-        :param gids list: gids of the atoms to be added
-        """
-        self.updateFrm()
-        self.dcell.atomCellUpdate(gids)
-        self.dcell.addGids(gids)
-
-    def updateFrm(self):
-        """
-        Update the coordinate frame based on the current conformer.
-        """
-        self.frm.loc[self.gids] = self.GetPositions()
-
     def remove(self, gids):
         """
         Remove atoms from the atom cell and existing record.
@@ -350,22 +360,6 @@ class GrownConf(PackedConf):
         """
         self.dcell.atomCellRemove(gids)
         self.dcell.removeGids(gids)
-
-    def hasClashes(self, gids):
-        """
-        Whether the atoms has clashes with existing atoms in the cell.
-
-        :param gids list: golabal atom ids to check clashes against.
-        :return bool: True if clashes are found.
-        """
-        for row in [self.frm.loc[x] for x in gids]:
-            clashes = self.dcell.getClashes(row,
-                                            included=self.dcell.extg_gids,
-                                            radii=self.radii,
-                                            excluded=self.excluded)
-            if clashes:
-                return True
-        return False
 
     def setFrag(self):
         """
@@ -406,9 +400,8 @@ class GrownConf(PackedConf):
             self.updateFrm()
             if self.hasClashes(frag.gids):
                 continue
-            # Successfully grew one fragment
+            self.updateDcell(frag.gids)
             self.frags += frag.nfrags
-            self.add(frag.gids)
             return True
 
         return False
@@ -603,7 +596,6 @@ class PackedMol(Mol):
         self.excluded = None
         self.frm = None
         self.dcell = None
-        self.extg_gids = None
 
     def initConformers(self, ConfClass=PackedConf):
         """
@@ -754,7 +746,6 @@ class PackedStruct(Struct):
         self.ff = ff
         self.options = options
         self.df_reader = None
-        self.extg_gids = set()
 
     def runWithDensity(self, density):
         """
@@ -826,7 +817,6 @@ class PackedStruct(Struct):
             mol.excluded = self.df_reader.excluded
             mol.frm = self.frm
             mol.dcell = self.dcell
-            mol.extg_gids = self.extg_gids
             for conf in mol.GetConformers():
                 conf.setReferences()
 
@@ -844,7 +834,6 @@ class PackedStruct(Struct):
         trial_id, mol_num = 1, len(self.conformers)
         tenth, threshold, = mol_num / 10., 0
         for trial_id in range(1, max_trial + 1):
-            self.extg_gids.clear()
             for conf_id, conf in enumerate(self.conformers):
                 try:
                     conf.setConformer()
@@ -1011,7 +1000,6 @@ class GrownMol(PackedMol):
         mol = GrownMol(self)
         mol.conf = conf
         mol.ifrag = self.ifrag.copyInit(mol=mol) if self.ifrag else None
-        mol.extg_aids = self.extg_aids.copy()
         mol.frm = self.frm
         mol.graph = self.graph
         mol.rotatable_bonds = self.rotatable_bonds
@@ -1136,33 +1124,6 @@ class GrownStruct(PackedStruct):
                 continue
             conf.setFrag()
             conformers.append(conf)
-
-    def hasClashes(self, gids):
-        """
-        Whether the atoms has clashes with existing atoms in the cell.
-
-        :param gids list: golabal atom ids to check clashes against.
-        :return bool: True if clashes are found.
-        """
-        frag_rows = [self.frm.loc[x] for x in gids]
-        for row in frag_rows:
-            clashes = self.dcell.getClashes(row,
-                                            included=self.dcell.extg_gids,
-                                            radii=self.df_reader.radii,
-                                            excluded=self.df_reader.excluded)
-            if clashes:
-                return True
-        return False
-
-    def add(self, gids):
-        """
-        Update trajectory frame, add atoms to the atom cell and existing record.
-
-        :param gids list: gids of the atoms to be added
-        """
-        self.updateFrm()
-        self.dcell.atomCellUpdate(gids)
-        self.dcell.addGids(gids)
 
     def remove(self, gids):
         """

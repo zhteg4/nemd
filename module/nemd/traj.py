@@ -260,6 +260,12 @@ class Frame(pd.DataFrame):
         """
         return self.loc[atom_id]
 
+    def update(self, gids, xyz):
+        """
+        Update the coordinate frame based on the give gids and xyz.
+        """
+        self.loc[gids] = xyz
+
     def setStep(self, step):
         """
         Set the simulation step.
@@ -818,7 +824,7 @@ class DistanceCell:
 
     def rmClashNodes(self):
         """
-        Remove nodes cocupied by existing atoms.
+        Remove nodes occupied by existing atoms.
         """
         xyzs = self.frm.loc[list(self.extg_gids)]
         nodes = (xyzs / self.ggrids).round().astype(int)
