@@ -141,19 +141,19 @@ class PackedConf(Conformer):
         self.id_map = None
         self.frm = None
         self.dcell = None
-        self.radii = None
-        self.excluded = None
+        self.df_reader = None
 
     def setReferences(self):
         """
         Set the references to the conformer.
         """
-        atoms, gids = self.mol.GetAtoms(), self.mol.id_map[self.GetId()]
-        self.id_map = {x.GetIdx(): y for x, y in zip(atoms, gids)}
-        self.radii = self.mol.radii
-        self.excluded = self.mol.excluded
+        self.df_reader = self.mol.df_reader
         self.frm = self.mol.frm
         self.dcell = self.mol.dcell
+        atoms, gids = self.mol.GetAtoms(), self.df_reader.mols[self.GetId()]
+        imap = {x.GetIdx(): y for x, y in zip(atoms, gids)}
+        id_map = [imap.get(x, -1) for x in range(max(imap.keys()) + 1)]
+        self.id_map = np.array(id_map)
 
     @property
     @functools.lru_cache(maxsize=None)
@@ -163,17 +163,7 @@ class PackedConf(Conformer):
 
         :return list of int: the global atom ids of this conformer.
         """
-        return list(self.id_map.keys())
-
-    @property
-    @functools.lru_cache(maxsize=None)
-    def gids(self):
-        """
-        Return the global atom ids of this conformer.
-
-        :return list of int: the global atom ids of this conformer.
-        """
-        return list(self.id_map.values())
+        return list(np.where(self.id_map != -1)[0])
 
     def setConformer(self, max_trial=MAX_TRIAL_PER_CONF):
         """
@@ -195,46 +185,43 @@ class PackedConf(Conformer):
             return
         raise ConfError
 
-    def hasClashes(self, gids=None):
+    def hasClashes(self, aids=None):
         """
         Whether the conformer has any clashes with the existing atoms in the cell.
 
-        :param bool: the conformer has clashes or not.
+        :param aids: the conformer atom ids.
         :return bool: True if clashes are found.
         """
-        gids = self.gids if gids is None else gids
-        for row in [self.frm.loc[x] for x in gids]:
+        aids = self.aids if aids is None else aids
+        for row in [self.frm.loc[x] for x in self.id_map[aids]]:
             clashes = self.dcell.getClashes(row,
                                             included=self.dcell.extg_gids,
-                                            radii=self.radii,
-                                            excluded=self.excluded)
+                                            radii=self.df_reader.radii,
+                                            excluded=self.df_reader.excluded)
             if clashes:
                 return True
         return False
 
-    def updateFrm(self, aids=None, gids=None):
+    def updateFrm(self, aids=None):
         """
         Update the coordinate frame based on the current conformer.
 
         :param aids list: the atom ids whose coordinates are used.
-        :param gids list: the global atom ids to be updated with.
         """
         if aids is None:
-            aids, gids = self.aids, self.gids
-        if aids is not None and gids is None:
-            gids = [self.id_map[x] for x in aids]
-        self.frm.update(gids, self.GetPositions()[aids, :])
+            aids = self.aids
+        self.frm.update(self.id_map[aids], self.GetPositions()[aids, :])
 
-    def updateDcell(self, gids=None):
+    def updateDcell(self, aids=None):
         """
         Update the distance cell based on the current conformer.
 
-        :param gids list: the global atom ids to be updated with.
+        :param aids list: the atom ids to be updated with.
         """
-        if gids is None:
-            gids = self.gids
-        self.dcell.atomCellUpdate(gids)
-        self.dcell.addGids(gids)
+        if aids is None:
+            aids = self.aids
+        self.dcell.atomCellUpdate(self.id_map[aids])
+        self.dcell.addGids(self.id_map[aids])
 
 
 class GrownConf(PackedConf):
@@ -243,7 +230,6 @@ class GrownConf(PackedConf):
         super(GrownConf, self).__init__(*args, **kwargs)
         self.ifrag = None
         self.init_aids = None
-        self.init_gids = None
         self.failed_num = 0
         self.frags = []
 
@@ -272,7 +258,6 @@ class GrownConf(PackedConf):
         self.GetOwningMol().fragmentize()
         mol = self.GetOwningMol()
         self.init_aids = mol.init_aids.copy()
-        self.init_gids = [self.id_map[x] for x in self.init_aids]
         self.ifrag = mol.ifrag.copyInit(self)
         self.frags = [self.ifrag]
 
@@ -338,9 +323,9 @@ class GrownConf(PackedConf):
             self.rotateRandomly()
             self.translate(point)
             self.updateFrm()
-            if self.hasClashes(self.init_gids):
+            if self.hasClashes(self.init_aids):
                 continue
-            self.updateDcell(self.init_gids)
+            self.updateDcell(self.init_aids)
             self.init_tf.loc[self.GetId()] = point
             return
 
@@ -351,15 +336,6 @@ class GrownConf(PackedConf):
         #                    points=points)
         raise ValueError(f'Failed to relocate the dead molecule. '
                          f'({len(self.dcell.extg_gids)}/{len(self.mols)})')
-
-    def remove(self, gids):
-        """
-        Remove atoms from the atom cell and existing record.
-
-        :param gids list: gids of the atoms to be removed
-        """
-        self.dcell.atomCellRemove(gids)
-        self.dcell.removeGids(gids)
 
     def setFrag(self):
         """
@@ -398,9 +374,9 @@ class GrownConf(PackedConf):
         while frag.vals:
             frag.setDihedralDeg()
             self.updateFrm()
-            if self.hasClashes(frag.gids):
+            if self.hasClashes(frag.aids):
                 continue
-            self.updateDcell(frag.gids)
+            self.updateDcell(frag.aids)
             self.frags += frag.nfrags
             return True
 
@@ -420,16 +396,25 @@ class GrownConf(PackedConf):
         # 2）Find the next fragments who have been placed into the cell.
         nxt_frags = frag.getNxtFrags()
         [x.resetVals() for x in nxt_frags]
-        ratom_gids = [y for x in nxt_frags for y in x.gids]
+        ratom_aids = [y for x in nxt_frags for y in x.aids]
         if not found:
-            ratom_gids += frag.conf.init_gids
-        self.remove(ratom_gids)
+            ratom_aids += frag.conf.init_aids
+        self.remove(ratom_aids)
         # 3）Fragment after the next fragments were added to the growing
         # frags before this backmove step.
         nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
         self.frags = [frag] + [x for x in self.frags if x not in nnxt_frags]
         log_debug(f"{len(self.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
         return found
+
+    def remove(self, aids):
+        """
+        Remove atoms from the atom cell and existing record.
+
+        :param gids list: gids of the atoms to be removed
+        """
+        self.dcell.atomCellRemove(self.id_map[aids])
+        self.dcell.removeGids(self.id_map[aids])
 
     def reportRelocation(self):
         """
@@ -439,7 +424,7 @@ class GrownConf(PackedConf):
         """
 
         idists = self.init_tf.pairDists()
-        dists = self.dcell.getDistsWithIds(self.init_gids)
+        dists = self.dcell.getDistsWithIds(self.id_map[self.init_aids])
         log_debug(f"Relocate the initiator of {self.GetId()} conformer "
                   f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
                   f"close contact: {dists.min():.2f}) ")
@@ -591,9 +576,7 @@ class PackedMol(Mol):
         """
         super().__init__(*args, **kwargs)
         self.ff = ff
-        self.id_map = None
-        self.radii = None
-        self.excluded = None
+        self.df_reader = None
         self.frm = None
         self.dcell = None
 
@@ -812,9 +795,7 @@ class PackedStruct(Struct):
         """
 
         for mol in self.mols.values():
-            mol.id_map = self.df_reader.mols
-            mol.radii = self.df_reader.radii
-            mol.excluded = self.df_reader.excluded
+            mol.df_reader = self.df_reader
             mol.frm = self.frm
             mol.dcell = self.dcell
             for conf in mol.GetConformers():
@@ -1125,15 +1106,6 @@ class GrownStruct(PackedStruct):
             conf.setFrag()
             conformers.append(conf)
 
-    def remove(self, gids):
-        """
-        Remove atoms from the atom cell and existing record.
-
-        :param gids list: gids of the atoms to be removed
-        """
-        self.dcell.atomCellRemove(gids)
-        self.dcell.removeGids(gids)
-
     def logInitFragsPlaced(self):
         """
         Log the initiator fragments status after the first placements.
@@ -1170,7 +1142,6 @@ class Fragment:
         self.dihe = dihe  # dihedral angle four-atom ids
         self.conf = conf  # Conformer object this fragment belongs to
         self.aids = []  # Atom ids of the swing atoms
-        self.gids = set()  # Global atom ids of the swing atoms
         self.pfrag = None  # Previous fragment
         self.nfrags = []  # Next fragments
         self.vals = []  # Available dihedral values candidates
@@ -1230,7 +1201,6 @@ class Fragment:
         """
         frag = Fragment(self.dihe, conf, delay=True)
         frag.aids = self.aids
-        frag.gids = [conf.id_map[x] for x in frag.aids]
         frag.pfrag = self.pfrag
         frag.nfrags = self.nfrags
         # Another conformer may have different value and candidates
