@@ -51,14 +51,6 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         super().__init__(*args, **kwargs)
         self.mol = mol
 
-    def GetOwningMol(self):
-        """
-        Get the Mol that owns this conformer.
-
-        :return `rdkit.Chem.rdchem.Mol`: the molecule this conformer belongs to.
-        """
-        return self.mol
-
     def SetOwningMol(self, mol):
         """
         Set the Mol that owns this conformer.
@@ -71,7 +63,15 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
 
         :return `bool`: the molecule this conformer belongs to.
         """
-        return bool(self.mol)
+        return bool(self.GetOwningMol())
+
+    def GetOwningMol(self):
+        """
+        Get the Mol that owns this conformer.
+
+        :return `rdkit.Chem.rdchem.Mol`: the molecule this conformer belongs to.
+        """
+        return self.mol
 
     def centroid(self, aids=None):
         """
@@ -100,11 +100,12 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         mtrx[:-1, 3] = vect
         Chem.rdMolTransforms.TransformConformer(self, mtrx)
 
-    def rotateRandomly(self):
+    def rotateRandomly(self, seed=None):
         """
         Randomly rotate the conformer.
 
         NOTE: the random state is set according to the numpy random seed.
+        :param seed: the random seed to generate the rotation matrix.
         """
         mtrx = np.identity(4)
         seed = np.random.randint(0, 2**32 - 1)
@@ -118,8 +119,8 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         :param ivect 3x3 'numpy.ndarray': Each row is one initial vector
         :param tvect 3x3 'numpy.ndarray': Each row is one corresponding target vector
         """
-        rotation, rmsd = Rotation.align_vectors(tvect, ivect)
         mtrx = np.identity(4)
+        rotation, _ = Rotation.align_vectors(tvect, ivect)
         mtrx[:-1, :-1] = rotation.as_matrix()
         Chem.rdMolTransforms.TransformConformer(self, mtrx)
 
@@ -492,10 +493,9 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
         :return list of conformers: the conformers of the molecule.
         """
-        if self.confs is not None:
-            return [x for x in self.confs.values()]
-        self.initConformers()
-        return [x for x in self.confs.values()]
+        if self.confs is None:
+            self.initConformers()
+        return list(self.confs.values())
 
     def initConformers(self, ConfClass=Conformer):
         """
@@ -505,7 +505,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
             class to instantiate conformers.
         """
         confs = super().GetConformers()
-        self.confs = {i: ConfClass(x, mol=self) for i, x in enumerate(confs)}
+        self.confs = {x.GetId(): ConfClass(x, mol=self) for x in confs}
 
     @property
     def molecular_weight(self):
@@ -533,22 +533,19 @@ class GriddedMol(Mol):
         # The xyz shift within one box
         self.vecs = []
 
-    @property
-    def size(self):
+    def setConformers(self, vector):
         """
-        Return the box size of this molecule.
-        """
-        # Grid layout assumes all conformers from one molecule are the same
-        xyzs = self.GetConformer().GetPositions()
-        return (xyzs.max(axis=0) - xyzs.min(axis=0)) + self.buffer
+        Fill a box of the max molecule size with the conformers based on the
+        shifting vector.
 
-    @property
-    def box_num(self):
+        :param vector np.ndarray: the translational vector to move the conformer
+            by multiple boxes distances.
         """
-        Return the number of boxes (the largest molecule size) needed to place
-            all conformers.
-        """
-        return math.ceil(self.GetNumConformers() / np.prod(self.mol_num))
+        mol_num_per_box = np.prod(self.mol_num)
+        for idx in range(min([self.GetNumConformers(), mol_num_per_box])):
+            vecs = vector + self.vecs[idx]
+            self.GetConformer().translate(vecs)
+            self.conf_id += 1
 
     def setConfNumPerEdge(self, size):
         """
@@ -558,6 +555,15 @@ class GriddedMol(Mol):
             place this conformer in.
         """
         self.mol_num = np.floor(size / self.size).astype(int)
+
+    @property
+    def size(self):
+        """
+        Return the box size of this molecule.
+        """
+        # Grid layout assumes all conformers from one molecule are the same
+        xyzs = self.GetConformer().GetPositions()
+        return (xyzs.max(axis=0) - xyzs.min(axis=0)) + self.buffer
 
     def setVecs(self, size):
         """
@@ -572,18 +578,13 @@ class GriddedMol(Mol):
             x * size for x in itertools.product(*[[y for y in x] for x in ptc])
         ]
 
-    def setConformers(self, vector):
+    @property
+    def box_num(self):
         """
-        Set the conformers of this molecule based on the shifting vector.
-
-        :param vector np.ndarray: the translational vector to move the conformer
-            by multiple boxes distances.
+        Return the number of boxes (the largest molecule size) needed to place
+            all conformers.
         """
-        mol_num_per_box = np.prod(self.mol_num)
-        for idx in range(min([self.GetNumConformers(), mol_num_per_box])):
-            vecs = vector + self.vecs[idx]
-            self.GetConformer().translate(vecs)
-            self.conf_id += 1
+        return math.ceil(self.GetNumConformers() / np.prod(self.mol_num))
 
 
 class PackedMol(Mol):
@@ -606,7 +607,7 @@ class PackedMol(Mol):
 
     def initConformers(self, ConfClass=PackedConf):
         """
-        See parant class for details.
+        See parent class for details.
         """
         return super().initConformers(ConfClass=ConfClass)
 
@@ -687,7 +688,7 @@ class GriddedStruct(Struct):
 
     def setBox(self):
         """
-        Set the periodic boundary box size.
+        Set the over-all periodic boundary box.
         """
         # vectors shifts molecules by the largest box size
         total_box_num = sum(x.box_num for x in self.molecules)
@@ -755,6 +756,20 @@ class PackedStruct(Struct):
         self.df_reader = None
         self.extg_gids = set()
 
+    def runWithDensity(self, density):
+        """
+        Create amorphous cell of the target density by randomly placing
+        molecules with random orientations.
+
+        NOTE: the final density of the output cell may be smaller than the
+        target if the max number of trial attempt is reached.
+
+        :param density float: the target density
+        """
+        # self.density is initialized in Struct.__init__() method
+        self.density = density
+        self.run()
+
     def run(self):
         """
         Create amorphous cell by randomly placing molecules with random
@@ -766,22 +781,6 @@ class PackedStruct(Struct):
         self.setReferences()
         self.fragmentize()
         self.setConformers()
-
-    def runWithDensity(self, density):
-        """
-        Create amorphous cell of the target density by randomly placing
-        molecules with random orientations.
-
-        NOTE: the final density of the output cell may be smaller than the
-        target if the max number of trial attempt is reached.
-
-        :param density float: the target density
-        """
-        self.density = density
-        self.run()
-
-    def fragmentize(self):
-        ...
 
     def setBox(self):
         """
@@ -830,6 +829,9 @@ class PackedStruct(Struct):
             mol.extg_gids = self.extg_gids
             for conf in mol.GetConformers():
                 conf.setReferences()
+
+    def fragmentize(self):
+        ...
 
     def setConformers(self, max_trial=MAX_TRIAL_PER_DENSITY):
         """
@@ -1102,6 +1104,9 @@ class GrownStruct(PackedStruct):
         self.frm.loc[:] = np.concatenate(pos, axis=0)
 
     def placeInitFrags(self):
+        """
+        Please the initiators into cell.
+        """
         log_debug(
             f'Placing {len(self.conformers)} initiators into the cell...')
 
