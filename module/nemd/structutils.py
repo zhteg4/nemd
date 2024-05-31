@@ -408,7 +408,6 @@ class GrownConf(PackedConf):
             # Successfully grew one fragment
             self.frags += frag.nfrags
             self.add(frag.gids)
-            # self.reportStatus()
             return True
 
         return False
@@ -448,8 +447,8 @@ class GrownConf(PackedConf):
         idists = self.init_tf.pairDists()
         dists = self.dcell.getDistsWithIds(self.init_gids)
         log_debug(f"Relocate the initiator of {self.GetId()} conformer "
-                 f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
-                 f"close contact: {dists.min():.2f}) ")
+                  f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
+                  f"close contact: {dists.min():.2f}) ")
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -1032,8 +1031,6 @@ class GrownStruct(PackedStruct):
 
     def __init__(self, *args, MolClass=GrownMol, **kwargs):
         super().__init__(*args, MolClass=MolClass, **kwargs)
-        self.failed_num = 0  # The failed attempts in growing molecules
-        self.mol_num = None  # the last reported growing molecule number
         self.init_tf = None
 
     def setFrameAndDcell(self):
@@ -1072,13 +1069,7 @@ class GrownStruct(PackedStruct):
         self.setInitFrm()
         self.setDcell()
         self.placeInitFrags()
-        conformers = [x for x in self.conformers]
-        while conformers:
-            conf = conformers.pop(0)
-            if not conf.frags:
-                continue
-            conf.setFrag()
-            conformers.append(conf)
+        self.growConformers()
 
     def setXYZ(self):
         for conf in self.conformers:
@@ -1123,6 +1114,23 @@ class GrownStruct(PackedStruct):
                     f"{int(index / len(self.conformers) * 100)}%{new_line}")
                 threshold = round(threshold + tenth, 1)
         self.logInitFragsPlaced()
+
+    def growConformers(self):
+        """
+        Looping conformer one by one and set one fragment configuration each
+        time until all to full length.
+        """
+        conformers = self.conformers[:]
+        while conformers:
+            conf = conformers.pop(0)
+            if not conf.frags:
+                # succesfully placed all fragments of one conformer
+                finished_num = len(self.conformers) - len(conformers)
+                failed_num = sum([x.failed_num for x in self.conformers])
+                log_debug(f'{finished_num} finished; {failed_num} failed.')
+                continue
+            conf.setFrag()
+            conformers.append(conf)
 
     def hasClashes(self, gids):
         """
@@ -1375,24 +1383,6 @@ class Fragment:
             nfrags = [y for x in nfrags for y in x.nfrags if not y.fval]
             frags += nfrags
         return frags
-
-    def reportStatus(self, frags):
-        """
-        Report the growing and failed molecule status.
-
-        :param frags list of 'fragments.Fragment': the growing fragments
-        """
-
-        cur_mol_num = len(set([x.conf.GetId() for x in frags]))
-        if cur_mol_num == self.mol_num:
-            # No change of the growing molecule number from previous report
-            return
-        import pdb
-        pdb.set_trace()
-        self.mol_num = cur_mol_num
-        finished_num = len(self.conformers) - self.mol_num
-        log_debug(f'{finished_num} finished; {self.failed_num} failed.')
-        return cur_mol_num
 
     def fragments(self):
         """
