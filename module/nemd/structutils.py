@@ -365,22 +365,21 @@ class GrownConf(PackedConf):
                 return True
         return False
 
-    def placeFrags(self):
+    def setFrag(self):
+        """
+        Set part of the conformer by rotating the dihedral angle, back moving,
+        and relocation.
+        """
         frag = self.frags.pop(0)
 
         if not frag.dihe:
             # ifrag without dihe means rigid body
             return
 
-        try:
-            self.place(frag)
-        except ConfError:
-            pass
-        else:
+        if self.setDihedral(frag):
             return
 
-        success = self.backMove(frag)
-        if success:
+        if self.backMove(frag):
             return
         # The molecule has grown to a dead end
         # self.failed_num += 1
@@ -391,9 +390,12 @@ class GrownConf(PackedConf):
         # self.reportRelocation(frags[0])
         log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
 
-    def place(self, frag):
+    def setDihedral(self, frag):
         """
         Set part of the conformer by rotating the dihedral angle.
+
+        :param frag 'fragments.Fragment': fragment to set the dihedral angle.
+        :return bool: True if successfully place one fragment.
         """
         while frag.vals:
             frag.setDihedralDeg()
@@ -404,15 +406,16 @@ class GrownConf(PackedConf):
             self.frags += frag.nfrags
             self.add(frag.gids)
             # self.reportStatus(frags)
-            return
-        raise ConfError
+            return True
+
+        return False
 
     def backMove(self, frag):
         """
         Back move fragment so that the obstacle can be walked around later.
 
         :param frag 'fragments.Fragment': fragment to perform back move
-        :param frags list: growing fragments
+        :return bool: True if back move is successful.
         """
         # 1）Find the previous fragment with available dihedral candidates.
         pfrag = frag.getPreAvailFrag()
@@ -429,8 +432,7 @@ class GrownConf(PackedConf):
         # frags before this backmove step.
         nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
         self.frags = [frag] + [x for x in self.frags if x not in nnxt_frags]
-        log_debug(
-            f"{len(self.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
+        log_debug(f"{len(self.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
         return found
 
 
@@ -1059,7 +1061,7 @@ class GrownStruct(PackedStruct):
             conf = conformers.pop(0)
             if not conf.frags:
                 continue
-            conf.placeFrags()
+            conf.setFrag()
             conformers.append(conf)
 
     def setXYZ(self):
