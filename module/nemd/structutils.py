@@ -411,7 +411,7 @@ class GrownConf(PackedConf):
         """
         Remove atoms from the atom cell and existing record.
 
-        :param gids list: gids of the atoms to be removed
+        :param aids list: aids of the atoms to be removed
         """
         self.dcell.atomCellRemove(self.id_map[aids])
         self.dcell.removeGids(self.id_map[aids])
@@ -435,12 +435,14 @@ class Mol(rdkit.Chem.rdchem.Mol):
     A subclass of rdkit.Chem.rdchem.Mol with additional attributes and methods.
     """
 
-    def __init__(self, *args, ff=None, **kwargs):
+    def __init__(self, *args, ff=None, delay=False, **kwargs):
         """
         :param ff 'OplsParser': the force field class.
+        :delay bool: customization is delayed for further setup or testing.
         """
         super().__init__(*args, **kwargs)
         self.ff = ff
+        self.delay = delay
         self.conf_id = 0
         self.confs = None
 
@@ -585,6 +587,142 @@ class PackedMol(Mol):
         See parent class for details.
         """
         return super().initConformers(ConfClass=ConfClass)
+
+
+class GrownMol(PackedMol):
+
+    # https://ctr.fandom.com/wiki/Break_rotatable_bonds_and_report_the_fragments
+    PATT = Chem.MolFromSmarts(
+        '[!$([NH]!@C(=O))&!D1&!$(*#*)]-&!@[!$([NH]!@C(=O))&!D1&!$(*#*)]')
+    IS_MONO = pnames.IS_MONO
+    MONO_ID = pnames.MONO_ID
+    POLYM_HT = pnames.POLYM_HT
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ifrag = None
+        self.init_aids = None
+        self.graph = None
+        self.rotatable_bonds = None
+        if self.delay:
+            return
+        self.setGraph()
+        self.rotatable_bonds = self.GetSubstructMatches(self.PATT,
+                                                        maxMatches=1000000)
+
+    def initConformers(self, ConfClass=GrownConf):
+        """
+        See parant class for details.
+        """
+        return super().initConformers(ConfClass=ConfClass)
+
+    def setGraph(self):
+        """
+        Get the networkx graph on the molecule.
+        """
+        self.graph = nx.Graph()
+        edges = [[x.GetBeginAtom(), x.GetEndAtom()] for x in self.GetBonds()]
+        edges = [tuple([x[0].GetIdx(), x[1].GetIdx()]) for x in edges]
+        if not edges:
+            # When bonds don't exist, just add the atom.
+            for atom in self.GetAtoms():
+                self.graph.add_node(atom.GetIdx())
+            return
+        # When bonds exist, add edges and the associated atoms, assuming atoms in
+        # one molecule are bonded.
+        self.graph.add_edges_from(edges)
+        for edge in edges:
+            for idx in range(2):
+                node = self.graph.nodes[edge[idx]]
+                try:
+                    node[EDGES].append(edge)
+                except KeyError:
+                    node[EDGES] = [edge]
+
+    def fragmentize(self):
+        """
+        Break the molecule into the smallest rigid fragments.
+        """
+        if self.ifrag is not None:
+            return
+        # dihe is not known and will be handled in setFragments()
+        self.ifrag = Fragment([], self.GetConformer(), delay=True)
+        self.ifrag.setFragments()
+        frags = self.ifrag.fragments()
+        frag_aids_set = set([y for x in frags for y in x.aids])
+        all_aids = set([x.GetIdx() for x in self.GetAtoms()])
+        self.init_aids = list(all_aids.difference(frag_aids_set))
+
+    def findHeadTailPair(self):
+        """
+        If the molecule is built from monomers, the atom pairs from
+        selected from the first and last monomers.
+
+        :return list or iterator of int tuple: each tuple is an atom id pair
+        """
+        if not self.HasProp(self.IS_MONO) or not self.GetBoolProp(
+                self.IS_MONO):
+            return [(None, None)]
+
+        ht_mono_ids = {
+            x.GetProp(self.MONO_ID): []
+            for x in self.GetAtoms() if x.HasProp(self.POLYM_HT)
+        }
+        for atom in self.GetAtoms():
+            try:
+                ht_mono_ids[atom.GetProp(self.MONO_ID)].append(atom.GetIdx())
+            except KeyError:
+                pass
+
+        st_atoms = list(ht_mono_ids.values())
+        sources = st_atoms[0]
+        targets = [y for x in st_atoms[1:] for y in x]
+
+        return itertools.product(sources, targets)
+
+    def findPath(self, source=None, target=None):
+        """
+        Find the shortest path between source and target. If source and target
+        are not provided, shortest paths between all pairs are computed and the
+        long path is returned.
+
+        :param source int: the atom id that serves as the source.
+        :param target int: the atom id that serves as the target.
+        :return list of ints: the atom ids that form the shortest path.
+        """
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            shortest_path = nx.shortest_path(self.graph,
+                                             source=source,
+                                             target=target)
+
+        if target is not None:
+            shortest_path = {target: shortest_path}
+        if source is not None:
+            shortest_path = {source: shortest_path}
+        path_length, path = -1, None
+        for a_source_node, target_path in shortest_path.items():
+            for a_target_node, a_path in target_path.items():
+                if path_length >= len(a_path):
+                    continue
+                source_node = a_source_node
+                target_node = a_target_node
+                path = a_path
+                path_length = len(a_path)
+        return source_node, target_node, path
+
+    def isRotatable(self, bond):
+        """
+        Whether the bond between the two atoms is rotatable.
+
+        :param bond list or tuple of two ints: the atom ids of two bonded atoms
+        :return bool: Whether the bond is rotatable.
+        """
+
+        in_ring = self.GetBondBetweenAtoms(*bond).IsInRing()
+        single = tuple(sorted(bond)) in self.rotatable_bonds
+        return not in_ring and single
 
 
 class Struct:
@@ -753,7 +891,6 @@ class PackedStruct(Struct):
         self.setDataReader()
         self.setFrameAndDcell()
         self.setReferences()
-        self.fragmentize()
         self.setConformers()
 
     def setBox(self):
@@ -779,14 +916,16 @@ class PackedStruct(Struct):
         self.df_reader.run()
         self.df_reader.setClashParams()
 
-    def setFrameAndDcell(self):
+    def setFrameAndDcell(self, **kwargs):
         """
         Set the trajectory frame and distance cell.
+
+        :param cut float: the cutoff distance to search neighbors
         """
         index = [atom.id for atom in self.df_reader.atoms.values()]
         xyz = [atom.xyz for atom in self.df_reader.atoms.values()]
         self.frm = traj.Frame(xyz=xyz, index=index, box=self.box)
-        self.dcell = traj.DistanceCell(self.frm)
+        self.dcell = traj.DistanceCell(self.frm, **kwargs)
         self.dcell.setUp()
 
     def setReferences(self):
@@ -800,9 +939,6 @@ class PackedStruct(Struct):
             mol.dcell = self.dcell
             for conf in mol.GetConformers():
                 conf.setReferences()
-
-    def fragmentize(self):
-        ...
 
     def setConformers(self, max_trial=MAX_TRIAL_PER_DENSITY):
         """
@@ -836,166 +972,6 @@ class PackedStruct(Struct):
         raise DensityError
 
 
-class GrownMol(PackedMol):
-
-    # https://ctr.fandom.com/wiki/Break_rotatable_bonds_and_report_the_fragments
-    PATT = Chem.MolFromSmarts(
-        '[!$([NH]!@C(=O))&!D1&!$(*#*)]-&!@[!$([NH]!@C(=O))&!D1&!$(*#*)]')
-    IS_MONO = pnames.IS_MONO
-    MONO_ID = pnames.MONO_ID
-    POLYM_HT = pnames.POLYM_HT
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ifrag = None
-        self.init_aids = None
-        self.setGraph()
-        self.rotatable_bonds = self.GetSubstructMatches(self.PATT,
-                                                        maxMatches=1000000)
-
-    def initConformers(self, ConfClass=GrownConf):
-        """
-        See parant class for details.
-        """
-        return super().initConformers(ConfClass=ConfClass)
-
-    def setGraph(self):
-        """
-        Get the networkx graph on the molecule.
-        """
-        self.graph = nx.Graph()
-        edges = [(
-            x.GetBeginAtom().GetIdx(),
-            x.GetEndAtom().GetIdx(),
-        ) for x in self.GetBonds()]
-        if not edges:
-            # When bonds don't exist, just add the atom.
-            for atom in self.GetAtoms():
-                self.graph.add_node(atom.GetIdx())
-            return
-        # When bonds exist, add edges and the associated atoms, assuming atoms in
-        # one molecule are bonded.
-        self.graph.add_edges_from(edges)
-        for edge in edges:
-            for idx in range(2):
-                node = self.graph.nodes[edge[idx]]
-                try:
-                    node[EDGES].append(edge)
-                except KeyError:
-                    node[EDGES] = [edge]
-
-    def fragmentize(self):
-        """
-        Break the molecule into the smallest rigid fragments.
-        """
-        if self.ifrag is not None:
-            return
-        # dihe is not known and will be handled in setFragments()
-        self.ifrag = Fragment([], self.GetConformer(), delay=True)
-        self.ifrag.setFragments()
-        frags = self.ifrag.fragments()
-        frag_aids_set = set([y for x in frags for y in x.aids])
-        all_aids = set([x.GetIdx() for x in self.GetAtoms()])
-        self.init_aids = list(all_aids.difference(frag_aids_set))
-
-    def findHeadTailPair(self):
-        """
-        If the molecule is built from monomers, the atom pairs from
-        selected from the first and last monomers.
-
-        :return list or iterator of int tuple: each tuple is an atom id pair
-        """
-        if not self.HasProp(self.IS_MONO) or not self.GetBoolProp(
-                self.IS_MONO):
-            return [(None, None)]
-
-        ht_mono_ids = {
-            x.GetProp(self.MONO_ID): []
-            for x in self.GetAtoms() if x.HasProp(self.POLYM_HT)
-        }
-        for atom in self.GetAtoms():
-            try:
-                ht_mono_ids[atom.GetProp(self.MONO_ID)].append(atom.GetIdx())
-            except KeyError:
-                pass
-
-        st_atoms = list(ht_mono_ids.values())
-        sources = st_atoms[0]
-        targets = [y for x in st_atoms[1:] for y in x]
-
-        return itertools.product(sources, targets)
-
-    def findPath(self, source=None, target=None):
-        """
-        Find the shortest path between source and target. If source and target
-        are not provided, shortest paths between all pairs are computed and the
-        long path is returned.
-
-        :param source int: the atom id that serves as the source.
-        :param target int: the atom id that serves as the target.
-        :return list of ints: the atom ids that form the shortest path.
-        """
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            shortest_path = nx.shortest_path(self.graph,
-                                             source=source,
-                                             target=target)
-
-        if target is not None:
-            shortest_path = {target: shortest_path}
-        if source is not None:
-            shortest_path = {source: shortest_path}
-        path_length, path = -1, None
-        for a_source_node, target_path in shortest_path.items():
-            for a_target_node, a_path in target_path.items():
-                if path_length >= len(a_path):
-                    continue
-                source_node = a_source_node
-                target_node = a_target_node
-                path = a_path
-                path_length = len(a_path)
-        return source_node, target_node, path
-
-    def isRotatable(self, bond):
-        """
-        Whether the bond between the two atoms is rotatable.
-
-        :param bond list or tuple of two ints: the atom ids of two bonded atoms
-        :return bool: Whether the bond is rotatable.
-        """
-
-        in_ring = self.GetBondBetweenAtoms(*bond).IsInRing()
-        single = tuple(sorted(bond)) in self.rotatable_bonds
-        return not in_ring and single
-
-    def copy(self, conf):
-        """
-        Copy the current GrownMol object and set the new conformer.
-        NOTE: dihedral value candidates, existing atom ids, and fragment references
-        are copied. Other attributes such as the graph, rotatable bonds, and frames
-        are just referred to the original object.
-
-        :param conf 'rdkit.Chem.rdchem.Conformer': the new conformer.
-        """
-        mol = GrownMol(self)
-        mol.conf = conf
-        mol.ifrag = self.ifrag.copyInit(mol=mol) if self.ifrag else None
-        mol.frm = self.frm
-        mol.graph = self.graph
-        mol.rotatable_bonds = self.rotatable_bonds
-        return mol
-
-    @property
-    def molecule_id(self):
-        """
-        Return molecule id
-
-        :return int: the molecule id.
-        """
-        return self.conf.GetId()
-
-
 class GrownStruct(PackedStruct):
 
     MAX_TRIAL_PER_DENSITY = 10
@@ -1004,18 +980,47 @@ class GrownStruct(PackedStruct):
         super().__init__(*args, MolClass=MolClass, **kwargs)
         self.init_tf = None
 
+    def run(self):
+        """
+        Create amorphous cell by randomly placing initiators of the conformers,
+        and grow the conformers by adding fragments one by one.
+        """
+        self.setBox()
+        self.setDataReader()
+        self.resetConformers()
+        self.setFrameAndDcell()
+        self.setReferences()
+        self.fragmentize()
+        self.placeInitFrags()
+        self.setConformers()
+
+    def resetConformers(self):
+        """
+        Rest the state of the conformers.
+        """
+        for conf in self.conformers:
+            xyz = self.df_reader.getMolXYZ(conf.GetId())
+            conf.setPositions(xyz)
+            conf.failed_num = 0
+
     def setFrameAndDcell(self):
         """
         Set distance cell parameters.
         """
-
         # memory saving flaot16 to regular float32
         # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
         # Separated by 1 max_clash_dist, meaning no clashes.
-        self.cell_cut = float(self.df_reader.radii.max())
-        super().setFrameAndDcell()
+        cut = float(self.df_reader.radii.max())
+        super().setFrameAndDcell(cut=cut)
+        self.dcell.setGraph(len(self.conformers))
+        data = np.full((len(self.conformers), 3), np.inf)
+        index = [x.GetId() for x in self.conformers]
+        self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
 
     def setReferences(self):
+        """
+        See parent class for details.
+        """
         for mol in self.mols.values():
             mol.init_tf = self.init_tf
         super().setReferences()
@@ -1032,52 +1037,11 @@ class GrownStruct(PackedStruct):
         total_frag_num = sum([x.getNumFrags() for x in self.conformers])
         log_debug(f"{total_frag_num} fragments in total.")
 
-    def setConformers(self):
-        """
-        Set conformer coordinates without clashes.
-        """
-        self.setXYZ()
-        self.setInitFrm()
-        self.setDcell()
-        self.placeInitFrags()
-        self.growConformers()
-
-    def setXYZ(self):
-        for conf in self.conformers:
-            xyz = self.df_reader.getMolXYZ(conf.GetId())
-            conf.setPositions(xyz)
-
-    def setInitFrm(self):
-        """
-        Set the traj frame for initiators.
-        """
-        data = np.full((len(self.conformers), 3), np.inf)
-        index = [x.GetId() for x in self.conformers]
-        self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
-
-    def setDcell(self):
-        """
-        Set distance cell for neighbor atom and graph for voids searching.
-        """
-        self.updateFrm()
-        self.dcell = traj.DistanceCell(frm=self.frm, cut=self.cell_cut)
-        self.dcell.setUp()
-        self.dcell.setGraph(len(self.conformers))
-        self.setReferences()
-
-    def updateFrm(self):
-        """
-        Update the coordinate frame based on the current conformer.
-        """
-        pos = [x.GetPositions() for x in self.conformers]
-        self.frm.loc[:] = np.concatenate(pos, axis=0)
-
     def placeInitFrags(self):
         """
-        Please the initiators into cell.
+        Place the initiators into cell.
         """
-        log_debug(
-            f'Placing {len(self.conformers)} initiators into the cell...')
+        log_debug(f'Placing {len(self.conformers)} initiators...')
 
         tenth, threshold, = len(self.conformers) / 10., 0
         for index, conf in enumerate(self.conformers, start=1):
@@ -1087,9 +1051,14 @@ class GrownStruct(PackedStruct):
                 log_debug(
                     f"{int(index / len(self.conformers) * 100)}%{new_line}")
                 threshold = round(threshold + tenth, 1)
-        self.logInitFragsPlaced()
 
-    def growConformers(self):
+        log_debug(f'{len(self.conformers)} initiators have been placed.')
+        if len(self.conformers) == 1:
+            return
+        dist = self.init_tf.pairDists().min()
+        log_debug(f'({dist:.2f} as the minimum pair distance)')
+
+    def setConformers(self):
         """
         Looping conformer one by one and set one fragment configuration each
         time until all to full length.
@@ -1105,20 +1074,6 @@ class GrownStruct(PackedStruct):
                 continue
             conf.setFrag()
             conformers.append(conf)
-
-    def logInitFragsPlaced(self):
-        """
-        Log the initiator fragments status after the first placements.
-        """
-
-        log_debug(
-            f'{len(self.conformers)} initiators have been placed into the cell.'
-        )
-        if len(self.mols) == 1:
-            return
-        log_debug(
-            f'({self.init_tf.pairDists().min():.2f} as the minimum pair distance)'
-        )
 
 
 class Fragment:
@@ -1266,12 +1221,10 @@ class Fragment:
 
         dihes, num = [], 0
         for source, target in pairs:
-            _, _, path = self.getOwningMol().findPath(source=source,
-                                                      target=target)
+            mol = self.getOwningMol()
+            _, _, path = mol.findPath(source=source, target=target)
             a_dihes = zip(path[:-3], path[1:-2], path[2:-1], path[3:])
-            a_dihes = [
-                x for x in a_dihes if self.getOwningMol().isRotatable(x[1:-1])
-            ]
+            a_dihes = [x for x in a_dihes if mol.isRotatable(x[1:-1])]
             if len(a_dihes) < num:
                 continue
             num = len(a_dihes)

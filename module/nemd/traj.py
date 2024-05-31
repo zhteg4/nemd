@@ -533,7 +533,7 @@ class DistanceCell:
         """
         :param frm 'Frame': trajectory frame
         :param gids list: global atom ids to analyze
-        :param cut float: the cutoff distace to search neighbors
+        :param cut float: the cutoff distance to search neighbors
         :param res float: the res of the grid step
         """
         self.frm = frm
