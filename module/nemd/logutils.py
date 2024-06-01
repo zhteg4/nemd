@@ -29,11 +29,24 @@ class FileHandler(logging.FileHandler):
         See parent method for documentation.
         """
 
-        self.terminator = '\n'
-        if record.msg.endswith(self.NO_NEWLINE):
-            record.msg = record.msg.replace(self.NO_NEWLINE, '')
-            self.terminator = ''
+        newline = not record.msg.endswith(self.NO_NEWLINE)
+        pre_newline = self.terminator == '\n'
+        record.msg = record.msg.replace(self.NO_NEWLINE, '')
+        self.terminator = '\n' if newline else ''
+        if not pre_newline:
+            record.msg = self.NO_NEWLINE + record.msg
         return super().emit(record)
+
+    def format(self, record):
+        """
+        See parent method for documentation.
+        """
+        if self.formatter and not record.msg.startswith(self.NO_NEWLINE):
+            fmt = self.formatter
+        else:
+            fmt = logging._defaultFormatter
+        record.msg = record.msg.replace(self.NO_NEWLINE, '')
+        return fmt.format(record)
 
 
 def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):

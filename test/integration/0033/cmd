@@ -1,0 +1,2 @@
+# Density is reduced for pack amorphous builder
+run_nemd polymer_builder_driver.py "*CC*" -cru_num 6 -mol_num 100 -density 1 -cell pack -seed 1234 -DEBUG

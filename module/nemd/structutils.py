@@ -134,7 +134,7 @@ class ConfError(RuntimeError):
 
 class PackedConf(Conformer):
 
-    MAX_TRIAL_PER_CONF = 10000
+    MAX_TRIAL_PER_CONF = 1000
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -438,7 +438,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
     def __init__(self, *args, ff=None, delay=False, **kwargs):
         """
         :param ff 'OplsParser': the force field class.
-        :delay bool: customization is delayed for further setup or testing.
+        :delay bool: customization is delayed for later setup or testing.
         """
         super().__init__(*args, **kwargs)
         self.ff = ff
@@ -848,7 +848,7 @@ class PackedStruct(Struct):
     Pack molecules by random rotation and translation.
     """
 
-    MAX_TRIAL_PER_DENSITY = 100
+    MAX_TRIAL_PER_DENSITY = 50
 
     def __init__(self,
                  *args,
@@ -919,8 +919,6 @@ class PackedStruct(Struct):
     def setFrameAndDcell(self, **kwargs):
         """
         Set the trajectory frame and distance cell.
-
-        :param cut float: the cutoff distance to search neighbors
         """
         index = [atom.id for atom in self.df_reader.atoms.values()]
         xyz = [atom.xyz for atom in self.df_reader.atoms.values()]
@@ -948,27 +946,35 @@ class PackedStruct(Struct):
         :raise DensityError: if the max number of trials at this density is
             reached.
         """
-        trial_id, mol_num = 1, len(self.conformers)
-        tenth, threshold, = mol_num / 10., 0
+        trial_id, conf_num, finished, nth = 1, len(self.conformers), [], -1
         for trial_id in range(1, max_trial + 1):
+            self.dcell.extg_gids.clear()
             for conf_id, conf in enumerate(self.conformers):
                 try:
                     conf.setConformer()
                 except ConfError:
-                    log_debug(f'{trial_id} trail fails. '
-                              f'(Only {conf_id} / {mol_num} '
-                              f'molecules placed in the cell.)')
+                    log_debug(f'{trial_id} trail fails.')
+                    log_debug(f'Only {conf_id} / {conf_num} molecules placed.')
+                    finished.append(conf_id)
+                    if not bool(trial_id % (max_trial / 10)):
+                        delta = len(self.conformers) - np.average(finished)
+                        std = np.std(finished)
+                        if not std:
+                            raise DensityError
+                        zscore = abs(delta) / std
+                        if scipy.stats.norm.cdf(-zscore) * max_trial < 1:
+                            # With successful conformer number following norm
+                            # distribution, max_trial won't succeed for one time
+                            raise DensityError
                     break
+                if nth != math.floor((conf_id + 1) / conf_num * 10):
+                    nth = math.floor((conf_id + 1) / conf_num * 10)
+                    nline = "" if conf_id == conf_num - 1 else ", [!n]"
+                    log_debug(f"{int((conf_id + 1) / conf_num * 100)}%{nline}")
 
-                if conf_id < threshold:
-                    continue
-                conf_num = conf_id + 1
-                new_line = "" if conf_id == mol_num else ", [!n]"
-                log_debug(f"{int(conf_num / mol_num * 100)}%{new_line}")
-                threshold = round(threshold + tenth, 1)
-
-            # All molecules successfully placed (no break)
-            return
+                if conf_id == conf_num - 1:
+                    # All molecules successfully placed (no break)
+                    return
         raise DensityError
 
 
