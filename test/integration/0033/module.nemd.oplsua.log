@@ -1,0 +1,29 @@
+2024-06-01 21:14:45,058 DEBUG assignAtomType CCCC, [0, 1, 2, None]
+2024-06-01 21:14:45,060 DEBUG C1 0 83
+2024-06-01 21:14:45,061 DEBUG C2 1 86
+2024-06-01 21:14:45,063 DEBUG C2 2 86
+2024-06-01 21:14:45,063 DEBUG assignAtomType CCCC, [None, 2, 3, None]
+2024-06-01 21:14:45,065 DEBUG C2 3 86
+2024-06-01 21:14:45,065 DEBUG assignAtomType CCCC, [None, 3, 4, None]
+2024-06-01 21:14:45,068 DEBUG C2 4 86
+2024-06-01 21:14:45,068 DEBUG assignAtomType CCCC, [None, 4, 5, None]
+2024-06-01 21:14:45,069 DEBUG C2 5 86
+2024-06-01 21:14:45,069 DEBUG assignAtomType CCCC, [None, 5, 6, None]
+2024-06-01 21:14:45,070 DEBUG C2 6 86
+2024-06-01 21:14:45,070 DEBUG assignAtomType CCCC, [None, 6, 7, None]
+2024-06-01 21:14:45,072 DEBUG C2 7 86
+2024-06-01 21:14:45,072 DEBUG assignAtomType CCCC, [None, 7, 8, None]
+2024-06-01 21:14:45,073 DEBUG C2 8 86
+2024-06-01 21:14:45,073 DEBUG assignAtomType CCCC, [None, 8, 9, None]
+2024-06-01 21:14:45,074 DEBUG C2 9 86
+2024-06-01 21:14:45,074 DEBUG assignAtomType CCCC, [None, 9, 10, 11]
+2024-06-01 21:14:45,075 DEBUG C2 10 86
+2024-06-01 21:14:45,076 DEBUG C1 11 83
+2024-06-01 21:14:45,076 DEBUG 12 out of 12 atoms marked
+2024-06-01 21:14:45,076 DEBUG 9 residues found.
+2024-06-01 21:14:45,076 DEBUG CCCC: 9 matches 3*1,1*7,2*1
+2024-06-01 21:14:45,077 DEBUG 9 residues reassigned.
+2024-06-01 21:14:45,095 DEBUG Impropers from the same symbols are of the same constants.
+2024-06-01 21:14:45,095 DEBUG Improper neighbor counts based on center conn and symbols are unique.
+2024-06-01 21:15:32,242 DEBUG Impropers from the same symbols are of the same constants.
+2024-06-01 21:15:32,243 DEBUG Improper neighbor counts based on center conn and symbols are unique.
