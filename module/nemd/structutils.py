@@ -944,7 +944,7 @@ class PackedStruct(Struct):
 
         :param max_trial int: the max number of trials at one density.
         :raise DensityError: if the max number of trials at this density is
-            reached.
+            reached or the chance of achieving the goal is too low.
         """
         trial_id, conf_num, finished, nth = 1, len(self.conformers), [], -1
         for trial_id in range(1, max_trial + 1):
@@ -953,28 +953,30 @@ class PackedStruct(Struct):
                 try:
                     conf.setConformer()
                 except ConfError:
-                    log_debug(f'{trial_id} trail fails.')
-                    log_debug(f'Only {conf_id} / {conf_num} molecules placed.')
-                    finished.append(conf_id)
-                    if not bool(trial_id % (max_trial / 10)):
-                        delta = len(self.conformers) - np.average(finished)
-                        std = np.std(finished)
-                        if not std:
-                            raise DensityError
-                        zscore = abs(delta) / std
-                        if scipy.stats.norm.cdf(-zscore) * max_trial < 1:
-                            # With successful conformer number following norm
-                            # distribution, max_trial won't succeed for one time
-                            raise DensityError
                     break
+                # One conformer successfully placed
                 if nth != math.floor((conf_id + 1) / conf_num * 10):
+                    # Progress
                     nth = math.floor((conf_id + 1) / conf_num * 10)
                     nline = "" if conf_id == conf_num - 1 else ", [!n]"
                     log_debug(f"{int((conf_id + 1) / conf_num * 100)}%{nline}")
-
+                # Whether all molecules successfully placed
                 if conf_id == conf_num - 1:
-                    # All molecules successfully placed (no break)
                     return
+            # Current conformer failed
+            log_debug(f'{trial_id} trail fails.')
+            log_debug(f'Only {conf_id} / {conf_num} molecules placed.')
+            finished.append(conf_id)
+            if not bool(trial_id % int(max_trial / 10)):
+                delta = conf_num - np.average(finished)
+                std = np.std(finished)
+                if not std:
+                    raise DensityError
+                zscore = abs(delta) / std
+                if scipy.stats.norm.cdf(-zscore) * max_trial < 1:
+                    # With successful conformer number following norm
+                    # distribution, max_trial won't succeed for one time
+                    raise DensityError
         raise DensityError
 
 

@@ -28,11 +28,10 @@ class FileHandler(logging.FileHandler):
         """
         See parent method for documentation.
         """
-
         newline = not record.msg.endswith(self.NO_NEWLINE)
         pre_newline = self.terminator == '\n'
-        record.msg = record.msg.replace(self.NO_NEWLINE, '')
         self.terminator = '\n' if newline else ''
+        record.msg = record.msg.replace(self.NO_NEWLINE, '')
         if not pre_newline:
             record.msg = self.NO_NEWLINE + record.msg
         return super().emit(record)
@@ -41,10 +40,8 @@ class FileHandler(logging.FileHandler):
         """
         See parent method for documentation.
         """
-        if self.formatter and not record.msg.startswith(self.NO_NEWLINE):
-            fmt = self.formatter
-        else:
-            fmt = logging._defaultFormatter
+        default = not self.formatter or record.msg.startswith(self.NO_NEWLINE)
+        fmt = logging._defaultFormatter if default else self.formatter
         record.msg = record.msg.replace(self.NO_NEWLINE, '')
         return fmt.format(record)
 
@@ -66,6 +63,7 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):
     """
     if verbose is None:
         verbose = environutils.is_debug()
+
     logger = logging.getLogger(basename)
     log_filename = basename + file_ext
     if os.path.isfile(log_filename):
@@ -73,16 +71,12 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):
             os.remove(log_filename)
         except FileNotFoundError:
             pass
-    hdlr = FileHandler(log_filename)
-    logger.addHandler(hdlr)
     if log_file:
         jobutils.add_outfile(log_filename, jobname=basename, log_file=log_file)
-    if verbose:
-        formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-    else:
-        formatter = logging.Formatter('%(message)s')
-
-    hdlr.setFormatter(formatter)
+    hdlr = FileHandler(log_filename)
+    fmt = '%(asctime)s %(levelname)s %(message)s' if verbose else '%(message)s'
+    hdlr.setFormatter(logging.Formatter(fmt))
+    logger.addHandler(hdlr)
     lvl = logging.DEBUG if verbose else logging.INFO
     logger.setLevel(lvl)
     return logger
