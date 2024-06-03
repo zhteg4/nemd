@@ -23,9 +23,8 @@ from collections import namedtuple
 from nemd import symbols
 from nemd import logutils
 from nemd import fileutils
-from nemd import constants as nconstants
-from nemd import pnames
 from nemd import environutils
+from nemd import constants as nconstants
 
 FLAG_TIMESTEP = '-timestep'
 FLAG_STEMP = '-stemp'
@@ -179,19 +178,21 @@ class FixWriter:
     """
     CHANGE_BDRY = CHANGE_BDRY.replace('\n    ', '\n').lstrip('\n')
 
-    def __init__(self, fh, options=None, mols=None):
+    def __init__(self, fh, options=None, struct=None):
         """
         :param fh '_io.TextIOWrapper': file handdle to write fix commands
         :param options 'argparse.Namespace': command line options
-        :param mols dict: id and rdkit.Chem.rdchem.Mol
+        :param struct 'Struct': struct with molecules and coordinates
         """
         self.fh = fh
         self.options = options
-        self.mols = mols
+        self.struct = struct
         self.cmd = []
-        self.mols = {} if mols is None else mols
+        self.mols = {} if self.struct is None else self.struct.mols
         self.mol_num = len(self.mols)
-        self.atom_num = sum([x.GetNumAtoms() * x.GetNumConformers() for x in self.mols.values()])
+        self.atom_num = sum([
+            x.GetNumAtoms() * x.GetNumConformers() for x in self.mols.values()
+        ])
         self.testing = self.mol_num == 1 and self.atom_num < 100
         self.timestep = self.options.timestep
         self.relax_time = self.options.relax_time
@@ -1328,14 +1329,14 @@ class LammpsIn(fileutils.LammpsInput):
         self.in_fh.write('compute 2 all improper/local chi\n')
         self.in_fh.write('dump 1i all local 1000 tmp.dump index c_1[1] c_2\n')
 
-    def writeRun(self, mols=None):
+    def writeRun(self, struct=None):
         """
         Write command to further equilibrate the system.
 
-        :param mols dict: id and rdkit.Chem.rdchem.Mol
+        :param struct 'Struct': the struct with molecules and coordinates.
         """
         self.in_fh.write(f"velocity all create {self.options.stemp} 482748\n")
-        fwriter = FixWriter(self.in_fh, options=self.options, mols=mols)
+        fwriter = FixWriter(self.in_fh, options=self.options, struct=struct)
         fwriter.run()
 
 
@@ -1360,16 +1361,15 @@ class LammpsDataBase(LammpsIn):
 
     ATOM_ID = 'atom_id'
 
-    def __init__(self, mols, *arg, ff=None, jobname='tmp', **kwarg):
+    def __init__(self, struct, *arg, ff=None, jobname='tmp', **kwarg):
         """
-        :param mols dict: keys are the molecule ids, and values are
-            'rdkit.Chem.rdchem.Mol'
+        :param struct 'Struct': the struct object with molecules and coordinates.
         :param ff 'oplsua.OplsParser': the force field information
         :param jobname str: jobname based on which out filenames are defined
         """
         super().__init__(jobname=jobname, *arg, **kwarg)
         self.ff = ff
-        self.mols = mols
+        self.struct = struct
         self.jobname = jobname
         self.atoms = {}
 
@@ -1400,7 +1400,8 @@ class LammpsDataBase(LammpsIn):
         :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
         """
 
-        return (atom for mol in self.molecule for atom in mol.GetAtoms())
+        return (atom for mol in self.struct.molecules
+                for atom in mol.GetAtoms())
 
     def hasCharge(self):
         """
@@ -1474,7 +1475,7 @@ class LammpsDataOne(LammpsDataBase):
         Balance the charge when residues are not neutral.
         """
 
-        for mol_id, mol in self.mols.items():
+        for mol_id, mol in self.struct.mols.items():
             # residual num: residual charge
             res_charge = collections.defaultdict(float)
             for atom in mol.GetAtoms():
@@ -1511,7 +1512,9 @@ class LammpsDataOne(LammpsDataBase):
         """
         Set bonding information.
         """
-        bonds = [bond for mol in self.molecule for bond in mol.GetBonds()]
+        bonds = [
+            bond for mol in self.struct.molecules for bond in mol.GetBonds()
+        ]
         for bond_id, bond in enumerate(bonds, start=1):
             bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
             # BOND_ATM_ID defines bonding parameters marked during atom typing
@@ -1537,7 +1540,7 @@ class LammpsDataOne(LammpsDataBase):
         if not adjust_bond_legnth:
             return
 
-        for mol in self.molecule:
+        for mol in self.struct.molecules:
             tpl = None
             for conf in mol.GetConformers():
                 if tpl:
@@ -1591,7 +1594,10 @@ class LammpsDataOne(LammpsDataBase):
 
         :return list of list: each sublist has four atoms forming a dihedral angle.
         """
-        return [y for x in self.molecule for y in self.getDihAtomsFromMol(x)]
+        return [
+            y for x in self.struct.molecules
+            for y in self.getDihAtomsFromMol(x)
+        ]
 
     def getDihAtomsFromMol(self, mol):
         """
@@ -1858,7 +1864,7 @@ class LammpsData(LammpsDataBase):
     ]
 
     def __init__(self,
-                 mols,
+                 struct,
                  *arg,
                  ff=None,
                  jobname='tmp',
@@ -1866,8 +1872,8 @@ class LammpsData(LammpsDataBase):
                  box=None,
                  **kwarg):
         """
-        :param mols dict: keys are the molecule ids, and values are
-            'rdkit.Chem.rdchem.Mol'
+        :param struct 'Struct': the struct object containing the molecules and
+            their coordinates.
         :param ff 'oplsua.OplsParser': the force field information
         :param jobname str: jobname based on which out filenames are defined
         :param concise bool: If False, all the atoms in the force field file
@@ -1875,7 +1881,7 @@ class LammpsData(LammpsDataBase):
             the present ones are writen into the data file.
         :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
         """
-        super().__init__(mols, *arg, ff=ff, jobname=jobname, **kwarg)
+        super().__init__(struct, *arg, ff=ff, jobname=jobname, **kwarg)
         self.concise = concise
         self.box = box
         self.mol_dat = {}
@@ -1902,7 +1908,7 @@ class LammpsData(LammpsDataBase):
         Write command to further equilibrate the system with molecules
         information considered.
         """
-        super().writeRun(*arg, mols=self.mols, **kwarg)
+        super().writeRun(*arg, struct=self.struct, **kwarg)
 
     def writeDumpModify(self):
         """
@@ -1954,8 +1960,9 @@ class LammpsData(LammpsDataBase):
             This only good for a small piece as clashes between non-bonded atoms
             may be introduced.
         """
-        for mol_id, mol in self.mols.items():
-            mol_dat = LammpsDataOne({mol_id: mol},
+        from nemd.structutils import Struct
+        for mol_id, mol in self.struct.mols.items():
+            mol_dat = LammpsDataOne(Struct([mol]),
                                     ff=self.ff,
                                     jobname=self.jobname)
             mol_dat.run(adjust_coords=adjust_coords)
@@ -1995,8 +2002,8 @@ class LammpsData(LammpsDataBase):
     def setBADI(self):
         bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 5
         for tpl_id, tpl_dat in self.mol_dat.items():
-            self.nbr_charge[tpl_id] = tpl_dat.nbr_charge[tpl_id]
-            for _ in range(tpl_dat.mols[tpl_id].GetNumConformers()):
+            self.nbr_charge[tpl_id] = tpl_dat.nbr_charge[1]
+            for _ in range(tpl_dat.struct.mols[1].GetNumConformers()):
                 for id in tpl_dat.bonds.values():
                     bond_id += 1
                     bond = tuple([id[0]] + [x + atom_num for x in id[1:]])
@@ -2013,7 +2020,7 @@ class LammpsData(LammpsDataBase):
                     improper_id += 1
                     improper = tuple([id[0]] + [x + atom_num for x in id[1:]])
                     self.impropers[improper_id] = improper
-                atom_num += tpl_dat.mols[tpl_id].GetNumAtoms()
+                atom_num += tpl_dat.struct.mols[1].GetNumAtoms()
 
     def removeUnused(self):
         """
@@ -2038,15 +2045,11 @@ class LammpsData(LammpsDataBase):
         Write the lammps description section, including the number of atom, bond,
         angle etc.
         """
-        if self.mols is None:
+        if self.struct.mols is None:
             raise ValueError(f"Mols are not set.")
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.data_hdl.write(f"{lmp_dsp}\n\n")
-        atom_nums = [
-            len(x.GetAtoms()) * x.GetNumConformers()
-            for x in self.mols.values()
-        ]
-        self.data_hdl.write(f"{sum(atom_nums)} {self.ATOMS}\n")
+        self.data_hdl.write(f"{self.struct.atom_total} {self.ATOMS}\n")
         self.data_hdl.write(f"{len(self.bonds)} {self.BONDS}\n")
         self.data_hdl.write(f"{len(self.angles)} {self.ANGLES}\n")
         self.data_hdl.write(f"{len(self.dihedrals)} {self.DIHEDRALS}\n")
@@ -2075,10 +2078,7 @@ class LammpsData(LammpsDataBase):
         :param buffer list: buffer in three dimensions
         """
 
-        xyzs = np.concatenate([
-            y.GetPositions() for x in self.mols.values()
-            for y in x.GetConformers()
-        ])
+        xyzs = self.struct.getPositions()
         ctr = xyzs.mean(axis=0)
         box_hf = self.getHalfBox(xyzs, min_box=min_box, buffer=buffer)
         box = [[x - y, x + y, z] for x, y, z in zip(ctr, box_hf, self.LO_HI)]
@@ -2092,7 +2092,7 @@ class LammpsData(LammpsDataBase):
         # Calculate density as the revised box may alter the box size.
         weight = sum([
             self.ff.molecular_weight(x) * x.GetNumConformers()
-            for x in self.molecule
+            for x in self.struct.molecules
         ])
         edges = [
             x * 2 * scipy.constants.angstrom / scipy.constants.centi
@@ -2122,7 +2122,7 @@ class LammpsData(LammpsDataBase):
         if self.box is not None:
             box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        if sum([x.GetNumConformers() for x in self.mols.values()]) != 1:
+        if self.struct.getNumConformers() != 1:
             return box_hf
         # All-trans single molecule with internal tension runs into clashes
         # across PBCs and thus larger box is used.
@@ -2238,8 +2238,9 @@ class LammpsData(LammpsDataBase):
 
         self.data_hdl.write(f"{self.ATOMS.capitalize()}\n\n")
         pre_atoms = 0
-        for tpl_id, mol in self.mols.items():
-            data = np.zeros((mol.GetNumAtoms(), 7))
+        for tpl_id, omol in self.struct.mols.items():
+            data = np.zeros((omol.GetNumAtoms(), 7))
+            mol = self.mol_dat[tpl_id].struct.mols[1]
             data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]
             type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
             data[:, 2] = [
@@ -2252,7 +2253,7 @@ class LammpsData(LammpsDataBase):
                 x + self.ff.charges[y] for x, y in zip(charges, type_ids)
             ]
             data[:, 0] += pre_atoms
-            for conformer in mol.GetConformers():
+            for conformer in omol.GetConformers():
                 data[:, 1] = conformer.GetId()
                 data[:, 4:] = conformer.GetPositions()
                 np.savetxt(self.data_hdl, data, fmt=fmt)
@@ -2527,16 +2528,6 @@ class DataFileReader(LammpsData):
         """
 
         return len(self.atoms)
-
-    @property
-    def molecule(self):
-        """
-        Handy way to get all molecules.
-
-        :return list of list: each sublist contains one int as atom id
-        """
-
-        return super().molecule
 
     def setMols(self):
         """
