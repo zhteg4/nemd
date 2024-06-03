@@ -226,6 +226,8 @@ class PackedConf(Conformer):
 
 class GrownConf(PackedConf):
 
+    MAX_TRIAL_PER_CONF = 5
+
     def __init__(self, *args, **kwargs):
         super(GrownConf, self).__init__(*args, **kwargs)
         self.ifrag = None
@@ -348,10 +350,14 @@ class GrownConf(PackedConf):
         log_debug(msg)
         raise ConfError(msg)
 
-    def setFrag(self):
+    def setFrag(self, max_trial=MAX_TRIAL_PER_CONF):
         """
         Set part of the conformer by rotating the dihedral angle, back moving,
         and relocation
+
+        :param max_trial int: the max number of trials for one conformer.
+        :raise ConfError: if the max number of trials for this conformer is
+            reached.
         """
         frag = self.frags.pop(0)
 
@@ -367,6 +373,11 @@ class GrownConf(PackedConf):
 
         # The molecule has grown to a dead end
         self.failed_num += 1
+        if self.failed_num > max_trial:
+            msg = f'Placed {len(self.dcell.extg_gids)} / {len(self.dcell.gids)}' \
+                  f'atoms reaching max trial number for conformer {self.GetId()}.'
+            log_debug(msg)
+            raise ConfError
         self.ifrag.reset()
         # The method backmove() deletes some extg_gids
         self.dcell.resetGraph()
@@ -1073,7 +1084,7 @@ class GrownStruct(PackedStruct):
 
         :param max_trial int: the max number of trials at one density.
         :raise DensityError: if the max number of trials at this density is
-            reached or the chance of achieving the goal is too low.
+            reached.
         """
         log_debug("*" * 10 + f"{self.density}" + "*" * 10)
 
@@ -1085,16 +1096,12 @@ class GrownStruct(PackedStruct):
                 try:
                     conf.setFrag()
                 except ConfError:
-                    # Keep trying as this conformer cannot be placed.
+                    # Reset and try again as this conformer cannot be placed.
+                    # 1 ) ifrag cannot be place; 2 ) failed_num reached maximum
                     break
-                if conf.failed_num > max_trial:
-                    # Keep trying as this one's growth failed too many times
-                    failed_num = sum([x.failed_num for x in self.conformers])
-                    msg = f'Only {len(self.dcell.extg_gids)} / {len(self.dcell.gids)} ' \
-                          f'placed with {failed_num} failed molecules.'
-                    log_debug(msg)
-                    break
+                # Successfully set one fragment of this conformer.
                 if conf.frags:
+                    # The conformer has more fragments to grow.
                     conformers.append(conf)
                     continue
                 # Successfully placed all fragments of one conformer
@@ -1102,8 +1109,9 @@ class GrownStruct(PackedStruct):
                 failed_num = sum([x.failed_num for x in self.conformers])
                 log_debug(f'{finished_num} finished; {failed_num} failed.')
                 if not conformers:
-                    # Successfully placed all conformers
+                    # Successfully placed all conformers.
                     return
+        # Max trial reached at this density.
         raise DensityError
 
     def reset(self):
