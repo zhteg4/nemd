@@ -191,7 +191,7 @@ class FixWriter:
         self.cmd = []
         self.mols = {} if mols is None else mols
         self.mol_num = len(self.mols)
-        self.atom_num = sum([x.GetNumAtoms() for x in self.mols.values()])
+        self.atom_num = sum([x.GetNumAtoms() * x.GetNumConformers() for x in self.mols.values()])
         self.testing = self.mol_num == 1 and self.atom_num < 100
         self.timestep = self.options.timestep
         self.relax_time = self.options.relax_time
