@@ -820,6 +820,9 @@ class DistanceCell:
         self.orig_graph = self.graph.copy()
 
     def resetGraph(self):
+        """
+        Rest the graph to the original state.
+        """
         self.graph = self.orig_graph.copy()
 
     def rmClashNodes(self):
@@ -835,7 +838,7 @@ class DistanceCell:
             rnodes.append(rnode)
         self.graph.remove_nodes_from(nodes)
 
-    def getVoids(self, num=100):
+    def getVoids(self, num=1000):
         """
         Get the points from the voids.
 
