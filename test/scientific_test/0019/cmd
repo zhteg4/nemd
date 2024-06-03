@@ -1,0 +1,2 @@
+run_nemd pb_lmp_post_workflow.py '[Ca+2]' '[Sr+2]' '[Ba+2]' '[Cl-]' -mol_num 1 1 1 6 -force_field OPLSUA,TIP3P -task density -seed 1234 -DEBUG
+

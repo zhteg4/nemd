@@ -366,16 +366,18 @@ class GrownConf(PackedConf):
         if self.setDihedral(frag):
             return
 
+
+
         if self.backMove(frag):
             return
 
         # The molecule has grown to a dead end
-        self.failed_num += 1
         if self.failed_num > max_trial:
             msg = f'Placed {len(self.dcell.extg_gids)} / {len(self.dcell.gids)}' \
                   f'atoms reaching max trial number for conformer {self.GetId()}.'
             log_debug(msg)
             raise ConfError
+        self.failed_num += 1
         self.ifrag.reset()
         # The method backmove() deletes some extg_gids
         self.dcell.resetGraph()
