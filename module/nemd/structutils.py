@@ -366,8 +366,6 @@ class GrownConf(PackedConf):
         if self.setDihedral(frag):
             return
 
-
-
         if self.backMove(frag):
             return
 
