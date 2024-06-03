@@ -326,8 +326,6 @@ class GrownConf(PackedConf):
         Place the initiator fragment into the cell with random position, random
         orientation, and large separation.
 
-        :param frag 'fragments.Fragment': the fragment to place
-
         :raise ValueError: when no void to place the initiator fragment of the
             dead molecule.
         """
@@ -443,8 +441,6 @@ class GrownConf(PackedConf):
     def reportRelocation(self):
         """
         Report the status after relocate an initiator fragment.
-
-        :param frag 'fragments.Fragment': the relocated fragment
         """
 
         idists = self.init_tf.pairDists()
