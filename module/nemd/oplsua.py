@@ -298,8 +298,9 @@ class FixWriter:
         self.cmd.append('print "Modulus = ${immed_modulus}"')
         self.cmd.append('print "Scale Factor  = ${factor}"\n')
         # If last loop or no scaling, break and record properties
-        self.cmd.append(f'if "${{defm_id}} == {max_loop} || ${{factor}} == 1" '
-                        f'then "jump SELF {defm_break}"\n')
+        self.cmd.append(
+            f'if "${{defm_id}} == {max_loop - 1} || ${{factor}} == 1" '
+            f'then "jump SELF {defm_break}"\n')
         self.nvt(nstep=nstep / 2,
                  stemp=self.temp,
                  temp=self.temp,
