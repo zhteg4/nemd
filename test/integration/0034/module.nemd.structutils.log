@@ -1,0 +1,166 @@
+2024-06-04 16:53:34,565 DEBUG Cubic box of size 7.94 angstrom is created.
+2024-06-04 16:53:34,862 DEBUG 42 fragments in total.
+2024-06-04 16:53:34,862 DEBUG ********** 2.65 **********
+2024-06-04 16:53:34,881 DEBUG Placing 7 initiators...
+2024-06-04 16:53:34,925 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:35,126 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:35,127 DEBUG (3.12 as the minimum pair distance)
+2024-06-04 16:53:35,174 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:35,177 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:35,179 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:35,204 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:35,359 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:35,907 DEBUG Only 46 / 56 placed
+2024-06-04 16:53:35,924 DEBUG Placing 7 initiators...
+2024-06-04 16:53:35,953 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:36,143 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:36,144 DEBUG (2.66 as the minimum pair distance)
+2024-06-04 16:53:36,180 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:36,188 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:36,194 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:36,199 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:36,212 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:36,450 DEBUG Only 47 / 56 placed
+2024-06-04 16:53:36,467 DEBUG Placing 7 initiators...
+2024-06-04 16:53:36,496 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:36,674 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:36,674 DEBUG (2.82 as the minimum pair distance)
+2024-06-04 16:53:36,724 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:36,725 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:36,817 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:36,819 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:36,828 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:36,893 DEBUG 6 finished; 0 failed.
+2024-06-04 16:53:37,208 DEBUG Only 49 / 56 placed
+2024-06-04 16:53:37,227 DEBUG Placing 7 initiators...
+2024-06-04 16:53:37,255 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:37,450 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:37,450 DEBUG (3.08 as the minimum pair distance)
+2024-06-04 16:53:37,476 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:37,494 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:37,511 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:37,539 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:37,599 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:37,836 DEBUG Only 46 / 56 placed
+2024-06-04 16:53:37,853 DEBUG Placing 7 initiators...
+2024-06-04 16:53:37,880 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:38,080 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:38,081 DEBUG (2.87 as the minimum pair distance)
+2024-06-04 16:53:38,127 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:38,134 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:38,134 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:38,137 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:38,273 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:38,502 DEBUG Only 47 / 56 placed
+2024-06-04 16:53:38,519 DEBUG Placing 7 initiators...
+2024-06-04 16:53:38,545 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:38,745 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:38,745 DEBUG (3.08 as the minimum pair distance)
+2024-06-04 16:53:38,778 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:38,803 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:38,828 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:38,865 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:39,043 DEBUG Relocate the initiator of 4 conformer (initiator: 3.08-6.18; close contact: 1.53) 
+2024-06-04 16:53:39,043 DEBUG 50 / 56 atoms placed.
+2024-06-04 16:53:39,045 DEBUG 5 finished; 1 failed.
+2024-06-04 16:53:39,251 DEBUG 6 finished; 1 failed.
+2024-06-04 16:53:39,643 DEBUG Only 49 / 56 placed
+2024-06-04 16:53:39,662 DEBUG Placing 7 initiators...
+2024-06-04 16:53:39,693 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:39,887 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:39,887 DEBUG (2.69 as the minimum pair distance)
+2024-06-04 16:53:39,924 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:39,926 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:39,929 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:39,956 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:40,041 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:40,526 DEBUG Only 45 / 56 placed
+2024-06-04 16:53:40,545 DEBUG Placing 7 initiators...
+2024-06-04 16:53:40,577 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:40,780 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:40,780 DEBUG (3.30 as the minimum pair distance)
+2024-06-04 16:53:40,817 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:40,818 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:40,824 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:40,843 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:40,917 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:41,272 DEBUG Only 48 / 56 placed
+2024-06-04 16:53:41,291 DEBUG Placing 7 initiators...
+2024-06-04 16:53:41,323 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:41,531 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:41,532 DEBUG (3.08 as the minimum pair distance)
+2024-06-04 16:53:41,563 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:41,569 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:41,572 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:41,575 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:41,613 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:41,696 DEBUG 6 finished; 0 failed.
+2024-06-04 16:53:41,921 DEBUG Only 49 / 56 placed
+2024-06-04 16:53:41,939 DEBUG Placing 7 initiators...
+2024-06-04 16:53:41,971 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:42,157 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:42,158 DEBUG (2.89 as the minimum pair distance)
+2024-06-04 16:53:42,206 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:42,270 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:42,272 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:42,294 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:42,409 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:43,134 DEBUG Only 45 / 56 placed
+2024-06-04 16:53:43,135 DEBUG Cubic box of size 8.05 angstrom is created.
+2024-06-04 16:53:43,187 DEBUG ********** 2.55 **********
+2024-06-04 16:53:43,205 DEBUG Placing 7 initiators...
+2024-06-04 16:53:43,237 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:43,440 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:43,440 DEBUG (2.83 as the minimum pair distance)
+2024-06-04 16:53:43,464 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:43,465 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:43,467 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:43,468 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:43,489 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:43,490 DEBUG 6 finished; 0 failed.
+2024-06-04 16:53:43,772 DEBUG Only 49 / 56 placed
+2024-06-04 16:53:43,790 DEBUG Placing 7 initiators...
+2024-06-04 16:53:43,817 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:44,009 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:44,010 DEBUG (3.07 as the minimum pair distance)
+2024-06-04 16:53:44,035 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:44,039 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:44,057 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:44,071 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:44,346 DEBUG Only 47 / 56 placed
+2024-06-04 16:53:44,418 DEBUG Placing 7 initiators...
+2024-06-04 16:53:44,447 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:44,632 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:44,633 DEBUG (2.90 as the minimum pair distance)
+2024-06-04 16:53:44,667 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:44,667 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:44,675 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:44,693 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:44,793 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:44,862 DEBUG Relocate the initiator of 4 conformer (initiator: 2.90-5.92; close contact: 1.53) 
+2024-06-04 16:53:44,862 DEBUG 51 / 56 atoms placed.
+2024-06-04 16:53:45,387 DEBUG Relocate the initiator of 4 conformer (initiator: 2.90-5.92; close contact: 1.53) 
+2024-06-04 16:53:45,387 DEBUG 48 / 56 atoms placed.
+2024-06-04 16:53:45,482 DEBUG 6 finished; 2 failed.
+2024-06-04 16:53:46,057 DEBUG Only 49 / 56 placed
+2024-06-04 16:53:46,075 DEBUG Placing 7 initiators...
+2024-06-04 16:53:46,104 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:46,290 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:46,290 DEBUG (3.26 as the minimum pair distance)
+2024-06-04 16:53:46,332 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:46,334 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:46,335 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:46,336 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:46,338 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:46,585 DEBUG Only 45 / 56 placed
+2024-06-04 16:53:46,602 DEBUG Placing 7 initiators...
+2024-06-04 16:53:46,631 DEBUG 14%, 28%, 42%, 57%, 71%, 85%, 100%
+2024-06-04 16:53:46,811 DEBUG 7 initiators have been placed.
+2024-06-04 16:53:46,811 DEBUG (3.13 as the minimum pair distance)
+2024-06-04 16:53:46,836 DEBUG 1 finished; 0 failed.
+2024-06-04 16:53:46,852 DEBUG 2 finished; 0 failed.
+2024-06-04 16:53:46,852 DEBUG 3 finished; 0 failed.
+2024-06-04 16:53:46,871 DEBUG 4 finished; 0 failed.
+2024-06-04 16:53:46,882 DEBUG 5 finished; 0 failed.
+2024-06-04 16:53:46,957 DEBUG 6 finished; 0 failed.
+2024-06-04 16:53:47,080 DEBUG 7 finished; 0 failed.

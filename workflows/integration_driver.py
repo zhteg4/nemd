@@ -192,8 +192,8 @@ class Integration(jobcontrol.Runner):
         """
         super().logStatus()
         jobs = self.project.find_jobs()
-        sjobs = [x for x in jobs if x.document[itestutils.SUCCESS]]
-        fjobs = [x for x in jobs if not x.document[itestutils.SUCCESS]]
+        sjobs = [x for x in jobs if x.document.get(itestutils.SUCCESS)]
+        fjobs = [x for x in jobs if not x.document.get(itestutils.SUCCESS)]
         log(f"{len(sjobs)} succeed; {len(fjobs)} failed.")
         for job in fjobs:
             if job.document[itestutils.SUCCESS]:

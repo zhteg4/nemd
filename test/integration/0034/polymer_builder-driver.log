@@ -1,32 +1,33 @@
-2024-06-03 09:13:16,280 INFO ..........Command Options..........
-2024-06-03 09:13:16,280 INFO cru: *CC*
-2024-06-03 09:13:16,281 INFO cru_num: 4
-2024-06-03 09:13:16,281 INFO mol_num: 11
-2024-06-03 09:13:16,281 INFO seed: 1234
-2024-06-03 09:13:16,281 INFO cell: grow
-2024-06-03 09:13:16,281 INFO density: 2.6
-2024-06-03 09:13:16,281 INFO timestep: 1
-2024-06-03 09:13:16,281 INFO stemp: 10
-2024-06-03 09:13:16,281 INFO temp: 300
-2024-06-03 09:13:16,281 INFO tdamp: 100
-2024-06-03 09:13:16,281 INFO press: 1
-2024-06-03 09:13:16,281 INFO pdamp: 1000
-2024-06-03 09:13:16,281 INFO lj_cut: 11.0
-2024-06-03 09:13:16,281 INFO coul_cut: 11.0
-2024-06-03 09:13:16,281 INFO relax_time: 1
-2024-06-03 09:13:16,281 INFO prod_time: 1
-2024-06-03 09:13:16,281 INFO prod_ens: NVE
-2024-06-03 09:13:16,281 INFO force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
-2024-06-03 09:13:16,281 INFO interactive: False
-2024-06-03 09:13:16,281 INFO jobname: polymer_builder
-2024-06-03 09:13:16,281 INFO debug: True
-2024-06-03 09:13:16,281 INFO python: 2
-2024-06-03 09:13:16,281 INFO cpu: 4
-2024-06-03 09:13:16,282 INFO JobStart: 09:13:16 06/03/24
-2024-06-03 09:13:16,282 INFO ...................................
-2024-06-03 09:13:16,302 INFO Polymer SMILES: CCCCCCCC
-2024-06-03 09:14:34,497 WARNING The density of the final data file is 0.196 kg/cm^3
-2024-06-03 09:14:34,498 INFO Data file written into polymer_builder.data
-2024-06-03 09:14:34,498 INFO In script written into polymer_builder.in
-2024-06-03 09:14:34,499 INFO Finished.
-2024-06-03 09:14:34,499 INFO 09:14:34 06/03/24
+2024-06-04 16:53:34,533 INFO ..........Command Options..........
+2024-06-04 16:53:34,533 INFO cru: *CC*
+2024-06-04 16:53:34,533 INFO cru_num: 4
+2024-06-04 16:53:34,533 INFO mol_num: 7
+2024-06-04 16:53:34,533 INFO seed: 1234
+2024-06-04 16:53:34,533 INFO cell: grow
+2024-06-04 16:53:34,533 INFO density: 2.65
+2024-06-04 16:53:34,534 INFO timestep: 1
+2024-06-04 16:53:34,534 INFO stemp: 10
+2024-06-04 16:53:34,534 INFO temp: 300
+2024-06-04 16:53:34,534 INFO tdamp: 100
+2024-06-04 16:53:34,534 INFO press: 1
+2024-06-04 16:53:34,534 INFO pdamp: 1000
+2024-06-04 16:53:34,534 INFO lj_cut: 11.0
+2024-06-04 16:53:34,534 INFO coul_cut: 11.0
+2024-06-04 16:53:34,534 INFO relax_time: 1
+2024-06-04 16:53:34,534 INFO prod_time: 1
+2024-06-04 16:53:34,534 INFO prod_ens: NVE
+2024-06-04 16:53:34,534 INFO force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+2024-06-04 16:53:34,534 INFO interactive: False
+2024-06-04 16:53:34,534 INFO jobname: polymer_builder
+2024-06-04 16:53:34,534 INFO debug: True
+2024-06-04 16:53:34,534 INFO python: 2
+2024-06-04 16:53:34,534 INFO cpu: 7
+2024-06-04 16:53:34,534 INFO JobStart: 16:53:34 06/04/24
+2024-06-04 16:53:34,534 INFO ...................................
+2024-06-04 16:53:34,546 INFO Polymer SMILES: CCCCCCCC
+2024-06-04 16:53:43,135 INFO Density is reduced to 2.5500 g/cm^3
+2024-06-04 16:53:47,083 WARNING The density of the final data file is 0.1247 kg/cm^3
+2024-06-04 16:53:47,084 INFO Data file written into polymer_builder.data
+2024-06-04 16:53:47,084 INFO In script written into polymer_builder.in
+2024-06-04 16:53:47,084 INFO Finished.
+2024-06-04 16:53:47,085 INFO 16:53:47 06/04/24

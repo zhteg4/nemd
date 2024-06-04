@@ -1,0 +1,35 @@
+2024-06-04 16:58:26,012 DEBUG Cubic box of size 7.69 angstrom is created.
+2024-06-04 16:58:26,291 DEBUG 40 fragments in total.
+2024-06-04 16:58:26,291 DEBUG ********** 2.6 **********
+2024-06-04 16:58:26,308 DEBUG Placing 5 initiators...
+2024-06-04 16:58:26,348 DEBUG 20%, 40%, 60%, 80%, 100%
+2024-06-04 16:58:26,475 DEBUG 5 initiators have been placed.
+2024-06-04 16:58:26,476 DEBUG (3.16 as the minimum pair distance)
+2024-06-04 16:58:26,521 DEBUG 1 finished; 0 failed.
+2024-06-04 16:58:26,536 DEBUG 2 finished; 0 failed.
+2024-06-04 16:58:26,541 DEBUG 3 finished; 0 failed.
+2024-06-04 16:58:26,571 DEBUG 4 finished; 0 failed.
+2024-06-04 16:58:29,102 DEBUG Relocate the initiator of 4 conformer (initiator: 2.83-5.71; close contact: 1.53) 
+2024-06-04 16:58:29,102 DEBUG 44 / 50 atoms placed.
+2024-06-04 16:58:29,358 DEBUG Only 41 / 50 placed
+2024-06-04 16:58:29,377 DEBUG Placing 5 initiators...
+2024-06-04 16:58:29,407 DEBUG 20%, 40%, 60%, 80%, 100%
+2024-06-04 16:58:29,520 DEBUG 5 initiators have been placed.
+2024-06-04 16:58:29,521 DEBUG (2.52 as the minimum pair distance)
+2024-06-04 16:58:29,546 DEBUG 1 finished; 0 failed.
+2024-06-04 16:58:29,547 DEBUG 2 finished; 0 failed.
+2024-06-04 16:58:29,549 DEBUG 3 finished; 0 failed.
+2024-06-04 16:58:29,934 DEBUG Only 39 / 50 placed
+2024-06-04 16:58:29,951 DEBUG Placing 5 initiators...
+2024-06-04 16:58:29,978 DEBUG 20%, 40%, 60%, 80%, 100%
+2024-06-04 16:58:30,106 DEBUG 5 initiators have been placed.
+2024-06-04 16:58:30,106 DEBUG (2.95 as the minimum pair distance)
+2024-06-04 16:58:30,132 DEBUG 1 finished; 0 failed.
+2024-06-04 16:58:30,133 DEBUG 2 finished; 0 failed.
+2024-06-04 16:58:30,182 DEBUG 3 finished; 0 failed.
+2024-06-04 16:58:30,213 DEBUG 4 finished; 0 failed.
+2024-06-04 16:58:33,343 DEBUG Relocate the initiator of 3 conformer (initiator: 2.95-5.51; close contact: 1.53) 
+2024-06-04 16:58:33,343 DEBUG 44 / 50 atoms placed.
+2024-06-04 16:58:33,435 DEBUG Relocate the initiator of 3 conformer (initiator: 2.95-5.51; close contact: 1.53) 
+2024-06-04 16:58:33,435 DEBUG 44 / 50 atoms placed.
+2024-06-04 16:58:35,646 DEBUG 5 finished; 2 failed.
