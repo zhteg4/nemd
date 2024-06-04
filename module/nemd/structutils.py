@@ -107,8 +107,9 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         NOTE: the random state is set according to the numpy random seed.
         :param seed: the random seed to generate the rotation matrix.
         """
+        if seed is None:
+            seed = np.random.randint(0, 2 ** 32 - 1)
         mtrx = np.identity(4)
-        seed = np.random.randint(0, 2**32 - 1)
         mtrx[:-1, :-1] = Rotation.random(random_state=seed).as_matrix()
         Chem.rdMolTransforms.TransformConformer(self, mtrx)
 
@@ -193,8 +194,11 @@ class PackedConf(Conformer):
         :return bool: True if clashes are found.
         """
         aids = self.aids if aids is None else aids
-        for row in [self.frm.loc[x] for x in self.id_map[aids]]:
-            clashes = self.dcell.getClashes(row,
+        gids = self.id_map[aids]
+        values = self.frm.vloc(gids)
+        for name, xyz in zip(gids, values):
+            clashes = self.dcell.getClashes(xyz,
+                                            name=name,
                                             included=self.dcell.extg_gids,
                                             radii=self.df_reader.radii,
                                             excluded=self.df_reader.excluded)

@@ -264,7 +264,7 @@ class Frame(pd.DataFrame):
         """
         Update the coordinate frame based on the give gids and xyz.
         """
-        self.loc[gids] = xyz
+        self.values[self.id_map[gids], :] = xyz
 
     def setStep(self, step):
         """
@@ -408,8 +408,8 @@ class Frame(pd.DataFrame):
     @property
     def id_map(self):
         """
-        The map from atom id to xyz row id. This is much faster than iterrows or
-        iloc indexing.
+        The map from atom gid to xyz row id. This is much faster than iterrows
+        or iloc indexing.
 
         :return 'numpy.ndarray': the map from atom id to xyz row id
         """
@@ -745,6 +745,7 @@ class DistanceCell:
 
     def getClashes(self,
                    row,
+                   name=None,
                    included=None,
                    excluded=None,
                    radii=None,
@@ -752,7 +753,9 @@ class DistanceCell:
         """
         Get the clashes between xyz and atoms in the frame.
 
-        :param row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
+        :param row (3,) 'pandas.core.series.Series' or (3,) 'numpy.ndarray':
+            xyz coordinates. Name is the atom id if Series provided.
+        :param name str: the atom id and row is expected to be a 'numpy.ndarray'
         :param included list of int: the atom ids included for the clash check
         :param excluded list of int: the atom ids excluded for the clash check
         :param radii oplsua.Radius: the values are the radii smaller than which
@@ -760,18 +763,20 @@ class DistanceCell:
         :param threshold clash radii: clash criteria when radii not defined
         :return list of tuple: clashed atom ids, distance, and threshold
         """
-        xyz = row.values
+        xyz = row.values if name is None else row
+        if name is None:
+            name = row.name
         neighbors = self.getNeighbors(xyz)
         # For small box, the same neighbor across PBCs appears multiple times
         neighbors = set(neighbors)
         try:
-            neighbors.remove(row.name)
+            neighbors.remove(name)
         except KeyError:
             pass
         if included is not None:
             neighbors = neighbors.intersection(included)
         if excluded is not None:
-            neighbors = neighbors.difference(excluded[row.name])
+            neighbors = neighbors.difference(excluded[name])
         if not neighbors:
             return
         neighbors = list(neighbors)
@@ -779,8 +784,8 @@ class DistanceCell:
         if radii is None:
             thresholds = [threshold] * len(neighbors)
         else:
-            thresholds = [radii.getRadius(row.name, x) for x in neighbors]
-        clashes = [(row.name, x, y, z)
+            thresholds = [radii.getRadius(name, x) for x in neighbors]
+        clashes = [(name, x, y, z)
                    for x, y, z in zip(neighbors, dists, thresholds) if y < z]
         return clashes
 
