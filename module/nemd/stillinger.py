@@ -67,8 +67,7 @@ class LammpsData(oplsua.LammpsDataBase):
     def setAtoms(self):
         super().setAtoms()
         elements = [
-            y.GetAtomicNum() for x in self.struct.molecules
-            for y in x.GetAtoms()
+            y.GetAtomicNum() for x in self.mols.values() for y in x.GetAtoms()
         ]
         self.elements = list(set(elements))
 
@@ -77,12 +76,12 @@ class LammpsData(oplsua.LammpsDataBase):
         Write the lammps description section, including the number of atom, bond,
         angle etc.
         """
-        if self.struct.molecules is None:
+        if self.mols is None:
             raise ValueError(f"Mols are not set.")
 
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.data_fh.write(f"{lmp_dsp}\n\n")
-        atom_nums = [len(x.GetAtoms()) for x in self.struct.molecules]
+        atom_nums = [len(x.GetAtoms()) for x in self.mols.values()]
         self.data_fh.write(f"{sum(atom_nums)} {self.ATOMS}\n\n")
 
     def writeTopoType(self):
@@ -96,7 +95,7 @@ class LammpsData(oplsua.LammpsDataBase):
         Write box information.
         """
 
-        boxes = [x.getBox() for x in self.struct.molecules]
+        boxes = [x.getBox() for x in self.mols.values()]
         box = boxes[0]
         repeated = np.repeat(box.reshape(1, -1), len(boxes), axis=0)
         if not (repeated == boxes).all():
@@ -114,8 +113,7 @@ class LammpsData(oplsua.LammpsDataBase):
         self.data_fh.write(f"{self.MASSES}\n\n")
         masses = list(
             set([
-                y.GetMass() for x in self.struct.molecules
-                for y in x.GetAtoms()
+                y.GetMass() for x in self.mols.values() for y in x.GetAtoms()
             ]))
         for id, mass in enumerate(masses, 1):
             self.data_fh.write(f"{id} {mass}\n")
@@ -130,7 +128,7 @@ class LammpsData(oplsua.LammpsDataBase):
         """
 
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
-        for mol_id, mol in self.struct.mols.items():
+        for mol_id, mol in self.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 5))
             conformer = mol.GetConformer()
             data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]

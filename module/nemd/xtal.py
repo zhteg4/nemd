@@ -9,38 +9,10 @@ import pathlib
 import crystals
 import subprocess
 from rdkit import Chem
-import numpy as np
-
 from nemd import jobutils
 from nemd import constants
-from nemd import structutils
+from nemd import rdkitutils
 from nemd import alamodeutils
-
-
-class Mol(structutils.Mol):
-
-    LATTICE_PARAMETERS = 'lattice_parameters'
-    DIMENSIONS = 'dimensions'
-
-    def __init__(self, *args, **kwargs):
-        self.lattice_parameters = kwargs.pop(self.LATTICE_PARAMETERS, None)
-        self.dimensions = kwargs.pop(self.DIMENSIONS, constants.ONE_ONE_ONE) # yapf: disable
-        super().__init__(*args, **kwargs)
-
-    def getBox(self):
-        if self.lattice_parameters is None:
-            return
-        param = self.lattice_parameters[:3]
-        return np.array(param) * self.dimensions
-
-
-class Struct(structutils.Struct):
-
-    def __init__(self, *args, MolClass=Mol, **kwargs):
-        super().__init__(*args, MolClass=MolClass, **kwargs)
-        for omol, mol in zip(args[0], self.molecules):
-            mol.lattice_parameters = omol.lattice_parameters
-            mol.dimensions = omol.dimensions
 
 
 class CrystalBuilder(object):
@@ -98,9 +70,9 @@ class CrystalBuilder(object):
         cfm = Chem.rdchem.Conformer(mol.GetNumAtoms())
         [cfm.SetAtomPosition(x, atoms[x].coords_cartesian) for x in idxs]
         mol.AddConformer(cfm)
-        return Mol(mol,
-                   lattice_parameters=self.scell.lattice_parameters,
-                   dimensions=self.scell.dimensions)
+        return rdkitutils.Mol(mol,
+                              lattice_parameters=self.scell.lattice_parameters,
+                              dimensions=self.scell.dimensions)
 
     def writeDispPattern(self):
         """

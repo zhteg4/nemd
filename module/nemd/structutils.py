@@ -19,6 +19,7 @@ from rdkit import DataStructs
 from scipy.spatial.transform import Rotation
 
 from nemd import traj
+from nemd import oplsua
 from nemd import pnames
 from nemd import logutils
 
@@ -170,7 +171,7 @@ class PackedConf(Conformer):
 
         :param max_trial int: the max trial number for each molecule to be placed
             into the cell.
-        :raise ConfError: if the conformer always has clashes with the existing
+        :raise MolError: if the conformer always has clashes with the existing
             atoms in the cell after the maximum trial.
         """
         for _ in range(max_trial):
@@ -225,25 +226,12 @@ class PackedConf(Conformer):
 
 class GrownConf(PackedConf):
 
-    MAX_TRIAL_PER_CONF = 5
-
     def __init__(self, *args, **kwargs):
         super(GrownConf, self).__init__(*args, **kwargs)
         self.ifrag = None
         self.init_aids = None
         self.failed_num = 0
         self.frags = []
-        self.oxyz = self.GetPositions()
-
-    def reset(self):
-        """
-        Rest the attributes that are changed during one grow attempt.
-        """
-        self.failed_num = 0
-        self.frags = [self.ifrag]
-        if self.ifrag:
-            self.ifrag.reset()
-        self.setPositions(self.oxyz)
 
     def setPositions(self, xyz):
         """
@@ -321,6 +309,8 @@ class GrownConf(PackedConf):
         Place the initiator fragment into the cell with random position, random
         orientation, and large separation.
 
+        :param frag 'fragments.Fragment': the fragment to place
+
         :raise ValueError: when no void to place the initiator fragment of the
             dead molecule.
         """
@@ -338,24 +328,21 @@ class GrownConf(PackedConf):
             self.updateDcell(self.init_aids)
             self.init_tf.loc[self.GetId()] = point
             return
+
         # with open('placeInitFrag.xyz', 'w') as out_fh:
         #     self.frm.write(out_fh,
         #                    dreader=self.df_reader,
         #                    visible=list(self.dcell.extg_gids),
         #                    points=points)
-        msg = f'Only {len(self.dcell.extg_gids)} / {len(self.dcell.gids)} placed'
-        log_debug(msg)
-        raise ConfError(msg)
+        raise ValueError(f'Failed to relocate the dead molecule. '
+                         f'({len(self.dcell.extg_gids)}/{len(self.mols)})')
 
-    def setFrag(self, max_trial=MAX_TRIAL_PER_CONF):
+    def setFrag(self):
         """
         Set part of the conformer by rotating the dihedral angle, back moving,
-        and relocation
-
-        :param max_trial int: the max number of trials for one conformer.
-        :raise ConfError: if the max number of trials for this conformer is
-            reached.
+        and relocation.
         """
+
         frag = self.frags.pop(0)
 
         if not frag.dihe:
@@ -369,17 +356,13 @@ class GrownConf(PackedConf):
             return
 
         # The molecule has grown to a dead end
-        if self.failed_num > max_trial:
-            msg = f'Placed {len(self.dcell.extg_gids)} / {len(self.dcell.gids)}' \
-                  f'atoms reaching max trial number for conformer {self.GetId()}.'
-            log_debug(msg)
-            raise ConfError
         self.failed_num += 1
-        self.ifrag.reset()
+        self.ifrag.resetVals()
         # The method backmove() deletes some extg_gids
         self.dcell.resetGraph()
         self.placeInitFrag()
         self.reportRelocation()
+        log_debug(f'{len(self.dcell.extg_gids)} atoms placed.')
 
     def setDihedral(self, frag):
         """
@@ -421,6 +404,7 @@ class GrownConf(PackedConf):
         # frags before this backmove step.
         nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
         self.frags = [frag] + [x for x in self.frags if x not in nnxt_frags]
+        log_debug(f"{len(self.dcell.extg_gids)}, {len(frag.vals)}: {frag}")
         return found
 
     def remove(self, aids):
@@ -435,6 +419,8 @@ class GrownConf(PackedConf):
     def reportRelocation(self):
         """
         Report the status after relocate an initiator fragment.
+
+        :param frag 'fragments.Fragment': the relocated fragment
         """
 
         idists = self.init_tf.pairDists()
@@ -442,9 +428,6 @@ class GrownConf(PackedConf):
         log_debug(f"Relocate the initiator of {self.GetId()} conformer "
                   f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
                   f"close contact: {dists.min():.2f}) ")
-        log_debug(
-            f'{len(self.dcell.extg_gids)} / {len(self.dcell.gids)} atoms placed.'
-        )
 
 
 class Mol(rdkit.Chem.rdchem.Mol):
@@ -514,15 +497,6 @@ class Mol(rdkit.Chem.rdchem.Mol):
         return self.ff.molecular_weight(self)
 
     mw = molecular_weight
-
-    @property
-    def atom_total(self):
-        """
-        The total number of atoms in all conformers.
-
-        :return int: the total number of atoms in all conformers.
-        """
-        return self.GetNumAtoms() * self.GetNumConformers()
 
 
 class GriddedMol(Mol):
@@ -791,24 +765,6 @@ class Struct:
         """
         return [x for x in self.mols.values()]
 
-    @property
-    def atom_total(self):
-        """
-        The total number of atoms in all conformers across all molecules.
-
-        :return int: the total number of atoms in all conformers.
-        """
-        return sum([x.atom_total for x in self.mols.values()])
-
-    def getPositions(self):
-        return np.concatenate([
-            y.GetPositions() for x in self.mols.values()
-            for y in x.GetConformers()
-        ])
-
-    def getNumConformers(self):
-        return sum([x.GetNumConformers() for x in self.molecules])
-
 
 class GriddedStruct(Struct):
     """
@@ -954,9 +910,7 @@ class PackedStruct(Struct):
         """
         if self.df_reader is not None:
             return
-
-        from nemd import oplsua
-        lmw = oplsua.LammpsData(self, ff=self.ff, options=self.options)
+        lmw = oplsua.LammpsData(self.mols, ff=self.ff, options=self.options)
         contents = lmw.writeData(nofile=True)
         self.df_reader = oplsua.DataFileReader(contents=contents)
         self.df_reader.run()
@@ -1041,10 +995,21 @@ class GrownStruct(PackedStruct):
         """
         self.setBox()
         self.setDataReader()
+        self.resetConformers()
         self.setFrameAndDcell()
         self.setReferences()
         self.fragmentize()
+        self.placeInitFrags()
         self.setConformers()
+
+    def resetConformers(self):
+        """
+        Rest the state of the conformers.
+        """
+        for conf in self.conformers:
+            xyz = self.df_reader.getMolXYZ(conf.GetId())
+            conf.setPositions(xyz)
+            conf.failed_num = 0
 
     def setFrameAndDcell(self):
         """
@@ -1101,52 +1066,22 @@ class GrownStruct(PackedStruct):
         dist = self.init_tf.pairDists().min()
         log_debug(f'({dist:.2f} as the minimum pair distance)')
 
-    def setConformers(self, max_trial=MAX_TRIAL_PER_DENSITY):
+    def setConformers(self):
         """
         Looping conformer one by one and set one fragment configuration each
         time until all to full length.
-
-        :param max_trial int: the max number of trials at one density.
-        :raise DensityError: if the max number of trials at this density is
-            reached.
         """
-        log_debug("*" * 10 + f"{self.density}" + "*" * 10)
-
-        for _ in range(max_trial):
-            self.reset()
-            conformers = self.conformers[:]
-            while conformers:
-                conf = conformers.pop(0)
-                try:
-                    conf.setFrag()
-                except ConfError:
-                    # Reset and try again as this conformer cannot be placed.
-                    # 1 ) ifrag cannot be place; 2 ) failed_num reached maximum
-                    break
-                # Successfully set one fragment of this conformer.
-                if conf.frags:
-                    # The conformer has more fragments to grow.
-                    conformers.append(conf)
-                    continue
-                # Successfully placed all fragments of one conformer
+        conformers = self.conformers[:]
+        while conformers:
+            conf = conformers.pop(0)
+            if not conf.frags:
+                # succesfully placed all fragments of one conformer
                 finished_num = len(self.conformers) - len(conformers)
                 failed_num = sum([x.failed_num for x in self.conformers])
                 log_debug(f'{finished_num} finished; {failed_num} failed.')
-                if not conformers:
-                    # Successfully placed all conformers.
-                    return
-        # Max trial reached at this density.
-        raise DensityError
-
-    def reset(self):
-        """
-        Reset the state so that a new growing attempt can happen.
-        """
-        for conf in self.conformers:
-            conf.reset()
-        self.dcell.extg_gids.clear()
-        self.dcell.resetGraph()
-        self.placeInitFrags()
+                continue
+            conf.setFrag()
+            conformers.append(conf)
 
 
 class Fragment:
@@ -1192,13 +1127,6 @@ class Fragment:
         """
         self.val, self.fval = None, True
         self.vals = list(np.linspace(0, 360, 36, endpoint=False))
-
-    def reset(self):
-        """
-        Reset the state of all fragments.
-        """
-        for frag in self.fragments():
-            frag.resetVals()
 
     def getOwningMol(self):
         """
