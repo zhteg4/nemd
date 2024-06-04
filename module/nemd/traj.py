@@ -544,7 +544,8 @@ class DistanceCell:
         self.neigh_ids = None
         self.atom_cell = None
         self.graph = None
-        self.orig_graph = None
+        self.frm_vals = None
+        self.cell_vals = None
         self.extg_gids = set()
         if self.gids is None:
             self.gids = list(range(1, self.frm.shape[0] + 1))
@@ -555,6 +556,7 @@ class DistanceCell:
         self.setNeighborIds()
         self.setNeighborMap()
         self.setAtomCell()
+        self.saveState()
 
     def setSpan(self):
         """
@@ -648,6 +650,17 @@ class DistanceCell:
         atom_ids = numba.int32(self.frm.index)
         self.atom_cell = self.setAtomCellNumba(atom_ids, self.frm.values,
                                                self.grids, self.indexes_numba)
+
+    def saveState(self):
+        self.frm_vals = self.frm.values.copy()
+        self.cell_vals = self.atom_cell.copy()
+
+    def reset(self):
+        self.extg_gids.clear()
+        self.frm.iloc[:] = self.frm_vals.copy()
+        self.atom_cell[:] = self.cell_vals.copy()
+        if self.graph is not None:
+            self.graph = self.orig_graph.copy()
 
     @staticmethod
     @numbautils.jit
@@ -825,6 +838,9 @@ class DistanceCell:
         self.orig_graph = self.graph.copy()
 
     def resetGraph(self):
+        """
+        Rest the graph to the original state.
+        """
         self.graph = self.orig_graph.copy()
 
     def rmClashNodes(self):
