@@ -229,11 +229,8 @@ def get_parser():
                         help='Checking for results only (the cmd task)')
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
-    parserutils.add_workflow_arguments(parser,
-                                       arg_flags=[parserutils.FLAG_CLEAN])
-    parser.add_argument(parserutils.FLAG_JTYPE,
-                        default=[jobutils.TASK],
-                        help=argparse.SUPPRESS)
+    parserutils.add_workflow_arguments(
+        parser, arg_flags=[parserutils.FLAG_CLEAN, parserutils.FLAG_JTYPE])
     return parser
 
 

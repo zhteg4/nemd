@@ -331,19 +331,23 @@ class BaseTask:
         :type log: 'function'
         """
 
-        delta_times = collections.defaultdict(list)
+        log(BaseTask.TIME_BREAKDOWN)
+        info = collections.defaultdict(list)
         for job in jobs:
             for tname, filename in job.doc[jobutils.LOGFILE].items():
                 delta = logutils.get_time(job.fn(filename))
-                delta_times[tname].append(delta)
-        log(BaseTask.TIME_BREAKDOWN)
-        for tname, deltas in delta_times.items():
-            deltas = [x for x in deltas if x]
-            if not deltas:
+                info[tname].append(SimpleNamespace(delta=delta, id=job.id))
+        for tname, tinfo in info.items():
+            tinfo = [x for x in tinfo if x.delta]
+            if not tinfo:
                 continue
-            ave = sum(deltas, timedelta(0)) / len(deltas)
-            deltas = [humanfriendly.format_timespan(x) for x in deltas]
+            ave = sum([x.delta
+                       for x in tinfo], start=timedelta(0)) / len(tinfo)
             ave = humanfriendly.format_timespan(ave)
+            deltas = [
+                f"{humanfriendly.format_timespan(x.delta)} ({x.id[:4]})"
+                for x in tinfo
+            ]
             log(f"{tname}: {', '.join(deltas)}; {ave} (ave)")
 
     @classmethod
@@ -358,8 +362,7 @@ class BaseTask:
                tname=None,
                **kwargs):
         """
-        Get and register an aggregator job task that collects custom dump task
-        outputs.
+        Get and register an aggregator job task that collects task outputs.
 
         :param cmd: Whether the aggregator function returns a command to run
         :type cmd: bool

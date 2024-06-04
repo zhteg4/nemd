@@ -108,7 +108,7 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         :param seed: the random seed to generate the rotation matrix.
         """
         if seed is None:
-            seed = np.random.randint(0, 2 ** 32 - 1)
+            seed = np.random.randint(0, 2**32 - 1)
         mtrx = np.identity(4)
         mtrx[:-1, :-1] = Rotation.random(random_state=seed).as_matrix()
         Chem.rdMolTransforms.TransformConformer(self, mtrx)
