@@ -265,7 +265,7 @@ class FixWriter:
                  press=self.press,
                  modulus="${modulus}")
 
-    def cycleToPress(self, max_loop=50, num=3, record_num=100):
+    def cycleToPress(self, max_loop=100, num=3, record_num=100):
         """
         Deform the box by cycles to get close to the target pressure.
 
