@@ -51,6 +51,18 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         super().__init__(*args, **kwargs)
         self.mol = mol
 
+    def setGids(self, atom_ids, start_gid):
+        """
+        Set the global ids of the atoms in this conformer.
+
+        :param atom_ids list of int: the atom ids in this conformer.
+        :param start_gid int: the starting global id.
+        """
+        gids = [x for x in range(start_gid, start_gid + len(atom_ids))]
+        id_map = {x: y for x, y in zip(atom_ids, gids)}
+        max_gid = max(atom_ids) + 1
+        self.id_map = np.array([id_map.get(x, -1) for x in range(max_gid)])
+
     def SetOwningMol(self, mol):
         """
         Set the Mol that owns this conformer.
@@ -160,10 +172,6 @@ class PackedConf(Conformer):
         self.df_reader = self.mol.df_reader
         self.frm = self.mol.frm
         self.dcell = self.mol.dcell
-        atoms, gids = self.mol.GetAtoms(), self.df_reader.mols[self.GetId()]
-        imap = {x.GetIdx(): y for x, y in zip(atoms, gids)}
-        id_map = [imap.get(x, -1) for x in range(max(imap.keys()) + 1)]
-        self.id_map = np.array(id_map)
 
     @property
     @functools.cache
@@ -469,6 +477,19 @@ class Mol(rdkit.Chem.rdchem.Mol):
         self.conf_id = 0
         self.confs = None
 
+    def setGids(self, start_gid):
+        """
+        Set the global ids of the atoms in all conformers of the molecule.
+
+        :param gid int: the starting global id.
+        :return start_gid int: the next starting global id.
+        """
+        atom_ids = [x.GetIdx() for x in self.GetAtoms()]
+        for conf in self.GetConformers():
+            conf.setGids(atom_ids, start_gid)
+            start_gid += self.GetNumAtoms()
+        return start_gid
+
     def setConformerId(self, conf_id):
         """
         Set the selected conformer id.
@@ -769,12 +790,18 @@ class Struct:
             molecule class
         :param ff 'OplsParser': the force field class.
         """
+        # Initialize molecules and conformers
         self.mols = {
             i: MolClass(x, ff=ff)
             for i, x in enumerate(mols, start=1)
         }
-        for mol_id, conf in enumerate(self.conformers, start=1):
-            conf.SetId(mol_id)
+        # Set conf_id for each conformer
+        for conf_id, conf in enumerate(self.conformers, start=1):
+            conf.SetId(conf_id)
+        # Set gids for atoms in each conformer
+        start_gid = 1
+        for mol in self.molecules:
+            start_gid = mol.setGids(start_gid=start_gid)
         self.density = None
 
     @property
