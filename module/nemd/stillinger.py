@@ -24,7 +24,7 @@ class LammpsData(oplsua.LammpsDataBase):
         Write out LAMMPS in script.
         """
         with open(self.lammps_in, 'w') as self.in_fh:
-            self.setAtoms()
+            self.setElements()
             self.writeDescriptions()
             self.readData()
             self.writePairStyle()

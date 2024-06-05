@@ -1376,23 +1376,13 @@ class LammpsDataBase(LammpsIn):
         self.jobname = jobname
         self.atoms = {}
 
-    @property
-    def atom(self):
-        """
-        Handy way to get atoms in all types of molecules.
-
-        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
-        """
-
-        return (atom for mol in self.struct.molecules
-                for atom in mol.GetAtoms())
-
     def hasCharge(self):
         """
         Whether any atom has charge.
         """
         charges = [
-            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atom
+            self.ff.charges[x.GetIntProp(self.TYPE_ID)]
+            for x in self.struct.atoms
         ]
         return any(charges)
 
@@ -1449,7 +1439,8 @@ class LammpsDataOne(LammpsDataBase):
         Whether any atom has charge.
         """
         charges = [
-            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atom
+            self.ff.charges[x.GetIntProp(self.TYPE_ID)]
+            for x in self.struct.atoms
         ]
         return any(charges)
 
@@ -1552,7 +1543,8 @@ class LammpsDataOne(LammpsDataBase):
         Set angle force field matches.
         """
 
-        angle_atoms = (y for x in self.atom for y in self.ff.getAngleAtoms(x))
+        angle_atoms = (y for x in self.struct.atoms
+                       for y in self.ff.getAngleAtoms(x))
         for angle_id, atoms in enumerate(angle_atoms, start=1):
             angle = self.ff.getMatchedAngles(atoms)[0]
             atom_ids = tuple(x.GetAtomMapNum() for x in atoms)
@@ -1728,7 +1720,7 @@ class LammpsDataOne(LammpsDataBase):
         Multipole Models
         """
         improper_id = 0
-        for atom in self.atom:
+        for atom in self.struct.atoms:
             atom_symbol, neighbors = atom.GetSymbol(), atom.GetNeighbors()
             if atom_symbol not in csymbols or len(neighbors) != 3:
                 continue
@@ -2013,7 +2005,8 @@ class LammpsData(LammpsDataBase):
         if not self.concise:
             return
 
-        atypes = sorted(set(x.GetIntProp(self.TYPE_ID) for x in self.atom))
+        atypes = sorted(
+            set(x.GetIntProp(self.TYPE_ID) for x in self.struct.atoms))
         self.atm_types = {y: x for x, y in enumerate(atypes, start=1)}
         btypes = sorted(set(x[0] for x in self.bonds.values()))
         self.bnd_types = {y: x for x, y in enumerate(btypes, start=1)}
