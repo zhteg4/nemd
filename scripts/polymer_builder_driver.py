@@ -240,6 +240,7 @@ class AmorphousCell(object):
         Write amorphous cell into data file.
         """
         lmw = oplsua.LammpsData(self.struct.mols,
+                                struct=self.struct,
                                 ff=self.ff,
                                 jobname=self.options.jobname,
                                 box=self.struct.box,
@@ -667,7 +668,10 @@ class Conformer(object):
         Adjust the conformer coordinates based on the force field.
         """
         mols = {1: self.polym}
+        struct = structutils.Struct([self.polym])
+        struct.mols = mols
         self.lmw = oplsua.LammpsData(mols,
+                                     struct=struct,
                                      ff=self.ff,
                                      jobname=self.jobname,
                                      options=self.options)

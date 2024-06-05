@@ -521,6 +521,15 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
     mw = molecular_weight
 
+    @property
+    def atom_total(self):
+        """
+        The total number of atoms in all conformers.
+
+        :return int: the total number of atoms in all conformers.
+        """
+        return self.GetNumAtoms() * self.GetNumConformers()
+
 
 class GriddedMol(Mol):
     """
@@ -788,6 +797,24 @@ class Struct:
         """
         return [x for x in self.mols.values()]
 
+    @property
+    def atom_total(self):
+        """
+        The total number of atoms in all conformers across all molecules.
+
+        :return int: the total number of atoms in all conformers.
+        """
+        return sum([x.atom_total for x in self.molecules])
+
+    def getPositions(self):
+        return np.concatenate([
+            y.GetPositions() for x in self.molecules
+            for y in x.GetConformers()
+        ])
+
+    def getNumConformers(self):
+        return sum([x.GetNumConformers() for x in self.molecules])
+
 
 class GriddedStruct(Struct):
     """
@@ -934,7 +961,10 @@ class PackedStruct(Struct):
         """
         if self.df_reader is not None:
             return
-        lmw = oplsua.LammpsData(self.mols, ff=self.ff, options=self.options)
+        lmw = oplsua.LammpsData(self.mols,
+                                struct=self,
+                                ff=self.ff,
+                                options=self.options)
         contents = lmw.writeData(nofile=True)
         self.df_reader = oplsua.DataFileReader(contents=contents)
         self.df_reader.run()
