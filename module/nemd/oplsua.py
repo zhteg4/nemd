@@ -24,9 +24,8 @@ from collections import namedtuple
 from nemd import symbols
 from nemd import logutils
 from nemd import fileutils
-from nemd import constants as nconstants
-from nemd import pnames
 from nemd import environutils
+from nemd import constants as nconstants
 
 FLAG_TIMESTEP = '-timestep'
 FLAG_STEMP = '-stemp'
