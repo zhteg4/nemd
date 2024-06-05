@@ -130,7 +130,6 @@ class Dispersion(object):
         mol = self.xbuild.getMol()
         tasks = [stillinger.LammpsData.XYZ, stillinger.LammpsData.FORCE]
         struct = xtal.Struct([mol])
-        struct.mols = {1: mol}
         self.lmp_dat = stillinger.LammpsData(struct,
                                              ff=self.SI_FF,
                                              jobname=self.options.jobname,

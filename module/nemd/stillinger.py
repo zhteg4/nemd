@@ -57,19 +57,15 @@ class LammpsData(oplsua.LammpsDataBase):
 
     def writeData(self, *args, **kwargs):
         with open(self.datafile, 'w') as self.data_fh:
-            self.setAtoms()
+            self.setElements()
             self.writeDescription()
             self.writeTopoType()
             self.writeBox()
             self.writeMasses()
             self.writeAtoms()
 
-    def setAtoms(self):
-        super().setAtoms()
-        elements = [
-            y.GetAtomicNum() for x in self.struct.mols.values()
-            for y in x.GetAtoms()
-        ]
+    def setElements(self):
+        elements = [x.GetAtomicNum() for x in self.struct.atoms]
         self.elements = list(set(elements))
 
     def writeDescription(self):
@@ -129,7 +125,7 @@ class LammpsData(oplsua.LammpsDataBase):
         for mol_id, mol in self.struct.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 5))
             conformer = mol.GetConformer()
-            data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]
+            data[:, 0] = [x.GetAtomMapNum() for x in mol.GetAtoms()]
             data[:, 1] = mol_id
             data[:, 2:] = conformer.GetPositions()
             np.savetxt(self.data_fh, data, fmt='%i %i %.3f %.3f %.3f')

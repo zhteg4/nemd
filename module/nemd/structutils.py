@@ -63,6 +63,16 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         max_gid = max(atom_ids) + 1
         self.id_map = np.array([id_map.get(x, -1) for x in range(max_gid)])
 
+    @property
+    @functools.cache
+    def aids(self):
+        """
+        Return the atom ids of this conformer.
+
+        :return list of int: the global atom ids of this conformer.
+        """
+        return list(np.where(self.id_map != -1)[0])
+
     def SetOwningMol(self, mol):
         """
         Set the Mol that owns this conformer.
@@ -84,6 +94,15 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         :return `rdkit.Chem.rdchem.Mol`: the molecule this conformer belongs to.
         """
         return self.mol
+
+    def setPositions(self, xyz):
+        """
+        Reset the positions of the atoms to the original xyz coordinates.
+
+        :return xyz np.ndarray: the xyz coordinates of the molecule.
+        """
+        for id in range(xyz.shape[0]):
+            self.SetAtomPosition(id, xyz[id, :])
 
     def centroid(self, aids=None):
         """
@@ -156,15 +175,6 @@ class PackedConf(Conformer):
         self.dcell = None
         self.df_reader = None
 
-    def setPositions(self, xyz):
-        """
-        Reset the positions of the atoms to the original xyz coordinates.
-
-        :return xyz np.ndarray: the xyz coordinates of the molecule.
-        """
-        for id in range(xyz.shape[0]):
-            self.SetAtomPosition(id, xyz[id, :])
-
     def setReferences(self):
         """
         Set the references to the conformer.
@@ -172,16 +182,6 @@ class PackedConf(Conformer):
         self.df_reader = self.mol.df_reader
         self.frm = self.mol.frm
         self.dcell = self.mol.dcell
-
-    @property
-    @functools.cache
-    def aids(self):
-        """
-        Return the atom ids of this conformer.
-
-        :return list of int: the global atom ids of this conformer.
-        """
-        return list(np.where(self.id_map != -1)[0])
 
     def setConformer(self, max_trial=MAX_TRIAL_PER_CONF):
         """
@@ -477,14 +477,17 @@ class Mol(rdkit.Chem.rdchem.Mol):
         self.conf_id = 0
         self.confs = None
 
-    def setGids(self, start_gid):
+    def setIdMap(self, start_gid):
         """
-        Set the global ids of the atoms in all conformers of the molecule.
+        Set the atom map num and the global ids of the atoms in all conformers
+        of the molecule.
 
         :param gid int: the starting global id.
         :return start_gid int: the next starting global id.
         """
         atom_ids = [x.GetIdx() for x in self.GetAtoms()]
+        for id, atom in enumerate(self.GetAtoms(), start=1):
+            atom.SetAtomMapNum(id)
         for conf in self.GetConformers():
             conf.setGids(atom_ids, start_gid)
             start_gid += self.GetNumAtoms()
@@ -801,7 +804,7 @@ class Struct:
         # Set gids for atoms in each conformer
         start_gid = 1
         for mol in self.molecules:
-            start_gid = mol.setGids(start_gid=start_gid)
+            start_gid = mol.setIdMap(start_gid=start_gid)
         self.density = None
 
     @property
@@ -823,6 +826,18 @@ class Struct:
             molecules.
         """
         return [x for x in self.mols.values()]
+
+    @property
+    def atoms(self):
+        """
+        Return atoms of molecules.
+
+        Note: the len() of these atoms is different atom_total as atom_toal
+        includes atoms from all conformers.
+
+        :return list of rdkit.Chem.rdchem.Atom: the atoms from all molecules.
+        """
+        return [y for x in self.molecules for y in x.GetAtoms()]
 
     @property
     def atom_total(self):

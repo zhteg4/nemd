@@ -667,11 +667,12 @@ class Conformer(object):
         Adjust the conformer coordinates based on the force field.
         """
         struct = structutils.Struct([self.polym])
-        struct.mols = {1: self.polym}
         self.lmw = oplsua.LammpsData(struct,
                                      ff=self.ff,
                                      jobname=self.jobname,
                                      options=self.options)
+        xyz = struct.mols[1].GetConformer().GetPositions()
+        self.polym.GetConformers()[0].setPositions(xyz)
         if self.minimization:
             return
         self.lmw.setOneMolData(adjust_coords=True)

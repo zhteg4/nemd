@@ -1376,15 +1376,6 @@ class LammpsDataBase(LammpsIn):
         self.jobname = jobname
         self.atoms = {}
 
-    def setAtoms(self):
-        """
-        Set atom property.
-        """
-
-        # atom id is stored as per atom property instead of global dict
-        for atom_id, atom in enumerate(self.atom, start=1):
-            atom.SetIntProp(self.ATOM_ID, atom_id)
-
     @property
     def atom(self):
         """
@@ -1444,7 +1435,6 @@ class LammpsDataOne(LammpsDataBase):
         self.nbr_charge = {}
 
     def run(self, adjust_coords=True):
-        self.setAtoms()
         self.balanceCharge()
         self.setBonds()
         self.adjustBondLength(adjust_coords)
@@ -1515,8 +1505,8 @@ class LammpsDataOne(LammpsDataBase):
                                   key=lambda x: x.GetIntProp(self.BOND_ATM_ID))
             matches = self.ff.getMatchedBonds(bonded_atoms)
             bond = matches[0]
-            atom_id1 = bonded_atoms[0].GetIntProp(self.ATOM_ID)
-            atom_id2 = bonded_atoms[1].GetIntProp(self.ATOM_ID)
+            atom_id1 = bonded_atoms[0].GetAtomMapNum()
+            atom_id2 = bonded_atoms[1].GetAtomMapNum()
             atom_ids = sorted([atom_id1, atom_id2])
             self.bonds[bond_id] = (
                 bond.id,
@@ -1543,7 +1533,7 @@ class LammpsDataOne(LammpsDataBase):
 
                 for bond in mol.GetBonds():
                     bnd_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
-                    ids = set([x.GetIntProp(self.ATOM_ID) for x in bnd_atoms])
+                    ids = set([x.GetAtomMapNum() for x in bnd_atoms])
                     bond_type = self.rvrs_bonds[tuple(sorted(ids))]
                     dist = self.ff.bonds[bond_type].dist
                     idxs = [x.GetIdx() for x in bnd_atoms]
@@ -1554,7 +1544,6 @@ class LammpsDataOne(LammpsDataBase):
         """
         Adjust the coordinates based bond length etc.
         """
-        self.setAtoms()
         self.setBonds()
         self.adjustBondLength()
 
@@ -1566,7 +1555,7 @@ class LammpsDataOne(LammpsDataBase):
         angle_atoms = (y for x in self.atom for y in self.ff.getAngleAtoms(x))
         for angle_id, atoms in enumerate(angle_atoms, start=1):
             angle = self.ff.getMatchedAngles(atoms)[0]
-            atom_ids = tuple(x.GetIntProp(self.ATOM_ID) for x in atoms)
+            atom_ids = tuple(x.GetAtomMapNum() for x in atoms)
             self.angles[angle_id] = (angle.id, ) + atom_ids
             self.rvrs_angles[tuple(atom_ids)] = angle_id
 
@@ -1578,7 +1567,7 @@ class LammpsDataOne(LammpsDataBase):
         dihe_atoms = self.getDiheAtoms()
         for dihedral_id, atoms in enumerate(dihe_atoms, start=1):
             dihedral = self.ff.getMatchedDihedrals(atoms)[0]
-            atom_ids = tuple([x.GetIntProp(self.ATOM_ID) for x in atoms])
+            atom_ids = tuple([x.GetAtomMapNum() for x in atoms])
             self.dihedrals[dihedral_id] = (dihedral.id, ) + atom_ids
 
     def getDiheAtoms(self):
@@ -1780,7 +1769,7 @@ class LammpsDataOne(LammpsDataBase):
             # the center.
             atoms = [neighbors[0], neighbors[1], atom, neighbors[2]]
             self.impropers[improper_id] = (improper_type_id, ) + tuple(
-                x.GetIntProp(self.ATOM_ID) for x in atoms)
+                x.GetAtomMapNum() for x in atoms)
 
     def printImpropers(self):
         """
@@ -2236,7 +2225,7 @@ class LammpsData(LammpsDataBase):
         pre_atoms = 0
         for tpl_id, mol in self.struct.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 7))
-            data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]
+            data[:, 0] = [x.GetAtomMapNum() for x in mol.GetAtoms()]
             type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
             data[:, 2] = [
                 self.atm_types[x] if self.concise else x for x in type_ids
