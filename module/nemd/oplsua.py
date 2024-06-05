@@ -192,7 +192,7 @@ class FixWriter:
         self.struct = struct
         self.cmd = []
         self.mols = {} if mols is None else mols
-        self.mol_num = len(self.mols)
+        self.mol_num = len(self.struct.mols)
         self.atom_num = self.struct.atom_total
         self.testing = self.mol_num == 1 and self.atom_num < 100
         self.timestep = self.options.timestep
@@ -1380,7 +1380,7 @@ class LammpsDataBase(LammpsIn):
         """
         super().__init__(jobname=jobname, *arg, **kwarg)
         self.ff = ff
-        self.mols = mols
+        self.mols = None
         self.struct = struct
         self.jobname = jobname
         self.atoms = {}
@@ -1393,16 +1393,6 @@ class LammpsDataBase(LammpsIn):
         # atom id is stored as per atom property instead of global dict
         for atom_id, atom in enumerate(self.atom, start=1):
             atom.SetIntProp(self.ATOM_ID, atom_id)
-
-    @property
-    def molecule(self):
-        """
-        Handy way to get all types of molecules.
-
-        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
-        """
-
-        return [mol for mol in self.mols.values()]
 
     @property
     def atom(self):
@@ -1920,7 +1910,10 @@ class LammpsData(LammpsDataBase):
         Write command to further equilibrate the system with molecules
         information considered.
         """
-        super().writeRun(*arg, mols=self.mols, struct=self.struct, **kwarg)
+        super().writeRun(*arg,
+                         mols=self.struct.mols,
+                         struct=self.struct,
+                         **kwarg)
 
     def writeDumpModify(self):
         """
@@ -2017,7 +2010,7 @@ class LammpsData(LammpsDataBase):
         bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 5
         for tpl_id, tpl_dat in self.mol_dat.items():
             self.nbr_charge[tpl_id] = tpl_dat.nbr_charge[tpl_id]
-            for _ in range(tpl_dat.mols[tpl_id].GetNumConformers()):
+            for _ in range(tpl_dat.struct.mols[tpl_id].GetNumConformers()):
                 for id in tpl_dat.bonds.values():
                     bond_id += 1
                     bond = tuple([id[0]] + [x + atom_num for x in id[1:]])
@@ -2034,7 +2027,7 @@ class LammpsData(LammpsDataBase):
                     improper_id += 1
                     improper = tuple([id[0]] + [x + atom_num for x in id[1:]])
                     self.impropers[improper_id] = improper
-                atom_num += tpl_dat.mols[tpl_id].GetNumAtoms()
+                atom_num += tpl_dat.struct.mols[tpl_id].GetNumAtoms()
 
     def removeUnused(self):
         """
@@ -2059,8 +2052,6 @@ class LammpsData(LammpsDataBase):
         Write the lammps description section, including the number of atom, bond,
         angle etc.
         """
-        if self.mols is None:
-            raise ValueError(f"Mols are not set.")
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.data_hdl.write(f"{lmp_dsp}\n\n")
         self.data_hdl.write(f"{self.struct.atom_total} {self.ATOMS}\n")
@@ -2093,7 +2084,7 @@ class LammpsData(LammpsDataBase):
         """
 
         xyzs = np.concatenate([
-            y.GetPositions() for x in self.mols.values()
+            y.GetPositions() for x in self.struct.mols.values()
             for y in x.GetConformers()
         ])
         ctr = xyzs.mean(axis=0)
@@ -2139,7 +2130,7 @@ class LammpsData(LammpsDataBase):
         if self.box is not None:
             box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        if sum([x.GetNumConformers() for x in self.mols.values()]) != 1:
+        if sum([x.GetNumConformers() for x in self.struct.mols.values()]) != 1:
             return box_hf
         # All-trans single molecule with internal tension runs into clashes
         # across PBCs and thus larger box is used.
@@ -2255,7 +2246,7 @@ class LammpsData(LammpsDataBase):
 
         self.data_hdl.write(f"{self.ATOMS.capitalize()}\n\n")
         pre_atoms = 0
-        for tpl_id, mol in self.mols.items():
+        for tpl_id, mol in self.struct.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 7))
             data[:, 0] = [x.GetIntProp(self.ATOM_ID) for x in mol.GetAtoms()]
             type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
