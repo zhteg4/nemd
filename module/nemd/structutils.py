@@ -166,7 +166,7 @@ class PackedConf(Conformer):
         self.id_map = np.array(id_map)
 
     @property
-    @functools.lru_cache(maxsize=None)
+    @functools.cache
     def aids(self):
         """
         Return the atom ids of this conformer.
@@ -311,7 +311,7 @@ class GrownConf(PackedConf):
         """
         return Chem.rdMolTransforms.GetDihedralDeg(self, *dihe)
 
-    @functools.lru_cache(maxsize=None)
+    @functools.cache
     def getNumFrags(self):
         """
         Return the number of the total fragments.
@@ -807,12 +807,19 @@ class Struct:
         return sum([x.atom_total for x in self.molecules])
 
     def getPositions(self):
-        return np.concatenate([
-            y.GetPositions() for x in self.molecules
-            for y in x.GetConformers()
-        ])
+        """
+        Get the positions of all conformers.
+
+        :return np.ndarray: the positions of all conformers.
+        """
+        return np.concatenate([x.GetPositions() for x in self.conformers])
 
     def getNumConformers(self):
+        """
+        Get the total number of all conformers.
+
+        :return np.ndarray: the total number of all conformers.
+        """
         return sum([x.GetNumConformers() for x in self.molecules])
 
 
@@ -983,9 +990,8 @@ class PackedStruct(Struct):
         """
         Set the trajectory frame and distance cell.
         """
-        index = [atom.id for atom in self.df_reader.atoms.values()]
-        xyz = [atom.xyz for atom in self.df_reader.atoms.values()]
-        self.frm = traj.Frame(xyz=xyz, index=index, box=self.box)
+        id = [x for x in range(1, self.atom_total + 1)]
+        self.frm = traj.Frame(xyz=self.getPositions(), index=id, box=self.box)
         self.dcell = traj.DistanceCell(self.frm, **kwargs)
         self.dcell.setUp()
 
