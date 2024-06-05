@@ -968,10 +968,7 @@ class PackedStruct(Struct):
         """
         if self.df_reader is not None:
             return
-        lmw = oplsua.LammpsData(self.mols,
-                                struct=self,
-                                ff=self.ff,
-                                options=self.options)
+        lmw = oplsua.LammpsData(self, ff=self.ff, options=self.options)
         contents = lmw.writeData(nofile=True)
         self.df_reader = oplsua.DataFileReader(contents=contents)
         self.df_reader.run()

@@ -1365,23 +1365,15 @@ class LammpsDataBase(LammpsIn):
 
     ATOM_ID = 'atom_id'
 
-    def __init__(self,
-                 mols,
-                 *arg,
-                 struct=None,
-                 ff=None,
-                 jobname='tmp',
-                 **kwarg):
+    def __init__(self, struct, *arg, ff=None, jobname='tmp', **kwarg):
         """
-        :param mols dict: keys are the molecule ids, and values are
-            'rdkit.Chem.rdchem.Mol'
+        :param struct 'Struct': structure with molecules and conformers
         :param ff 'oplsua.OplsParser': the force field information
         :param jobname str: jobname based on which out filenames are defined
         """
         super().__init__(jobname=jobname, *arg, **kwarg)
-        self.ff = ff
-        self.mols = None
         self.struct = struct
+        self.ff = ff
         self.jobname = jobname
         self.atoms = {}
 
@@ -1968,10 +1960,7 @@ class LammpsData(LammpsDataBase):
         for mol_id, mol in self.struct.mols.items():
             struct = copy.copy(self.struct)
             struct.mols = {mol_id: mol}
-            mol_dat = LammpsDataOne({mol_id: mol},
-                                    struct=struct,
-                                    ff=self.ff,
-                                    jobname=self.jobname)
+            mol_dat = LammpsDataOne(struct, ff=self.ff, jobname=self.jobname)
             mol_dat.run(adjust_coords=adjust_coords)
             self.mol_dat[mol_id] = mol_dat
 
