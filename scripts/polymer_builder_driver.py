@@ -268,7 +268,6 @@ class Mol(structutils.Mol):
 
     ATOM_ID = oplsua.LammpsData.ATOM_ID
     TYPE_ID = oplsua.TYPE_ID
-    BOND_ATM_ID = oplsua.BOND_ATM_ID
     RES_NUM = oplsua.RES_NUM
     WATER_TIP3P = oplsua.OplsTyper.WATER_TIP3P
     IMPLICIT_H = oplsua.IMPLICIT_H

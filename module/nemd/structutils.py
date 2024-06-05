@@ -131,30 +131,14 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         mtrx[:-1, 3] = vect
         Chem.rdMolTransforms.TransformConformer(self, mtrx)
 
-    def rotateRandomly(self, seed=None):
+    def setBondLength(self, bonded, val):
         """
-        Randomly rotate the conformer.
+        Set bond length of the given dihedral.
 
-        NOTE: the random state is set according to the numpy random seed.
-        :param seed: the random seed to generate the rotation matrix.
+        :param bonded tuple of int: the bonded atom indices.
+        :param val val: the bond distance.
         """
-        if seed is None:
-            seed = np.random.randint(0, 2**32 - 1)
-        mtrx = np.identity(4)
-        mtrx[:-1, :-1] = Rotation.random(random_state=seed).as_matrix()
-        Chem.rdMolTransforms.TransformConformer(self, mtrx)
-
-    def rotate(self, ivect, tvect):
-        """
-        Rotate the conformer by three initial vectors and three target vectors.
-
-        :param ivect 3x3 'numpy.ndarray': Each row is one initial vector
-        :param tvect 3x3 'numpy.ndarray': Each row is one corresponding target vector
-        """
-        mtrx = np.identity(4)
-        rotation, _ = Rotation.align_vectors(tvect, ivect)
-        mtrx[:-1, :-1] = rotation.as_matrix()
-        Chem.rdMolTransforms.TransformConformer(self, mtrx)
+        Chem.rdMolTransforms.SetBondLength(self, *bonded, val)
 
 
 class ConfError(RuntimeError):
@@ -202,6 +186,31 @@ class PackedConf(Conformer):
             self.updateDcell()
             return
         raise ConfError
+
+    def rotateRandomly(self, seed=None):
+        """
+        Randomly rotate the conformer.
+
+        NOTE: the random state is set according to the numpy random seed.
+        :param seed: the random seed to generate the rotation matrix.
+        """
+        if seed is None:
+            seed = np.random.randint(0, 2**32 - 1)
+        mtrx = np.identity(4)
+        mtrx[:-1, :-1] = Rotation.random(random_state=seed).as_matrix()
+        Chem.rdMolTransforms.TransformConformer(self, mtrx)
+
+    def rotate(self, ivect, tvect):
+        """
+        Rotate the conformer by three initial vectors and three target vectors.
+
+        :param ivect 3x3 'numpy.ndarray': Each row is one initial vector
+        :param tvect 3x3 'numpy.ndarray': Each row is one corresponding target vector
+        """
+        mtrx = np.identity(4)
+        rotation, _ = Rotation.align_vectors(tvect, ivect)
+        mtrx[:-1, :-1] = rotation.as_matrix()
+        Chem.rdMolTransforms.TransformConformer(self, mtrx)
 
     def hasClashes(self, aids=None):
         """

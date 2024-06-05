@@ -44,7 +44,7 @@ NPT = 'NPT'
 NVE = 'NVE'
 ENSEMBLES = [NVE, NVT, NPT]
 
-BOND_ATM_ID = 'bond_atm_id'
+BOND_AID = 'bond_aid'
 ANGLE_ATM_ID = 'angle_atm_id'
 DIHE_ATM_ID = 'dihe_atm_id'
 RES_NUM = 'res_num'
@@ -479,7 +479,7 @@ class OplsTyper:
     OPLSUA = 'OPLSUA'
     TYPE_ID = TYPE_ID
     RES_NUM = RES_NUM
-    BOND_ATM_ID = BOND_ATM_ID
+    BOND_AID = BOND_AID
     ANGLE_ATM_ID = ANGLE_ATM_ID
     DIHE_ATM_ID = DIHE_ATM_ID
     IMPLICIT_H = IMPLICIT_H
@@ -735,8 +735,8 @@ class OplsTyper:
         # TYPE_ID defines vdw and charge
         atom.SetIntProp(self.TYPE_ID, type_id)
         atom.SetIntProp(self.RES_NUM, res_num)
-        # BOND_ATM_ID defines bonding parameters
-        atom.SetIntProp(self.BOND_ATM_ID, self.BOND_ATOM[type_id])
+        # BOND_AID defines bonding parameters
+        atom.SetIntProp(self.BOND_AID, self.BOND_ATOM[type_id])
         atom.SetIntProp(self.ANGLE_ATM_ID, self.ANGLE_ATOM[type_id])
         atom.SetIntProp(self.DIHE_ATM_ID, self.DIHE_ATOM[type_id])
 
@@ -765,7 +765,7 @@ class OplsParser:
         UREY_MK, IMPROPER_MK, TORSIONAL_MK, ATOMIC_MK, BIOPOLYMER_MK
     ]
 
-    BOND_ATM_ID = BOND_ATM_ID
+    BOND_AID = BOND_AID
     ANGLE_ATM_ID = ANGLE_ATM_ID
     DIHE_ATM_ID = DIHE_ATM_ID
     IMPLICIT_H = IMPLICIT_H
@@ -955,11 +955,11 @@ class OplsParser:
 
         :raise ValueError: If the above failed
 
-        :param bonded_atoms: list of two bonded atoms sorted by BOND_ATM_ID
+        :param bonded_atoms: list of two bonded atoms sorted by BOND_AID
         :return list of 'oplsua.BOND': bond information
         """
 
-        atypes = sorted([x.GetIntProp(self.BOND_ATM_ID) for x in bonded_atoms])
+        atypes = sorted([x.GetIntProp(self.BOND_AID) for x in bonded_atoms])
         try:
             atypes = OplsTyper.BOND_ATOMS[tuple(atypes)]
         except KeyError:
@@ -994,7 +994,7 @@ class OplsParser:
                 atom_id = bond.id1
             atom = [
                 x for x in bonded_atoms
-                if x.GetIntProp(self.BOND_ATM_ID) not in [bond.id1, bond.id2]
+                if x.GetIntProp(self.BOND_AID) not in [bond.id1, bond.id2]
             ][0]
             ssymbol = self.atoms[atom_id].symbol == atom.GetSymbol()
             scnnt = self.atoms[atom_id].conn == self.getAtomConnt(atom)
@@ -1374,7 +1374,11 @@ class LammpsDataBase(LammpsIn):
         self.struct = struct
         self.ff = ff
         self.jobname = jobname
-        self.atoms = {}
+        self.bonds = {}
+        self.angles = {}
+        self.dihedrals = {}
+        self.impropers = {}
+        self.nbr_charge = {}
 
     def hasCharge(self):
         """
@@ -1389,42 +1393,38 @@ class LammpsDataBase(LammpsIn):
 
 class LammpsDataOne(LammpsDataBase):
     """
-    Class to write out LAMMPS data file.
+    Class to set bond, angle, dihedral, improper parameters, and other topology
+    information.
     """
     TYPE_ID = TYPE_ID
     IMPLICIT_H = IMPLICIT_H
     RES_NUM = RES_NUM
-    BOND_ATM_ID = OplsTyper.BOND_ATM_ID
+    BOND_AID = OplsTyper.BOND_AID
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
 
-    def __init__(self, mols, *arg, ff=None, jobname=None, **kwarg):
-        """
-        :param mols dict: keys are the molecule ids, and values are
-            'rdkit.Chem.rdchem.Mol'
-        :param ff 'oplsua.OplsParser': the force field information
-        :param jobname str: jobname based on which out filenames are defined
-        :param concise bool: If False, all the atoms in the force field file
-            shows up in the force field section of the data file. If True, only
-            the present ones are writen into the data file.
-        :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
-        """
-        super().__init__(mols, *arg, ff=ff, jobname=jobname, **kwarg)
-        self.bonds = {}
-        self.rvrs_bonds = {}
-        self.rvrs_angles = {}
-        self.angles = {}
-        self.dihedrals = {}
-        self.dihe_map = None
-        self.impropers = {}
+    def __init__(self, *arg, **kwarg):
+        super().__init__(*arg, **kwarg)
         self.symbol_impropers = {}
         self.atm_types = {}
         self.bnd_types = {}
         self.ang_types = {}
         self.dihe_types = {}
         self.impr_types = {}
-        self.nbr_charge = {}
+        self.rvrs_bonds = {}
+        self.rvrs_angles = {}
+        self.dihe_map = None
+
+    def adjustCoords(self):
+        """
+        Adjust the coordinates based bond length etc.
+        """
+        self.setBonds()
+        self.adjustBondLength()
 
     def run(self, adjust_coords=True):
+        """
+        Set charge, bond, angle, dihedral, improper, and other topology params.
+        """
         self.balanceCharge()
         self.setBonds()
         self.adjustBondLength(adjust_coords)
@@ -1433,16 +1433,6 @@ class LammpsDataOne(LammpsDataBase):
         self.setImproperSymbols()
         self.setImpropers()
         self.removeAngles()
-
-    def hasCharge(self):
-        """
-        Whether any atom has charge.
-        """
-        charges = [
-            self.ff.charges[x.GetIntProp(self.TYPE_ID)]
-            for x in self.struct.atoms
-        ]
-        return any(charges)
 
     def balanceCharge(self):
         """
@@ -1486,23 +1476,16 @@ class LammpsDataOne(LammpsDataBase):
         """
         Set bonding information.
         """
-        bonds = [
-            bond for mol in self.struct.molecules for bond in mol.GetBonds()
-        ]
+        bonds = [y for x in self.struct.molecules for y in x.GetBonds()]
         for bond_id, bond in enumerate(bonds, start=1):
-            bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
-            # BOND_ATM_ID defines bonding parameters marked during atom typing
-            bonded_atoms = sorted(bonded_atoms,
-                                  key=lambda x: x.GetIntProp(self.BOND_ATM_ID))
-            matches = self.ff.getMatchedBonds(bonded_atoms)
-            bond = matches[0]
-            atom_id1 = bonded_atoms[0].GetAtomMapNum()
-            atom_id2 = bonded_atoms[1].GetAtomMapNum()
+            bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
+            # BOND_AID defines bonding parameters marked during atom typing
+            bonded = sorted(bonded, key=lambda x: x.GetIntProp(self.BOND_AID))
+            bond = self.ff.getMatchedBonds(bonded)[0]
+            atom_id1 = bonded[0].GetAtomMapNum()
+            atom_id2 = bonded[1].GetAtomMapNum()
             atom_ids = sorted([atom_id1, atom_id2])
-            self.bonds[bond_id] = (
-                bond.id,
-                *atom_ids,
-            )
+            self.bonds[bond_id] = tuple([bond.id, *atom_ids])
             self.rvrs_bonds[tuple(atom_ids)] = bond.id
 
     def adjustBondLength(self, adjust_bond_legnth=True):
@@ -1515,37 +1498,26 @@ class LammpsDataOne(LammpsDataBase):
             return
 
         for mol in self.struct.molecules:
-            tpl = None
+            # Set the bond lengths of one conformer
+            tpl = mol.GetConformer()
+            for bond in mol.GetBonds():
+                bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
+                gids = set([x.GetAtomMapNum() for x in bonded])
+                bond_type = self.rvrs_bonds[tuple(sorted(gids))]
+                dist = self.ff.bonds[bond_type].dist
+                tpl.setBondLength([x.GetIdx() for x in bonded], dist)
+            # Update all conformers
+            xyz = tpl.GetPositions()
             for conf in mol.GetConformers():
-                if tpl:
-                    for aid in range(mol.GetNumAtoms()):
-                        conf.SetAtomPosition(aid, tpl.GetAtomPosition(aid))
-                    continue
-
-                for bond in mol.GetBonds():
-                    bnd_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
-                    ids = set([x.GetAtomMapNum() for x in bnd_atoms])
-                    bond_type = self.rvrs_bonds[tuple(sorted(ids))]
-                    dist = self.ff.bonds[bond_type].dist
-                    idxs = [x.GetIdx() for x in bnd_atoms]
-                    Chem.rdMolTransforms.SetBondLength(conf, *idxs, dist)
-                tpl = conf
-
-    def adjustCoords(self):
-        """
-        Adjust the coordinates based bond length etc.
-        """
-        self.setBonds()
-        self.adjustBondLength()
+                conf.setPositions(xyz)
 
     def setAngles(self):
         """
         Set angle force field matches.
         """
 
-        angle_atoms = (y for x in self.struct.atoms
-                       for y in self.ff.getAngleAtoms(x))
-        for angle_id, atoms in enumerate(angle_atoms, start=1):
+        angs = [y for x in self.struct.atoms for y in self.ff.getAngleAtoms(x)]
+        for angle_id, atoms in enumerate(angs, start=1):
             angle = self.ff.getMatchedAngles(atoms)[0]
             atom_ids = tuple(x.GetAtomMapNum() for x in atoms)
             self.angles[angle_id] = (angle.id, ) + atom_ids
@@ -1556,22 +1528,14 @@ class LammpsDataOne(LammpsDataBase):
         Set the dihedral angles of the molecules.
         """
 
-        dihe_atoms = self.getDiheAtoms()
+        dihe_atoms = [
+            y for x in self.struct.molecules
+            for y in self.getDihAtomsFromMol(x)
+        ]
         for dihedral_id, atoms in enumerate(dihe_atoms, start=1):
             dihedral = self.ff.getMatchedDihedrals(atoms)[0]
             atom_ids = tuple([x.GetAtomMapNum() for x in atoms])
             self.dihedrals[dihedral_id] = (dihedral.id, ) + atom_ids
-
-    def getDiheAtoms(self):
-        """
-        Get the dihedral atoms of all molecules.
-
-        :return list of list: each sublist has four atoms forming a dihedral angle.
-        """
-        return [
-            y for x in self.struct.molecules
-            for y in self.getDihAtomsFromMol(x)
-        ]
 
     def getDihAtomsFromMol(self, mol):
         """
@@ -1838,7 +1802,7 @@ class LammpsData(LammpsDataBase):
     ]
 
     def __init__(self,
-                 mols,
+                 struct,
                  *arg,
                  ff=None,
                  jobname='tmp',
@@ -1846,8 +1810,7 @@ class LammpsData(LammpsDataBase):
                  box=None,
                  **kwarg):
         """
-        :param mols dict: keys are the molecule ids, and values are
-            'rdkit.Chem.rdchem.Mol'
+        :param struct Struct: struct object with moelcules and conformers.
         :param ff 'oplsua.OplsParser': the force field information
         :param jobname str: jobname based on which out filenames are defined
         :param concise bool: If False, all the atoms in the force field file
@@ -1855,24 +1818,10 @@ class LammpsData(LammpsDataBase):
             the present ones are writen into the data file.
         :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
         """
-        super().__init__(mols, *arg, ff=ff, jobname=jobname, **kwarg)
+        super().__init__(struct, *arg, ff=ff, jobname=jobname, **kwarg)
         self.concise = concise
         self.box = box
         self.mol_dat = {}
-        self.bonds = {}
-        self.rvrs_bonds = {}
-        self.rvrs_angles = {}
-        self.angles = {}
-        self.dihedrals = {}
-        self.dihe_map = None
-        self.impropers = {}
-        self.symbol_impropers = {}
-        self.atm_types = {}
-        self.bnd_types = {}
-        self.ang_types = {}
-        self.dihe_types = {}
-        self.impr_types = {}
-        self.nbr_charge = {}
         self.total_charge = 0.
         self.data_hdl = None
         self.density = None
@@ -1976,6 +1925,10 @@ class LammpsData(LammpsDataBase):
             return self.getContents() if nofile else None
 
     def setBADI(self):
+        """
+        Set bond, angle, dihedral, and improper for all conformers across
+        all molecules.
+        """
         bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 5
         for tpl_id, tpl_dat in self.mol_dat.items():
             self.nbr_charge[tpl_id] = tpl_dat.nbr_charge[tpl_id]
