@@ -1,6 +1,8 @@
 import io
 import copy
 import math
+import struct
+
 import scipy
 import types
 import base64
@@ -25,6 +27,10 @@ def log_debug(msg):
     if logger is None:
         return
     logger.debug(msg)
+
+
+class Struct(struct.Struct):
+    ...
 
 
 class LammpsDataBase(lammpsin.LammpsIn):
@@ -54,6 +60,7 @@ class LammpsDataBase(lammpsin.LammpsIn):
         :param ff 'oplsua.OplsParser': the force field information
         :param jobname str: jobname based on which out filenames are defined
         """
+        # super(Struct, self).__init__(struct)
         super().__init__(jobname=jobname, *arg, **kwarg)
         self.struct = struct
         self.ff = ff
@@ -81,7 +88,6 @@ class LammpsDataOne(LammpsDataBase):
     information.
     """
     RES_NUM = oplsua.RES_NUM
-    BOND_AID = oplsua.OplsTyper.BOND_AID
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
 
     def __init__(self, *arg, **kwarg):
@@ -161,8 +167,6 @@ class LammpsDataOne(LammpsDataBase):
         bonds = [y for x in self.struct.molecules for y in x.GetBonds()]
         for bond_id, bond in enumerate(bonds, start=1):
             bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
-            # BOND_AID defines bonding parameters marked during atom typing
-            bonded = sorted(bonded, key=lambda x: x.GetIntProp(self.BOND_AID))
             bond = self.ff.getMatchedBonds(bonded)[0]
             atom_id1 = bonded[0].GetAtomMapNum()
             atom_id2 = bonded[1].GetAtomMapNum()
@@ -865,7 +869,7 @@ class LammpsData(LammpsDataBase):
             ]
             data[:, 0] += pre_atoms
             for conformer in mol.GetConformers():
-                data[:, 1] = conformer.GetId()
+                data[:, 1] = conformer.gid
                 data[:, 4:] = conformer.GetPositions()
                 np.savetxt(self.data_hdl, data, fmt=fmt)
                 # Increment atom ids by atom number in this conformer so that

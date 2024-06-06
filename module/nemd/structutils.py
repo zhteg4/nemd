@@ -251,7 +251,7 @@ class GrownConf(PackedConf):
             if self.hasClashes(self.init_aids):
                 continue
             self.updateDcell(self.init_aids)
-            self.init_tf.loc[self.GetId()] = point
+            self.init_tf.loc[self.gid] = point
             return
         # with open('placeInitFrag.xyz', 'w') as out_fh:
         #     self.frm.write(out_fh,
@@ -287,7 +287,7 @@ class GrownConf(PackedConf):
 
         if self.failed_num > max_trial:
             msg = f'Placed {len(self.dcell.extg_gids)} / {len(self.dcell.gids)} ' \
-                  f'atoms reaching max trial number for conformer {self.GetId()}.'
+                  f'atoms reaching max trial number for conformer {self.gid}.'
             log_debug(msg)
             raise ConfError
         self.failed_num += 1
@@ -355,7 +355,7 @@ class GrownConf(PackedConf):
 
         idists = self.init_tf.pairDists()
         dists = self.dcell.getDistsWithIds(self.id_map[self.init_aids])
-        log_debug(f"Relocate the initiator of {self.GetId()} conformer "
+        log_debug(f"Relocate the initiator of {self.gid} conformer "
                   f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
                   f"close contact: {dists.min():.2f}) ")
         log_debug(
@@ -446,11 +446,11 @@ class PackedMol(structure.Mol):
         self.frm = None
         self.dcell = None
 
-    def initConformers(self, ConfClass=PackedConf):
+    def initConfs(self, ConfClass=PackedConf, **kwargs):
         """
         See parent class for details.
         """
-        return super().initConformers(ConfClass=ConfClass)
+        return super().initConfs(ConfClass=ConfClass, **kwargs)
 
 
 class GrownMol(PackedMol):
@@ -475,11 +475,11 @@ class GrownMol(PackedMol):
         self.rotatable_bonds = self.GetSubstructMatches(self.PATT,
                                                         maxMatches=1000000)
 
-    def initConformers(self, ConfClass=GrownConf):
+    def initConfs(self, ConfClass=GrownConf, **kwargs):
         """
         See parant class for details.
         """
-        return super().initConformers(ConfClass=ConfClass)
+        return super().initConfs(ConfClass=ConfClass, **kwargs)
 
     def setGraph(self):
         """
@@ -746,7 +746,7 @@ class PackedStruct(structure.Struct):
         Rest the state of the conformers.
         """
         for conf in self.conformers:
-            xyz = self.df_reader.getMolXYZ(conf.GetId())
+            xyz = self.df_reader.getMolXYZ(conf.gid)
             conf.setPositions(xyz)
             conf.oxyz = xyz[:]
 
@@ -845,7 +845,7 @@ class GrownStruct(PackedStruct):
         super().setFrameAndDcell(cut=cut)
         self.dcell.setGraph(len(self.conformers))
         data = np.full((len(self.conformers), 3), np.inf)
-        index = [x.GetId() for x in self.conformers]
+        index = [x.gid for x in self.conformers]
         self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
 
     def setReferences(self):

@@ -24,7 +24,6 @@ import pandas as pd
 import networkx as nx
 from contextlib import contextmanager
 
-from nemd import oplsua
 from nemd import symbols
 from nemd import lammpsdata
 from nemd import environutils

@@ -126,7 +126,8 @@ class LammpsData(lammpsdata.LammpsDataBase):
             data = np.zeros((mol.GetNumAtoms(), 5))
             conformer = mol.GetConformer()
             data[:, 0] = [x.GetAtomMapNum() for x in mol.GetAtoms()]
-            data[:, 1] = mol_id
+            # Fix Me: use atom type instead of hard-coded 1
+            data[:, 1] = 1
             data[:, 2:] = conformer.GetPositions()
             np.savetxt(self.data_fh, data, fmt='%i %i %.3f %.3f %.3f')
         self.data_fh.write(f"\n")

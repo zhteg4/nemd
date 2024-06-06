@@ -31,9 +31,6 @@ FLAG_PROD_TIME = '-prod_time'
 FLAG_PROD_ENS = '-prod_ens'
 FlAG_FORCE_FIELD = '-force_field'
 
-BOND_AID = 'bond_aid'
-ANGLE_ATM_ID = 'angle_atm_id'
-DIHE_ATM_ID = 'dihe_atm_id'
 RES_NUM = 'res_num'
 IMPLICIT_H = 'implicit_h'
 TYPE_ID = 'type_id'
@@ -84,9 +81,9 @@ class OplsTyper:
     OPLSUA = 'OPLSUA'
     TYPE_ID = TYPE_ID
     RES_NUM = RES_NUM
-    BOND_AID = BOND_AID
-    ANGLE_ATM_ID = ANGLE_ATM_ID
-    DIHE_ATM_ID = DIHE_ATM_ID
+    BOND_AID = 'bond_aid'
+    ANGLE_ATM_ID = 'angle_atm_id'
+    DIHE_ATM_ID = 'dihe_atm_id'
     IMPLICIT_H = IMPLICIT_H
     LARGE_NUM = nconstants.LARGE_NUM
 
@@ -370,9 +367,9 @@ class OplsParser:
         UREY_MK, IMPROPER_MK, TORSIONAL_MK, ATOMIC_MK, BIOPOLYMER_MK
     ]
 
-    BOND_AID = BOND_AID
-    ANGLE_ATM_ID = ANGLE_ATM_ID
-    DIHE_ATM_ID = DIHE_ATM_ID
+    BOND_AID = OplsTyper.BOND_AID
+    ANGLE_ATM_ID = OplsTyper.ANGLE_ATM_ID
+    DIHE_ATM_ID = OplsTyper.DIHE_ATM_ID
     IMPLICIT_H = IMPLICIT_H
     TYPE_ID = TYPE_ID
 
@@ -563,6 +560,9 @@ class OplsParser:
         :param bonded_atoms: list of two bonded atoms sorted by BOND_AID
         :return list of 'oplsua.BOND': bond information
         """
+        # BOND_AID defines bonding parameters marked during atom typing
+        bonded_atoms = sorted(bonded_atoms,
+                              key=lambda x: x.GetIntProp(self.BOND_AID))
 
         atypes = sorted([x.GetIntProp(self.BOND_AID) for x in bonded_atoms])
         try:

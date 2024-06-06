@@ -18,15 +18,14 @@ import collections
 import numpy as np
 import networkx as nx
 from rdkit import Chem
-from rdkit.Chem import AllChem
 
 from nemd import pnames
 from nemd import oplsua
-from nemd import structure
 from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
 from nemd import fileutils
+from nemd import structure
 from nemd import lammpsdata
 from nemd import rdkitutils
 from nemd import structutils
@@ -434,7 +433,7 @@ class Mol(structure.Mol):
                 # Mg+2 triggers
                 # WARNING UFFTYPER: Warning: hybridization set to SP3 for atom 0
                 # ERROR UFFTYPER: Unrecognized charge state for atom: 0
-                AllChem.EmbedMolecule(self, useRandomCoords=True)
+                self.EmbedMolecule(useRandomCoords=True)
                 [log_debug(f'{x} {y}') for x, y in logs.items()]
             Chem.GetSymmSSSR(self)
             return
@@ -450,7 +449,7 @@ class Mol(structure.Mol):
         Set multiple conformers based on the first one.
         """
         for _ in range(self.mol_num - 1):
-            conf = Chem.rdchem.Conformer(self.GetConformer(0))
+            conf = structure.Conformer(self.GetConformer(0))
             self.AddConformer(conf, assignId=True)
 
 
@@ -528,8 +527,7 @@ class Conformer(object):
         """
         Set the cru conformer.
         """
-        AllChem.EmbedMolecule(self.cru_mol)
-
+        self.cru_mol.EmbedMolecule()
         self.cru_conf = self.cru_mol.GetConformer(0)
 
     def setCruBackbone(self):
@@ -652,7 +650,7 @@ class Conformer(object):
         for atom in self.polym.GetAtoms():
             mono_id_atoms[atom.GetIntProp(self.MONO_ID)].append(atom)
 
-        conformer = Chem.rdchem.Conformer(self.polym.GetNumAtoms())
+        conformer = structure.Conformer(self.polym.GetNumAtoms())
         for mono_id, atoms in mono_id_atoms.items():
             vect = mono_id * self.vector
             for atom in atoms:
@@ -671,7 +669,7 @@ class Conformer(object):
                                          ff=self.ff,
                                          jobname=self.jobname,
                                          options=self.options)
-        xyz = struct.mols[1].GetConformer().GetPositions()
+        xyz = struct.mols[0].GetConformer().GetPositions()
         self.polym.GetConformers()[0].setPositions(xyz)
         if self.minimization:
             return
