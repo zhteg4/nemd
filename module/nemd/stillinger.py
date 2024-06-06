@@ -1,15 +1,15 @@
 import sh
 import types
 import numpy as np
-from nemd import oplsua
 from nemd import symbols
+from nemd import lammpsdata
 
 
-class LammpsData(oplsua.LammpsDataBase):
+class LammpsData(lammpsdata.LammpsDataBase):
 
     XYZ = 'XYZ'
     FORCE = 'force'
-    CUSTOM_EXT = f'.{oplsua.LammpsDataBase.DUMP}'
+    CUSTOM_EXT = f'.{lammpsdata.LammpsDataBase.DUMP}'
 
     def __init__(self, *args, tasks=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -132,7 +132,7 @@ class LammpsData(oplsua.LammpsDataBase):
         self.data_fh.write(f"\n")
 
 
-class DataFileReader(oplsua.DataFileReader):
+class DataFileReader(lammpsdata.DataFileReader):
 
     def setAtoms(self):
         """
@@ -149,7 +149,9 @@ class DataFileReader(oplsua.DataFileReader):
 
 
 def get_df_reader(data_file):
-    line = sh.grep(oplsua.LammpsDataBase.LAMMPS_DESCRIPTION[:-2], data_file)
-    if line.split(symbols.POUND)[1].strip() == oplsua.LammpsDataBase.ATOMIC:
+    line = sh.grep(lammpsdata.LammpsDataBase.LAMMPS_DESCRIPTION[:-2],
+                   data_file)
+    if line.split(
+            symbols.POUND)[1].strip() == lammpsdata.LammpsDataBase.ATOMIC:
         return DataFileReader(data_file)
-    return oplsua.DataFileReader(data_file)
+    return lammpsdata.DataFileReader(data_file)

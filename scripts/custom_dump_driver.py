@@ -17,7 +17,7 @@ from scipy import constants
 
 from nemd import traj
 from nemd import symbols
-from nemd import oplsua
+from nemd import lammpsdata
 from nemd import jobutils
 from nemd import logutils
 from nemd import analyzer
@@ -123,7 +123,7 @@ class CustomDump(object):
         """
         if not self.options.data_file:
             return
-        self.df_reader = oplsua.DataFileReader(self.options.data_file)
+        self.df_reader = lammpsdata.DataFileReader(self.options.data_file)
         self.df_reader.run()
 
     def setAtoms(self):

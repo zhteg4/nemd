@@ -8,10 +8,10 @@ from scipy.stats import linregress
 from scipy.signal import savgol_filter
 
 from nemd import traj
-from nemd import oplsua
 from nemd import symbols
 from nemd import molview
 from nemd import logutils
+from nemd import lammpsin
 from nemd import plotutils
 
 
@@ -252,7 +252,7 @@ class RDF(BaseAnalyzer):
     UNIT = 'r'
     LABEL = f'{PNAME} ({UNIT})'
     ILABEL = f'r ({symbols.ANGSTROM})'
-    DEFAULT_CUT = oplsua.LammpsIn.DEFAULT_CUT
+    DEFAULT_CUT = lammpsin.LammpsIn.DEFAULT_CUT
 
     def setData(self, res=0.02, dcut=None, dres=None):
         """

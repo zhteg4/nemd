@@ -26,6 +26,7 @@ from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
 from nemd import fileutils
+from nemd import lammpsdata
 from nemd import rdkitutils
 from nemd import structutils
 from nemd import parserutils
@@ -239,11 +240,11 @@ class AmorphousCell(object):
         """
         Write amorphous cell into data file.
         """
-        lmw = oplsua.LammpsData(self.struct,
-                                ff=self.ff,
-                                jobname=self.options.jobname,
-                                box=self.struct.box,
-                                options=self.options)
+        lmw = lammpsdata.LammpsData(self.struct,
+                                    ff=self.ff,
+                                    jobname=self.options.jobname,
+                                    box=self.struct.box,
+                                    options=self.options)
         lmw.writeData(adjust_coords=False)
         if not np.isclose(lmw.density, self.struct.density):
             log_warning(
@@ -266,7 +267,6 @@ class Mol(structutils.Mol):
     Class to hold a regular molecule or a polymer built from monomers.
     """
 
-    ATOM_ID = oplsua.LammpsData.ATOM_ID
     TYPE_ID = oplsua.TYPE_ID
     RES_NUM = oplsua.RES_NUM
     WATER_TIP3P = oplsua.OplsTyper.WATER_TIP3P
@@ -304,7 +304,7 @@ class Mol(structutils.Mol):
         self.box = None
         self.cru_mol = None
         self.smiles = None
-        self.buffer = oplsua.LammpsData.BUFFER
+        self.buffer = lammpsdata.LammpsData.BUFFER
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
         if delay:
@@ -666,10 +666,10 @@ class Conformer(object):
         Adjust the conformer coordinates based on the force field.
         """
         struct = structutils.Struct([self.polym])
-        self.lmw = oplsua.LammpsData(struct,
-                                     ff=self.ff,
-                                     jobname=self.jobname,
-                                     options=self.options)
+        self.lmw = lammpsdata.LammpsData(struct,
+                                         ff=self.ff,
+                                         jobname=self.jobname,
+                                         options=self.options)
         xyz = struct.mols[1].GetConformer().GetPositions()
         self.polym.GetConformers()[0].setPositions(xyz)
         if self.minimization:

@@ -26,6 +26,7 @@ from contextlib import contextmanager
 
 from nemd import oplsua
 from nemd import symbols
+from nemd import lammpsdata
 from nemd import environutils
 from nemd import numbautils
 
@@ -340,7 +341,7 @@ class Frame(pd.DataFrame):
         box = self.getBox()
         if box is None:
             return []
-        return oplsua.DataFileReader.getEdgesFromList(box)
+        return lammpsdata.DataFileReader.getEdgesFromList(box)
 
     def getDists(self, ids, xyz, span=None):
         """
@@ -523,7 +524,7 @@ class DistanceCell:
     checking.
     """
 
-    SCALE = oplsua.DataFileReader.SCALE
+    SCALE = lammpsdata.DataFileReader.SCALE
     BOX = Frame.BOX
     AUTO = 'auto'
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),

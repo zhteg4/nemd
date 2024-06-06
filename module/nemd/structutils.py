@@ -19,9 +19,9 @@ from rdkit import DataStructs
 from scipy.spatial.transform import Rotation
 
 from nemd import traj
-from nemd import oplsua
 from nemd import pnames
 from nemd import logutils
+from nemd import lammpsdata
 
 EDGES = 'edges'
 WEIGHT = 'weight'
@@ -1019,9 +1019,9 @@ class PackedStruct(Struct):
         """
         if self.df_reader is not None:
             return
-        lmw = oplsua.LammpsData(self, ff=self.ff, options=self.options)
+        lmw = lammpsdata.LammpsData(self, ff=self.ff, options=self.options)
         contents = lmw.writeData(nofile=True)
-        self.df_reader = oplsua.DataFileReader(contents=contents)
+        self.df_reader = lammpsdata.DataFileReader(contents=contents)
         self.df_reader.run()
         self.df_reader.setClashParams()
 
