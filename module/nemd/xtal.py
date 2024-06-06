@@ -12,11 +12,11 @@ import numpy as np
 from rdkit import Chem
 from nemd import jobutils
 from nemd import constants
-from nemd import structutils
+from nemd import structure
 from nemd import alamodeutils
 
 
-class Mol(structutils.Mol):
+class Mol(structure.Mol):
 
     LATTICE_PARAMETERS = 'lattice_parameters'
     DIMENSIONS = 'dimensions'
@@ -33,7 +33,7 @@ class Mol(structutils.Mol):
         return np.array(param) * self.dimensions
 
 
-class Struct(structutils.Struct):
+class Struct(structure.Struct):
 
     def __init__(self, *args, MolClass=Mol, **kwargs):
         super().__init__(*args, MolClass=MolClass, **kwargs)

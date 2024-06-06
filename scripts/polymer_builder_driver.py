@@ -22,6 +22,7 @@ from rdkit.Chem import AllChem
 
 from nemd import pnames
 from nemd import oplsua
+from nemd import structure
 from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
@@ -262,7 +263,7 @@ class AmorphousCell(object):
                              set_file=True)
 
 
-class Mol(structutils.Mol):
+class Mol(structure.Mol):
     """
     Class to hold a regular molecule or a polymer built from monomers.
     """
@@ -665,7 +666,7 @@ class Conformer(object):
         """
         Adjust the conformer coordinates based on the force field.
         """
-        struct = structutils.Struct([self.polym])
+        struct = structure.Struct([self.polym])
         self.lmw = lammpsdata.LammpsData(struct,
                                          ff=self.ff,
                                          jobname=self.jobname,
