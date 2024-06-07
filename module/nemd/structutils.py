@@ -669,7 +669,6 @@ class PackedStruct(structure.Struct):
 
     def __init__(self, *args, options=None, **kwargs):
         """
-        :param polymers 'Polymer': one polymer object for each type
         :param options 'argparse.Namespace': command line options
         """
         # Force field -> Molecular weight -> Box -> Frame -> Distance cell

@@ -36,16 +36,16 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         self.mol = mol
         self.gid = 1
 
-    def setGids(self, atom_ids, start_gid):
+    def setGids(self, gid):
         """
         Set the global ids of the atoms in this conformer.
 
         :param atom_ids list of int: the atom ids in this conformer.
         :param start_gid int: the starting global id.
         """
-        gids = [x for x in range(start_gid, start_gid + len(atom_ids))]
-        id_map = {x: y for x, y in zip(atom_ids, gids)}
-        max_gid = max(atom_ids) + 1
+        gids = [x for x in range(gid, gid + self.mol.GetNumAtoms())]
+        id_map = {x.GetIdx(): y for x, y in zip(self.mol.GetAtoms(), gids)}
+        max_gid = max(id_map.keys()) + 1
         self.id_map = np.array([id_map.get(x, -1) for x in range(max_gid)])
 
     @property
@@ -135,32 +135,40 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
     ConfClass = Conformer
 
-    def __init__(self, *args, ff=None, delay=False, **kwargs):
+    def __init__(self, *args, struct=None, ff=None, delay=False, **kwargs):
         """
         :param ff 'OplsParser': the force field class.
         :delay bool: customization is delayed for later setup or testing.
         """
         super().__init__(*args, **kwargs)
+        self.struct = struct
         self.ff = ff
         self.delay = delay
         self.conf_id = 0
         self.confs = {}
+        for map_num, atom in enumerate(self.GetAtoms(), start=1):
+            atom.SetAtomMapNum(map_num)
+        if delay:
+            return
+        self.setUp()
 
-    def setIdMap(self, gid):
+    def setUp(self, cid=1, gid=1):
         """
-        Set the atom map num and the global ids of the atoms in all conformers
-        of the molecule.
+        Set up the molecule and conformers including global ids and references.
 
+        :param cid int: the conformer gid to start with.
         :param gid int: the starting global id.
-        :return gid int: the next starting global id.
         """
-        atom_ids = [x.GetIdx() for x in self.GetAtoms()]
-        for id, atom in enumerate(self.GetAtoms(), start=1):
-            atom.SetAtomMapNum(id)
-        for conf in self.GetConformers():
-            conf.setGids(atom_ids, gid)
+        if self.struct and self.struct.conformers:
+            cid = max([x.gid for x in self.struct.conformers]) + 1
+            gid = max([x.id_map.max() for x in self.struct.conformers]) + 1
+
+        confs = [self.ConfClass(x, mol=self) for x in super().GetConformers()]
+        for conf_id, conf in enumerate(confs, start=cid):
+            conf.gid = conf_id
+            conf.setGids(gid)
             gid += self.GetNumAtoms()
-        return gid
+        self.confs = {x.GetId(): x for x in confs}
 
     def setConformerId(self, conf_id):
         """
@@ -207,19 +215,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         Embed the molecule to generate a conformer.
         """
         Chem.AllChem.EmbedMolecule(self, **kwargs)
-        self.initConfs()
-
-    def initConfs(self, cid=1):
-        """
-        Set the conformers of the molecule.
-
-        :param cid int: the conformer gid to start with.
-        """
-        confs = super().GetConformers()
-        self.confs = {x.GetId(): self.ConfClass(x, mol=self) for x in confs}
-        for id, conf in enumerate(self.confs.values(), start=cid):
-            conf.gid = id
-        return id + 1
+        self.setUp()
 
     @property
     def molecular_weight(self):
@@ -252,27 +248,26 @@ class Struct:
     def __init__(self, mols, ff=None):
         """
         :param mols list of rdkit.Chem.rdchem.Mol: the molecules to be handled.
-        :param MolClass subclass of 'rdkit.Chem.rdchem.Mol': the customized
-            molecule class
         :param ff 'OplsParser': the force field class.
         """
         self.ff = ff
         self.mols = {}
         self.density = None
-        self.start_cid = 1
         self.start_gid = 1
         for mol in mols:
             self.addMol(mol)
 
-    def addMol(self, mol):
+    def addMol(self, mol, mol_id=0):
         """
         Initialize molecules and conformers with id and map set.
+
+        :param mol_id int: the starting id of the molecules.
         """
-        mol_id = max(self.mols.keys()) + 1 if self.mols else 0
-        mol = self.MolClass(mol, ff=self.ff)
+        if self.mols:
+            mol_id = max(self.mols.keys()) + 1
+
+        mol = self.MolClass(mol, struct=self, ff=self.ff)
         self.mols[mol_id] = mol
-        self.start_cid = mol.initConfs(cid=self.start_cid)
-        self.start_gid = mol.setIdMap(gid=self.start_gid)
 
     @property
     def conformers(self):

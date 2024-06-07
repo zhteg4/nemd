@@ -309,9 +309,9 @@ class Mol(structure.Mol):
             self.ff = oplsua.get_opls_parser()
         if delay:
             return
-        self.setUp()
+        self.build()
 
-    def setUp(self):
+    def build(self):
         """
         Main method to build one polymer.
         """
