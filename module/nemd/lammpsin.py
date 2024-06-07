@@ -402,6 +402,9 @@ class LammpsIn(fileutils.LammpsInput):
     IN_EXT = '.in'
     DATA_EXT = '.data'
 
+    METAL = 'metal'
+    ATOMIC = 'atomic'
+
     LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
     LJ_CUT = 'lj/cut'
     GEOMETRIC = 'geometric'

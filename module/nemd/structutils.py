@@ -72,7 +72,8 @@ class PackedConf(structure.Conformer):
         for _ in range(max_trial):
             self.translate(-np.array(self.centroid()))
             self.rotateRandomly()
-            self.translate(self.frm.getPoint())
+            pnt = self.frm.getPoint()
+            self.translate(pnt)
             self.updateFrm()
             if self.hasClashes():
                 continue
@@ -802,7 +803,7 @@ class GrownStruct(PackedStruct):
     MolClass = GrownMol
     MAX_TRIAL_PER_DENSITY = 10
 
-    def __init__(self, *args, MolClass=GrownMol, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.init_tf = None
 

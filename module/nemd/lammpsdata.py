@@ -1,7 +1,6 @@
 import io
 import copy
 import math
-import struct
 
 import scipy
 import types
@@ -15,6 +14,7 @@ from nemd import oplsua
 from nemd import symbols
 from nemd import logutils
 from nemd import lammpsin
+from nemd import structure
 
 logger = logutils.createModuleLogger(file_path=__file__)
 
@@ -29,19 +29,18 @@ def log_debug(msg):
     logger.debug(msg)
 
 
-class Struct(struct.Struct):
-    ...
-
-
 class LammpsDataBase(lammpsin.LammpsIn):
 
     LAMMPS_DESCRIPTION = 'LAMMPS Description # %s'
 
-    METAL = 'metal'
-    ATOMIC = 'atomic'
-
-    ATOMS = 'atoms'
     ATOM_TYPES = 'atom types'
+    BOND_TYPES = 'bond types'
+    ANGLE_TYPES = 'angle types'
+    DIHEDRAL_TYPES = 'dihedral types'
+    IMPROPER_TYPES = 'improper types'
+    TYPE_DSP = [
+        ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHEDRAL_TYPES, IMPROPER_TYPES
+    ]
 
     XLO_XHI = 'xlo xhi'
     YLO_YHI = 'ylo yhi'
@@ -54,15 +53,38 @@ class LammpsDataBase(lammpsin.LammpsIn):
     ATOM_ID = 'atom_id'
     TYPE_ID = oplsua.TYPE_ID
 
-    def __init__(self, struct, *arg, ff=None, jobname='tmp', **kwarg):
+    ATOMS = 'atoms'
+    BONDS = 'bonds'
+    ANGLES = 'angles'
+    DIHEDRALS = 'dihedrals'
+    IMPROPERS = 'impropers'
+    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
+
+    MASSES = 'Masses'
+    PAIR_COEFFS = 'Pair Coeffs'
+    BOND_COEFFS = 'Bond Coeffs'
+    ANGLE_COEFFS = 'Angle Coeffs'
+    DIHEDRAL_COEFFS = 'Dihedral Coeffs'
+    IMPROPER_COEFFS = 'Improper Coeffs'
+    ATOMS_CAP = ATOMS.capitalize()
+    BONDS_CAP = BONDS.capitalize()
+    ANGLES_CAP = ANGLES.capitalize()
+    DIHEDRALS_CAP = DIHEDRALS.capitalize()
+    IMPROPERS_CAP = IMPROPERS.capitalize()
+
+    MARKERS = [
+        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
+        IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
+        IMPROPERS_CAP
+    ]
+
+    def __init__(self, *arg, ff=None, jobname='tmp', **kwarg):
         """
         :param struct 'Struct': structure with molecules and conformers
         :param ff 'oplsua.OplsParser': the force field information
         :param jobname str: jobname based on which out filenames are defined
         """
-        # super(Struct, self).__init__(struct)
-        super().__init__(jobname=jobname, *arg, **kwarg)
-        self.struct = struct
+        super().__init__(*arg, jobname=jobname, **kwarg)
         self.ff = ff
         self.jobname = jobname
         self.bonds = {}
@@ -76,13 +98,23 @@ class LammpsDataBase(lammpsin.LammpsIn):
         Whether any atom has charge.
         """
         charges = [
-            self.ff.charges[x.GetIntProp(self.TYPE_ID)]
-            for x in self.struct.atoms
+            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atoms
         ]
         return any(charges)
 
 
-class LammpsDataOne(LammpsDataBase):
+class Struct(structure.Struct, LammpsDataBase):
+
+    def __init__(self, struct, *arg, jobname='tmp', **kwarg):
+        """
+        :param struct 'Struct': structure with molecules and conformers
+        :param jobname str: jobname based on which out filenames are defined
+        """
+        super(Struct, self).__init__(struct)
+        super(structure.Struct, self).__init__(*arg, jobname=jobname, **kwarg)
+
+
+class LammpsDataOne(Struct):
     """
     Class to set bond, angle, dihedral, improper parameters, and other topology
     information.
@@ -127,7 +159,7 @@ class LammpsDataOne(LammpsDataBase):
         Balance the charge when residues are not neutral.
         """
 
-        for mol_id, mol in self.struct.mols.items():
+        for mol_id, mol in self.mols.items():
             # residual num: residual charge
             res_charge = collections.defaultdict(float)
             for atom in mol.GetAtoms():
@@ -164,7 +196,7 @@ class LammpsDataOne(LammpsDataBase):
         """
         Set bonding information.
         """
-        bonds = [y for x in self.struct.molecules for y in x.GetBonds()]
+        bonds = [y for x in self.molecules for y in x.GetBonds()]
         for bond_id, bond in enumerate(bonds, start=1):
             bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
             bond = self.ff.getMatchedBonds(bonded)[0]
@@ -182,8 +214,7 @@ class LammpsDataOne(LammpsDataBase):
         """
         if not adjust_bond_legnth:
             return
-
-        for mol in self.struct.molecules:
+        for mol in self.molecules:
             # Set the bond lengths of one conformer
             tpl = mol.GetConformer()
             for bond in mol.GetBonds():
@@ -202,7 +233,7 @@ class LammpsDataOne(LammpsDataBase):
         Set angle force field matches.
         """
 
-        angs = [y for x in self.struct.atoms for y in self.ff.getAngleAtoms(x)]
+        angs = [y for x in self.atoms for y in self.ff.getAngleAtoms(x)]
         for angle_id, atoms in enumerate(angs, start=1):
             angle = self.ff.getMatchedAngles(atoms)[0]
             atom_ids = tuple(x.GetAtomMapNum() for x in atoms)
@@ -215,8 +246,7 @@ class LammpsDataOne(LammpsDataBase):
         """
 
         dihe_atoms = [
-            y for x in self.struct.molecules
-            for y in self.getDihAtomsFromMol(x)
+            y for x in self.molecules for y in self.getDihAtomsFromMol(x)
         ]
         for dihedral_id, atoms in enumerate(dihe_atoms, start=1):
             dihedral = self.ff.getMatchedDihedrals(atoms)[0]
@@ -370,7 +400,7 @@ class LammpsDataOne(LammpsDataBase):
         Multipole Models
         """
         improper_id = 0
-        for atom in self.struct.atoms:
+        for atom in self.atoms:
             atom_symbol, neighbors = atom.GetSymbol(), atom.GetNeighbors()
             if atom_symbol not in csymbols or len(neighbors) != 3:
                 continue
@@ -451,40 +481,7 @@ class LammpsDataOne(LammpsDataBase):
             self.angles.pop(self.rvrs_angles[angle_atom_ids])
 
 
-class LammpsData(LammpsDataBase):
-    ATOMS = LammpsDataBase.ATOMS
-    BONDS = 'bonds'
-    ANGLES = 'angles'
-    DIHEDRALS = 'dihedrals'
-    IMPROPERS = 'impropers'
-    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
-
-    ATOM_TYPES = LammpsDataBase.ATOM_TYPES
-    BOND_TYPES = 'bond types'
-    ANGLE_TYPES = 'angle types'
-    DIHEDRAL_TYPES = 'dihedral types'
-    IMPROPER_TYPES = 'improper types'
-    TYPE_DSP = [
-        ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHEDRAL_TYPES, IMPROPER_TYPES
-    ]
-
-    MASSES = LammpsDataBase.MASSES
-    PAIR_COEFFS = 'Pair Coeffs'
-    BOND_COEFFS = 'Bond Coeffs'
-    ANGLE_COEFFS = 'Angle Coeffs'
-    DIHEDRAL_COEFFS = 'Dihedral Coeffs'
-    IMPROPER_COEFFS = 'Improper Coeffs'
-    ATOMS_CAP = ATOMS.capitalize()
-    BONDS_CAP = BONDS.capitalize()
-    ANGLES_CAP = ANGLES.capitalize()
-    DIHEDRALS_CAP = DIHEDRALS.capitalize()
-    IMPROPERS_CAP = IMPROPERS.capitalize()
-
-    MARKERS = [
-        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
-        IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
-        IMPROPERS_CAP
-    ]
+class LammpsData(Struct):
 
     def __init__(self,
                  struct,
@@ -516,10 +513,7 @@ class LammpsData(LammpsDataBase):
         Write command to further equilibrate the system with molecules
         information considered.
         """
-        super().writeRun(*arg,
-                         mols=self.struct.mols,
-                         struct=self.struct,
-                         **kwarg)
+        super().writeRun(*arg, mols=self.mols, struct=self, **kwarg)
 
     def writeDumpModify(self):
         """
@@ -571,9 +565,9 @@ class LammpsData(LammpsDataBase):
             This only good for a small piece as clashes between non-bonded atoms
             may be introduced.
         """
-        for mol_id, mol in self.struct.mols.items():
-            struct = copy.copy(self.struct)
-            struct.mols = {mol_id: mol}
+        for mol_id, mol in self.mols.items():
+            struct = copy.copy(self)
+            struct.mols = {0: mol}
             mol_dat = LammpsDataOne(struct, ff=self.ff, jobname=self.jobname)
             mol_dat.run(adjust_coords=adjust_coords)
             self.mol_dat[mol_id] = mol_dat
@@ -616,8 +610,8 @@ class LammpsData(LammpsDataBase):
         """
         bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 5
         for tpl_id, tpl_dat in self.mol_dat.items():
-            self.nbr_charge[tpl_id] = tpl_dat.nbr_charge[tpl_id]
-            for _ in range(tpl_dat.struct.mols[tpl_id].GetNumConformers()):
+            self.nbr_charge[tpl_id] = tpl_dat.nbr_charge[0]
+            for _ in range(tpl_dat.mols[0].GetNumConformers()):
                 for id in tpl_dat.bonds.values():
                     bond_id += 1
                     bond = tuple([id[0]] + [x + atom_num for x in id[1:]])
@@ -634,7 +628,7 @@ class LammpsData(LammpsDataBase):
                     improper_id += 1
                     improper = tuple([id[0]] + [x + atom_num for x in id[1:]])
                     self.impropers[improper_id] = improper
-                atom_num += tpl_dat.struct.mols[tpl_id].GetNumAtoms()
+                atom_num += tpl_dat.mols[0].GetNumAtoms()
 
     def removeUnused(self):
         """
@@ -643,8 +637,7 @@ class LammpsData(LammpsDataBase):
         if not self.concise:
             return
 
-        atypes = sorted(
-            set(x.GetIntProp(self.TYPE_ID) for x in self.struct.atoms))
+        atypes = sorted(set(x.GetIntProp(self.TYPE_ID) for x in self.atoms))
         self.atm_types = {y: x for x, y in enumerate(atypes, start=1)}
         btypes = sorted(set(x[0] for x in self.bonds.values()))
         self.bnd_types = {y: x for x, y in enumerate(btypes, start=1)}
@@ -662,7 +655,7 @@ class LammpsData(LammpsDataBase):
         """
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.data_hdl.write(f"{lmp_dsp}\n\n")
-        self.data_hdl.write(f"{self.struct.atom_total} {self.ATOMS}\n")
+        self.data_hdl.write(f"{self.atom_total} {self.ATOMS}\n")
         self.data_hdl.write(f"{len(self.bonds)} {self.BONDS}\n")
         self.data_hdl.write(f"{len(self.angles)} {self.ANGLES}\n")
         self.data_hdl.write(f"{len(self.dihedrals)} {self.DIHEDRALS}\n")
@@ -692,7 +685,7 @@ class LammpsData(LammpsDataBase):
         """
 
         xyzs = np.concatenate([
-            y.GetPositions() for x in self.struct.mols.values()
+            y.GetPositions() for x in self.mols.values()
             for y in x.GetConformers()
         ])
         ctr = xyzs.mean(axis=0)
@@ -708,7 +701,7 @@ class LammpsData(LammpsDataBase):
         # Calculate density as the revised box may alter the box size.
         weight = sum([
             self.ff.molecular_weight(x) * x.GetNumConformers()
-            for x in self.struct.molecules
+            for x in self.molecules
         ])
         edges = [
             x * 2 * scipy.constants.angstrom / scipy.constants.centi
@@ -738,7 +731,7 @@ class LammpsData(LammpsDataBase):
         if self.box is not None:
             box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        if sum([x.GetNumConformers() for x in self.struct.mols.values()]) != 1:
+        if sum([x.GetNumConformers() for x in self.mols.values()]) != 1:
             return box_hf
         # All-trans single molecule with internal tension runs into clashes
         # across PBCs and thus larger box is used.
@@ -854,7 +847,7 @@ class LammpsData(LammpsDataBase):
 
         self.data_hdl.write(f"{self.ATOMS.capitalize()}\n\n")
         pre_atoms = 0
-        for tpl_id, mol in self.struct.mols.items():
+        for tpl_id, mol in self.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 7))
             data[:, 0] = [x.GetAtomMapNum() for x in mol.GetAtoms()]
             type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
@@ -870,7 +863,8 @@ class LammpsData(LammpsDataBase):
             data[:, 0] += pre_atoms
             for conformer in mol.GetConformers():
                 data[:, 1] = conformer.gid
-                data[:, 4:] = conformer.GetPositions()
+                data[:, 4:] = self.mol_dat[tpl_id].mols[0].GetConformer(
+                    conformer.GetId()).GetPositions()
                 np.savetxt(self.data_hdl, data, fmt=fmt)
                 # Increment atom ids by atom number in this conformer so that
                 # the next writing starts from the atoms in previous conformers
@@ -948,7 +942,7 @@ class LammpsData(LammpsDataBase):
         return b','.join([b'lammps_datafile', contents])
 
 
-class DataFileReader(LammpsData):
+class DataFileReader(LammpsDataBase):
     """
     LAMMPS Data file reader
     """

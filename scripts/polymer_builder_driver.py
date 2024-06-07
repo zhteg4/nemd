@@ -450,8 +450,9 @@ class Mol(structure.Mol):
         """
         Set multiple conformers based on the first one.
         """
-        for _ in range(self.mol_num - 1):
+        for conf_id in range(1, self.mol_num):
             conf = structure.Conformer(self.GetConformer(0))
+            conf.SetId(conf_id)
             self.AddConformer(conf, assignId=True)
 
 
