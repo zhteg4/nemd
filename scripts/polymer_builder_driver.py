@@ -186,7 +186,7 @@ class AmorphousCell(object):
         """
         if self.options.cell != GRID:
             return
-        self.struct = structutils.GriddedStruct(self.mols, ff=self.ff)
+        self.struct = structutils.GriddedStruct.fromMols(self.mols, ff=self.ff)
         self.struct.run()
 
     def setPackedCell(self, mini_density=MINIMUM_DENSITY):
@@ -223,7 +223,9 @@ class AmorphousCell(object):
         :param mini_density float: the minium density for liquid and solid when
             reducing it automatically.
         """
-        self.struct = ClassStruct(self.mols, ff=self.ff, options=self.options)
+        self.struct = ClassStruct.fromMols(self.mols,
+                                           ff=self.ff,
+                                           options=self.options)
         density = self.options.density
         mini_density = min([mini_density, density / 5.])
         delta = min([0.1, (density - mini_density) / 4])
@@ -664,7 +666,7 @@ class Conformer(object):
         """
         Adjust the conformer coordinates based on the force field.
         """
-        struct = structure.Struct([self.polym])
+        struct = structure.Struct.fromMols([self.polym])
         self.lmw = lammpsdata.LammpsData(struct,
                                          ff=self.ff,
                                          jobname=self.jobname,

@@ -137,6 +137,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
     def __init__(self, *args, struct=None, ff=None, delay=False, **kwargs):
         """
+        :param struct 'Struct': owning structure
         :param ff 'OplsParser': the force field class.
         :delay bool: customization is delayed for later setup or testing.
         """
@@ -245,22 +246,36 @@ class Struct:
 
     MolClass = Mol
 
-    def __init__(self, mols, ff=None):
+    def __init__(self, struct=None, ff=None):
         """
-        :param mols list of rdkit.Chem.rdchem.Mol: the molecules to be handled.
+        :param struct 'Struct': the structure with molecules.
         :param ff 'OplsParser': the force field class.
         """
         self.ff = ff
         self.mols = {}
         self.density = None
-        self.start_gid = 1
-        for mol in mols:
+        if struct is None:
+            return
+        for mol in struct.mols.values():
             self.addMol(mol)
+
+    @classmethod
+    def fromMols(cls, mols, *args, **kwargs):
+        """
+        Create structure instance from molecules.
+
+        :param mols list of 'rdkit.Chem.rdchem.Mol': the molecules to be added.
+        """
+        struct = cls(*args, **kwargs)
+        for mol in mols:
+            struct.addMol(mol)
+        return struct
 
     def addMol(self, mol, mol_id=0):
         """
         Initialize molecules and conformers with id and map set.
 
+        :param mol 'Mol': the molecule to be added.
         :param mol_id int: the starting id of the molecules.
         """
         if self.mols:
@@ -268,6 +283,7 @@ class Struct:
 
         mol = self.MolClass(mol, struct=self, ff=self.ff)
         self.mols[mol_id] = mol
+        return mol_id
 
     @property
     def conformers(self):

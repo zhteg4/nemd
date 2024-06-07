@@ -18,30 +18,26 @@ from nemd import alamodeutils
 
 class Mol(structure.Mol):
 
-    LATTICE_PARAMETERS = 'lattice_parameters'
+    LATTICE_PARAMETERS = 'lattice_params'
     DIMENSIONS = 'dimensions'
 
-    def __init__(self, *args, **kwargs):
-        self.lattice_parameters = kwargs.pop(self.LATTICE_PARAMETERS, None)
-        self.dimensions = kwargs.pop(self.DIMENSIONS, constants.ONE_ONE_ONE) # yapf: disable
-        super().__init__(*args, **kwargs)
+    def __init__(self, mol, *args, **kwargs):
+        lt_params = kwargs.pop(self.LATTICE_PARAMETERS, None)
+        dimensions = kwargs.pop(self.DIMENSIONS, None)
+        super().__init__(mol, *args, **kwargs)
+        self.lattice_params = lt_params if lt_params else mol.lattice_params
+        self.dimensions = dimensions if dimensions else mol.dimensions
 
     def getBox(self):
-        if self.lattice_parameters is None:
+        if self.lattice_params is None:
             return
-        param = self.lattice_parameters[:3]
+        param = self.lattice_params[:3]
         return np.array(param) * self.dimensions
 
 
 class Struct(structure.Struct):
 
     MolClass = Mol
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for omol, mol in zip(args[0], self.molecules):
-            mol.lattice_parameters = omol.lattice_parameters
-            mol.dimensions = omol.dimensions
 
 
 class CrystalBuilder(object):
@@ -100,7 +96,7 @@ class CrystalBuilder(object):
         [cfm.SetAtomPosition(x, atoms[x].coords_cartesian) for x in idxs]
         mol.AddConformer(cfm)
         return Mol(mol,
-                   lattice_parameters=self.scell.lattice_parameters,
+                   lattice_params=self.scell.lattice_parameters,
                    dimensions=self.scell.dimensions)
 
     def writeDispPattern(self):
