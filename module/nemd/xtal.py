@@ -35,8 +35,10 @@ class Mol(structure.Mol):
 
 class Struct(structure.Struct):
 
-    def __init__(self, *args, MolClass=Mol, **kwargs):
-        super().__init__(*args, MolClass=MolClass, **kwargs)
+    MolClass = Mol
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         for omol, mol in zip(args[0], self.molecules):
             mol.lattice_parameters = omol.lattice_parameters
             mol.dimensions = omol.dimensions

@@ -436,25 +436,21 @@ class PackedMol(structure.Mol):
     A subclass of rdkit.Chem.rdchem.Mol with additional attributes and methods.
     """
 
-    def __init__(self, *args, ff=None, **kwargs):
+    ConfClass = PackedConf
+
+    def __init__(self, *args, **kwargs):
         """
         :param ff 'OplsParser': the force field class.
         """
         super().__init__(*args, **kwargs)
-        self.ff = ff
         self.df_reader = None
         self.frm = None
         self.dcell = None
 
-    def initConfs(self, ConfClass=PackedConf, **kwargs):
-        """
-        See parent class for details.
-        """
-        return super().initConfs(ConfClass=ConfClass, **kwargs)
-
 
 class GrownMol(PackedMol):
 
+    ConfClass = GrownConf
     # https://ctr.fandom.com/wiki/Break_rotatable_bonds_and_report_the_fragments
     PATT = Chem.MolFromSmarts(
         '[!$([NH]!@C(=O))&!D1&!$(*#*)]-&!@[!$([NH]!@C(=O))&!D1&!$(*#*)]')
@@ -474,12 +470,6 @@ class GrownMol(PackedMol):
         self.setGraph()
         self.rotatable_bonds = self.GetSubstructMatches(self.PATT,
                                                         maxMatches=1000000)
-
-    def initConfs(self, ConfClass=GrownConf, **kwargs):
-        """
-        See parant class for details.
-        """
-        return super().initConfs(ConfClass=ConfClass, **kwargs)
 
     def setGraph(self):
         """
@@ -602,8 +592,10 @@ class GriddedStruct(structure.Struct):
     Grid the space and fill sub-cells with molecules as rigid bodies.
     """
 
-    def __init__(self, *args, MolClass=GriddedMol, **kwargs):
-        super().__init__(*args, MolClass=MolClass, **kwargs)
+    MolClass = GriddedMol
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.size = np.zeros([3])
 
     def run(self):
@@ -672,23 +664,16 @@ class PackedStruct(structure.Struct):
     Pack molecules by random rotation and translation.
     """
 
+    MolClass = PackedMol
     MAX_TRIAL_PER_DENSITY = 50
 
-    def __init__(self,
-                 *args,
-                 MolClass=PackedMol,
-                 ff=None,
-                 options=None,
-                 **kwargs):
+    def __init__(self, *args, options=None, **kwargs):
         """
         :param polymers 'Polymer': one polymer object for each type
-        :param ff 'OplsParser': the force field class.
         :param options 'argparse.Namespace': command line options
         """
         # Force field -> Molecular weight -> Box -> Frame -> Distance cell
-        MolClass = functools.partial(MolClass, ff=ff)
-        super().__init__(*args, MolClass=MolClass, ff=ff, **kwargs)
-        self.ff = ff
+        super().__init__(*args, **kwargs)
         self.options = options
         self.df_reader = None
 
@@ -815,10 +800,11 @@ class PackedStruct(structure.Struct):
 
 class GrownStruct(PackedStruct):
 
+    MolClass = GrownMol
     MAX_TRIAL_PER_DENSITY = 10
 
     def __init__(self, *args, MolClass=GrownMol, **kwargs):
-        super().__init__(*args, MolClass=MolClass, **kwargs)
+        super().__init__(*args, **kwargs)
         self.init_tf = None
 
     def run(self):

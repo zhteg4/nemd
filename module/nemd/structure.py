@@ -133,6 +133,8 @@ class Mol(rdkit.Chem.rdchem.Mol):
     A subclass of rdkit.Chem.rdchem.Mol with additional attributes and methods.
     """
 
+    ConfClass = Conformer
+
     def __init__(self, *args, ff=None, delay=False, **kwargs):
         """
         :param ff 'OplsParser': the force field class.
@@ -207,15 +209,14 @@ class Mol(rdkit.Chem.rdchem.Mol):
         Chem.AllChem.EmbedMolecule(self, **kwargs)
         self.initConfs()
 
-    def initConfs(self, ConfClass=Conformer, cid=1):
+    def initConfs(self, cid=1):
         """
         Set the conformers of the molecule.
 
-        :param ConfClass (sub)class 'rdkit.Chem.rdchem.Conformer': the conformer
-            class to instantiate conformers.
+        :param cid int: the conformer gid to start with.
         """
         confs = super().GetConformers()
-        self.confs = {x.GetId(): ConfClass(x, mol=self) for x in confs}
+        self.confs = {x.GetId(): self.ConfClass(x, mol=self) for x in confs}
         for id, conf in enumerate(self.confs.values(), start=cid):
             conf.gid = id
         return id + 1
@@ -246,14 +247,15 @@ class Struct:
     A class to handle multiple molecules and their conformers.
     """
 
-    def __init__(self, mols, MolClass=Mol, ff=None):
+    MolClass = Mol
+
+    def __init__(self, mols, ff=None):
         """
         :param mols list of rdkit.Chem.rdchem.Mol: the molecules to be handled.
         :param MolClass subclass of 'rdkit.Chem.rdchem.Mol': the customized
             molecule class
         :param ff 'OplsParser': the force field class.
         """
-        self.MolClass = MolClass
         self.ff = ff
         self.mols = {}
         self.density = None
