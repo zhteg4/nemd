@@ -150,8 +150,6 @@ class Mol(rdkit.Chem.rdchem.Mol):
         self.confs = {}
         if delay:
             return
-        for map_num, atom in enumerate(self.GetAtoms(), start=1):
-            atom.SetAtomMapNum(map_num)
         if args:
             self.setUp(args[0])
 

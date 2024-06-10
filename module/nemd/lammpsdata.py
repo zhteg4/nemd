@@ -88,20 +88,6 @@ class LammpsDataBase(lammpsin.LammpsIn):
         super().__init__(*arg, jobname=jobname, **kwarg)
         self.ff = ff
         self.jobname = jobname
-        self.bonds = {}
-        self.angles = {}
-        self.dihedrals = {}
-        self.impropers = {}
-        self.nbr_charge = {}
-
-    def hasCharge(self):
-        """
-        Whether any atom has charge.
-        """
-        charges = [
-            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atoms
-        ]
-        return any(charges)
 
 
 class Mol(structure.Mol):
@@ -113,10 +99,10 @@ class Mol(structure.Mol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.symbol_impropers = {}
-        self.bonds = {}
-        self.angles = {}
-        self.dihedrals = {}
-        self.impropers = {}
+        self.bonds = []
+        self.angles = []
+        self.dihedrals = []
+        self.impropers = []
         self.nbr_charge = collections.defaultdict(float)
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
@@ -172,14 +158,12 @@ class Mol(structure.Mol):
         """
         Set bonding information.
         """
-        for bond_id, bond in enumerate(self.GetBonds(), start=1):
+        for bond_id, bond in enumerate(self.GetBonds()):
             bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
             bond = self.ff.getMatchedBonds(bonded)[0]
-            atom_id1 = bonded[0].GetAtomMapNum()
-            atom_id2 = bonded[1].GetAtomMapNum()
-            atom_ids = sorted([atom_id1, atom_id2])
-            self.bonds[bond_id] = tuple([bond.id, *atom_ids])
-            self.rvrs_bonds[tuple(atom_ids)] = bond.id
+            aids = sorted([bonded[0].GetIdx(), bonded[1].GetIdx()])
+            self.bonds.append(tuple([bond.id, *aids]))
+            self.rvrs_bonds[tuple(aids)] = bond.id
 
     def adjustBondLength(self):
         """
@@ -189,8 +173,8 @@ class Mol(structure.Mol):
         tpl = self.GetConformer()
         for bond in self.GetBonds():
             bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
-            gids = set([x.GetAtomMapNum() for x in bonded])
-            bond_type = self.rvrs_bonds[tuple(sorted(gids))]
+            aids = set([x.GetIdx() for x in bonded])
+            bond_type = self.rvrs_bonds[tuple(sorted(aids))]
             dist = self.ff.bonds[bond_type].dist
             tpl.setBondLength([x.GetIdx() for x in bonded], dist)
         # Update all conformers
@@ -203,22 +187,20 @@ class Mol(structure.Mol):
         Set angle force field matches.
         """
         angles = [y for x in self.GetAtoms() for y in self.ff.getAngleAtoms(x)]
-        for angle_id, atoms in enumerate(angles, start=1):
+        for angle_id, atoms in enumerate(angles):
             angle = self.ff.getMatchedAngles(atoms)[0]
-            atom_ids = tuple(x.GetAtomMapNum() for x in atoms)
-            self.angles[angle_id] = (angle.id, ) + atom_ids
-            self.rvrs_angles[tuple(atom_ids)] = angle_id
+            aids = tuple(x.GetIdx() for x in atoms)
+            self.angles.append((angle.id, ) + aids)
+            self.rvrs_angles[tuple(aids)] = angle_id
 
     def setDihedrals(self):
         """
         Set the dihedral angles of the molecules.
         """
-
-        dihe_atoms = self.getDihAtoms()
-        for dihedral_id, atoms in enumerate(dihe_atoms, start=1):
+        for atoms in self.getDihAtoms():
             dihedral = self.ff.getMatchedDihedrals(atoms)[0]
-            atom_ids = tuple([x.GetAtomMapNum() for x in atoms])
-            self.dihedrals[dihedral_id] = (dihedral.id, ) + atom_ids
+            aids = tuple([x.GetIdx() for x in atoms])
+            self.dihedrals.append((dihedral.id, ) + aids)
 
     def getDihAtoms(self):
         """
@@ -302,7 +284,6 @@ class Mol(structure.Mol):
         ref: Atomic Forces for Geometry-Dependent Point Multipole and Gaussian
         Multipole Models
         """
-        improper_id = 0
         for atom in self.GetAtoms():
             atom_symbol, neighbors = atom.GetSymbol(), atom.GetNeighbors()
             if atom_symbol not in csymbols or len(neighbors) != 3:
@@ -312,7 +293,6 @@ class Mol(structure.Mol):
                 continue
             # Sp2 carbon for planar, Sp3 with one H (CHR1R2R3) for chirality,
             # Sp2 N in Amino Acid
-            improper_id += 1
             neighbor_symbols = [x.GetSymbol() for x in neighbors]
             counted = self.ff.countSymbols(
                 [str(oplsua.OplsParser.getAtomConnt(atom)), atom_symbol] +
@@ -343,8 +323,8 @@ class Mol(structure.Mol):
             # 120 deg sounds more plausible and thus the third is chosen to be
             # the center.
             atoms = [neighbors[0], neighbors[1], atom, neighbors[2]]
-            self.impropers[improper_id] = (improper_type_id, ) + tuple(
-                x.GetAtomMapNum() for x in atoms)
+            improper = (improper_type_id, ) + tuple(x.GetIdx() for x in atoms)
+            self.impropers.append(improper)
 
     def printImpropers(self):
         """
@@ -373,15 +353,19 @@ class Mol(structure.Mol):
         Multipole Models
         """
 
-        for idx, (itype, id1, id2, id3, id4) in self.impropers.items():
+        to_remove = []
+        for itype, id1, id2, id3, id4 in self.impropers:
             for eids in itertools.combinations([id2, id1, id4], 2):
                 angle_atom_ids = tuple([eids[0], id3, eids[1]])
                 if angle_atom_ids not in self.rvrs_angles:
                     angle_atom_ids = angle_atom_ids[::-1]
-                angle_type = self.angles[self.rvrs_angles[angle_atom_ids]][0]
-                if np.isnan(self.ff.angles[angle_type].ene):
+                index = self.rvrs_angles[angle_atom_ids]
+                angle = self.angles[index]
+                if np.isnan(self.ff.angles[angle[0]].ene):
                     break
-            self.angles.pop(self.rvrs_angles[angle_atom_ids])
+            to_remove.append(index)
+        for index in sorted(to_remove, reverse=True):
+            self.angles.pop(index)
 
     @property
     def bond_total(self):
@@ -404,41 +388,50 @@ class Struct(structure.Struct):
 
     MolClass = Mol
 
+    @property
+    def bond_total(self):
+        return sum(x.bond_total for x in self.molecules)
 
-class LammpsStruct(Struct, LammpsDataBase):
+    @property
+    def angle_total(self):
+        return sum(x.angle_total for x in self.molecules)
 
-    def __init__(self, struct, *args, jobname='tmp', ff=None, **kwargs):
+    @property
+    def dihedral_total(self):
+        return sum(x.dihedral_total for x in self.molecules)
+
+    @property
+    def improper_total(self):
+        return sum(x.improper_total for x in self.molecules)
+
+    def hasCharge(self):
         """
-        :param struct 'Struct': structure with molecules and conformers
-        :param jobname str: jobname based on which out filenames are defined
+        Whether any atom has charge.
         """
-        Struct.__init__(self, struct, ff=ff)
-        LammpsDataBase.__init__(self, *args, jobname=jobname, ff=ff, **kwargs)
+        charges = [
+            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atoms
+        ]
+        return any(charges)
 
 
-class LammpsData(LammpsStruct):
+class LammpsData(Struct, LammpsDataBase):
 
     def __init__(self,
                  struct,
-                 *arg,
+                 *args,
                  ff=None,
                  jobname='tmp',
-                 concise=True,
                  box=None,
-                 **kwarg):
+                 **kwargs):
         """
         :param struct Struct: struct object with moelcules and conformers.
         :param ff 'oplsua.OplsParser': the force field information
         :param jobname str: jobname based on which out filenames are defined
-        :param concise bool: If False, all the atoms in the force field file
-            shows up in the force field section of the data file. If True, only
-            the present ones are writen into the data file.
         :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
         """
-        super().__init__(struct, *arg, ff=ff, jobname=jobname, **kwarg)
-        self.concise = concise
+        Struct.__init__(self, struct, ff=ff)
+        LammpsDataBase.__init__(self, *args, jobname=jobname, ff=ff, **kwargs)
         self.box = box
-        self.mol_dat = {}
         self.total_charge = 0.
         self.data_hdl = None
         self.density = None
@@ -450,40 +443,25 @@ class LammpsData(LammpsStruct):
         """
         super().writeRun(*arg, mols=self.mols, struct=self, **kwarg)
 
-    def writeDumpModify(self):
-        """
-        Write dump modify commands so that dump command can write out element.
-        """
-        atoms = self.ff.atoms.values()
-        if self.concise:
-            atoms = [x for x in atoms if x.id in self.atm_types]
-        smbs = ' '.join(map(str, [x.symbol for x in atoms]))
-        self.in_fh.write(f"dump_modify 1 element {smbs}\n")
-
     def writeFixShake(self):
         """
         Write the fix shake so that the bonds and angles associated with hydrogen
         atoms keep constant.
         """
         fix_bonds = set()
-        for btype, btype_concise in self.bnd_types.items():
-            bond = self.ff.bonds[btype]
+        for oid, id in self.bnd_types.items():
+            bond = self.ff.bonds[oid]
             atoms = [self.ff.atoms[x] for x in [bond.id1, bond.id2]]
-            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
-            if has_h:
-                bond_type = btype_concise if self.concise else btype
-                fix_bonds.add(bond_type)
+            if any(x.symbol == symbols.HYDROGEN for x in atoms):
+                fix_bonds.add(id)
 
         fix_angles = set()
-        for atype, atype_concise in self.ang_types.items():
-            angle = self.ff.angles[atype]
-            atoms = [
-                self.ff.atoms[x] for x in [angle.id1, angle.id2, angle.id3]
-            ]
-            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
-            if has_h:
-                angle_type = atype_concise if self.concise else atype
-                fix_angles.add(angle_type)
+        for oid, id in self.ang_types.items():
+            angle = self.ff.angles[oid]
+            ids = [angle.id1, angle.id2, angle.id3]
+            atoms = [self.ff.atoms[x] for x in ids]
+            if any(x.symbol == symbols.HYDROGEN for x in atoms):
+                fix_angles.add(id)
         btype_ids = ' '.join(map(str, fix_bonds))
         atype_ids = ' '.join(map(str, fix_angles))
         if not any([btype_ids, atype_ids]):
@@ -501,8 +479,7 @@ class LammpsData(LammpsStruct):
 
         with io.StringIO() if nofile else open(self.datafile,
                                                'w') as self.data_hdl:
-            self.setBADI()
-            self.removeUnused()
+            self.setTypeMap()
             self.writeDescription()
             self.writeTopoType()
             self.writeBox()
@@ -519,48 +496,19 @@ class LammpsData(LammpsStruct):
             self.writeImpropers()
             return self.getContents() if nofile else None
 
-    def setBADI(self):
+    def setTypeMap(self):
         """
-        Set bond, angle, dihedral, and improper for all conformers across
-        all molecules.
+        Set the type map for atoms, bonds, angles, dihedrals, and impropers.
         """
-        bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 5
-        for mol in self.molecules:
-            for _ in range(mol.GetNumConformers()):
-                for id in mol.bonds.values():
-                    bond_id += 1
-                    bond = tuple([id[0]] + [x + atom_num for x in id[1:]])
-                    self.bonds[bond_id] = bond
-                for id in mol.angles.values():
-                    angle_id += 1
-                    angle = tuple([id[0]] + [x + atom_num for x in id[1:]])
-                    self.angles[angle_id] = angle
-                for id in mol.dihedrals.values():
-                    dihedral_id += 1
-                    dihedral = tuple([id[0]] + [x + atom_num for x in id[1:]])
-                    self.dihedrals[dihedral_id] = dihedral
-                for id in mol.impropers.values():
-                    improper_id += 1
-                    improper = tuple([id[0]] + [x + atom_num for x in id[1:]])
-                    self.impropers[improper_id] = improper
-                atom_num += mol.GetNumAtoms()
-
-    def removeUnused(self):
-        """
-        Remove used force field information so that the data file is minimal.
-        """
-        if not self.concise:
-            return
-
         atypes = sorted(set(x.GetIntProp(self.TYPE_ID) for x in self.atoms))
         self.atm_types = {y: x for x, y in enumerate(atypes, start=1)}
-        btypes = set(y[0] for x in self.molecules for y in x.bonds.values())
+        btypes = set(y[0] for x in self.molecules for y in x.bonds)
         self.bnd_types = {y: x for x, y in enumerate(sorted(btypes), start=1)}
-        antypes = set(y[0] for x in self.molecules for y in x.angles.values())
+        antypes = set(y[0] for x in self.molecules for y in x.angles)
         self.ang_types = {y: x for x, y in enumerate(sorted(antypes), start=1)}
-        dtps = set(y[0] for x in self.molecules for y in x.dihedrals.values())
+        dtps = set(y[0] for x in self.molecules for y in x.dihedrals)
         self.dihe_types = {y: x for x, y in enumerate(sorted(dtps), start=1)}
-        itps = set(y[0] for x in self.molecules for y in x.impropers.values())
+        itps = set(y[0] for x in self.molecules for y in x.impropers)
         self.impr_types = {y: x for x, y in enumerate(sorted(itps), start=1)}
 
     def writeDescription(self):
@@ -571,29 +519,21 @@ class LammpsData(LammpsStruct):
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.data_hdl.write(f"{lmp_dsp}\n\n")
         self.data_hdl.write(f"{self.atom_total} {self.ATOMS}\n")
-        bond_num = sum([x.bond_total for x in self.molecules])
-        self.data_hdl.write(f"{bond_num} {self.BONDS}\n")
-        angle_num = sum([x.angle_total for x in self.molecules])
-        self.data_hdl.write(f"{angle_num} {self.ANGLES}\n")
-        dihedral_num = sum([x.dihedral_total for x in self.molecules])
-        self.data_hdl.write(f"{dihedral_num} {self.DIHEDRALS}\n")
-        improper_num = sum([x.improper_total for x in self.molecules])
-        self.data_hdl.write(f"{improper_num} {self.IMPROPERS}\n\n")
+        self.data_hdl.write(f"{self.bond_total} {self.BONDS}\n")
+        self.data_hdl.write(f"{self.angle_total} {self.ANGLES}\n")
+        self.data_hdl.write(f"{self.dihedral_total} {self.DIHEDRALS}\n")
+        self.data_hdl.write(f"{self.improper_total} {self.IMPROPERS}\n\n")
 
     def writeTopoType(self):
         """
         Write topologic data. e.g. number of atoms, angles...
         """
-        atom_num = len(self.atm_types) if self.concise else len(self.ff.atoms)
-        self.data_hdl.write(f"{atom_num} {self.ATOM_TYPES}\n")
-        bond_num = len(self.bnd_types) if self.concise else len(self.ff.bonds)
-        self.data_hdl.write(f"{bond_num} {self.BOND_TYPES}\n")
-        ang_num = len(self.ang_types) if self.concise else len(self.ff.angles)
-        self.data_hdl.write(f"{ang_num} {self.ANGLE_TYPES}\n")
-        dnum = len(self.dihe_types) if self.concise else len(self.ff.dihedrals)
-        self.data_hdl.write(f"{dnum} {self.DIHEDRAL_TYPES}\n")
-        inum = len(self.impr_types) if self.concise else len(self.ff.impropers)
-        self.data_hdl.write(f"{inum} {self.IMPROPER_TYPES}\n\n")
+        self.data_hdl.write(f"{len(self.atm_types)} {self.ATOM_TYPES}\n")
+        self.data_hdl.write(f"{len(self.bnd_types)} {self.BOND_TYPES}\n")
+        self.data_hdl.write(f"{len(self.ang_types)} {self.ANGLE_TYPES}\n")
+        self.data_hdl.write(f"{len(self.dihe_types)} {self.DIHEDRAL_TYPES}\n")
+        self.data_hdl.write(f"{len(self.impr_types)} {self.IMPROPER_TYPES}\n")
+        self.data_hdl.write("\n")
 
     def writeBox(self, min_box=None, buffer=None):
         """
@@ -740,87 +680,93 @@ class LammpsData(LammpsStruct):
         """
 
         self.data_hdl.write(f"{self.ATOMS.capitalize()}\n\n")
-        pre_atoms = 0
-        for tpl_id, mol in self.mols.items():
+        for mol in self.molecules:
             data = np.zeros((mol.GetNumAtoms(), 7))
-            data[:, 0] = [x.GetAtomMapNum() for x in mol.GetAtoms()]
             type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
-            data[:, 2] = [
-                self.atm_types[x] if self.concise else x for x in type_ids
-            ]
-            charges = [mol.nbr_charge[x.GetIdx()] for x in mol.GetAtoms()]
-            data[:, 3] = [
-                x + self.ff.charges[y] for x, y in zip(charges, type_ids)
-            ]
-            data[:, 0] += pre_atoms
+            data[:, 2] = [self.atm_types[x] for x in type_ids]
+            aids = [x.GetIdx() for x in mol.GetAtoms()]
+            nbr_charge = [mol.nbr_charge[x] for x in aids]
+            ff_charge = [self.ff.charges[x] for x in type_ids]
+            data[:, 3] = [x + y for x, y in zip(nbr_charge, ff_charge)]
             for conformer in mol.GetConformers():
+                data[:, 0] = conformer.id_map[aids]
                 data[:, 1] = conformer.gid
-                data[:,
-                     4:] = mol.GetConformer(conformer.GetId()).GetPositions()
+                data[:, 4:] = conformer.GetPositions()
                 np.savetxt(self.data_hdl, data, fmt=fmt)
-                # Increment atom ids by atom number in this conformer so that
-                # the next writing starts from the atoms in previous conformers
-                data[:, 0] += mol.GetNumAtoms()
                 self.total_charge += data[:, 3].sum()
             # Atom ids in starts from atom ids in previous template molecules
-            pre_atoms += mol.GetNumAtoms() * mol.GetNumConformers()
         self.data_hdl.write(f"\n")
 
     def writeBonds(self):
         """
         Write bond coefficients.
         """
-
-        if not self.bonds:
+        if not self.bond_total:
             return
 
         self.data_hdl.write(f"{self.BONDS.capitalize()}\n\n")
-        for bond_id, (bond_type, id1, id2) in self.bonds.items():
-            bond_type = self.bnd_types[bond_type] if self.concise else bond_type
-            self.data_hdl.write(f"{bond_id} {bond_type} {id1} {id2}\n")
+        bond_id = 1
+        for mol in self.molecules:
+            for conf in mol.GetConformers():
+                for bond_type, *ids in mol.bonds:
+                    bond_type = self.bnd_types[bond_type]
+                    ids = ' '.join(map(str, conf.id_map[ids]))
+                    self.data_hdl.write(f"{bond_id} {bond_type} {ids}\n")
+                    bond_id += 1
         self.data_hdl.write(f"\n")
 
     def writeAngles(self):
         """
         Write angle coefficients.
         """
-        if not self.angles:
+        if not self.angle_total:
             return
         self.data_hdl.write(f"{self.ANGLES.capitalize()}\n\n")
         # Some angles may be filtered out by improper
-        for angle_id, value in enumerate(self.angles.items(), start=1):
-            _, (type_id, id1, id2, id3) = value
-            angle_type = self.ang_types[type_id] if self.concise else type_id
-            self.data_hdl.write(f"{angle_id} {angle_type} {id1} {id2} {id3}\n")
+        id = 1
+        for mol in self.molecules:
+            for conf in mol.GetConformers():
+                for type_id, *ids in mol.angles:
+                    angle_type = self.ang_types[type_id]
+                    ids = ' '.join(map(str, conf.id_map[ids]))
+                    self.data_hdl.write(f"{id} {angle_type} {ids}\n")
+                    id += 1
         self.data_hdl.write(f"\n")
 
     def writeDihedrals(self):
         """
         Write dihedral coefficients.
         """
-        if not self.dihedrals:
+        if not self.dihedral_total:
             return
 
         self.data_hdl.write(f"{self.DIHEDRALS.capitalize()}\n\n")
-        for dihe_id, (type_id, id1, id2, id3, id4) in self.dihedrals.items():
-            type_id = self.dihe_types[type_id] if self.concise else type_id
-            self.data_hdl.write(
-                f"{dihe_id} {type_id} {id1} {id2} {id3} {id4}\n")
+        id = 1
+        for mol in self.molecules:
+            for conf in mol.GetConformers():
+                for type_id, *ids in mol.dihedrals:
+                    dihe_type = self.dihe_types[type_id]
+                    ids = ' '.join(map(str, conf.id_map[ids]))
+                    self.data_hdl.write(f"{id} {dihe_type} {ids}\n")
+                    id += 1
         self.data_hdl.write(f"\n")
 
     def writeImpropers(self):
         """
         Write improper coefficients.
         """
-        if not self.impropers:
+        if not self.improper_total:
             return
 
         self.data_hdl.write(f"{self.IMPROPERS.capitalize()}\n\n")
-        for improper_id, (type_id, id1, id2, id3,
-                          id4) in self.impropers.items():
-            type_id = self.impr_types[type_id] if self.concise else type_id
-            self.data_hdl.write(
-                f"{improper_id} {type_id} {id1} {id2} {id3} {id4}\n")
+        id = 1
+        for mol in self.molecules:
+            for conf in mol.GetConformers():
+                for type_id, *ids in mol.impropers:
+                    impr_type = self.impr_types[type_id]
+                    ids = ' '.join(map(str, conf.id_map[ids]))
+                    self.data_hdl.write(f"{id} {impr_type} {ids}\n")
+                    id += 1
         self.data_hdl.write(f"\n")
 
     def getContents(self):

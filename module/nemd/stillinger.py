@@ -109,10 +109,7 @@ class LammpsData(xtal.Struct, lammpsdata.LammpsDataBase):
         Write out mass information.
         """
         self.data_fh.write(f"{self.MASSES}\n\n")
-        masses = list(
-            set([
-                y.GetMass() for x in self.mols.values() for y in x.GetAtoms()
-            ]))
+        masses = list(set([x.GetMass() for x in self.atoms]))
         for id, mass in enumerate(masses, 1):
             self.data_fh.write(f"{id} {mass}\n")
         self.data_fh.write(f"\n")
@@ -120,18 +117,15 @@ class LammpsData(xtal.Struct, lammpsdata.LammpsDataBase):
     def writeAtoms(self):
         """
         Write atom coefficients.
-
-        :param comments bool: If True, additional descriptions including element
-            sysmbol are written after each atom line
         """
 
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
-        for mol_id, mol in self.mols.items():
+        for mol in self.molecules:
             data = np.zeros((mol.GetNumAtoms(), 5))
             conformer = mol.GetConformer()
-            data[:, 0] = [x.GetAtomMapNum() for x in mol.GetAtoms()]
-            # Fix Me: use atom type instead of hard-coded 1
-            data[:, 1] = 1
+            aids = [x.GetIdx() for x in mol.GetAtoms()]
+            data[:, 0] = conformer.id_map[aids]
+            data[:, 1] = conformer.gid
             data[:, 2:] = conformer.GetPositions()
             np.savetxt(self.data_fh, data, fmt='%i %i %.3f %.3f %.3f')
         self.data_fh.write(f"\n")
