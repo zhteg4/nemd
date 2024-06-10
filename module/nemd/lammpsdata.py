@@ -105,13 +105,13 @@ class LammpsDataBase(lammpsin.LammpsIn):
 
 class Struct(structure.Struct, LammpsDataBase):
 
-    def __init__(self, struct, *arg, jobname='tmp', **kwarg):
+    def __init__(self, struct, *args, jobname='tmp', **kwargs):
         """
         :param struct 'Struct': structure with molecules and conformers
         :param jobname str: jobname based on which out filenames are defined
         """
         super(Struct, self).__init__(struct)
-        super(structure.Struct, self).__init__(*arg, jobname=jobname, **kwarg)
+        LammpsDataBase.__init__(self, *args, jobname=jobname, **kwargs)
 
 
 class LammpsDataOne(Struct):

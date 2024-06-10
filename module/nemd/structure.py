@@ -142,6 +142,8 @@ class Mol(rdkit.Chem.rdchem.Mol):
         :delay bool: customization is delayed for later setup or testing.
         """
         super().__init__(*args, **kwargs)
+        # Save original reference otherwise this conf interface may be deleted.
+        self.mol = args[0] if args else None
         self.struct = struct
         self.ff = ff
         self.delay = delay
@@ -151,16 +153,19 @@ class Mol(rdkit.Chem.rdchem.Mol):
             atom.SetAtomMapNum(map_num)
         if delay:
             return
-        self.setUp(args[0])
+        self.setUp()
 
-    def setUp(self, mol, cid=1, gid=1):
+    def setUp(self, mol=None, cid=1, gid=1):
         """
         Set up the molecule and conformers including global ids and references.
 
-        :param mol `rdkit.Chem.rdchem.Mol`: the original molecule.
         :param cid int: the conformer gid to start with.
         :param gid int: the starting global id.
         """
+        if mol is None:
+            mol = self.mol
+        if mol is None:
+            return
         if self.struct and self.struct.conformers:
             cid = max([x.gid for x in self.struct.conformers]) + 1
             gid = max([x.id_map.max() for x in self.struct.conformers]) + 1
@@ -198,8 +203,10 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
         :param conf `rdkit.Chem.rdchem.Conformer`: the conformer to add.
         """
+        # AddConformer set the owning molecule
         id = super().AddConformer(conf, **kwargs)
-        self.confs[id] = conf
+        # self.ConfClass(GetConformer(id))) set customized methods and props
+        self.confs[id] = self.ConfClass(super().GetConformer(id))
 
     def GetConformers(self):
         """
@@ -219,7 +226,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         Chem.AllChem.EmbedMolecule(self, **kwargs)
         self.confs.clear()
         self.confs[0] = super().GetConformer(0)
-        self.setUp(self)
+        self.setUp(mol=self)
 
     @property
     def molecular_weight(self):

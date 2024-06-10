@@ -91,8 +91,8 @@ class CrystalBuilder(object):
         mol = Chem.Mol()
         emol = Chem.EditableMol(mol)
         idxs = [emol.AddAtom(Chem.rdchem.Atom(x.atomic_number)) for x in atoms]
-        mol = emol.GetMol()
-        cfm = Chem.rdchem.Conformer(mol.GetNumAtoms())
+        mol = structure.Mol(emol.GetMol())
+        cfm = structure.Conformer(mol.GetNumAtoms())
         [cfm.SetAtomPosition(x, atoms[x].coords_cartesian) for x in idxs]
         mol.AddConformer(cfm)
         return Mol(mol,

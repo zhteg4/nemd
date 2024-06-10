@@ -1,18 +1,23 @@
 import sh
 import types
 import numpy as np
+from nemd import xtal
 from nemd import symbols
 from nemd import lammpsdata
 
 
-class LammpsData(lammpsdata.LammpsDataBase):
+class LammpsData(xtal.Struct, lammpsdata.LammpsDataBase):
 
     XYZ = 'XYZ'
     FORCE = 'force'
     CUSTOM_EXT = f'.{lammpsdata.LammpsDataBase.DUMP}'
 
-    def __init__(self, *args, tasks=None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, struct, *args, jobname='tmp', tasks=None, **kwargs):
+        super(LammpsData, self).__init__(struct)
+        lammpsdata.LammpsDataBase.__init__(self,
+                                           *args,
+                                           jobname=jobname,
+                                           **kwargs)
         self.tasks = tasks
         self.units = self.METAL
         self.atom_style = self.ATOMIC
@@ -65,7 +70,7 @@ class LammpsData(lammpsdata.LammpsDataBase):
             self.writeAtoms()
 
     def setElements(self):
-        elements = [x.GetAtomicNum() for x in self.struct.atoms]
+        elements = [x.GetAtomicNum() for x in self.atoms]
         self.elements = list(set(elements))
 
     def writeDescription(self):
@@ -75,7 +80,7 @@ class LammpsData(lammpsdata.LammpsDataBase):
         """
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.data_fh.write(f"{lmp_dsp}\n\n")
-        self.data_fh.write(f"{self.struct.atom_total} {self.ATOMS}\n\n")
+        self.data_fh.write(f"{self.atom_total} {self.ATOMS}\n\n")
 
     def writeTopoType(self):
         """
@@ -88,7 +93,7 @@ class LammpsData(lammpsdata.LammpsDataBase):
         Write box information.
         """
 
-        boxes = [x.getBox() for x in self.struct.mols.values()]
+        boxes = [x.getBox() for x in self.mols.values()]
         box = boxes[0]
         repeated = np.repeat(box.reshape(1, -1), len(boxes), axis=0)
         if not (repeated == boxes).all():
@@ -106,8 +111,7 @@ class LammpsData(lammpsdata.LammpsDataBase):
         self.data_fh.write(f"{self.MASSES}\n\n")
         masses = list(
             set([
-                y.GetMass() for x in self.struct.mols.values()
-                for y in x.GetAtoms()
+                y.GetMass() for x in self.mols.values() for y in x.GetAtoms()
             ]))
         for id, mass in enumerate(masses, 1):
             self.data_fh.write(f"{id} {mass}\n")
@@ -122,7 +126,7 @@ class LammpsData(lammpsdata.LammpsDataBase):
         """
 
         self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
-        for mol_id, mol in self.struct.mols.items():
+        for mol_id, mol in self.mols.items():
             data = np.zeros((mol.GetNumAtoms(), 5))
             conformer = mol.GetConformer()
             data[:, 0] = [x.GetAtomMapNum() for x in mol.GetAtoms()]
