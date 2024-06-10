@@ -389,6 +389,7 @@ class OplsParser:
         self.impropers = {}
         self.dihedrals = {}
         self.charges = {}
+        self.symbol_impropers = None
 
     def read(self):
         """
@@ -778,3 +779,70 @@ class OplsParser:
         """
         atypes = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
         return sum(self.atoms[x].mass for x in atypes)
+
+    @property
+    def improper_symbols(self):
+        """
+        Check and assert the current improper force field. These checks may be
+        only good for this specific force field for even this specific file.
+        """
+        if self.symbol_impropers is not None:
+            return self.symbol_impropers
+        msg = "Impropers from the same symbols are of the same constants."
+        # {1: 'CNCO', 2: 'CNCO', 3: 'CNCO' ...
+        symbolss = {
+            z:
+            ''.join(
+                [str(self.atoms[x.id3].conn)] +
+                [self.atoms[y].symbol for y in [x.id1, x.id2, x.id3, x.id4]])
+            for z, x in self.impropers.items()
+        }
+        # {'CNCO': (10.5, 180.0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9), ...
+        symbol_impropers = {}
+        for id, symbols in symbolss.items():
+            improper = self.impropers[id]
+            if symbols not in symbol_impropers:
+                symbol_impropers[symbols] = (
+                    improper.ene,
+                    improper.angle,
+                    improper.n_parm,
+                )
+            assert symbol_impropers[symbols][:3] == (
+                improper.ene,
+                improper.angle,
+                improper.n_parm,
+            )
+            symbol_impropers[symbols] += (improper.id, )
+        log_debug(msg)
+
+        # neighbors of CC(=O)C and CC(O)C have the same symbols
+        msg = "Improper neighbor counts based on center conn and symbols are unique."
+        # The third one is the center ('Improper Torsional Parameters' in prm)
+        neighbors = [[x[0], x[3], x[1], x[2], x[4]]
+                     for x in symbol_impropers.keys()]
+        # The csmbls in getCountedSymbols is obtained from the following
+        csmbls = sorted(set([y for x in neighbors for y in x[1:]]))  # CHNO
+        counted = [self.countSymbols(x, csmbls=csmbls) for x in neighbors]
+        assert len(symbol_impropers) == len(set(counted))
+        log_debug(msg)
+        self.symbol_impropers = {
+            x: y[3:]
+            for x, y in zip(counted, symbol_impropers.values())
+        }
+        return self.symbol_impropers
+
+    @staticmethod
+    def countSymbols(symbols, csmbls='CHNO'):
+        """
+        Count improper cluster symbols: the first is the center atom connectivity
+        including implicit hydrogen atoms. The second is the center atom symbol,
+        and the rest connects with the center.
+
+        :param symbols list: the element symbols forming the improper cluster
+            with first being the center
+        :param csmbls str: all possible cluster symbols
+        """
+        # e.g., ['3', 'C', 'C', 'N', 'O']
+        counted = [y + str(symbols[2:].count(y)) for y in csmbls]
+        # e.g., '3CC1H0N1O1'
+        return ''.join(symbols[:2] + counted)

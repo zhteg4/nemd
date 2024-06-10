@@ -129,7 +129,6 @@ class Mol(structure.Mol):
         self.adjustBondLength(adjust_coords)
         self.setAngles()
         self.setDihedrals()
-        self.setImproperSymbols()
         self.setImpropers()
         self.removeAngles()
 
@@ -218,20 +217,19 @@ class Mol(structure.Mol):
         Set the dihedral angles of the molecules.
         """
 
-        dihe_atoms = self.getDihAtomsFromMol()
+        dihe_atoms = self.getDihAtoms()
         for dihedral_id, atoms in enumerate(dihe_atoms, start=1):
             dihedral = self.ff.getMatchedDihedrals(atoms)[0]
             atom_ids = tuple([x.GetAtomMapNum() for x in atoms])
             self.dihedrals[dihedral_id] = (dihedral.id, ) + atom_ids
 
-    def getDihAtomsFromMol(self):
+    def getDihAtoms(self):
         """
         Get the dihedral atoms of this molecule.
 
         NOTE: Flipping the order the four dihedral atoms yields the same dihedral,
         and only one of them is returned.
 
-        :param 'rdkit.Chem.rdchem.Mol': the molecule to get dihedral atoms.
         :return list of list: each sublist has four atom ids forming a dihedral angle.
         """
         atomss = [y for x in self.GetAtoms() for y in self.getDihedralAtoms(x)]
@@ -268,69 +266,6 @@ class Mol(structure.Mol):
                 dihe_atoms.append([satom, matom, eatom, dihe_4th])
 
         return dihe_atoms
-
-    def setImproperSymbols(self):
-        """
-        Check and assert the current improper force field. These checks may be
-        only good for this specific force field for even this specific file.
-        """
-        msg = "Impropers from the same symbols are of the same constants."
-        # {1: 'CNCO', 2: 'CNCO', 3: 'CNCO' ...
-        symbolss = {
-            z:
-            ''.join([str(self.ff.atoms[x.id3].conn)] + [
-                self.ff.atoms[y].symbol for y in [x.id1, x.id2, x.id3, x.id4]
-            ])
-            for z, x in self.ff.impropers.items()
-        }
-        # {'CNCO': (10.5, 180.0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9), ...
-        symbol_impropers = {}
-        for id, symbols in symbolss.items():
-            improper = self.ff.impropers[id]
-            if symbols not in symbol_impropers:
-                symbol_impropers[symbols] = (
-                    improper.ene,
-                    improper.angle,
-                    improper.n_parm,
-                )
-            assert symbol_impropers[symbols][:3] == (
-                improper.ene,
-                improper.angle,
-                improper.n_parm,
-            )
-            symbol_impropers[symbols] += (improper.id, )
-        log_debug(msg)
-
-        # neighbors of CC(=O)C and CC(O)C have the same symbols
-        msg = "Improper neighbor counts based on center conn and symbols are unique."
-        # The third one is the center ('Improper Torsional Parameters' in prm)
-        neighbors = [[x[0], x[3], x[1], x[2], x[4]]
-                     for x in symbol_impropers.keys()]
-        # The csmbls in getCountedSymbols is obtained from the following
-        csmbls = sorted(set([y for x in neighbors for y in x[1:]]))  # CHNO
-        counted = [self.countSymbols(x, csmbls=csmbls) for x in neighbors]
-        assert len(symbol_impropers) == len(set(counted))
-        log_debug(msg)
-        self.symbol_impropers = {
-            x: y[3:]
-            for x, y in zip(counted, symbol_impropers.values())
-        }
-
-    @staticmethod
-    def countSymbols(symbols, csmbls='CHNO'):
-        """
-        Count improper cluster symbols: the first is the center atom connectivity
-        including implicit hydrogen atoms. The second is the center atom symbol,
-        and the rest connects with the center.
-
-        :param symbols list: the element symbols forming the improper cluster
-            with first being the center
-        :param csmbls str: all possible cluster symbols
-        """
-        # e.g., ['3', 'C', 'C', 'N', 'O']
-        counted = [y + str(symbols[2:].count(y)) for y in csmbls]
-        # e.g., '3CC1H0N1O1'
-        return ''.join(symbols[:2] + counted)
 
     def setImpropers(self, csymbols=IMPROPER_CENTER_SYMBOLS):
         """
@@ -382,10 +317,10 @@ class Mol(structure.Mol):
             # Sp2 N in Amino Acid
             improper_id += 1
             neighbor_symbols = [x.GetSymbol() for x in neighbors]
-            counted = self.countSymbols(
+            counted = self.ff.countSymbols(
                 [str(oplsua.OplsParser.getAtomConnt(atom)), atom_symbol] +
                 neighbor_symbols)
-            improper_type_id = self.symbol_impropers[counted][0]
+            improper_type_id = self.ff.improper_symbols[counted][0]
             # FIXME: see docstring for current investigation. (NO ACTIONS TAKEN)
             #  1) LAMMPS recommends the first to be the center, while the prm
             #  and literature order the third as the center.
