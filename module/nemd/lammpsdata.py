@@ -1,5 +1,4 @@
 import io
-import copy
 import math
 
 import scipy
@@ -8,6 +7,7 @@ import base64
 import itertools
 import collections
 import numpy as np
+from rdkit import Chem
 from scipy import constants
 
 from nemd import oplsua
@@ -15,6 +15,7 @@ from nemd import symbols
 from nemd import logutils
 from nemd import lammpsin
 from nemd import structure
+from nemd import constants as nconstant
 
 logger = logutils.createModuleLogger(file_path=__file__)
 
@@ -183,8 +184,6 @@ class Mol(structure.Mol):
     def adjustBondLength(self):
         """
         Adjust bond length according to the force field parameters.
-
-        :param adjust_bond_legnth bool: adjust bond length if True.
         """
         # Set the bond lengths of one conformer
         tpl = self.GetConformer()
@@ -384,8 +383,25 @@ class Mol(structure.Mol):
                     break
             self.angles.pop(self.rvrs_angles[angle_atom_ids])
 
+    @property
+    def bond_total(self):
+        return len(self.bonds) * self.GetNumConformers()
+
+    @property
+    def angle_total(self):
+        return len(self.angles) * self.GetNumConformers()
+
+    @property
+    def dihedral_total(self):
+        return len(self.dihedrals) * self.GetNumConformers()
+
+    @property
+    def improper_total(self):
+        return len(self.impropers) * self.GetNumConformers()
+
 
 class Struct(structure.Struct):
+
     MolClass = Mol
 
 
@@ -538,27 +554,31 @@ class LammpsData(LammpsStruct):
 
         atypes = sorted(set(x.GetIntProp(self.TYPE_ID) for x in self.atoms))
         self.atm_types = {y: x for x, y in enumerate(atypes, start=1)}
-        btypes = sorted(set(x[0] for x in self.bonds.values()))
-        self.bnd_types = {y: x for x, y in enumerate(btypes, start=1)}
-        antypes = sorted(set(x[0] for x in self.angles.values()))
-        self.ang_types = {y: x for x, y in enumerate(antypes, start=1)}
-        dtps = sorted(set(x[0] for x in self.dihedrals.values()))
-        self.dihe_types = {y: x for x, y in enumerate(dtps, start=1)}
-        itps = sorted(set(x[0] for x in self.impropers.values()))
-        self.impr_types = {y: x for x, y in enumerate(itps, start=1)}
+        btypes = set(y[0] for x in self.molecules for y in x.bonds.values())
+        self.bnd_types = {y: x for x, y in enumerate(sorted(btypes), start=1)}
+        antypes = set(y[0] for x in self.molecules for y in x.angles.values())
+        self.ang_types = {y: x for x, y in enumerate(sorted(antypes), start=1)}
+        dtps = set(y[0] for x in self.molecules for y in x.dihedrals.values())
+        self.dihe_types = {y: x for x, y in enumerate(sorted(dtps), start=1)}
+        itps = set(y[0] for x in self.molecules for y in x.impropers.values())
+        self.impr_types = {y: x for x, y in enumerate(sorted(itps), start=1)}
 
     def writeDescription(self):
         """
-        Write the lammps description section, including the number of atom, bond,
-        angle etc.
+        Write the lammps description section, including the number of atom,
+        bond, angle etc.
         """
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.data_hdl.write(f"{lmp_dsp}\n\n")
         self.data_hdl.write(f"{self.atom_total} {self.ATOMS}\n")
-        self.data_hdl.write(f"{len(self.bonds)} {self.BONDS}\n")
-        self.data_hdl.write(f"{len(self.angles)} {self.ANGLES}\n")
-        self.data_hdl.write(f"{len(self.dihedrals)} {self.DIHEDRALS}\n")
-        self.data_hdl.write(f"{len(self.impropers)} {self.IMPROPERS}\n\n")
+        bond_num = sum([x.bond_total for x in self.molecules])
+        self.data_hdl.write(f"{bond_num} {self.BONDS}\n")
+        angle_num = sum([x.angle_total for x in self.molecules])
+        self.data_hdl.write(f"{angle_num} {self.ANGLES}\n")
+        dihedral_num = sum([x.dihedral_total for x in self.molecules])
+        self.data_hdl.write(f"{dihedral_num} {self.DIHEDRALS}\n")
+        improper_num = sum([x.improper_total for x in self.molecules])
+        self.data_hdl.write(f"{improper_num} {self.IMPROPERS}\n\n")
 
     def writeTopoType(self):
         """
@@ -582,11 +602,7 @@ class LammpsData(LammpsStruct):
         :param min_box list: minimum box size
         :param buffer list: buffer in three dimensions
         """
-
-        xyzs = np.concatenate([
-            y.GetPositions() for x in self.mols.values()
-            for y in x.GetConformers()
-        ])
+        xyzs = self.getPositions()
         ctr = xyzs.mean(axis=0)
         box_hf = self.getHalfBox(xyzs, min_box=min_box, buffer=buffer)
         box = [[x - y, x + y, z] for x, y, z in zip(ctr, box_hf, self.LO_HI)]
@@ -598,14 +614,8 @@ class LammpsData(LammpsStruct):
             self.data_hdl.write(f"{' '.join(line)}\n")
         self.data_hdl.write("\n")
         # Calculate density as the revised box may alter the box size.
-        weight = sum([
-            self.ff.molecular_weight(x) * x.GetNumConformers()
-            for x in self.molecules
-        ])
-        edges = [
-            x * 2 * scipy.constants.angstrom / scipy.constants.centi
-            for x in box_hf
-        ]
+        weight = sum([x.mw * x.GetNumConformers() for x in self.molecules])
+        edges = [x * 2 * nconstant.ANG_TO_CM for x in box_hf]
         self.density = weight / math.prod(edges) / scipy.constants.Avogadro
 
     def getHalfBox(self, xyzs, min_box=None, buffer=None):
@@ -630,7 +640,7 @@ class LammpsData(LammpsStruct):
         if self.box is not None:
             box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        if sum([x.GetNumConformers() for x in self.mols.values()]) != 1:
+        if self.getNumConformers() != 1:
             return box_hf
         # All-trans single molecule with internal tension runs into clashes
         # across PBCs and thus larger box is used.
@@ -641,12 +651,10 @@ class LammpsData(LammpsStruct):
         Write out mass information.
         """
         self.data_hdl.write(f"{self.MASSES}\n\n")
-        for atom_id, atom in self.ff.atoms.items():
-            if self.concise and atom_id not in self.atm_types:
-                continue
-            atm_id = self.atm_types[atom_id] if self.concise else atom_id
-            dscrptn = f"{atom.description} {atom.symbol} {atom_id}" if self.concise else atom.description
-            self.data_hdl.write(f"{atm_id} {atom.mass} # {dscrptn}\n")
+        for oid, id in self.atm_types.items():
+            atom = self.ff.atoms[oid]
+            dscrptn = f"{atom.description} {atom.symbol} {oid}"
+            self.data_hdl.write(f"{id} {atom.mass} # {dscrptn}\n")
         self.data_hdl.write(f"\n")
 
     def writePairCoeffs(self):
@@ -654,12 +662,9 @@ class LammpsData(LammpsStruct):
         Write pair coefficients.
         """
         self.data_hdl.write(f"{self.PAIR_COEFFS}\n\n")
-        for atom in self.ff.atoms.values():
-            if self.concise and atom.id not in self.atm_types:
-                continue
-            vdw = self.ff.vdws[atom.id]
-            atom_id = self.atm_types[atom.id] if self.concise else atom.id
-            self.data_hdl.write(f"{atom_id} {vdw.ene:.4f} {vdw.dist:.4f}\n")
+        for oid, id in self.atm_types.items():
+            vdw = self.ff.vdws[oid]
+            self.data_hdl.write(f"{id} {vdw.ene:.4f} {vdw.dist:.4f}\n")
         self.data_hdl.write("\n")
 
     def writeBondCoeffs(self):
@@ -671,11 +676,9 @@ class LammpsData(LammpsStruct):
             return
 
         self.data_hdl.write(f"{self.BOND_COEFFS}\n\n")
-        for bond in self.ff.bonds.values():
-            if self.concise and bond.id not in self.bnd_types:
-                continue
-            bond_id = self.bnd_types[bond.id] if self.concise else bond.id
-            self.data_hdl.write(f"{bond_id}  {bond.ene} {bond.dist}\n")
+        for oid, id in self.bnd_types.items():
+            bond = self.ff.bonds[oid]
+            self.data_hdl.write(f"{id}  {bond.ene} {bond.dist}\n")
         self.data_hdl.write("\n")
 
     def writeAngleCoeffs(self):
@@ -686,11 +689,9 @@ class LammpsData(LammpsStruct):
             return
 
         self.data_hdl.write(f"{self.ANGLE_COEFFS}\n\n")
-        for angle in self.ff.angles.values():
-            if self.concise and angle.id not in self.ang_types:
-                continue
-            angle_id = self.ang_types[angle.id] if self.concise else angle.id
-            self.data_hdl.write(f"{angle_id} {angle.ene} {angle.angle}\n")
+        for oid, id in self.ang_types.items():
+            angle = self.ff.angles[oid]
+            self.data_hdl.write(f"{id} {angle.ene} {angle.angle}\n")
         self.data_hdl.write("\n")
 
     def writeDihedralCoeffs(self):
@@ -701,21 +702,18 @@ class LammpsData(LammpsStruct):
             return
 
         self.data_hdl.write(f"{self.DIHEDRAL_COEFFS}\n\n")
-        for dihe in self.ff.dihedrals.values():
-            if self.concise and dihe.id not in self.dihe_types:
-                continue
-            dihedral_id = self.dihe_types[dihe.id] if self.concise else dihe.id
+        for oid, id in self.dihe_types.items():
             params = [0., 0., 0., 0.]
             # LAMMPS: K1, K2, K3, K4 in 0.5*K1[1+cos(x)] + 0.5*K2[1-cos(2x)]...
             # OPLS: [1 + cos(nx-gama)]
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
-            for ene_ang_n in dihe.constants:
+            for ene_ang_n in self.ff.dihedrals[oid].constants:
                 params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
-                if params[ene_ang_n.n_parm] and ((ene_ang_n.angle == 180.) ^
-                                                 (not ene_ang_n.n_parm % 2)):
+                if not params[ene_ang_n.n_parm]:
+                    continue
+                if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
                     params[ene_ang_n.n_parm] *= -1
-            self.data_hdl.write(
-                f"{dihedral_id}  {' '.join(map(str, params))}\n")
+            self.data_hdl.write(f"{id}  {' '.join(map(str, params))}\n")
         self.data_hdl.write("\n")
 
     def writeImproperCoeffs(self):
@@ -726,15 +724,12 @@ class LammpsData(LammpsStruct):
             return
 
         self.data_hdl.write(f"{self.IMPROPER_COEFFS}\n\n")
-        for impr in self.ff.impropers.values():
-            if self.concise and impr.id not in self.impr_types:
-                continue
-            improper_id = self.impr_types[impr.id] if self.concise else impr.id
+        for oid, id in self.impr_types.items():
+            impr = self.ff.impropers[oid]
             # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
             sign = 1 if impr.angle == 0. else -1
-            self.data_hdl.write(
-                f"{improper_id} {impr.ene} {sign} {impr.n_parm}\n")
+            self.data_hdl.write(f"{id} {impr.ene} {sign} {impr.n_parm}\n")
         self.data_hdl.write("\n")
 
     def writeAtoms(self, fmt='%i %i %i %.4f %.3f %.3f %.3f'):

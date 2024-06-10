@@ -12,7 +12,6 @@ molecules into condensed phase amorphous cell.
 import os
 import sys
 import copy
-import lammps
 import functools
 import collections
 import numpy as np
@@ -24,7 +23,6 @@ from nemd import oplsua
 from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
-from nemd import fileutils
 from nemd import structure
 from nemd import lammpsdata
 from nemd import rdkitutils
@@ -440,9 +438,7 @@ class Mol(structure.Mol):
             Chem.GetSymmSSSR(self)
             return
 
-        trans_conf = Conformer(self,
-                               self.cru_mol,
-                               options=self.options)
+        trans_conf = Conformer(self, self.cru_mol, options=self.options)
         trans_conf.run()
 
     def setConformers(self):
@@ -464,25 +460,17 @@ class Conformer(object):
     MONO_ID = Mol.MONO_ID
     OUT_EXTN = '.sdf'
 
-    def __init__(self,
-                 polym,
-                 original_cru_mol,
-                 options=None,
-                 jobname=None):
+    def __init__(self, polym, original_cru_mol, options=None):
         """
         :param polym 'rdkit.Chem.rdchem.Mol': the polymer to set conformer
         :param original_cru_mol 'rdkit.Chem.rdchem.Mol': the monomer mol
             constructing the polymer
         :param options 'argparse.Namespace': command line options.
-        :param jobname str: The jobname
         """
         self.polym = polym
         self.original_cru_mol = original_cru_mol
         self.options = options
-        self.jobname = jobname
         self.ff = oplsua.get_opls_parser()
-        if self.jobname is None:
-            self.jobname = 'conf_search'
         self.relax_dir = '_relax'
         self.data_file = 'polym.data'
         self.conformer = None

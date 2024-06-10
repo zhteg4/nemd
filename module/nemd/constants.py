@@ -9,6 +9,6 @@ from scipy import constants
 
 LARGE_NUM = 1000000
 ONE_ONE_ONE = (1, 1, 1,) # yapf: disable
-
+ANG_TO_CM = constants.angstrom / constants.centi
 CM_INV_THZ = constants.physical_constants['inverse meter-hertz relationship'][
     0] / constants.tera / constants.centi
