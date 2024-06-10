@@ -21,18 +21,32 @@ class Mol(structure.Mol):
     LATTICE_PARAMETERS = 'lattice_params'
     DIMENSIONS = 'dimensions'
 
-    def __init__(self, mol, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         lt_params = kwargs.pop(self.LATTICE_PARAMETERS, None)
         dimensions = kwargs.pop(self.DIMENSIONS, None)
-        super().__init__(mol, *args, **kwargs)
-        self.lattice_params = lt_params if lt_params else mol.lattice_params
-        self.dimensions = dimensions if dimensions else mol.dimensions
+        super().__init__(*args, **kwargs)
+        if not args:
+            return
+        self.lattice_params = lt_params if lt_params else args[0].lattice_params
+        self.dimensions = dimensions if dimensions else args[0].dimensions
 
     def getBox(self):
         if self.lattice_params is None:
             return
         param = self.lattice_params[:3]
         return np.array(param) * self.dimensions
+
+    @classmethod
+    def fromAtoms(cls, atoms, *args, **kwargs):
+        emol = Chem.EditableMol(Chem.Mol())
+        atoms = sorted(atoms, key=lambda x: tuple(x.coords_fractional))
+        [emol.AddAtom(Chem.rdchem.Atom(x.atomic_number)) for x in atoms]
+        mol = cls(emol.GetMol(), *args, **kwargs)
+        cfm = structure.Conformer(mol.GetNumAtoms())
+        xyz = np.array([x.coords_cartesian for x in atoms])
+        cfm.setPositions(xyz)
+        mol.AddConformer(cfm)
+        return mol
 
 
 class Struct(structure.Struct):
@@ -86,18 +100,9 @@ class CrystalBuilder(object):
 
         :return 'rdkit.Chem.rdchem.Mol': the molecule in the supercell.
         """
-        atoms = [x for x in self.scell.atoms]
-        atoms = sorted(atoms, key=lambda x: tuple(x.coords_fractional))
-        mol = Chem.Mol()
-        emol = Chem.EditableMol(mol)
-        idxs = [emol.AddAtom(Chem.rdchem.Atom(x.atomic_number)) for x in atoms]
-        mol = structure.Mol(emol.GetMol())
-        cfm = structure.Conformer(mol.GetNumAtoms())
-        [cfm.SetAtomPosition(x, atoms[x].coords_cartesian) for x in idxs]
-        mol.AddConformer(cfm)
-        return Mol(mol,
-                   lattice_params=self.scell.lattice_parameters,
-                   dimensions=self.scell.dimensions)
+        return Mol.fromAtoms(self.scell.atoms,
+                             lattice_params=self.scell.lattice_parameters,
+                             dimensions=self.scell.dimensions)
 
     def writeDispPattern(self):
         """

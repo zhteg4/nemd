@@ -143,27 +143,26 @@ class Mol(rdkit.Chem.rdchem.Mol):
         """
         super().__init__(*args, **kwargs)
         # Save original reference otherwise this conf interface may be deleted.
-        self.mol = args[0] if args else None
         self.struct = struct
         self.ff = ff
         self.delay = delay
         self.conf_id = 0
         self.confs = {}
-        for map_num, atom in enumerate(self.GetAtoms(), start=1):
-            atom.SetAtomMapNum(map_num)
         if delay:
             return
-        self.setUp()
+        for map_num, atom in enumerate(self.GetAtoms(), start=1):
+            atom.SetAtomMapNum(map_num)
+        if args:
+            self.setUp(args[0])
 
-    def setUp(self, mol=None, cid=1, gid=1):
+    def setUp(self, mol, cid=1, gid=1):
         """
-        Set up the molecule and conformers including global ids and references.
+        Set up the conformers including global ids and references.
 
+        :param mol `rdkit.Chem.rdchem.Mol`: the original molecule.
         :param cid int: the conformer gid to start with.
         :param gid int: the starting global id.
         """
-        if mol is None:
-            mol = self.mol
         if mol is None:
             return
         if self.struct and self.struct.conformers:
@@ -226,7 +225,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         Chem.AllChem.EmbedMolecule(self, **kwargs)
         self.confs.clear()
         self.confs[0] = super().GetConformer(0)
-        self.setUp(mol=self)
+        self.setUp(self)
 
     @property
     def molecular_weight(self):
