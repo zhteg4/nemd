@@ -247,7 +247,7 @@ class AmorphousCell(object):
                                     jobname=self.options.jobname,
                                     box=self.struct.box,
                                     options=self.options)
-        lmw.writeData(adjust_coords=False)
+        lmw.writeData()
         if not np.isclose(lmw.density, self.struct.density):
             log_warning(
                 f'The density of the final data file is {lmw.density:.4g} kg/cm^3'
@@ -673,9 +673,6 @@ class Conformer(object):
                                          options=self.options)
         xyz = struct.mols[0].GetConformer().GetPositions()
         self.polym.GetConformers()[0].setPositions(xyz)
-        if self.minimization:
-            return
-        self.lmw.setOneMolData(adjust_coords=True)
 
     def minimize(self):
         """

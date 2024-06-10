@@ -119,14 +119,14 @@ class Mol(structure.Mol):
         self.nbr_charge = collections.defaultdict(float)
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
+        self.setTopo()
 
-    def run(self, adjust_coords=True):
+    def setTopo(self):
         """
         Set charge, bond, angle, dihedral, improper, and other topology params.
         """
         self.balanceCharge()
         self.setBonds()
-        self.adjustBondLength(adjust_coords)
         self.setAngles()
         self.setDihedrals()
         self.setImpropers()
@@ -180,14 +180,12 @@ class Mol(structure.Mol):
             self.bonds[bond_id] = tuple([bond.id, *atom_ids])
             self.rvrs_bonds[tuple(atom_ids)] = bond.id
 
-    def adjustBondLength(self, adjust_bond_legnth=True):
+    def adjustBondLength(self):
         """
         Adjust bond length according to the force field parameters.
 
         :param adjust_bond_legnth bool: adjust bond length if True.
         """
-        if not adjust_bond_legnth:
-            return
         # Set the bond lengths of one conformer
         tpl = self.GetConformer()
         for bond in self.GetBonds():
@@ -478,30 +476,15 @@ class LammpsData(LammpsStruct):
             f'fix rigid all shake 0.0001 10 10000 b {btype_ids} a {atype_ids}\n'
         )
 
-    def setOneMolData(self, adjust_coords=True):
-        """
-        Set one molecule for each molecule type.
-
-        :param adjust_coords bool: whether adjust coordinates of the molecules.
-            This only good for a small piece as clashes between non-bonded atoms
-            may be introduced.
-        """
-        for mol in self.molecules:
-            mol.run(adjust_coords=adjust_coords)
-
-    def writeData(self, adjust_coords=True, nofile=False):
+    def writeData(self, nofile=False):
         """
         Write out LAMMPS data file.
 
-        :param adjust_coords bool: whether adjust coordinates of the molecules.
-            This only good for a small piece as clashes between non-bonded atoms
-            may be introduced.
         :param nofile bool: return the string instead of writing to a file if True
         """
 
         with io.StringIO() if nofile else open(self.datafile,
                                                'w') as self.data_hdl:
-            self.setOneMolData(adjust_coords=adjust_coords)
             self.setBADI()
             self.removeUnused()
             self.writeDescription()
