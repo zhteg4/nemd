@@ -103,43 +103,22 @@ class LammpsDataBase(lammpsin.LammpsIn):
         return any(charges)
 
 
-class Struct(structure.Struct, LammpsDataBase):
+class Mol(structure.Mol):
 
-    def __init__(self, struct, *args, jobname='tmp', **kwargs):
-        """
-        :param struct 'Struct': structure with molecules and conformers
-        :param jobname str: jobname based on which out filenames are defined
-        """
-        super(Struct, self).__init__(struct)
-        LammpsDataBase.__init__(self, *args, jobname=jobname, **kwargs)
-
-
-class LammpsDataOne(Struct):
-    """
-    Class to set bond, angle, dihedral, improper parameters, and other topology
-    information.
-    """
     RES_NUM = oplsua.RES_NUM
+    TYPE_ID = oplsua.TYPE_ID
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
 
-    def __init__(self, *arg, **kwarg):
-        super().__init__(*arg, **kwarg)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.symbol_impropers = {}
-        self.atm_types = {}
-        self.bnd_types = {}
-        self.ang_types = {}
-        self.dihe_types = {}
-        self.impr_types = {}
+        self.bonds = {}
+        self.angles = {}
+        self.dihedrals = {}
+        self.impropers = {}
+        self.nbr_charge = collections.defaultdict(float)
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
-        self.dihe_map = None
-
-    def adjustCoords(self):
-        """
-        Adjust the coordinates based bond length etc.
-        """
-        self.setBonds()
-        self.adjustBondLength()
 
     def run(self, adjust_coords=True):
         """
@@ -158,46 +137,42 @@ class LammpsDataOne(Struct):
         """
         Balance the charge when residues are not neutral.
         """
+        # residual num: residual charge
+        res_charge = collections.defaultdict(float)
+        for atom in self.GetAtoms():
+            res_num = atom.GetIntProp(self.RES_NUM)
+            type_id = atom.GetIntProp(self.TYPE_ID)
+            res_charge[res_num] += self.ff.charges[type_id]
 
-        for mol_id, mol in self.mols.items():
-            # residual num: residual charge
-            res_charge = collections.defaultdict(float)
-            for atom in mol.GetAtoms():
-                res_num = atom.GetIntProp(self.RES_NUM)
-                type_id = atom.GetIntProp(self.TYPE_ID)
-                res_charge[res_num] += self.ff.charges[type_id]
-
-            res_snacharge = {x: 0 for x, y in res_charge.items() if y}
-            res_atom = {}
-            for bond in mol.GetBonds():
-                batom, eatom = bond.GetBeginAtom(), bond.GetEndAtom()
-                bres_num = batom.GetIntProp(self.RES_NUM)
-                eres_num = eatom.GetIntProp(self.RES_NUM)
-                if bres_num == eres_num:
+        res_snacharge = {x: 0 for x, y in res_charge.items() if y}
+        res_atom = {}
+        for bond in self.GetBonds():
+            batom, eatom = bond.GetBeginAtom(), bond.GetEndAtom()
+            bres_num = batom.GetIntProp(self.RES_NUM)
+            eres_num = eatom.GetIntProp(self.RES_NUM)
+            if bres_num == eres_num:
+                continue
+            # Bonded atoms in different residuals
+            for atom, natom in [[batom, eatom], [eatom, batom]]:
+                nres_num = natom.GetIntProp(self.RES_NUM)
+                ncharge = res_charge[nres_num]
+                if not ncharge:
                     continue
-                # Bonded atoms in different residuals
-                for atom, natom in [[batom, eatom], [eatom, batom]]:
-                    nres_num = natom.GetIntProp(self.RES_NUM)
-                    ncharge = res_charge[nres_num]
-                    if not ncharge:
-                        continue
-                    # The natom lives in nres with total charge
-                    snatom_charge = abs(self.ff.charges[natom.GetIntProp(
-                        self.TYPE_ID)])
-                    if snatom_charge > res_snacharge[nres_num]:
-                        res_atom[nres_num] = atom.GetIdx()
-                        res_snacharge[nres_num] = snatom_charge
-            nbr_charge = collections.defaultdict(float)
-            for res, idx in res_atom.items():
-                nbr_charge[idx] -= res_charge[res]
-            self.nbr_charge[mol_id] = nbr_charge
+                # The natom lives in nres with total charge
+                snatom_charge = abs(self.ff.charges[natom.GetIntProp(
+                    self.TYPE_ID)])
+                if snatom_charge > res_snacharge[nres_num]:
+                    res_atom[nres_num] = atom.GetIdx()
+                    res_snacharge[nres_num] = snatom_charge
+
+        for res, idx in res_atom.items():
+            self.nbr_charge[idx] -= res_charge[res]
 
     def setBonds(self):
         """
         Set bonding information.
         """
-        bonds = [y for x in self.molecules for y in x.GetBonds()]
-        for bond_id, bond in enumerate(bonds, start=1):
+        for bond_id, bond in enumerate(self.GetBonds(), start=1):
             bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
             bond = self.ff.getMatchedBonds(bonded)[0]
             atom_id1 = bonded[0].GetAtomMapNum()
@@ -214,27 +189,25 @@ class LammpsDataOne(Struct):
         """
         if not adjust_bond_legnth:
             return
-        for mol in self.molecules:
-            # Set the bond lengths of one conformer
-            tpl = mol.GetConformer()
-            for bond in mol.GetBonds():
-                bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
-                gids = set([x.GetAtomMapNum() for x in bonded])
-                bond_type = self.rvrs_bonds[tuple(sorted(gids))]
-                dist = self.ff.bonds[bond_type].dist
-                tpl.setBondLength([x.GetIdx() for x in bonded], dist)
-            # Update all conformers
-            xyz = tpl.GetPositions()
-            for conf in mol.GetConformers():
-                conf.setPositions(xyz)
+        # Set the bond lengths of one conformer
+        tpl = self.GetConformer()
+        for bond in self.GetBonds():
+            bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
+            gids = set([x.GetAtomMapNum() for x in bonded])
+            bond_type = self.rvrs_bonds[tuple(sorted(gids))]
+            dist = self.ff.bonds[bond_type].dist
+            tpl.setBondLength([x.GetIdx() for x in bonded], dist)
+        # Update all conformers
+        xyz = tpl.GetPositions()
+        for conf in self.GetConformers():
+            conf.setPositions(xyz)
 
     def setAngles(self):
         """
         Set angle force field matches.
         """
-
-        angs = [y for x in self.atoms for y in self.ff.getAngleAtoms(x)]
-        for angle_id, atoms in enumerate(angs, start=1):
+        angles = [y for x in self.GetAtoms() for y in self.ff.getAngleAtoms(x)]
+        for angle_id, atoms in enumerate(angles, start=1):
             angle = self.ff.getMatchedAngles(atoms)[0]
             atom_ids = tuple(x.GetAtomMapNum() for x in atoms)
             self.angles[angle_id] = (angle.id, ) + atom_ids
@@ -245,15 +218,13 @@ class LammpsDataOne(Struct):
         Set the dihedral angles of the molecules.
         """
 
-        dihe_atoms = [
-            y for x in self.molecules for y in self.getDihAtomsFromMol(x)
-        ]
+        dihe_atoms = self.getDihAtomsFromMol()
         for dihedral_id, atoms in enumerate(dihe_atoms, start=1):
             dihedral = self.ff.getMatchedDihedrals(atoms)[0]
             atom_ids = tuple([x.GetAtomMapNum() for x in atoms])
             self.dihedrals[dihedral_id] = (dihedral.id, ) + atom_ids
 
-    def getDihAtomsFromMol(self, mol):
+    def getDihAtomsFromMol(self):
         """
         Get the dihedral atoms of this molecule.
 
@@ -263,7 +234,7 @@ class LammpsDataOne(Struct):
         :param 'rdkit.Chem.rdchem.Mol': the molecule to get dihedral atoms.
         :return list of list: each sublist has four atom ids forming a dihedral angle.
         """
-        atomss = [y for x in mol.GetAtoms() for y in self.getDihedralAtoms(x)]
+        atomss = [y for x in self.GetAtoms() for y in self.getDihedralAtoms(x)]
         # 1-2-3-4 and 4-3-2-1 are the same dihedral
         atomss_no_flip = []
         atom_idss = set()
@@ -400,7 +371,7 @@ class LammpsDataOne(Struct):
         Multipole Models
         """
         improper_id = 0
-        for atom in self.atoms:
+        for atom in self.GetAtoms():
             atom_symbol, neighbors = atom.GetSymbol(), atom.GetNeighbors()
             if atom_symbol not in csymbols or len(neighbors) != 3:
                 continue
@@ -481,7 +452,22 @@ class LammpsDataOne(Struct):
             self.angles.pop(self.rvrs_angles[angle_atom_ids])
 
 
-class LammpsData(Struct):
+class Struct(structure.Struct):
+    MolClass = Mol
+
+
+class LammpsStruct(Struct, LammpsDataBase):
+
+    def __init__(self, struct, *args, jobname='tmp', ff=None, **kwargs):
+        """
+        :param struct 'Struct': structure with molecules and conformers
+        :param jobname str: jobname based on which out filenames are defined
+        """
+        Struct.__init__(self, struct, ff=ff)
+        LammpsDataBase.__init__(self, *args, jobname=jobname, ff=ff, **kwargs)
+
+
+class LammpsData(LammpsStruct):
 
     def __init__(self,
                  struct,
@@ -565,12 +551,8 @@ class LammpsData(Struct):
             This only good for a small piece as clashes between non-bonded atoms
             may be introduced.
         """
-        for mol_id, mol in self.mols.items():
-            struct = copy.copy(self)
-            struct.mols = {0: mol}
-            mol_dat = LammpsDataOne(struct, ff=self.ff, jobname=self.jobname)
-            mol_dat.run(adjust_coords=adjust_coords)
-            self.mol_dat[mol_id] = mol_dat
+        for mol in self.molecules:
+            mol.run(adjust_coords=adjust_coords)
 
     def writeData(self, adjust_coords=True, nofile=False):
         """
@@ -609,26 +591,25 @@ class LammpsData(Struct):
         all molecules.
         """
         bond_id, angle_id, dihedral_id, improper_id, atom_num = [0] * 5
-        for tpl_id, tpl_dat in self.mol_dat.items():
-            self.nbr_charge[tpl_id] = tpl_dat.nbr_charge[0]
-            for _ in range(tpl_dat.mols[0].GetNumConformers()):
-                for id in tpl_dat.bonds.values():
+        for mol in self.molecules:
+            for _ in range(mol.GetNumConformers()):
+                for id in mol.bonds.values():
                     bond_id += 1
                     bond = tuple([id[0]] + [x + atom_num for x in id[1:]])
                     self.bonds[bond_id] = bond
-                for id in tpl_dat.angles.values():
+                for id in mol.angles.values():
                     angle_id += 1
                     angle = tuple([id[0]] + [x + atom_num for x in id[1:]])
                     self.angles[angle_id] = angle
-                for id in tpl_dat.dihedrals.values():
+                for id in mol.dihedrals.values():
                     dihedral_id += 1
                     dihedral = tuple([id[0]] + [x + atom_num for x in id[1:]])
                     self.dihedrals[dihedral_id] = dihedral
-                for id in tpl_dat.impropers.values():
+                for id in mol.impropers.values():
                     improper_id += 1
                     improper = tuple([id[0]] + [x + atom_num for x in id[1:]])
                     self.impropers[improper_id] = improper
-                atom_num += tpl_dat.mols[0].GetNumAtoms()
+                atom_num += mol.GetNumAtoms()
 
     def removeUnused(self):
         """
@@ -854,17 +835,15 @@ class LammpsData(Struct):
             data[:, 2] = [
                 self.atm_types[x] if self.concise else x for x in type_ids
             ]
-            charges = [
-                self.nbr_charge[tpl_id][x.GetIdx()] for x in mol.GetAtoms()
-            ]
+            charges = [mol.nbr_charge[x.GetIdx()] for x in mol.GetAtoms()]
             data[:, 3] = [
                 x + self.ff.charges[y] for x, y in zip(charges, type_ids)
             ]
             data[:, 0] += pre_atoms
             for conformer in mol.GetConformers():
                 data[:, 1] = conformer.gid
-                data[:, 4:] = self.mol_dat[tpl_id].mols[0].GetConformer(
-                    conformer.GetId()).GetPositions()
+                data[:,
+                     4:] = mol.GetConformer(conformer.GetId()).GetPositions()
                 np.savetxt(self.data_hdl, data, fmt=fmt)
                 # Increment atom ids by atom number in this conformer so that
                 # the next writing starts from the atoms in previous conformers
