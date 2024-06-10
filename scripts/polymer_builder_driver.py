@@ -422,7 +422,7 @@ class Mol(structure.Mol):
         ff_typer = oplsua.OplsTyper(self, wmodel=wmodel)
         ff_typer.run()
 
-    def embedMol(self, trans=False):
+    def embedMol(self):
         """
         Embed the molecule with coordinates.
 
@@ -430,7 +430,7 @@ class Mol(structure.Mol):
             built.
         """
 
-        if self.GetNumAtoms() <= 200 and not trans:
+        if self.GetNumAtoms() <= 200:
             with rdkitutils.CaptureLogger() as logs:
                 # Mg+2 triggers
                 # WARNING UFFTYPER: Warning: hybridization set to SP3 for atom 0
@@ -442,8 +442,7 @@ class Mol(structure.Mol):
 
         trans_conf = Conformer(self,
                                self.cru_mol,
-                               options=self.options,
-                               trans=trans)
+                               options=self.options)
         trans_conf.run()
 
     def setConformers(self):
@@ -469,24 +468,18 @@ class Conformer(object):
                  polym,
                  original_cru_mol,
                  options=None,
-                 trans=True,
-                 jobname=None,
-                 minimization=False):
+                 jobname=None):
         """
         :param polym 'rdkit.Chem.rdchem.Mol': the polymer to set conformer
         :param original_cru_mol 'rdkit.Chem.rdchem.Mol': the monomer mol
             constructing the polymer
         :param options 'argparse.Namespace': command line options.
-        :param trans bool: Whether all-tran conformation is requested.
         :param jobname str: The jobname
-        :param minimization bool: Whether LAMMPS minimization is performed.
         """
         self.polym = polym
         self.original_cru_mol = original_cru_mol
         self.options = options
-        self.trans = trans
         self.jobname = jobname
-        self.minimization = minimization
         self.ff = oplsua.get_opls_parser()
         if self.jobname is None:
             self.jobname = 'conf_search'
@@ -507,9 +500,6 @@ class Conformer(object):
         self.rotateSideGroups()
         self.setXYZAndVect()
         self.setConformer()
-        self.adjustConformer()
-        self.minimize()
-        self.foldPolym()
 
     def setCruMol(self):
         """
@@ -661,57 +651,6 @@ class Conformer(object):
                 conformer.SetAtomPosition(atom.GetIdx(), xyz)
         self.polym.AddConformer(conformer, assignId=True)
         Chem.GetSymmSSSR(self.polym)
-
-    def adjustConformer(self):
-        """
-        Adjust the conformer coordinates based on the force field.
-        """
-        struct = structure.Struct.fromMols([self.polym])
-        self.lmw = lammpsdata.LammpsData(struct,
-                                         ff=self.ff,
-                                         jobname=self.jobname,
-                                         options=self.options)
-        xyz = struct.mols[0].GetConformer().GetPositions()
-        self.polym.GetConformers()[0].setPositions(xyz)
-
-    def minimize(self):
-        """
-        Run force field minimizer.
-        """
-
-        if not self.minimization:
-            return
-
-        with fileutils.chdir(self.relax_dir):
-            self.lmw.writeData()
-            self.lmw.writeLammpsIn()
-            lmp = lammps.lammps(cmdargs=['-screen', 'none'])
-            lmp.file(self.lmw.lammps_in)
-            lmp.command(f'write_data {self.data_file}')
-            lmp.close()
-            # Don't delete: The following is one example for interactive lammps
-            # min_cycle=10, max_cycle=100, threshold=.99
-            # lmp.command('compute 1 all gyration')
-            # data = []
-            # for iclycle in range(max_cycle):
-            #     lmp.command('run 1000')
-            #     data.append(lmp.extract_compute('1', 0, 0))
-            #     if iclycle >= min_cycle:
-            #         percentage = np.mean(data[-5:]) / np.mean(data[-10:])
-            #         if percentage >= threshold:
-            #             break
-
-    def foldPolym(self):
-        """
-        Fold polymer chain with clash check.
-        """
-
-        if self.trans or not self.minimization:
-            return
-        data_file = os.path.join(self.relax_dir, self.data_file)
-        fmol = structutils.GrownMol(self.polym, data_file=data_file)
-        fmol.run()
-        log('An entangled conformer set.')
 
     @classmethod
     def write(cls, mol, filename):
