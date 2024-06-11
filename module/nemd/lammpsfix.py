@@ -38,14 +38,16 @@ RECORD_PRESS_VOL = f"{FIX} %s all ave/time 1 {{period}} {{period}} " \
                    f"c_thermo_{PRESS} v_{VOL} file {PRESS_VOL_FILE}\n"
 
 IMMED_MODULUS = 'immed_modulus'
-SET_MODULUS = f"""variable {IMMED_MODULUS} python getModulus
+SET_IMMED_MODULUS = f"""variable {IMMED_MODULUS} python getModulus
 python getModulus input 2 {PRESS_VOL_FILE} {{record_num}} return v_{IMMED_MODULUS} format sif here "from nemd.pyfunc import getModulus"
 """
+SET_MODULUS = f'variable modulus equal ${{{IMMED_MODULUS}}}'
 
 IMMED_PRESS = 'immed_press'
-SET_PRESS = f"""variable {IMMED_PRESS} python getPress
+SET_IMMED_PRESS = f"""variable {IMMED_PRESS} python getPress
 python getPress input 1 {PRESS_VOL_FILE} return v_{IMMED_PRESS} format sf here "from nemd.pyfunc import getPress"
 """
+SET_PRESS = f'variable press equal ${{{IMMED_PRESS}}}'
 
 FACTOR = 'factor'
 SET_FACTOR = f"""variable {FACTOR} python getBdryFactor
@@ -85,3 +87,9 @@ variable zl delete
 """
 
 SET_LABEL = "label {label}"
+SET_LOOP = "variable {id} loop 0 {end} pad"
+MKDIR = "shell mkdir {dir}"
+CD = "shell cd {dir}"
+JUMP = "jump SELF {label}"
+IF_JUMP = f'if "{{cond}}" then "{JUMP}"'
+PRINT = 'print "{var} = ${{{var}}}"'

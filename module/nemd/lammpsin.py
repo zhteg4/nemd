@@ -1,3 +1,4 @@
+import os
 import math
 import string
 import numpy as np
@@ -30,16 +31,31 @@ class FixWriter:
     DUMP_ID = lammpsfix.DUMP_ID
     DUMP_Q = lammpsfix.DUMP_Q
     SET_VOL = lammpsfix.SET_VOL
+    SET_AMP = lammpsfix.SET_AMP
+    PRESS = lammpsfix.PRESS
+    IMMED_PRESS = lammpsfix.IMMED_PRESS
+    SET_IMMED_PRESS = lammpsfix.SET_IMMED_PRESS
     SET_PRESS = lammpsfix.SET_PRESS
+    MODULUS = lammpsfix.MODULUS
+    IMMED_MODULUS = lammpsfix.IMMED_MODULUS
+    SET_IMMED_MODULUS = lammpsfix.SET_IMMED_MODULUS
     SET_MODULUS = lammpsfix.SET_MODULUS
     SET_FACTOR = lammpsfix.SET_FACTOR
     SET_LABEL = lammpsfix.SET_LABEL
     FIX_DEFORM = lammpsfix.FIX_DEFORM
-    VARIABLE_AMP = lammpsfix.VARIABLE_AMP
     WIGGLE_DIM = lammpsfix.WIGGLE_DIM
     WIGGLE_VOL = lammpsfix.WIGGLE_VOL
     RECORD_PRESS_VOL = lammpsfix.RECORD_PRESS_VOL
     CHANGE_BDRY = lammpsfix.CHANGE_BDRY
+    FACTOR = lammpsfix.FACTOR
+    SET_LOOP = lammpsfix.SET_LOOP
+    MKDIR = lammpsfix.MKDIR
+    CD = lammpsfix.CD
+    JUMP = lammpsfix.JUMP
+    IF_JUMP = lammpsfix.IF_JUMP
+    PRINT = lammpsfix.PRINT
+    PRESS_VAR = f'${{{PRESS}}}'
+    MODULUS_VAR = f'${{{MODULUS}}}'
 
     def __init__(self, fh, options=None, testing=True):
         """
@@ -152,9 +168,9 @@ class FixWriter:
         self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
                  temp=self.temp,
-                 spress='${ave_press}',
+                 spress=self.PRESS_VAR,
                  press=self.press,
-                 modulus="${modulus}")
+                 modulus=self.MODULUS_VAR)
 
     def npt(self,
             nstep=20000,
@@ -191,7 +207,13 @@ class FixWriter:
         fix = [x for x in cmd.split(symbols.RETURN) if x.startswith(self.FIX)]
         self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX * len(fix))
 
-    def cycleToPress(self, max_loop=100, num=3, record_num=100):
+    def cycleToPress(self,
+                     max_loop=100,
+                     num=3,
+                     record_num=100,
+                     defm_id='defm_id',
+                     defm_start='defm_start',
+                     defm_break='defm_break'):
         """
         Deform the box by cycles to get close to the target pressure.
         One cycle consists of sinusoidal wave, print properties, deformation,
@@ -201,52 +223,55 @@ class FixWriter:
         :param max_loop int: the maximum number of big cycle loops.
         :param num int: the number of sinusoidal cycles.
         :param record_num int: each sinusoidal wave records this number of data.
+        :param defm_id str: Deformation id loop from 0 to max_loop - 1
+        :param defm_start str: Each deformation loop starts with this label
+        :param defm_break str: Terminate the loop by go to the this label
         """
         # Set variables used in the loop
         self.cmd.append(self.SET_VOL)
         self.cmd.append(self.SET_AMP)
-        self.cmd.append(self.SET_PRESS)
+        self.cmd.append(self.SET_IMMED_PRESS)
+        self.cmd.append(self.SET_IMMED_MODULUS.format(record_num=record_num))
         self.cmd.append(self.SET_FACTOR.format(press=self.options.press))
-        self.cmd.append(self.SET_MODULUS.format(record_num=record_num))
         # The number of steps for one sinusoidal cycle that yields 10 records
         nstep = int(self.relax_step / max_loop / (num + 1))
         nstep = max([int(nstep / record_num), 10]) * record_num
         cyc_nstep = nstep * (num + 1)
         # Each cycle dumps one trajectory frame
         self.cmd.append(self.DUMP_EVERY.format(id=self.DUMP_ID, arg=cyc_nstep))
-        defm_id = 'defm_id'  # deformation id loop from 0 to max_loop - 1
-        self.cmd.append(f"variable {defm_id} loop 0 {max_loop - 1} pad")
-        loop_defm = 'loop_defm'  # Each deformation loop starts with this label
-        self.cmd.append(self.SET_LABEL.format(label=loop_defm))
-        self.cmd.append('print "Deform Id  = ${defm_id}"')
+        self.cmd.append(self.SET_LOOP.format(id=defm_id, end=max_loop - 1))
+        self.cmd.append(self.SET_LABEL.format(label=defm_start))
+        self.cmd.append(self.PRINT.format(var=defm_id))
         # Run in a subdirectory as some output files are of the same names
-        self.cmd.append("shell mkdir defm_${defm_id}")
-        self.cmd.append("shell cd defm_${defm_id}\n")
+        dirname = f"defm_${{{defm_id}}}"
+        self.cmd.append(self.MKDIR.format(dir=dirname))
+        self.cmd.append(self.CD.format(dir=dirname))
+        self.cmd.append("")
         pre = self.getCyclePre(nstep, record_num=record_num)
         self.nvt(nstep=nstep * num, stemp=self.temp, temp=self.temp, pre=pre)
-        self.cmd.append('print "Averaged Press = ${immed_press}"')
-        self.cmd.append('print "Modulus = ${immed_modulus}"')
-        self.cmd.append('print "Scale Factor  = ${factor}"\n')
-        # If last loop or no scaling, go to the break label
-        defm_break = 'defm_break'
-        self.cmd.append(
-            f'if "${{defm_id}} == {max_loop - 1} || ${{factor}} == 1" '
-            f'then "jump SELF {defm_break}"\n')
+        self.cmd.append(self.PRINT.format(var=self.IMMED_PRESS))
+        self.cmd.append(self.PRINT.format(var=self.IMMED_MODULUS))
+        self.cmd.append(self.PRINT.format(var=self.FACTOR))
+        cond = f"${{{defm_id}}} == {max_loop - 1} || ${{{self.FACTOR}}} == 1"
+        self.cmd.append(self.IF_JUMP.format(cond=cond, label=defm_break))
+        self.cmd.append("")
         self.nvt(nstep=nstep / 2,
                  stemp=self.temp,
                  temp=self.temp,
                  pre=self.FIX_DEFORM)
         self.nvt(nstep=nstep / 2, stemp=self.temp, temp=self.temp)
-        self.cmd.append("shell cd ..")
+        self.cmd.append(self.CD.format(dir=os.pardir))
         self.cmd.append(f"next {defm_id}")
-        self.cmd.append(f"jump SELF {loop_defm}\n")
+        self.cmd.append(self.JUMP.format(label=defm_start))
+        self.cmd.append("")
         self.cmd.append(self.SET_LABEL.format(label=defm_break))
         # Record press and modulus as immediate variable evaluation uses files
-        self.cmd.append('variable ave_press equal ${immed_press}')
-        self.cmd.append('variable modulus equal ${immed_modulus}')
-        self.cmd.append('shell cd ..\n')
-        self.cmd.append(
-            self.DUMP_EVERY.format(id=self.DUMP_ID, arg=self.DUMP_Q))
+        self.cmd.append(self.SET_MODULUS)
+        self.cmd.append(self.SET_PRESS)
+        self.cmd.append(self.CD.format(dir=os.pardir))
+        self.cmd.append("")
+        cmd = self.DUMP_EVERY.format(id=self.DUMP_ID, arg=self.DUMP_Q) + '\n'
+        self.cmd.append(cmd)
 
     def getCyclePre(self, nstep, record_num=100):
         """
@@ -274,7 +299,7 @@ class FixWriter:
                      stemp=self.temp,
                      temp=self.temp,
                      press=self.press,
-                     modulus="${modulus}")
+                     modulus=self.MODULUS_VAR)
             return
         # NVE and NVT production runs use averaged cell
         pre = self.getBdryPre()
@@ -282,7 +307,7 @@ class FixWriter:
                  stemp=self.temp,
                  temp=self.temp,
                  press=self.press,
-                 modulus="${modulus}",
+                 modulus=self.MODULUS_VAR,
                  pre=pre)
         self.cmd.append(self.CHANGE_BDRY)
         self.nvt(nstep=self.relax_step / 1E2, stemp=self.temp, temp=self.temp)
@@ -304,7 +329,7 @@ class FixWriter:
                      stemp=self.temp,
                      temp=self.temp,
                      press=self.press,
-                     modulus="${modulus}")
+                     modulus=self.MODULUS_VAR)
 
     def getBdryPre(self, start_pct=0.2):
         """
