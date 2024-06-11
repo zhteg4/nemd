@@ -7,6 +7,7 @@ from rdkit import Chem
 from nemd import oplsua
 from nemd import symbols
 from nemd import lammpsin
+from nemd import lammpsfix
 from nemd import constants
 from nemd import environutils
 from nemd import jobutils
@@ -259,8 +260,8 @@ def add_md_arguments(parser):
                         help='Production simulation time.')
     parser.add_argument(oplsua.FLAG_PROD_ENS,
                         metavar=oplsua.FLAG_PROD_ENS[1:].upper(),
-                        choices=lammpsin.ENSEMBLES,
-                        default=lammpsin.NVE,
+                        choices=lammpsfix.ENSEMBLES,
+                        default=lammpsfix.NVE,
                         help='Production ensemble.')
     parser.add_argument(
         oplsua.FlAG_FORCE_FIELD,

@@ -6,102 +6,40 @@ from nemd import symbols
 from nemd import fileutils
 from nemd import constants
 from nemd import environutils
-
-NVT = 'NVT'
-NPT = 'NPT'
-NVE = 'NVE'
-ENSEMBLES = [NVE, NVT, NPT]
+from nemd import lammpsfix
 
 
 class FixWriter:
     """
-    This the wrapper for LAMMPS fix command writer. which usually includes a
+    This the wrapper for LAMMPS fix command writer. which usually includes an
     unfix after the run command.
     """
-
-    VOL = 'vol'
-    PRESS = 'press'
-    MODULUS = 'modulus'
-    IMMED_MODULUS = 'immed_modulus'
-    AVE_PRESS = 'ave_press'
-    IMMED_PRESS = 'immed_press'
-    FACTOR = 'factor'
-    TEMP_BERENDSEN = 'temp/berendsen'
-    PRESS_BERENDSEN = f'{PRESS}/berendsen'
-    FIX = 'fix'
-    SET_LABEL = "label %s"
-    DEL_VARIABLE = "variable %s delete"
-    DUMP_EVERY = "dump_modify {id} every {arg}"
-    DUMP_ID, DUMP_Q = 1, 1000
-
-    RUN_STEP = "run %i\n"
-    UNFIX = "unfix %s\n"
-    FIX_NVE = f"{FIX} %s all nve\n"
-    FIX_NVT = f"{FIX} %s all nvt temp {{stemp}} {{temp}} {{tdamp}}\n"
-    FIX_TEMP_BERENDSEN = f"{FIX} %s all {TEMP_BERENDSEN} {{stemp}} {{temp}} {{tdamp}}\n"
-    FIX_PRESS_BERENDSEN = f"{FIX} %s all {PRESS_BERENDSEN} iso {{spress}} {{press}} {{pdamp}} {MODULUS} {{modulus}}\n"
-    FIX_DEFORM = f"{FIX} %s all deform 100 x scale ${{factor}} y scale ${{factor}} z scale ${{factor}} remap v\n"
-    PRESS_VOL_FILE = 'press_vol.data'
-    SET_VOL = f"variable {VOL} equal {VOL}"
-    RECORD_PRESS_VOL = f"{FIX} %s all ave/time 1 {{period}} {{period}} " \
-                   f"c_thermo_{PRESS} v_{VOL} file {PRESS_VOL_FILE}\n"
-    WIGGLE_DIM = "%s wiggle ${{amp}} {period}"
-    AMP = 'amp'
-    VARIABLE_AMP = f'variable {AMP} equal "0.01*{VOL}^(1/3)"\n'
-    WIGGLE_VOL = f"{FIX} %s all deform 100 {{PARAM}}\n"
-
-    SET_MODULUS = f"""
-    variable {IMMED_MODULUS} python getModulus
-    python getModulus input 2 {PRESS_VOL_FILE} %s return v_{IMMED_MODULUS} format sif here "from nemd.pyfunc import getModulus"
-    """
-    SET_MODULUS = SET_MODULUS.replace('\n    ', '\n').lstrip('\n')
-
-    SET_PRESS = f"""
-    variable {IMMED_PRESS} python getPress
-    python getPress input 1 {PRESS_VOL_FILE} return v_{IMMED_PRESS} format sf here "from nemd.pyfunc import getPress"
-    """
-    SET_PRESS = SET_PRESS.replace('\n    ', '\n').lstrip('\n')
-
-    SET_FACTOR = f"""
-    variable {FACTOR} python getBdryFactor
-    python getBdryFactor input 2 %f press_vol.data return v_{FACTOR} format fsf here "from nemd.pyfunc import getBdryFactor"
-    """
-    SET_FACTOR = SET_FACTOR.replace('\n    ', '\n').lstrip('\n')
-
-    XYZL_FILE = 'xyzl.data'
-    RECORD_BDRY = f"""
-    variable xl equal "xhi - xlo"
-    variable yl equal "yhi - ylo"
-    variable zl equal "zhi - zlo"
-    fix %s all ave/time 1 1000 1000 v_xl v_yl v_zl file {XYZL_FILE}
-    """
-    RECORD_BDRY = RECORD_BDRY.replace('\n    ', '\n').lstrip('\n')
-
-    CHANGE_BOX = "change_box all x scale ${factor} y scale ${factor} z scale ${factor} remap\n"
-    CHANGE_BDRY = f"""
-    print "Final Boundary: xl = ${{xl}}, yl = ${{yl}}, zl = ${{zl}}"
-    variable ave_xl python getXL
-    python getXL input 1 {XYZL_FILE} return v_ave_xl format sf here "from nemd.pyfunc import getXL"
-    variable ave_yl python getYL
-    python getYL input 1 {XYZL_FILE} return v_ave_yl format sf here "from nemd.pyfunc import getYL"
-    variable ave_zl python getZL
-    python getZL input 1 {XYZL_FILE} return v_ave_zl format sf here "from nemd.pyfunc import getZL"
-    print "Averaged  xl = ${{ave_xl}} yl = ${{ave_yl}} zl = ${{ave_zl}}"\n
-    variable ave_xr equal "v_ave_xl / v_xl"
-    variable ave_yr equal "v_ave_yl / v_yl"
-    variable ave_zr equal "v_ave_zl / v_zl"
-    change_box all x scale ${{ave_xr}} y scale ${{ave_yr}} z scale ${{ave_zr}} remap
-    variable ave_xr delete
-    variable ave_yr delete
-    variable ave_zr delete
-    variable ave_xl delete
-    variable ave_yl delete
-    variable ave_zl delete
-    variable xl delete
-    variable yl delete
-    variable zl delete
-    """
-    CHANGE_BDRY = CHANGE_BDRY.replace('\n    ', '\n').lstrip('\n')
+    NVE = lammpsfix.NVE
+    NVT = lammpsfix.NVT
+    NPT = lammpsfix.NPT
+    FIX = lammpsfix.FIX
+    FIX_NVE = lammpsfix.FIX_NVE
+    TEMP_BERENDSEN = lammpsfix.TEMP_BERENDSEN
+    FIX_TEMP_BERENDSEN = lammpsfix.FIX_TEMP_BERENDSEN
+    PRESS_BERENDSEN = lammpsfix.PRESS_BERENDSEN
+    FIX_PRESS_BERENDSEN = lammpsfix.FIX_PRESS_BERENDSEN
+    RUN_STEP = lammpsfix.RUN_STEP
+    UNFIX = lammpsfix.UNFIX
+    RECORD_BDRY = lammpsfix.RECORD_BDRY
+    DUMP_EVERY = lammpsfix.DUMP_EVERY
+    DUMP_ID = lammpsfix.DUMP_ID
+    DUMP_Q = lammpsfix.DUMP_Q
+    SET_VOL = lammpsfix.SET_VOL
+    SET_PRESS = lammpsfix.SET_PRESS
+    SET_MODULUS = lammpsfix.SET_MODULUS
+    SET_FACTOR = lammpsfix.SET_FACTOR
+    SET_LABEL = lammpsfix.SET_LABEL
+    FIX_DEFORM = lammpsfix.FIX_DEFORM
+    VARIABLE_AMP = lammpsfix.VARIABLE_AMP
+    WIGGLE_DIM = lammpsfix.WIGGLE_DIM
+    WIGGLE_VOL = lammpsfix.WIGGLE_VOL
+    RECORD_PRESS_VOL = lammpsfix.RECORD_PRESS_VOL
+    CHANGE_BDRY = lammpsfix.CHANGE_BDRY
 
     def __init__(self, fh, options=None, testing=True):
         """
@@ -144,6 +82,15 @@ class FixWriter:
         """
         if not self.testing:
             return
+        self.nve(nstep=nstep)
+
+    def nve(self, nstep=1E3):
+        """
+        Append command for constant energy and volume.
+
+        :nstep int: run this steps for time integration.
+        """
+        # NVT on single molecule gives nan coords (guess due to translation)
         cmd = self.FIX_NVE + self.RUN_STEP % nstep + self.UNFIX
         self.cmd.append(cmd)
 
@@ -157,6 +104,30 @@ class FixWriter:
                  stemp=self.stemp,
                  temp=self.stemp)
 
+    def nvt(self,
+            nstep=1E4,
+            stemp=300,
+            temp=300,
+            style=TEMP_BERENDSEN,
+            pre=''):
+        """
+        Append command for constant volume and temperature.
+
+        :nstep int: run this steps for time integration
+        :stemp float: starting temperature
+        :temp float: target temperature
+        :style str: the style for the command
+        :pre str: additional pre-conditions
+        """
+        if style == self.TEMP_BERENDSEN:
+            cmd1 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
+                                                  temp=temp,
+                                                  tdamp=self.tdamp)
+            cmd2 = self.FIX_NVE
+        cmd = pre + cmd1 + cmd2
+        fix = [x for x in cmd.split(symbols.RETURN) if x.startswith(self.FIX)]
+        self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX * len(fix))
+
     def rampUp(self, ensemble=None):
         """
         Ramp up temperature to the targe value.
@@ -169,7 +140,7 @@ class FixWriter:
         """
         if self.testing:
             return
-        if ensemble == NPT:
+        if ensemble == self.NPT:
             self.npt(nstep=self.relax_step / 1E1,
                      stemp=self.stemp,
                      temp=self.temp,
@@ -185,31 +156,70 @@ class FixWriter:
                  press=self.press,
                  modulus="${modulus}")
 
+    def npt(self,
+            nstep=20000,
+            stemp=300,
+            temp=300,
+            spress=1.,
+            press=1.,
+            style=PRESS_BERENDSEN,
+            modulus=10,
+            pre=''):
+        """
+        Append command for constant pressure and temperature.
+
+        :nstep int: run this steps for time integration
+        :stemp int: starting temperature
+        :temp float: target temperature
+        :spress float: starting pressure
+        :press float: target pressure
+        :style str: the style for the command
+        :pre str: additional pre-conditions
+        """
+        if spress is None:
+            spress = press
+        if style == self.PRESS_BERENDSEN:
+            cmd1 = self.FIX_PRESS_BERENDSEN.format(spress=spress,
+                                                   press=press,
+                                                   pdamp=self.pdamp,
+                                                   modulus=modulus)
+            cmd2 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
+                                                  temp=temp,
+                                                  tdamp=self.tdamp)
+            cmd3 = self.FIX_NVE
+        cmd = pre + cmd1 + cmd2 + cmd3
+        fix = [x for x in cmd.split(symbols.RETURN) if x.startswith(self.FIX)]
+        self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX * len(fix))
+
     def cycleToPress(self, max_loop=100, num=3, record_num=100):
         """
         Deform the box by cycles to get close to the target pressure.
+        One cycle consists of sinusoidal wave, print properties, deformation,
+        and relaxation. The max total simulation time for the all cycles is the
+        regular relaxation simulation time.
 
         :param max_loop int: the maximum number of big cycle loops.
         :param num int: the number of sinusoidal cycles.
         :param record_num int: each sinusoidal wave records this number of data.
         """
-        # Sinusoidal wave, print properties, cycle deformation, cycle relaxation
-        # The max simulation time for the three stages is the regular relaxation
+        # Set variables used in the loop
+        self.cmd.append(self.SET_VOL)
+        self.cmd.append(self.SET_AMP)
+        self.cmd.append(self.SET_PRESS)
+        self.cmd.append(self.SET_FACTOR.format(press=self.options.press))
+        self.cmd.append(self.SET_MODULUS.format(record_num=record_num))
+        # The number of steps for one sinusoidal cycle that yields 10 records
         nstep = int(self.relax_step / max_loop / (num + 1))
         nstep = max([int(nstep / record_num), 10]) * record_num
-        self.cmd.append(
-            self.DUMP_EVERY.format(id=self.DUMP_ID, arg=nstep * (num + 1)))
-        # The variables defined here will be evaluated by ${xxx}
-        self.cmd.append(self.SET_VOL)
-        self.cmd.append(self.VARIABLE_AMP)
-        self.cmd.append(self.SET_PRESS)
-        self.cmd.append(self.SET_MODULUS % record_num)
-        self.cmd.append(self.SET_FACTOR % self.options.press)
-        # Start loop and cd into sub-dir as some files are of the same name
-        loop_defm, defm_id, defm_break = 'loop_defm', 'defm_id', 'defm_break'
+        cyc_nstep = nstep * (num + 1)
+        # Each cycle dumps one trajectory frame
+        self.cmd.append(self.DUMP_EVERY.format(id=self.DUMP_ID, arg=cyc_nstep))
+        defm_id = 'defm_id'  # deformation id loop from 0 to max_loop - 1
         self.cmd.append(f"variable {defm_id} loop 0 {max_loop - 1} pad")
-        self.cmd.append(self.SET_LABEL % loop_defm)
+        loop_defm = 'loop_defm'  # Each deformation loop starts with this label
+        self.cmd.append(self.SET_LABEL.format(label=loop_defm))
         self.cmd.append('print "Deform Id  = ${defm_id}"')
+        # Run in a subdirectory as some output files are of the same names
         self.cmd.append("shell mkdir defm_${defm_id}")
         self.cmd.append("shell cd defm_${defm_id}\n")
         pre = self.getCyclePre(nstep, record_num=record_num)
@@ -217,7 +227,8 @@ class FixWriter:
         self.cmd.append('print "Averaged Press = ${immed_press}"')
         self.cmd.append('print "Modulus = ${immed_modulus}"')
         self.cmd.append('print "Scale Factor  = ${factor}"\n')
-        # If last loop or no scaling, break and record properties
+        # If last loop or no scaling, go to the break label
+        defm_break = 'defm_break'
         self.cmd.append(
             f'if "${{defm_id}} == {max_loop - 1} || ${{factor}} == 1" '
             f'then "jump SELF {defm_break}"\n')
@@ -229,12 +240,13 @@ class FixWriter:
         self.cmd.append("shell cd ..")
         self.cmd.append(f"next {defm_id}")
         self.cmd.append(f"jump SELF {loop_defm}\n")
-        self.cmd.append(f'label {defm_break}')
+        self.cmd.append(self.SET_LABEL.format(label=defm_break))
+        # Record press and modulus as immediate variable evaluation uses files
         self.cmd.append('variable ave_press equal ${immed_press}')
         self.cmd.append('variable modulus equal ${immed_modulus}')
+        self.cmd.append('shell cd ..\n')
         self.cmd.append(
             self.DUMP_EVERY.format(id=self.DUMP_ID, arg=self.DUMP_Q))
-        self.cmd.append('shell cd ..\n')
 
     def getCyclePre(self, nstep, record_num=100):
         """
@@ -257,7 +269,7 @@ class FixWriter:
         """
         if self.testing:
             return
-        if self.options.prod_ens == NPT:
+        if self.options.prod_ens == self.NPT:
             self.npt(nstep=self.relax_step,
                      stemp=self.temp,
                      temp=self.temp,
@@ -283,9 +295,9 @@ class FixWriter:
         """
         if self.testing:
             return
-        if self.options.prod_ens == NVE:
+        if self.options.prod_ens == self.NVE:
             self.nve(nstep=self.prod_step)
-        elif self.options.prod_ens == NVT:
+        elif self.options.prod_ens == self.NVT:
             self.nvt(nstep=self.prod_step, stemp=self.temp, temp=self.temp)
         else:
             self.npt(nstep=self.prod_step,
@@ -293,79 +305,6 @@ class FixWriter:
                      temp=self.temp,
                      press=self.press,
                      modulus="${modulus}")
-
-    def nve(self, nstep=1E3):
-        """
-        Append command for constant energy and volume.
-
-        :nstep int: run this steps for time integration.
-        """
-        # NVT on single molecule gives nan coords (guess due to translation)
-        cmd = self.FIX_NVE + self.RUN_STEP % nstep + self.UNFIX
-        self.cmd.append(cmd)
-
-    def nvt(self,
-            nstep=1E4,
-            stemp=300,
-            temp=300,
-            style=TEMP_BERENDSEN,
-            pre=''):
-        """
-        Append command for constant volume and temperature.
-
-        :nstep int: run this steps for time integration
-        :stemp float: starting temperature
-        :temp float: target temperature
-        :style str: the style for the command
-        :pre str: additional pre-conditions
-        """
-        if style == self.TEMP_BERENDSEN:
-            cmd1 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
-                                                  temp=temp,
-                                                  tdamp=self.tdamp)
-            cmd2 = self.FIX_NVE
-        cmd = pre + cmd1 + cmd2
-        fx = [x for x in cmd.split(symbols.RETURN) if x.startswith(self.FIX)]
-        self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX * len(fx))
-
-    def npt(self,
-            nstep=20000,
-            stemp=300,
-            temp=300,
-            spress=1.,
-            press=1.,
-            style=PRESS_BERENDSEN,
-            modulus=10,
-            pdamp=None,
-            pre=''):
-        """
-        Append command for constant pressure and temperature.
-
-        :nstep int: run this steps for time integration
-        :stemp int: starting temperature
-        :temp float: target temperature
-        :spress float: starting pressure
-        :press float: target pressure
-        :style str: the style for the command
-        :pdamp pdamp: Pressure damping parameter (x timestep to get the param)
-        :pre str: additional pre-conditions
-        """
-        if pdamp is None:
-            pdamp = self.pdamp
-        if spress is None:
-            spress = press
-        if style == self.PRESS_BERENDSEN:
-            cmd1 = self.FIX_PRESS_BERENDSEN.format(spress=spress,
-                                                   press=press,
-                                                   pdamp=pdamp,
-                                                   modulus=modulus)
-            cmd2 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
-                                                  temp=temp,
-                                                  tdamp=self.tdamp)
-            cmd3 = self.FIX_NVE
-        cmd = pre + cmd1 + cmd2 + cmd3
-        fx = [x for x in cmd.split(symbols.RETURN) if x.startswith(self.FIX)]
-        self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX * len(fx))
 
     def getBdryPre(self, start_pct=0.2):
         """
