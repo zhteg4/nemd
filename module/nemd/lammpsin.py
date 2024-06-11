@@ -15,14 +15,14 @@ class FixWriter:
     This the wrapper for LAMMPS fix command writer. which usually includes an
     unfix after the run command.
     """
+    SET_VAR = lammpsfix.SET_VAR
     NVE = lammpsfix.NVE
     NVT = lammpsfix.NVT
     NPT = lammpsfix.NPT
     FIX = lammpsfix.FIX
     FIX_NVE = lammpsfix.FIX_NVE
-    TEMP_BERENDSEN = lammpsfix.TEMP_BERENDSEN
+    BERENDSEN = lammpsfix.BERENDSEN
     FIX_TEMP_BERENDSEN = lammpsfix.FIX_TEMP_BERENDSEN
-    PRESS_BERENDSEN = lammpsfix.PRESS_BERENDSEN
     FIX_PRESS_BERENDSEN = lammpsfix.FIX_PRESS_BERENDSEN
     RUN_STEP = lammpsfix.RUN_STEP
     UNFIX = lammpsfix.UNFIX
@@ -30,30 +30,31 @@ class FixWriter:
     DUMP_EVERY = lammpsfix.DUMP_EVERY
     DUMP_ID = lammpsfix.DUMP_ID
     DUMP_Q = lammpsfix.DUMP_Q
-    SET_VOL = lammpsfix.SET_VOL
-    SET_AMP = lammpsfix.SET_AMP
-    PRESS = lammpsfix.PRESS
+    VOL = lammpsfix.VOL
+    AMP = lammpsfix.AMP
     IMMED_PRESS = lammpsfix.IMMED_PRESS
     SET_IMMED_PRESS = lammpsfix.SET_IMMED_PRESS
+    PRESS = lammpsfix.PRESS
     SET_PRESS = lammpsfix.SET_PRESS
-    MODULUS = lammpsfix.MODULUS
     IMMED_MODULUS = lammpsfix.IMMED_MODULUS
     SET_IMMED_MODULUS = lammpsfix.SET_IMMED_MODULUS
+    MODULUS = lammpsfix.MODULUS
     SET_MODULUS = lammpsfix.SET_MODULUS
+    FACTOR = lammpsfix.FACTOR
     SET_FACTOR = lammpsfix.SET_FACTOR
     SET_LABEL = lammpsfix.SET_LABEL
     FIX_DEFORM = lammpsfix.FIX_DEFORM
-    WIGGLE_DIM = lammpsfix.WIGGLE_DIM
     WIGGLE_VOL = lammpsfix.WIGGLE_VOL
     RECORD_PRESS_VOL = lammpsfix.RECORD_PRESS_VOL
     CHANGE_BDRY = lammpsfix.CHANGE_BDRY
-    FACTOR = lammpsfix.FACTOR
     SET_LOOP = lammpsfix.SET_LOOP
     MKDIR = lammpsfix.MKDIR
     CD = lammpsfix.CD
     JUMP = lammpsfix.JUMP
     IF_JUMP = lammpsfix.IF_JUMP
     PRINT = lammpsfix.PRINT
+    NEXT = lammpsfix.NEXT
+    DEL_VAR = lammpsfix.DEL_VAR
     PRESS_VAR = f'${{{PRESS}}}'
     MODULUS_VAR = f'${{{MODULUS}}}'
 
@@ -120,12 +121,7 @@ class FixWriter:
                  stemp=self.stemp,
                  temp=self.stemp)
 
-    def nvt(self,
-            nstep=1E4,
-            stemp=300,
-            temp=300,
-            style=TEMP_BERENDSEN,
-            pre=''):
+    def nvt(self, nstep=1E4, stemp=300, temp=300, style=BERENDSEN, pre=''):
         """
         Append command for constant volume and temperature.
 
@@ -135,7 +131,7 @@ class FixWriter:
         :style str: the style for the command
         :pre str: additional pre-conditions
         """
-        if style == self.TEMP_BERENDSEN:
+        if style == self.BERENDSEN:
             cmd1 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
                                                   temp=temp,
                                                   tdamp=self.tdamp)
@@ -178,7 +174,7 @@ class FixWriter:
             temp=300,
             spress=1.,
             press=1.,
-            style=PRESS_BERENDSEN,
+            style=BERENDSEN,
             modulus=10,
             pre=''):
         """
@@ -194,7 +190,7 @@ class FixWriter:
         """
         if spress is None:
             spress = press
-        if style == self.PRESS_BERENDSEN:
+        if style == self.BERENDSEN:
             cmd1 = self.FIX_PRESS_BERENDSEN.format(spress=spress,
                                                    press=press,
                                                    pdamp=self.pdamp,
@@ -227,18 +223,19 @@ class FixWriter:
         :param defm_start str: Each deformation loop starts with this label
         :param defm_break str: Terminate the loop by go to the this label
         """
-        # Set variables used in the loop
-        self.cmd.append(self.SET_VOL)
-        self.cmd.append(self.SET_AMP)
-        self.cmd.append(self.SET_IMMED_PRESS)
-        self.cmd.append(self.SET_IMMED_MODULUS.format(record_num=record_num))
-        self.cmd.append(self.SET_FACTOR.format(press=self.options.press))
         # The number of steps for one sinusoidal cycle that yields 10 records
         nstep = int(self.relax_step / max_loop / (num + 1))
         nstep = max([int(nstep / record_num), 10]) * record_num
         cyc_nstep = nstep * (num + 1)
         # Each cycle dumps one trajectory frame
         self.cmd.append(self.DUMP_EVERY.format(id=self.DUMP_ID, arg=cyc_nstep))
+        # Set variables used in the loop
+        self.cmd.append(self.SET_VAR.format(var=self.VOL, expr=self.VOL))
+        expr = f'0.01*v_{self.VOL}^(1/3)'
+        self.cmd.append(self.SET_VAR.format(var=self.AMP, expr=expr))
+        self.cmd.append(self.SET_IMMED_PRESS)
+        self.cmd.append(self.SET_IMMED_MODULUS.format(record_num=record_num))
+        self.cmd.append(self.SET_FACTOR.format(press=self.options.press))
         self.cmd.append(self.SET_LOOP.format(id=defm_id, end=max_loop - 1))
         self.cmd.append(self.SET_LABEL.format(label=defm_start))
         self.cmd.append(self.PRINT.format(var=defm_id))
@@ -261,7 +258,7 @@ class FixWriter:
                  pre=self.FIX_DEFORM)
         self.nvt(nstep=nstep / 2, stemp=self.temp, temp=self.temp)
         self.cmd.append(self.CD.format(dir=os.pardir))
-        self.cmd.append(f"next {defm_id}")
+        self.cmd.append(self.NEXT.format(id=defm_id))
         self.cmd.append(self.JUMP.format(label=defm_start))
         self.cmd.append("")
         self.cmd.append(self.SET_LABEL.format(label=defm_break))
@@ -269,8 +266,15 @@ class FixWriter:
         self.cmd.append(self.SET_MODULUS)
         self.cmd.append(self.SET_PRESS)
         self.cmd.append(self.CD.format(dir=os.pardir))
-        self.cmd.append("")
-        cmd = self.DUMP_EVERY.format(id=self.DUMP_ID, arg=self.DUMP_Q) + '\n'
+        # Delete variables used in the loop
+        self.cmd.append(self.DEL_VAR.format(var=self.VOL))
+        self.cmd.append(self.DEL_VAR.format(var=self.AMP))
+        self.cmd.append(self.DEL_VAR.format(var=self.IMMED_PRESS))
+        self.cmd.append(self.DEL_VAR.format(var=self.IMMED_MODULUS))
+        self.cmd.append(self.DEL_VAR.format(var=self.FACTOR))
+        self.cmd.append(self.DEL_VAR.format(var=defm_id))
+        # Restore dump defaults
+        cmd = '\n' + self.DUMP_EVERY.format(id=self.DUMP_ID, arg=self.DUMP_Q)
         self.cmd.append(cmd)
 
     def getCyclePre(self, nstep, record_num=100):
@@ -281,9 +285,8 @@ class FixWriter:
         :param record_num int: each cycle records this number of data
         :return str: the prefix string of the cycle stage.
         """
-        params = ' '.join([self.WIGGLE_DIM % dim for dim in ['x', 'y', 'z']])
-        period = nstep * self.timestep
-        wiggle = self.WIGGLE_VOL.format(PARAM=params).format(period=period)
+
+        wiggle = self.WIGGLE_VOL.format(period=nstep * self.timestep)
         record_period = int(nstep / record_num)
         record_press = self.RECORD_PRESS_VOL.format(period=record_period)
         return record_press + wiggle
