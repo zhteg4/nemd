@@ -6,18 +6,15 @@ from nemd import symbols
 from nemd import lammpsdata
 
 
-class LammpsData(xtal.Struct, lammpsdata.LammpsDataBase):
+class Data(xtal.Struct, lammpsdata.Base):
 
     XYZ = 'XYZ'
     FORCE = 'force'
-    CUSTOM_EXT = f'.{lammpsdata.LammpsDataBase.DUMP}'
+    CUSTOM_EXT = f'.{lammpsdata.Base.DUMP}'
 
-    def __init__(self, struct, *args, jobname='tmp', tasks=None, **kwargs):
-        super(LammpsData, self).__init__(struct)
-        lammpsdata.LammpsDataBase.__init__(self,
-                                           *args,
-                                           jobname=jobname,
-                                           **kwargs)
+    def __init__(self, struct, *args, ff=None, tasks=None, **kwargs):
+        xtal.Struct.__init__(self, struct, ff=ff)
+        lammpsdata.Base.__init__(self, *args, **kwargs)
         self.tasks = tasks
         self.units = self.METAL
         self.atom_style = self.ATOMIC
@@ -148,9 +145,7 @@ class DataFileReader(lammpsdata.DataFileReader):
 
 
 def get_df_reader(data_file):
-    line = sh.grep(lammpsdata.LammpsDataBase.LAMMPS_DESCRIPTION[:-2],
-                   data_file)
-    if line.split(
-            symbols.POUND)[1].strip() == lammpsdata.LammpsDataBase.ATOMIC:
+    line = sh.grep(lammpsdata.DataBase.LAMMPS_DESCRIPTION[:-2], data_file)
+    if line.split(symbols.POUND)[1].strip() == lammpsdata.DataBase.ATOMIC:
         return DataFileReader(data_file)
     return lammpsdata.DataFileReader(data_file)

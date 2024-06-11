@@ -237,14 +237,14 @@ def add_md_arguments(parser):
         oplsua.FLAG_LJ_CUT,
         metavar=oplsua.FLAG_LJ_CUT[1:].upper(),
         type=type_positive_float,
-        default=lammpsin.LammpsIn.DEFAULT_LJ_CUT,
+        default=lammpsin.In.DEFAULT_LJ_CUT,
         # Cut off for the lennard jones
         help=argparse.SUPPRESS)
     parser.add_argument(
         oplsua.FLAG_COUL_CUT,
         metavar=oplsua.FLAG_COUL_CUT[1:].upper(),
         type=type_positive_float,
-        default=lammpsin.LammpsIn.DEFAULT_COUL_CUT,
+        default=lammpsin.In.DEFAULT_COUL_CUT,
         # Cut off for the coulombic interaction
         help=argparse.SUPPRESS)
     parser.add_argument(oplsua.FLAG_RELAX_TIME,

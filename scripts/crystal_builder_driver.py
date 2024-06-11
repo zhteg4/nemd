@@ -76,8 +76,7 @@ class CrystalBuilder(object):
                                      scale_factor=self.options.scale_factor)
         xbuild.run()
         mol = xbuild.getMol()
-        lmp_dat = stillinger.LammpsData({1: mol}, self.SI_FF,
-                                        self.options.jobname)
+        lmp_dat = stillinger.Data({1: mol}, self.SI_FF, self.options.jobname)
         lmp_dat.writeData()
         log(f"LAMMPS data file written as {lmp_dat.lammps_data}")
         lmp_dat.writeLammpsIn()

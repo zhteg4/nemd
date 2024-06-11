@@ -15,7 +15,7 @@ from nemd import lammpsin
 from nemd import plotutils
 
 
-class BaseAnalyzer:
+class Base:
     """
     The base class subclassed by analyzers.
     """
@@ -219,7 +219,7 @@ class BaseAnalyzer:
             print(msg)
 
 
-class Density(BaseAnalyzer):
+class Density(Base):
     """
     The density analyzer.
     """
@@ -241,7 +241,7 @@ class Density(BaseAnalyzer):
         self.data.index.name = f"{self.ILABEL} ({self.sidx})"
 
 
-class RDF(BaseAnalyzer):
+class RDF(Base):
     """
     The radial distribution function analyzer.
     """
@@ -252,7 +252,7 @@ class RDF(BaseAnalyzer):
     UNIT = 'r'
     LABEL = f'{PNAME} ({UNIT})'
     ILABEL = f'r ({symbols.ANGSTROM})'
-    DEFAULT_CUT = lammpsin.LammpsIn.DEFAULT_CUT
+    DEFAULT_CUT = lammpsin.In.DEFAULT_CUT
 
     def setData(self, res=0.02, dcut=None, dres=None):
         """
@@ -321,7 +321,7 @@ class RDF(BaseAnalyzer):
         return None, None
 
 
-class MSD(BaseAnalyzer):
+class MSD(Base):
     """
     The mean squared displacement analyzer.
     """
@@ -379,7 +379,7 @@ class MSD(BaseAnalyzer):
         return sidx, eidx
 
 
-class Clash(BaseAnalyzer):
+class Clash(Base):
     """
     The clash analyzer.
     """
@@ -423,7 +423,7 @@ class Clash(BaseAnalyzer):
         return clashes
 
 
-class XYZ(BaseAnalyzer):
+class XYZ(Base):
     """
     The XYZ coordinate converter.
     """
@@ -458,7 +458,7 @@ class XYZ(BaseAnalyzer):
         self.log(f"{self.DESCR} coordinates are written into {outfile}")
 
 
-class Thermo(BaseAnalyzer):
+class Thermo(Base):
 
     NAME = 'thermo'
     DESCR = 'Thermodynamic information'
@@ -479,7 +479,7 @@ class Thermo(BaseAnalyzer):
             super().plot(dat, aname, *args, **kwargs)
 
 
-class View(BaseAnalyzer):
+class View(Base):
     """
     The coordinate visualizer.
     """

@@ -624,10 +624,10 @@ class Lammps(BaseTask):
 class Custom_Dump(BaseTask):
 
     import custom_dump_driver as DRIVER
-    CUSTOM_EXT = lammpsin.LammpsIn.CUSTOM_EXT
-    DUMP = lammpsin.LammpsIn.DUMP
-    READ_DATA = lammpsin.LammpsIn.READ_DATA
-    DATA_EXT = lammpsin.LammpsIn.DATA_EXT
+    CUSTOM_EXT = lammpsin.In.CUSTOM_EXT
+    DUMP = lammpsin.In.DUMP
+    READ_DATA = lammpsin.In.READ_DATA
+    DATA_EXT = lammpsin.In.DATA_EXT
     RESULTS = DRIVER.CustomDump.RESULTS
 
     @staticmethod
@@ -716,8 +716,8 @@ class Custom_Dump(BaseTask):
 class Lmp_Log(BaseTask):
 
     import lmp_log_driver as DRIVER
-    READ_DATA = lammpsin.LammpsIn.READ_DATA
-    DATA_EXT = lammpsin.LammpsIn.DATA_EXT
+    READ_DATA = lammpsin.In.READ_DATA
+    DATA_EXT = lammpsin.In.DATA_EXT
     RESULTS = DRIVER.LmpLog.RESULTS
 
     @staticmethod

@@ -720,7 +720,7 @@ class PackedStruct(structure.Struct):
         """
         if self.df_reader is not None:
             return
-        lmw = lammpsdata.LammpsData(self, ff=self.ff, options=self.options)
+        lmw = lammpsdata.Data(self, ff=self.ff, options=self.options)
         for mol in lmw.molecules:
             mol.adjustBondLength()
         contents = lmw.writeData(nofile=True)

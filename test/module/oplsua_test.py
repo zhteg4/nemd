@@ -122,7 +122,7 @@ class TestLammpsIn:
             assert os.path.exists('lmp.in')
 
 
-class TestLammpsDataOne:
+class TestDataOne:
 
     @pytest.fixture
     def lmp_data(self):
@@ -130,7 +130,7 @@ class TestLammpsDataOne:
         oplsua.OplsTyper(mol).run()
         ff = oplsua.get_opls_parser()
         options = get_options()
-        return oplsua.LammpsDataOne({1: mol}, ff, 'lmp', options=options)
+        return oplsua.DataOne({1: mol}, ff, 'lmp', options=options)
 
     def testBalanceCharge(self, lmp_data):
         assert all([not x.HasProp('neighbor_charge') for x in lmp_data.atom])
@@ -173,7 +173,7 @@ class TestLammpsDataOne:
         assert 5 == len(lmp_data.impropers)
 
 
-class TestLammpsData:
+class TestData:
 
     @pytest.fixture
     def lmp_data(self):
@@ -184,7 +184,7 @@ class TestLammpsData:
         oplsua.OplsTyper(mol2).run()
         ff = oplsua.get_opls_parser()
         options = get_options()
-        return oplsua.LammpsData(mols, ff, 'lmp', options=options)
+        return oplsua.Data(mols, ff, 'lmp', options=options)
 
     def testWriteData(self, lmp_data, tmp_path):
         with fileutils.chdir(tmp_path, rmtree=True):

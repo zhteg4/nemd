@@ -88,7 +88,7 @@ class CustomDump(object):
     TASK = FlAG_TASK[1:]
     DATA_EXT = '_%s.csv'
     PNG_EXT = '_%s.png'
-    RESULTS = analyzer.BaseAnalyzer.RESULTS
+    RESULTS = analyzer.Base.RESULTS
     ANALYZER = [
         analyzer.Density, analyzer.RDF, analyzer.MSD, analyzer.Clash,
         analyzer.View, analyzer.XYZ

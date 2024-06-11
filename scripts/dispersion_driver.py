@@ -128,12 +128,12 @@ class Dispersion(object):
         calculate the force.
         """
         mol = self.xbuild.getMol()
-        tasks = [stillinger.LammpsData.XYZ, stillinger.LammpsData.FORCE]
+        tasks = [stillinger.Data.XYZ, stillinger.Data.FORCE]
         struct = xtal.Struct.fromMols([mol])
-        self.lmp_dat = stillinger.LammpsData(struct,
-                                             ff=self.SI_FF,
-                                             jobname=self.options.jobname,
-                                             tasks=tasks)
+        self.lmp_dat = stillinger.Data(struct,
+                                       ff=self.SI_FF,
+                                       jobname=self.options.jobname,
+                                       tasks=tasks)
         self.lmp_dat.writeData()
         self.orig_lammps_dat = self.lmp_dat.datafile
         log(f"LAMMPS data file written as {self.orig_lammps_dat}")

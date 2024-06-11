@@ -240,11 +240,11 @@ class AmorphousCell(object):
         """
         Write amorphous cell into data file.
         """
-        lmw = lammpsdata.LammpsData(self.struct,
-                                    ff=self.ff,
-                                    jobname=self.options.jobname,
-                                    box=self.struct.box,
-                                    options=self.options)
+        lmw = lammpsdata.Data(self.struct,
+                              ff=self.ff,
+                              jobname=self.options.jobname,
+                              box=self.struct.box,
+                              options=self.options)
         lmw.writeData()
         if not np.isclose(lmw.density, self.struct.density):
             log_warning(
@@ -253,7 +253,7 @@ class AmorphousCell(object):
         if round(lmw.total_charge, 4):
             log_warning(
                 f'The system has a net charge of {lmw.total_charge:.4f}')
-        lmw.writeLammpsIn()
+        lmw.writeIn()
         log(f'Data file written into {lmw.datafile}')
         log(f'In script written into {lmw.lammps_in}')
         jobutils.add_outfile(lmw.datafile, jobname=self.options.jobname)
@@ -304,7 +304,7 @@ class Mol(structure.Mol):
         self.box = None
         self.cru_mol = None
         self.smiles = None
-        self.buffer = lammpsdata.LammpsData.BUFFER
+        self.buffer = lammpsdata.Data.BUFFER
         if self.ff is None:
             self.ff = oplsua.get_opls_parser()
         if delay:

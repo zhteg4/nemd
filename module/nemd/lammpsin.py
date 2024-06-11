@@ -394,7 +394,7 @@ class FixWriter:
             self.fh.write(cmd + '\n')
 
 
-class LammpsIn(fileutils.LammpsInput):
+class In(fileutils.LammpsInput):
     """
     Class to write out LAMMPS in script.
     """
@@ -428,15 +428,13 @@ class LammpsIn(fileutils.LammpsInput):
     DEFAULT_COUL_CUT = DEFAULT_CUT
     DUMP_ID, DUMP_Q = FixWriter.DUMP_ID, FixWriter.DUMP_Q
 
-    def __init__(self, jobname='tmp', options=None, concise=True):
+    def __init__(self, jobname='tmp', options=None):
         """
         :param jobname str: jobname based on which out filenames are defined
         :param options 'argparse.Namespace': command line options
-        :param concise bool: don't write unused force field info to the datafile
         """
         self.jobname = jobname
         self.options = options
-        self.concise = concise
         self.lammps_in = self.jobname + self.IN_EXT
         self.datafile = self.jobname + self.DATA_EXT
         self.lammps_dump = self.jobname + self.CUSTOM_EXT
@@ -467,7 +465,7 @@ class LammpsIn(fileutils.LammpsInput):
         self.datafile = jobname + self.DATA_EXT
         self.lammps_dump = jobname + self.CUSTOM_EXT
 
-    def writeLammpsIn(self):
+    def writeIn(self):
         """
         Write out LAMMPS in script.
         """

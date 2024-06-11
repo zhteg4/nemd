@@ -1,6 +1,5 @@
 import io
 import math
-
 import scipy
 import types
 import base64
@@ -28,66 +27,6 @@ def log_debug(msg):
     if logger is None:
         return
     logger.debug(msg)
-
-
-class LammpsDataBase(lammpsin.LammpsIn):
-
-    LAMMPS_DESCRIPTION = 'LAMMPS Description # %s'
-
-    ATOM_TYPES = 'atom types'
-    BOND_TYPES = 'bond types'
-    ANGLE_TYPES = 'angle types'
-    DIHEDRAL_TYPES = 'dihedral types'
-    IMPROPER_TYPES = 'improper types'
-    TYPE_DSP = [
-        ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHEDRAL_TYPES, IMPROPER_TYPES
-    ]
-
-    XLO_XHI = 'xlo xhi'
-    YLO_YHI = 'ylo yhi'
-    ZLO_ZHI = 'zlo zhi'
-    BOX_DSP = [XLO_XHI, YLO_YHI, ZLO_ZHI]
-    LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
-    BUFFER = [4., 4., 4.] # yapf: disable
-
-    MASSES = 'Masses'
-    ATOM_ID = 'atom_id'
-    TYPE_ID = oplsua.TYPE_ID
-
-    ATOMS = 'atoms'
-    BONDS = 'bonds'
-    ANGLES = 'angles'
-    DIHEDRALS = 'dihedrals'
-    IMPROPERS = 'impropers'
-    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
-
-    MASSES = 'Masses'
-    PAIR_COEFFS = 'Pair Coeffs'
-    BOND_COEFFS = 'Bond Coeffs'
-    ANGLE_COEFFS = 'Angle Coeffs'
-    DIHEDRAL_COEFFS = 'Dihedral Coeffs'
-    IMPROPER_COEFFS = 'Improper Coeffs'
-    ATOMS_CAP = ATOMS.capitalize()
-    BONDS_CAP = BONDS.capitalize()
-    ANGLES_CAP = ANGLES.capitalize()
-    DIHEDRALS_CAP = DIHEDRALS.capitalize()
-    IMPROPERS_CAP = IMPROPERS.capitalize()
-
-    MARKERS = [
-        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
-        IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
-        IMPROPERS_CAP
-    ]
-
-    def __init__(self, *arg, ff=None, jobname='tmp', **kwarg):
-        """
-        :param struct 'Struct': structure with molecules and conformers
-        :param ff 'oplsua.OplsParser': the force field information
-        :param jobname str: jobname based on which out filenames are defined
-        """
-        super().__init__(*arg, jobname=jobname, **kwarg)
-        self.ff = ff
-        self.jobname = jobname
 
 
 class Mol(structure.Mol):
@@ -369,18 +308,38 @@ class Mol(structure.Mol):
 
     @property
     def bond_total(self):
+        """
+        Total number of bonds in the molecule.
+
+        :return int: number of bonds across conformers.
+        """
         return len(self.bonds) * self.GetNumConformers()
 
     @property
     def angle_total(self):
+        """
+        Total number of angles in the molecule.
+
+        :return int: number of angles across conformers.
+        """
         return len(self.angles) * self.GetNumConformers()
 
     @property
     def dihedral_total(self):
+        """
+        Total number of dihedral angles in the molecule.
+
+        :return int: number of dihedral in across conformers.
+        """
         return len(self.dihedrals) * self.GetNumConformers()
 
     @property
     def improper_total(self):
+        """
+        Total number of improper angles in the structure.
+
+        :return int: number of improper angles across conformers.
+        """
         return len(self.impropers) * self.GetNumConformers()
 
 
@@ -390,18 +349,40 @@ class Struct(structure.Struct):
 
     @property
     def bond_total(self):
+        """
+        Total number of bonds in the structure.
+
+        :return int: Total number of bonds across all molecules and conformers.
+        """
         return sum(x.bond_total for x in self.molecules)
 
     @property
     def angle_total(self):
+        """
+        Total number of angels in the structure.
+
+        :return int: Total number of angels across all molecules and conformers.
+        """
         return sum(x.angle_total for x in self.molecules)
 
     @property
     def dihedral_total(self):
+        """
+        Total number of dihedral angels in the structure.
+
+        :return int: Total number of dihedral angels across all molecules and
+            conformers.
+        """
         return sum(x.dihedral_total for x in self.molecules)
 
     @property
     def improper_total(self):
+        """
+        Total number of improper angels in the structure.
+
+        :return int: Total number of improper angels across all molecules and
+            conformers.
+        """
         return sum(x.improper_total for x in self.molecules)
 
     def hasCharge(self):
@@ -414,23 +395,68 @@ class Struct(structure.Struct):
         return any(charges)
 
 
-class LammpsData(Struct, LammpsDataBase):
+class Base(lammpsin.In):
 
-    def __init__(self,
-                 struct,
-                 *args,
-                 ff=None,
-                 jobname='tmp',
-                 box=None,
-                 **kwargs):
+    LAMMPS_DESCRIPTION = 'LAMMPS Description # %s'
+
+    ATOM_TYPES = 'atom types'
+    BOND_TYPES = 'bond types'
+    ANGLE_TYPES = 'angle types'
+    DIHE_TYPES = 'dihedral types'
+    IMPROP_TYPES = 'improper types'
+    TYPE_DSP = [ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHE_TYPES, IMPROP_TYPES]
+
+    XLO_XHI = 'xlo xhi'
+    YLO_YHI = 'ylo yhi'
+    ZLO_ZHI = 'zlo zhi'
+    LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
+    BUFFER = [4., 4., 4.]
+
+    MASSES = 'Masses'
+    ATOM_ID = 'atom_id'
+    TYPE_ID = oplsua.TYPE_ID
+
+    ATOMS = 'atoms'
+    BONDS = 'bonds'
+    ANGLES = 'angles'
+    DIHEDRALS = 'dihedrals'
+    IMPROPERS = 'impropers'
+    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
+
+    MASSES = 'Masses'
+    PAIR_COEFFS = 'Pair Coeffs'
+    BOND_COEFFS = 'Bond Coeffs'
+    ANGLE_COEFFS = 'Angle Coeffs'
+    DIHEDRAL_COEFFS = 'Dihedral Coeffs'
+    IMPROPER_COEFFS = 'Improper Coeffs'
+    ATOMS_CAP = ATOMS.capitalize()
+    BONDS_CAP = BONDS.capitalize()
+    ANGLES_CAP = ANGLES.capitalize()
+    DIHEDRALS_CAP = DIHEDRALS.capitalize()
+    IMPROPERS_CAP = IMPROPERS.capitalize()
+
+    MARKERS = [
+        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
+        IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
+        IMPROPERS_CAP
+    ]
+
+
+class Data(Struct, Base):
+
+    def __init__(self, struct, *args, ff=None, box=None, **kwargs):
         """
         :param struct Struct: struct object with moelcules and conformers.
         :param ff 'oplsua.OplsParser': the force field information
-        :param jobname str: jobname based on which out filenames are defined
         :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
         """
         Struct.__init__(self, struct, ff=ff)
-        LammpsDataBase.__init__(self, *args, jobname=jobname, ff=ff, **kwargs)
+        Base.__init__(self, *args, **kwargs)
+        self.atm_types = None
+        self.bnd_types = None
+        self.ang_types = None
+        self.dihe_types = None
+        self.impr_types = None
         self.box = box
         self.total_charge = 0.
         self.data_hdl = None
@@ -487,8 +513,8 @@ class LammpsData(Struct, LammpsDataBase):
             self.writePairCoeffs()
             self.writeBondCoeffs()
             self.writeAngleCoeffs()
-            self.writeDihedralCoeffs()
-            self.writeImproperCoeffs()
+            self.writeDiheCoeffs()
+            self.writeImpropCoeffs()
             self.writeAtoms()
             self.writeBonds()
             self.writeAngles()
@@ -531,8 +557,8 @@ class LammpsData(Struct, LammpsDataBase):
         self.data_hdl.write(f"{len(self.atm_types)} {self.ATOM_TYPES}\n")
         self.data_hdl.write(f"{len(self.bnd_types)} {self.BOND_TYPES}\n")
         self.data_hdl.write(f"{len(self.ang_types)} {self.ANGLE_TYPES}\n")
-        self.data_hdl.write(f"{len(self.dihe_types)} {self.DIHEDRAL_TYPES}\n")
-        self.data_hdl.write(f"{len(self.impr_types)} {self.IMPROPER_TYPES}\n")
+        self.data_hdl.write(f"{len(self.dihe_types)} {self.DIHE_TYPES}\n")
+        self.data_hdl.write(f"{len(self.impr_types)} {self.IMPROP_TYPES}\n")
         self.data_hdl.write("\n")
 
     def writeBox(self, min_box=None, buffer=None):
@@ -634,7 +660,7 @@ class LammpsData(Struct, LammpsDataBase):
             self.data_hdl.write(f"{id} {angle.ene} {angle.angle}\n")
         self.data_hdl.write("\n")
 
-    def writeDihedralCoeffs(self):
+    def writeDiheCoeffs(self):
         """
         Write dihedral coefficients.
         """
@@ -656,7 +682,7 @@ class LammpsData(Struct, LammpsDataBase):
             self.data_hdl.write(f"{id}  {' '.join(map(str, params))}\n")
         self.data_hdl.write("\n")
 
-    def writeImproperCoeffs(self):
+    def writeImpropCoeffs(self):
         """
         Write improper coefficients.
         """
@@ -780,7 +806,7 @@ class LammpsData(Struct, LammpsDataBase):
         return b','.join([b'lammps_datafile', contents])
 
 
-class DataFileReader(LammpsDataBase):
+class DataFileReader(Base):
     """
     LAMMPS Data file reader
     """
@@ -882,7 +908,7 @@ class DataFileReader(LammpsDataBase):
         self.box_dsp = {
             y: [float(z) for z in self.lines[x].split(y)[0].split()]
             for x in range(dsp_eidx)
-            for y in self.BOX_DSP if y in self.lines[x]
+            for y in self.LO_HI if y in self.lines[x]
         }
 
     def setMasses(self):
@@ -1117,7 +1143,7 @@ class DataFileReader(LammpsDataBase):
                                                        dist=float(dist),
                                                        ene=float(ene))
 
-    def setVdwRadius(self, mix=LammpsData.GEOMETRIC, scale=1.):
+    def setVdwRadius(self, mix=Data.GEOMETRIC, scale=1.):
         """
         Set the vdw radius based on the mixing rule and vdw radii.
 
@@ -1128,8 +1154,8 @@ class DataFileReader(LammpsDataBase):
         NOTE: the scaled radii here are more like diameters (or distance)
             between two sites.
         """
-        if mix == LammpsData.GEOMETRIC:
-            # LammpsData.GEOMETRIC is optimized for speed and is supported
+        if mix == Data.GEOMETRIC:
+            # Data.GEOMETRIC is optimized for speed and is supported
             atom_types = sorted(set([x.type_id for x in self.atoms.values()]))
             radii = [0] + [self.vdws[x].dist for x in atom_types]
             radii = np.full((len(radii), len(radii)), radii, dtype='float16')
