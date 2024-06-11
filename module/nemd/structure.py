@@ -340,10 +340,11 @@ class Struct:
         """
         return np.concatenate([x.GetPositions() for x in self.conformers])
 
-    def getNumConformers(self):
+    @property
+    def conformer_total(self):
         """
         Get the total number of all conformers.
 
-        :return np.ndarray: the total number of all conformers.
+        :return int: the total number of all conformers.
         """
         return sum([x.GetNumConformers() for x in self.molecules])

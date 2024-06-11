@@ -452,49 +452,15 @@ class Data(Struct, Base):
         """
         Struct.__init__(self, struct, ff=ff)
         Base.__init__(self, *args, **kwargs)
+        self.box = box
+        self.total_charge = 0.
         self.atm_types = None
         self.bnd_types = None
         self.ang_types = None
         self.dihe_types = None
         self.impr_types = None
-        self.box = box
-        self.total_charge = 0.
-        self.data_hdl = None
+        self.hdl = None
         self.density = None
-
-    def writeRun(self, *arg, **kwarg):
-        """
-        Write command to further equilibrate the system with molecules
-        information considered.
-        """
-        super().writeRun(*arg, mols=self.mols, struct=self, **kwarg)
-
-    def writeFixShake(self):
-        """
-        Write the fix shake so that the bonds and angles associated with hydrogen
-        atoms keep constant.
-        """
-        fix_bonds = set()
-        for oid, id in self.bnd_types.items():
-            bond = self.ff.bonds[oid]
-            atoms = [self.ff.atoms[x] for x in [bond.id1, bond.id2]]
-            if any(x.symbol == symbols.HYDROGEN for x in atoms):
-                fix_bonds.add(id)
-
-        fix_angles = set()
-        for oid, id in self.ang_types.items():
-            angle = self.ff.angles[oid]
-            ids = [angle.id1, angle.id2, angle.id3]
-            atoms = [self.ff.atoms[x] for x in ids]
-            if any(x.symbol == symbols.HYDROGEN for x in atoms):
-                fix_angles.add(id)
-        btype_ids = ' '.join(map(str, fix_bonds))
-        atype_ids = ' '.join(map(str, fix_angles))
-        if not any([btype_ids, atype_ids]):
-            return
-        self.in_fh.write(
-            f'fix rigid all shake 0.0001 10 10000 b {btype_ids} a {atype_ids}\n'
-        )
 
     def writeData(self, nofile=False):
         """
@@ -503,8 +469,7 @@ class Data(Struct, Base):
         :param nofile bool: return the string instead of writing to a file if True
         """
 
-        with io.StringIO() if nofile else open(self.datafile,
-                                               'w') as self.data_hdl:
+        with io.StringIO() if nofile else open(self.datafile, 'w') as self.hdl:
             self.setTypeMap()
             self.writeDescription()
             self.writeTopoType()
@@ -543,23 +508,23 @@ class Data(Struct, Base):
         bond, angle etc.
         """
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
-        self.data_hdl.write(f"{lmp_dsp}\n\n")
-        self.data_hdl.write(f"{self.atom_total} {self.ATOMS}\n")
-        self.data_hdl.write(f"{self.bond_total} {self.BONDS}\n")
-        self.data_hdl.write(f"{self.angle_total} {self.ANGLES}\n")
-        self.data_hdl.write(f"{self.dihedral_total} {self.DIHEDRALS}\n")
-        self.data_hdl.write(f"{self.improper_total} {self.IMPROPERS}\n\n")
+        self.hdl.write(f"{lmp_dsp}\n\n")
+        self.hdl.write(f"{self.atom_total} {self.ATOMS}\n")
+        self.hdl.write(f"{self.bond_total} {self.BONDS}\n")
+        self.hdl.write(f"{self.angle_total} {self.ANGLES}\n")
+        self.hdl.write(f"{self.dihedral_total} {self.DIHEDRALS}\n")
+        self.hdl.write(f"{self.improper_total} {self.IMPROPERS}\n\n")
 
     def writeTopoType(self):
         """
         Write topologic data. e.g. number of atoms, angles...
         """
-        self.data_hdl.write(f"{len(self.atm_types)} {self.ATOM_TYPES}\n")
-        self.data_hdl.write(f"{len(self.bnd_types)} {self.BOND_TYPES}\n")
-        self.data_hdl.write(f"{len(self.ang_types)} {self.ANGLE_TYPES}\n")
-        self.data_hdl.write(f"{len(self.dihe_types)} {self.DIHE_TYPES}\n")
-        self.data_hdl.write(f"{len(self.impr_types)} {self.IMPROP_TYPES}\n")
-        self.data_hdl.write("\n")
+        self.hdl.write(f"{len(self.atm_types)} {self.ATOM_TYPES}\n")
+        self.hdl.write(f"{len(self.bnd_types)} {self.BOND_TYPES}\n")
+        self.hdl.write(f"{len(self.ang_types)} {self.ANGLE_TYPES}\n")
+        self.hdl.write(f"{len(self.dihe_types)} {self.DIHE_TYPES}\n")
+        self.hdl.write(f"{len(self.impr_types)} {self.IMPROP_TYPES}\n")
+        self.hdl.write("\n")
 
     def writeBox(self, min_box=None, buffer=None):
         """
@@ -577,8 +542,8 @@ class Data(Struct, Base):
             box = [[*x, symbols.POUND, *y] for x, y in boxes]
         for line in box:
             line = [f'{x:.2f}' if isinstance(x, float) else x for x in line]
-            self.data_hdl.write(f"{' '.join(line)}\n")
-        self.data_hdl.write("\n")
+            self.hdl.write(f"{' '.join(line)}\n")
+        self.hdl.write("\n")
         # Calculate density as the revised box may alter the box size.
         weight = sum([x.mw * x.GetNumConformers() for x in self.molecules])
         edges = [x * 2 * nconstant.ANG_TO_CM for x in box_hf]
@@ -606,7 +571,7 @@ class Data(Struct, Base):
         if self.box is not None:
             box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        if self.getNumConformers() != 1:
+        if self.conformer_total != 1:
             return box_hf
         # All-trans single molecule with internal tension runs into clashes
         # across PBCs and thus larger box is used.
@@ -616,22 +581,22 @@ class Data(Struct, Base):
         """
         Write out mass information.
         """
-        self.data_hdl.write(f"{self.MASSES}\n\n")
+        self.hdl.write(f"{self.MASSES}\n\n")
         for oid, id in self.atm_types.items():
             atom = self.ff.atoms[oid]
             dscrptn = f"{atom.description} {atom.symbol} {oid}"
-            self.data_hdl.write(f"{id} {atom.mass} # {dscrptn}\n")
-        self.data_hdl.write(f"\n")
+            self.hdl.write(f"{id} {atom.mass} # {dscrptn}\n")
+        self.hdl.write(f"\n")
 
     def writePairCoeffs(self):
         """
         Write pair coefficients.
         """
-        self.data_hdl.write(f"{self.PAIR_COEFFS}\n\n")
+        self.hdl.write(f"{self.PAIR_COEFFS}\n\n")
         for oid, id in self.atm_types.items():
             vdw = self.ff.vdws[oid]
-            self.data_hdl.write(f"{id} {vdw.ene:.4f} {vdw.dist:.4f}\n")
-        self.data_hdl.write("\n")
+            self.hdl.write(f"{id} {vdw.ene:.4f} {vdw.dist:.4f}\n")
+        self.hdl.write("\n")
 
     def writeBondCoeffs(self):
         """
@@ -641,11 +606,11 @@ class Data(Struct, Base):
         if not self.bnd_types:
             return
 
-        self.data_hdl.write(f"{self.BOND_COEFFS}\n\n")
+        self.hdl.write(f"{self.BOND_COEFFS}\n\n")
         for oid, id in self.bnd_types.items():
             bond = self.ff.bonds[oid]
-            self.data_hdl.write(f"{id}  {bond.ene} {bond.dist}\n")
-        self.data_hdl.write("\n")
+            self.hdl.write(f"{id}  {bond.ene} {bond.dist}\n")
+        self.hdl.write("\n")
 
     def writeAngleCoeffs(self):
         """
@@ -654,11 +619,11 @@ class Data(Struct, Base):
         if not self.ang_types:
             return
 
-        self.data_hdl.write(f"{self.ANGLE_COEFFS}\n\n")
+        self.hdl.write(f"{self.ANGLE_COEFFS}\n\n")
         for oid, id in self.ang_types.items():
             angle = self.ff.angles[oid]
-            self.data_hdl.write(f"{id} {angle.ene} {angle.angle}\n")
-        self.data_hdl.write("\n")
+            self.hdl.write(f"{id} {angle.ene} {angle.angle}\n")
+        self.hdl.write("\n")
 
     def writeDiheCoeffs(self):
         """
@@ -667,7 +632,7 @@ class Data(Struct, Base):
         if not self.dihe_types:
             return
 
-        self.data_hdl.write(f"{self.DIHEDRAL_COEFFS}\n\n")
+        self.hdl.write(f"{self.DIHEDRAL_COEFFS}\n\n")
         for oid, id in self.dihe_types.items():
             params = [0., 0., 0., 0.]
             # LAMMPS: K1, K2, K3, K4 in 0.5*K1[1+cos(x)] + 0.5*K2[1-cos(2x)]...
@@ -679,8 +644,8 @@ class Data(Struct, Base):
                     continue
                 if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
                     params[ene_ang_n.n_parm] *= -1
-            self.data_hdl.write(f"{id}  {' '.join(map(str, params))}\n")
-        self.data_hdl.write("\n")
+            self.hdl.write(f"{id}  {' '.join(map(str, params))}\n")
+        self.hdl.write("\n")
 
     def writeImpropCoeffs(self):
         """
@@ -689,14 +654,14 @@ class Data(Struct, Base):
         if not self.impr_types:
             return
 
-        self.data_hdl.write(f"{self.IMPROPER_COEFFS}\n\n")
+        self.hdl.write(f"{self.IMPROPER_COEFFS}\n\n")
         for oid, id in self.impr_types.items():
             impr = self.ff.impropers[oid]
             # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
             sign = 1 if impr.angle == 0. else -1
-            self.data_hdl.write(f"{id} {impr.ene} {sign} {impr.n_parm}\n")
-        self.data_hdl.write("\n")
+            self.hdl.write(f"{id} {impr.ene} {sign} {impr.n_parm}\n")
+        self.hdl.write("\n")
 
     def writeAtoms(self, fmt='%i %i %i %.4f %.3f %.3f %.3f'):
         """
@@ -705,7 +670,7 @@ class Data(Struct, Base):
         :param fmt str: the format of atom line in LAMMPS data file.
         """
 
-        self.data_hdl.write(f"{self.ATOMS.capitalize()}\n\n")
+        self.hdl.write(f"{self.ATOMS.capitalize()}\n\n")
         for mol in self.molecules:
             data = np.zeros((mol.GetNumAtoms(), 7))
             type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
@@ -718,10 +683,10 @@ class Data(Struct, Base):
                 data[:, 0] = conformer.id_map[aids]
                 data[:, 1] = conformer.gid
                 data[:, 4:] = conformer.GetPositions()
-                np.savetxt(self.data_hdl, data, fmt=fmt)
+                np.savetxt(self.hdl, data, fmt=fmt)
                 self.total_charge += data[:, 3].sum()
             # Atom ids in starts from atom ids in previous template molecules
-        self.data_hdl.write(f"\n")
+        self.hdl.write(f"\n")
 
     def writeBonds(self):
         """
@@ -730,16 +695,16 @@ class Data(Struct, Base):
         if not self.bond_total:
             return
 
-        self.data_hdl.write(f"{self.BONDS.capitalize()}\n\n")
+        self.hdl.write(f"{self.BONDS.capitalize()}\n\n")
         bond_id = 1
         for mol in self.molecules:
             for conf in mol.GetConformers():
                 for bond_type, *ids in mol.bonds:
                     bond_type = self.bnd_types[bond_type]
                     ids = ' '.join(map(str, conf.id_map[ids]))
-                    self.data_hdl.write(f"{bond_id} {bond_type} {ids}\n")
+                    self.hdl.write(f"{bond_id} {bond_type} {ids}\n")
                     bond_id += 1
-        self.data_hdl.write(f"\n")
+        self.hdl.write(f"\n")
 
     def writeAngles(self):
         """
@@ -747,7 +712,7 @@ class Data(Struct, Base):
         """
         if not self.angle_total:
             return
-        self.data_hdl.write(f"{self.ANGLES.capitalize()}\n\n")
+        self.hdl.write(f"{self.ANGLES.capitalize()}\n\n")
         # Some angles may be filtered out by improper
         id = 1
         for mol in self.molecules:
@@ -755,9 +720,9 @@ class Data(Struct, Base):
                 for type_id, *ids in mol.angles:
                     angle_type = self.ang_types[type_id]
                     ids = ' '.join(map(str, conf.id_map[ids]))
-                    self.data_hdl.write(f"{id} {angle_type} {ids}\n")
+                    self.hdl.write(f"{id} {angle_type} {ids}\n")
                     id += 1
-        self.data_hdl.write(f"\n")
+        self.hdl.write(f"\n")
 
     def writeDihedrals(self):
         """
@@ -766,16 +731,16 @@ class Data(Struct, Base):
         if not self.dihedral_total:
             return
 
-        self.data_hdl.write(f"{self.DIHEDRALS.capitalize()}\n\n")
+        self.hdl.write(f"{self.DIHEDRALS.capitalize()}\n\n")
         id = 1
         for mol in self.molecules:
             for conf in mol.GetConformers():
                 for type_id, *ids in mol.dihedrals:
                     dihe_type = self.dihe_types[type_id]
                     ids = ' '.join(map(str, conf.id_map[ids]))
-                    self.data_hdl.write(f"{id} {dihe_type} {ids}\n")
+                    self.hdl.write(f"{id} {dihe_type} {ids}\n")
                     id += 1
-        self.data_hdl.write(f"\n")
+        self.hdl.write(f"\n")
 
     def writeImpropers(self):
         """
@@ -784,16 +749,16 @@ class Data(Struct, Base):
         if not self.improper_total:
             return
 
-        self.data_hdl.write(f"{self.IMPROPERS.capitalize()}\n\n")
+        self.hdl.write(f"{self.IMPROPERS.capitalize()}\n\n")
         id = 1
         for mol in self.molecules:
             for conf in mol.GetConformers():
                 for type_id, *ids in mol.impropers:
                     impr_type = self.impr_types[type_id]
                     ids = ' '.join(map(str, conf.id_map[ids]))
-                    self.data_hdl.write(f"{id} {impr_type} {ids}\n")
+                    self.hdl.write(f"{id} {impr_type} {ids}\n")
                     id += 1
-        self.data_hdl.write(f"\n")
+        self.hdl.write(f"\n")
 
     def getContents(self):
         """
@@ -801,9 +766,41 @@ class Data(Struct, Base):
 
         :return `bytes`: the contents of the data file in base64 encoding.
         """
-        self.data_hdl.seek(0)
-        contents = base64.b64encode(self.data_hdl.read().encode("utf-8"))
+        self.hdl.seek(0)
+        contents = base64.b64encode(self.hdl.read().encode("utf-8"))
         return b','.join([b'lammps_datafile', contents])
+
+    def writeFixShake(self):
+        """
+        Write the fix shake so that the bonds and angles associated with hydrogen
+        atoms keep constant.
+        """
+        fix_bonds = set()
+        for oid, id in self.bnd_types.items():
+            bond = self.ff.bonds[oid]
+            atoms = [self.ff.atoms[x] for x in [bond.id1, bond.id2]]
+            if any(x.symbol == symbols.HYDROGEN for x in atoms):
+                fix_bonds.add(id)
+
+        fix_angles = set()
+        for oid, id in self.ang_types.items():
+            angle = self.ff.angles[oid]
+            ids = [angle.id1, angle.id2, angle.id3]
+            atoms = [self.ff.atoms[x] for x in ids]
+            if any(x.symbol == symbols.HYDROGEN for x in atoms):
+                fix_angles.add(id)
+
+        btype_ids = ' '.join(map(str, fix_bonds))
+        atype_ids = ' '.join(map(str, fix_angles))
+        super().writeFixShake(bond=btype_ids, angle=atype_ids)
+
+    def writeRun(self, *arg, **kwarg):
+        """
+        Write command to further equilibrate the system with molecules
+        information considered.
+        """
+        testing = self.conformer_total == 1 and self.atom_total < 100
+        super().writeRun(*arg, testing=testing, **kwarg)
 
 
 class DataFileReader(Base):

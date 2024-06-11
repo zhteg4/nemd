@@ -1,9 +1,10 @@
 import math
 import string
-from scipy import constants
+import numpy as np
 
 from nemd import symbols
 from nemd import fileutils
+from nemd import constants
 from nemd import environutils
 
 NVT = 'NVT'
@@ -102,21 +103,16 @@ class FixWriter:
     """
     CHANGE_BDRY = CHANGE_BDRY.replace('\n    ', '\n').lstrip('\n')
 
-    def __init__(self, fh, options=None, mols=None, struct=None):
+    def __init__(self, fh, options=None, testing=True):
         """
         :param fh '_io.TextIOWrapper': file handdle to write fix commands
         :param options 'argparse.Namespace': command line options
-        :param mols dict: id and rdkit.Chem.rdchem.Mol
+        :param testing bool: the structure object.
         """
         self.fh = fh
+        self.testing = testing
         self.options = options
-        self.mols = mols
-        self.struct = struct
         self.cmd = []
-        self.mols = {} if mols is None else mols
-        self.mol_num = len(self.struct.mols)
-        self.atom_num = self.struct.atom_total
-        self.testing = self.mol_num == 1 and self.atom_num < 100
         self.timestep = self.options.timestep
         self.relax_time = self.options.relax_time
         self.prod_time = self.options.prod_time
@@ -125,9 +121,9 @@ class FixWriter:
         self.tdamp = self.options.timestep * self.options.tdamp
         self.press = self.options.press
         self.pdamp = self.options.timestep * self.options.pdamp
-        nano_femto = constants.nano / constants.femto
-        self.relax_step = round(self.relax_time / self.timestep * nano_femto)
-        self.prod_step = round(self.prod_time / self.timestep * nano_femto)
+        ps_timestep = self.timestep / constants.NANO_TO_FEMTO
+        self.relax_step = round(self.relax_time / ps_timestep)
+        self.prod_step = round(self.prod_time / ps_timestep)
 
     def run(self):
         """
@@ -427,6 +423,7 @@ class In(fileutils.LammpsInput):
     DEFAULT_LJ_CUT = DEFAULT_CUT
     DEFAULT_COUL_CUT = DEFAULT_CUT
     DUMP_ID, DUMP_Q = FixWriter.DUMP_ID, FixWriter.DUMP_Q
+    FIX_RIGID_SHAKE = 'fix rigid all shake 0.0001 10 10000 b {bond} a {angle}\n'
 
     def __init__(self, jobname='tmp', options=None):
         """
@@ -494,12 +491,16 @@ class In(fileutils.LammpsInput):
         if self.hasCharge():
             self.in_fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
 
-    def writeFixShake(self):
+    def writeFixShake(self, bond=None, angle=None):
         """
-        Write fix shake command to constrain bonds and angles. This method
-        should be overwritten when force field and structure are available.
+        Write fix shake command to enforce constant bond length and angel values.
+
+        :param bond float: bond types to be enforced.
+        :param angle float: angle types to be enforced.
         """
-        return
+        if not any([bond, angle]):
+            return
+        self.in_fh.write(self.FIX_RIGID_SHAKE.format(bond=bond, angle=angle))
 
     def hasCharge(self):
         """
@@ -549,15 +550,13 @@ class In(fileutils.LammpsInput):
         self.in_fh.write('compute 2 all improper/local chi\n')
         self.in_fh.write('dump 1i all local 1000 tmp.dump index c_1[1] c_2\n')
 
-    def writeRun(self, mols=None, struct=None):
+    def writeRun(self, testing=True):
         """
         Write command to further equilibrate the system.
 
-        :param mols dict: id and rdkit.Chem.rdchem.Mol
+        :param testing bool: fixes are for testing only.
         """
-        self.in_fh.write(f"velocity all create {self.options.stemp} 482748\n")
-        fwriter = FixWriter(self.in_fh,
-                            options=self.options,
-                            mols=mols,
-                            struct=struct)
+        seed = np.random.randint(0, high=constants.LARGE_NUM)
+        self.in_fh.write(f"velocity all create {self.options.stemp} {seed}\n")
+        fwriter = FixWriter(self.in_fh, options=self.options, testing=testing)
         fwriter.run()
