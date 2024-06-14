@@ -12,9 +12,9 @@ LAMMPS Description # full
 1 dihedral types
 0 improper types
 
--12.00 14.40 xlo xhi # 0.00 5.35
--8.74 17.66 ylo yhi # 0.00 5.35
--9.02 17.38 zlo zhi # 0.00 5.35
+-2.01 4.40 xlo xhi # 0.00 5.35
+1.25 7.67 ylo yhi # 0.00 5.35
+0.97 7.39 zlo zhi # 0.00 5.35
 
 Masses
 

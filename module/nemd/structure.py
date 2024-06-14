@@ -1,7 +1,6 @@
 """
 This module handles molecular topology and structural editing.
 """
-import rdkit
 import functools
 import numpy as np
 from rdkit import Chem
@@ -23,14 +22,14 @@ def log_debug(msg):
     logger.debug(msg)
 
 
-class Conformer(rdkit.Chem.rdchem.Conformer):
+class Conformer(Chem.rdchem.Conformer):
     """
-    A subclass of rdkit.Chem.rdchem.Conformer with additional attributes and methods.
+    A subclass of Chem.rdchem.Conformer with additional attributes and methods.
     """
 
     def __init__(self, *args, mol=None, **kwargs):
         """
-        :param mol `rdkit.Chem.rdchem.Mol`: the molecule this conformer belongs to.
+        :param mol `Chem.rdchem.Mol`: the molecule this conformer belongs to.
         """
         super().__init__(*args, **kwargs)
         self.mol = mol
@@ -76,7 +75,7 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         """
         Get the Mol that owns this conformer.
 
-        :return `rdkit.Chem.rdchem.Mol`: the molecule this conformer belongs to.
+        :return `Chem.rdchem.Mol`: the molecule this conformer belongs to.
         """
         return self.mol
 
@@ -128,9 +127,9 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         Chem.rdMolTransforms.SetBondLength(self, *bonded, val)
 
 
-class Mol(rdkit.Chem.rdchem.Mol):
+class Mol(Chem.rdchem.Mol):
     """
-    A subclass of rdkit.Chem.rdchem.Mol with additional attributes and methods.
+    A subclass of Chem.rdchem.Mol with additional attributes and methods.
     """
 
     ConfClass = Conformer
@@ -157,7 +156,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         """
         Set up the conformers including global ids and references.
 
-        :param mol `rdkit.Chem.rdchem.Mol`: the original molecule.
+        :param mol `Chem.rdchem.Mol`: the original molecule.
         :param cid int: the conformer gid to start with.
         :param gid int: the starting global id.
         """
@@ -186,7 +185,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         Get the conformer of the molecule.
 
         :param conf_id int: the conformer id to get.
-        :return `rdkit.Chem.rdchem.Conformer`: the selected conformer.
+        :return `Chem.rdchem.Conformer`: the selected conformer.
         """
         if conf_id is None:
             conf_id = self.conf_id
@@ -198,7 +197,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         """
         Add conformer to the molecule.
 
-        :param conf `rdkit.Chem.rdchem.Conformer`: the conformer to add.
+        :param conf `Chem.rdchem.Conformer`: the conformer to add.
         """
         # AddConformer set the owning molecule
         id = super().AddConformer(conf, **kwargs)
@@ -271,7 +270,7 @@ class Struct:
         """
         Create structure instance from molecules.
 
-        :param mols list of 'rdkit.Chem.rdchem.Mol': the molecules to be added.
+        :param mols list of 'Chem.rdchem.Mol': the molecules to be added.
         """
         struct = cls(*args, **kwargs)
         for mol in mols:
@@ -296,7 +295,7 @@ class Struct:
         """
         Return all conformers of all molecules.
 
-        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all
+        :return list of Chem.rdchem.Conformer: the conformers of all
             molecules.
         """
         return [x for y in self.molecules for x in y.GetConformers()]
@@ -306,7 +305,7 @@ class Struct:
         """
         Return all conformers of all molecules.
 
-        :return list of rdkit.Chem.rdchem.Conformer: the conformers of all
+        :return list of Chem.rdchem.Conformer: the conformers of all
             molecules.
         """
         return [x for x in self.mols.values()]
@@ -319,7 +318,7 @@ class Struct:
         Note: the len() of these atoms is different atom_total as atom_toal
         includes atoms from all conformers.
 
-        :return list of rdkit.Chem.rdchem.Atom: the atoms from all molecules.
+        :return list of Chem.rdchem.Atom: the atoms from all molecules.
         """
         return [y for x in self.molecules for y in x.GetAtoms()]
 

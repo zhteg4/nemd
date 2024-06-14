@@ -133,7 +133,7 @@ class Mol(structure.Mol):
             angle = self.ff.getMatchedAngles(atoms)[0]
             aids = tuple(x.GetIdx() for x in atoms)
             self.angles.append((angle.id, ) + aids)
-            self.rvrs_angles[tuple(aids)] = angle_id
+            self.rvrs_angles[aids] = angle_id
 
     def setDihedrals(self):
         """
@@ -473,7 +473,8 @@ class Data(Struct, Base):
         self.dihe_types = None
         self.impr_types = None
         self.hdl = None
-        self.density = None
+        self.density = struct.density if struct else None
+        self.warnings = []
 
     def writeData(self, nofile=False):
         """
@@ -560,7 +561,11 @@ class Data(Struct, Base):
         # Calculate density as the revised box may alter the box size.
         weight = sum([x.mw * x.GetNumConformers() for x in self.molecules])
         edges = [x * 2 * nconstant.ANG_TO_CM for x in box_hf]
-        self.density = weight / math.prod(edges) / scipy.constants.Avogadro
+        density = weight / math.prod(edges) / scipy.constants.Avogadro
+        if np.isclose(self.density, density):
+            return
+        msg = f'The density of the final data file is {density:.4g} kg/cm^3'
+        self.warnings.append(msg)
 
     def getHalfBox(self, xyzs, min_box=None, buffer=None):
         """
@@ -573,17 +578,21 @@ class Data(Struct, Base):
         :return list of three floats: the xyz box limits.
         """
         if min_box is None:
-            # PBC should be 2x larger than the cutoff, otherwise one particle
-            # can interact with another particle within its cutoff twice: within
-            # the box and across the PBC.
-            cut_x2 = min([self.lj_cut, self.coul_cut]) * 2
-            min_box = (cut_x2, cut_x2, cut_x2,)  # yapf: disable
+            min_box = [1, 1, 1]
         if buffer is None:
             buffer = self.BUFFER  # yapf: disable
         box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
         if self.box is not None:
             box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
+        if min(box_hf) < min([self.lj_cut, self.coul_cut]):
+            # One particle interacts with another particle within cutoff twice:
+            # within the box and across the PBC
+            msg = f"The half box size ({min(box_hf):.2f} {symbols.ANGSTROM}) " \
+                  f"is smaller than the {min([self.lj_cut, self.coul_cut])} " \
+                  f"{symbols.ANGSTROM} interaction cutoff."
+            self.warnings.append(msg)
+
         if self.conformer_total != 1:
             return box_hf
         # All-trans single molecule with internal tension runs into clashes
@@ -700,6 +709,10 @@ class Data(Struct, Base):
                 self.total_charge += data[:, 3].sum()
             # Atom ids in starts from atom ids in previous template molecules
         self.hdl.write(f"\n")
+        if not round(self.total_charge, 4):
+            return
+        msg = f'The system has a net charge of {self.total_charge:.4f}'
+        self.warnings.append(msg)
 
     def writeBonds(self):
         """

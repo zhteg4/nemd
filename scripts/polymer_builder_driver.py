@@ -246,13 +246,8 @@ class AmorphousCell(object):
                               box=self.struct.box,
                               options=self.options)
         lmw.writeData()
-        if not np.isclose(lmw.density, self.struct.density):
-            log_warning(
-                f'The density of the final data file is {lmw.density:.4g} kg/cm^3'
-            )
-        if round(lmw.total_charge, 4):
-            log_warning(
-                f'The system has a net charge of {lmw.total_charge:.4f}')
+        for warning in lmw.warnings:
+            log_warning(f'{warning}')
         lmw.writeIn()
         log(f'Data file written into {lmw.datafile}')
         log(f'In script written into {lmw.lammps_in}')

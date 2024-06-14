@@ -100,9 +100,9 @@ class FixWriter:
         """
         if not any([self.options.btypes, self.options.atypes]):
             return
-        self.fh.write(
-            self.FIX_RIGID_SHAKE.format(bond=self.options.btypes,
-                                        angle=self.options.atypes))
+        btypes = ' '.join(map(str, self.options.btypes))
+        atypes = ' '.join(map(str, self.options.atypes))
+        self.fh.write(self.FIX_RIGID_SHAKE.format(bond=btypes, angle=atypes))
 
     def velocity(self):
         """
