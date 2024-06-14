@@ -791,11 +791,10 @@ class Data(Struct, Base):
         btypes = [self.bnd_types[y] for x in self.molecules for y in x.fbonds]
         atypes = [self.ang_types[y] for x in self.molecules for y in x.fangles]
         testing = self.conformer_total == 1 and self.atom_total < 100
-        super().writeRun(*arg,
-                         btypes=btypes,
-                         atypes=atypes,
-                         testing=testing,
-                         **kwarg)
+        struct_info = types.SimpleNamespace(btypes=btypes,
+                                            atypes=atypes,
+                                            testing=testing)
+        super().writeRun(*arg, struct_info=struct_info, **kwarg)
 
 
 class DataFileReader(Base):

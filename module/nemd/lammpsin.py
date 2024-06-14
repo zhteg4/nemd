@@ -1,5 +1,6 @@
 import os
 import math
+import types
 import string
 import numpy as np
 
@@ -59,25 +60,14 @@ class FixWriter:
     PRESS_VAR = f'${{{PRESS}}}'
     MODULUS_VAR = f'${{{MODULUS}}}'
 
-    def __init__(self,
-                 fh,
-                 options=None,
-                 btypes=None,
-                 atypes=None,
-                 testing=True):
+    def __init__(self, fh, options=None):
         """
         :param fh '_io.TextIOWrapper': file handdle to write fix commands
-        :param options 'argparse.Namespace': command line options
-        :param btypes float: bond types to enforce constant lengths.
-        :param atypes float: angle types to enforce constant angle values.
-        :param testing bool: the structure object.
+        :param options 'types.Namespace': command line options and structure
+            information such as bond types, angle types, and testing flag.
         """
         self.fh = fh
         self.options = options
-        self.btypes = btypes
-        self.atypes = atypes
-        self.testing = testing
-
         self.cmd = []
         self.timestep = self.options.timestep
         self.relax_time = self.options.relax_time
@@ -108,10 +98,11 @@ class FixWriter:
         """
         Write fix shake command to enforce constant bond length and angel values.
         """
-        if not any([self.btypes, self.atypes]):
+        if not any([self.options.btypes, self.options.atypes]):
             return
         self.fh.write(
-            self.FIX_RIGID_SHAKE.format(bond=self.btypes, angle=self.atypes))
+            self.FIX_RIGID_SHAKE.format(bond=self.options.btypes,
+                                        angle=self.options.atypes))
 
     def velocity(self):
         """
@@ -127,7 +118,7 @@ class FixWriter:
 
         :nstep int: run this steps for time integration.
         """
-        if not self.testing:
+        if not self.options.testing:
             return
         self.nve(nstep=nstep)
 
@@ -145,7 +136,7 @@ class FixWriter:
         """
         Start simulation from low temperature and constant volume.
         """
-        if self.testing:
+        if self.options.testing:
             return
         self.nvt(nstep=self.relax_step / 1E3,
                  stemp=self.stemp,
@@ -180,7 +171,7 @@ class FixWriter:
         volume, calculate the averaged pressure at high temperature, and changes
         volume to reach the target pressure.
         """
-        if self.testing:
+        if self.options.testing:
             return
         if ensemble == self.NPT:
             self.npt(nstep=self.relax_step / 1E1,
@@ -325,7 +316,7 @@ class FixWriter:
         """
         Longer relaxation at constant temperature and deform to the mean size.
         """
-        if self.testing:
+        if self.options.testing:
             return
         if self.options.prod_ens == self.NPT:
             self.npt(nstep=self.relax_step,
@@ -351,7 +342,7 @@ class FixWriter:
         requires for good energy conservation in time integration. NVT and NPT
         may help for disturbance non-sensitive property.
         """
-        if self.testing:
+        if self.options.testing:
             return
         if self.options.prod_ens == self.NVE:
             self.nve(nstep=self.prod_step)
@@ -553,15 +544,13 @@ class In:
         self.in_fh.write(f'{self.DUMP} 1i all local 1000 tmp.dump '
                          f'index c_1[1] c_2\n')
 
-    def writeRun(self, btypes=None, atypes=None, testing=True):
+    def writeRun(self, struct_info=None):
         """
         Write command to further equilibrate the system.
 
-        :param testing bool: fixes are for testing only.
+        :param struct_info 'types.Namespace': structure information.
         """
-        fwriter = FixWriter(self.in_fh,
-                            options=self.options,
-                            btypes=btypes,
-                            atypes=atypes,
-                            testing=testing)
+        options = {x: y for x, y in self.options._get_kwargs()}
+        options = types.SimpleNamespace(**options, **struct_info.__dict__)
+        fwriter = FixWriter(self.in_fh, options=options)
         fwriter.run()
