@@ -39,8 +39,9 @@ ATOM_TYPE = namedtuple('ATOM_TYPE', [
     'id', 'formula', 'symbol', 'description', 'atomic_number', 'mass', 'conn'
 ])
 VDW = namedtuple('VDW', ['id', 'dist', 'ene'])
-BOND = namedtuple('BOND', ['id', 'id1', 'id2', 'dist', 'ene'])
-ANGLE = namedtuple('ANGLE', ['id', 'id1', 'id2', 'id3', 'ene', 'angle'])
+BOND = namedtuple('BOND', ['id', 'id1', 'id2', 'dist', 'ene', 'has_h'])
+ANGLE = namedtuple('ANGLE',
+                   ['id', 'id1', 'id2', 'id3', 'ene', 'angle', 'has_h'])
 UREY_BRADLEY = namedtuple('UREY_BRADLEY', ['id1', 'id2', 'id3', 'ene', 'dist'])
 IMPROPER = namedtuple(
     'IMPROPER', ['id', 'id1', 'id2', 'id3', 'id4', 'ene', 'angle', 'n_parm'])
@@ -469,11 +470,14 @@ class OplsParser:
         for id, line in enumerate(self.raw_content[self.BOND_MK], 1):
             # 'bond        104  107          386.00     1.4250'
             _, id1, id2, ene, dist = line.split()
+            atoms = [self.atoms[int(x)] for x in [id1, id2]]
+            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
             self.bonds[id] = BOND(id=id,
                                   id1=int(id1),
                                   id2=int(id2),
                                   ene=float(ene),
-                                  dist=float(dist))
+                                  dist=float(dist),
+                                  has_h=has_h)
             self.bnd_map[int(id1), int(id2)] = id
 
     def setAngle(self):
@@ -485,12 +489,15 @@ class OplsParser:
         for id, line in enumerate(self.raw_content[self.ANGLE_MK], 1):
             # 'angle        83  107  104      80.00     109.50'
             _, id1, id2, id3, ene, angle = line.split()
+            atoms = [self.atoms[int(x)] for x in [id1, id2, id3]]
+            has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
             self.angles[id] = ANGLE(id=id,
                                     id1=int(id1),
                                     id2=int(id2),
                                     id3=int(id3),
                                     ene=float(ene),
-                                    angle=float(angle))
+                                    angle=float(angle),
+                                    has_h=has_h)
             self.ang_map[int(id1), int(id2), int(id3)] = id
 
     def setUreyBradley(self):

@@ -4,7 +4,6 @@ import string
 import numpy as np
 
 from nemd import symbols
-from nemd import fileutils
 from nemd import constants
 from nemd import environutils
 from nemd import lammpsfix
@@ -15,6 +14,8 @@ class FixWriter:
     This the wrapper for LAMMPS fix command writer. which usually includes an
     unfix after the run command.
     """
+    FIX_RIGID_SHAKE = lammpsfix.FIX_RIGID_SHAKE
+    VELOCITY = lammpsfix.VELOCITY
     SET_VAR = lammpsfix.SET_VAR
     NVE = lammpsfix.NVE
     NVT = lammpsfix.NVT
@@ -58,15 +59,25 @@ class FixWriter:
     PRESS_VAR = f'${{{PRESS}}}'
     MODULUS_VAR = f'${{{MODULUS}}}'
 
-    def __init__(self, fh, options=None, testing=True):
+    def __init__(self,
+                 fh,
+                 options=None,
+                 btypes=None,
+                 atypes=None,
+                 testing=True):
         """
         :param fh '_io.TextIOWrapper': file handdle to write fix commands
         :param options 'argparse.Namespace': command line options
+        :param btypes float: bond types to enforce constant lengths.
+        :param atypes float: angle types to enforce constant angle values.
         :param testing bool: the structure object.
         """
         self.fh = fh
-        self.testing = testing
         self.options = options
+        self.btypes = btypes
+        self.atypes = atypes
+        self.testing = testing
+
         self.cmd = []
         self.timestep = self.options.timestep
         self.relax_time = self.options.relax_time
@@ -84,12 +95,31 @@ class FixWriter:
         """
         Main method to run the writer.
         """
+        self.fixShake()
+        self.velocity()
         self.test()
         self.startLow()
         self.rampUp()
         self.relaxAndDefrom()
         self.production()
         self.write()
+
+    def fixShake(self):
+        """
+        Write fix shake command to enforce constant bond length and angel values.
+        """
+        if not any([self.btypes, self.atypes]):
+            return
+        self.fh.write(
+            self.FIX_RIGID_SHAKE.format(bond=self.btypes, angle=self.atypes))
+
+    def velocity(self):
+        """
+        Create initial velocity for the system.
+        """
+        seed = np.random.randint(0, high=constants.LARGE_NUM)
+        self.fh.write(
+            f"{self.VELOCITY} all create {self.options.stemp} {seed}\n")
 
     def test(self, nstep=1E3):
         """
@@ -357,7 +387,7 @@ class FixWriter:
             self.fh.write(cmd + '\n')
 
 
-class In(fileutils.LammpsInput):
+class In:
     """
     Class to write out LAMMPS in script.
     """
@@ -365,9 +395,25 @@ class In(fileutils.LammpsInput):
     IN_EXT = '.in'
     DATA_EXT = '.data'
 
+    UNITS = 'units'
     METAL = 'metal'
     ATOMIC = 'atomic'
 
+    ATOM_STYLE = 'atom_style'
+    BOND_STYLE = 'bond_style'
+    ANGLE_STYLE = 'angle_style'
+    DIHEDRAL_STYLE = 'dihedral_style'
+    IMPROPER_STYLE = 'improper_style'
+
+    PAIR_STYLE = 'pair_style'
+    PAIR_MODIFY = 'pair_modify'
+    SPECIAL_BONDS = 'special_bonds'
+    KSPACE_STYLE = 'kspace_style'
+
+    READ_DATA = 'read_data'
+    TIMESTEP = 'timestep'
+    THERMO_MODIFY = 'thermo_modify'
+    THERMO = 'thermo'
     LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
     LJ_CUT = 'lj/cut'
     GEOMETRIC = 'geometric'
@@ -386,11 +432,12 @@ class In(fileutils.LammpsInput):
     LJ_COUL = 'lj/coul'
     CUSTOM_EXT = '.custom.gz'
     DUMP = 'dump'
+    DUMP_MODIFY = 'dump_modify'
     DEFAULT_CUT = 11.
     DEFAULT_LJ_CUT = DEFAULT_CUT
     DEFAULT_COUL_CUT = DEFAULT_CUT
     DUMP_ID, DUMP_Q = FixWriter.DUMP_ID, FixWriter.DUMP_Q
-    FIX_RIGID_SHAKE = 'fix rigid all shake 0.0001 10 10000 b {bond} a {angle}\n'
+    MINIMIZE = 'minimize'
 
     def __init__(self, jobname='tmp', options=None):
         """
@@ -438,7 +485,6 @@ class In(fileutils.LammpsInput):
             self.readData()
             self.writeTimestep()
             self.writeMinimize()
-            self.writeFixShake()
             self.writeRun()
 
     def writeDescriptions(self):
@@ -457,17 +503,6 @@ class In(fileutils.LammpsInput):
         self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5\n")
         if self.hasCharge():
             self.in_fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
-
-    def writeFixShake(self, bond=None, angle=None):
-        """
-        Write fix shake command to enforce constant bond length and angel values.
-
-        :param bond float: bond types to be enforced.
-        :param angle float: angle types to be enforced.
-        """
-        if not any([bond, angle]):
-            return
-        self.in_fh.write(self.FIX_RIGID_SHAKE.format(bond=bond, angle=angle))
 
     def hasCharge(self):
         """
@@ -496,34 +531,37 @@ class In(fileutils.LammpsInput):
             self.in_fh.write(
                 f"{self.DUMP} {self.DUMP_ID} all custom {self.DUMP_Q} "
                 f"dump{self.CUSTOM_EXT} id xu yu zu\n")
-            self.in_fh.write("dump_modify 1 sort id\n")
+            self.in_fh.write(f"{self.DUMP_MODIFY} 1 sort id\n")
         self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
-        self.in_fh.write("minimize 1.0e-6 1.0e-8 1000000 10000000\n\n")
+        self.in_fh.write(f"{self.MINIMIZE} 1.0e-6 1.0e-8 1000000 10000000\n\n")
 
     def writeTimestep(self):
         """
         Write commands related to timestep.
         """
-        self.in_fh.write(f'timestep {self.options.timestep}\n')
-        self.in_fh.write('thermo_modify flush yes\n')
-        self.in_fh.write('thermo 1000\n')
+        self.in_fh.write(f'{self.TIMESTEP} {self.options.timestep}\n')
+        self.in_fh.write(f'{self.THERMO_MODIFY} flush yes\n')
+        self.in_fh.write(f'{self.THERMO} 1000\n')
 
     def dumpImproper(self):
         """
         Compute and dump improper values with type.
         """
-        self.in_fh.write(
-            'compute 1 all property/local itype iatom1 iatom2 iatom3 iatom4\n')
-        self.in_fh.write('compute 2 all improper/local chi\n')
-        self.in_fh.write('dump 1i all local 1000 tmp.dump index c_1[1] c_2\n')
+        self.in_fh.write(f'{self.COMPUTE} 1 all property/local itype '
+                         f'iatom1 iatom2 iatom3 iatom4\n')
+        self.in_fh.write(f'{self.COMPUTE} 2 all improper/local chi\n')
+        self.in_fh.write(f'{self.DUMP} 1i all local 1000 tmp.dump '
+                         f'index c_1[1] c_2\n')
 
-    def writeRun(self, testing=True):
+    def writeRun(self, btypes=None, atypes=None, testing=True):
         """
         Write command to further equilibrate the system.
 
         :param testing bool: fixes are for testing only.
         """
-        seed = np.random.randint(0, high=constants.LARGE_NUM)
-        self.in_fh.write(f"velocity all create {self.options.stemp} {seed}\n")
-        fwriter = FixWriter(self.in_fh, options=self.options, testing=testing)
+        fwriter = FixWriter(self.in_fh,
+                            options=self.options,
+                            btypes=btypes,
+                            atypes=atypes,
+                            testing=testing)
         fwriter.run()

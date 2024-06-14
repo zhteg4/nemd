@@ -100,7 +100,6 @@ class LammpsBase(object):
     FIX = 'fix'
     DUMP_MODIFY = 'dump_modify'
     PAIR_STYLE = 'pair_style'
-    PAIR_MODIFY = 'pair_modify'
     SPECIAL_BONDS = 'special_bonds'
     KSPACE_STYLE = 'kspace_style'
     KSPACE_MODIFY = 'kspace_modify'

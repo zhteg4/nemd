@@ -45,6 +45,8 @@ class Mol(structure.Mol):
         self.nbr_charge = collections.defaultdict(float)
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
+        self.fbonds = set()
+        self.fangles = set()
         self.setTopo()
 
     def setTopo(self):
@@ -57,6 +59,7 @@ class Mol(structure.Mol):
         self.setDihedrals()
         self.setImpropers()
         self.removeAngles()
+        self.setFixGeom()
 
     def balanceCharge(self):
         """
@@ -305,6 +308,16 @@ class Mol(structure.Mol):
             to_remove.append(index)
         for index in sorted(to_remove, reverse=True):
             self.angles.pop(index)
+
+    def setFixGeom(self):
+        """
+        The lengths or angle values are these geometry remain unchanged during
+        simulation.
+        """
+        bonds = [self.ff.bonds[x[0]] for x in self.bonds]
+        self.fbonds = set([x[0] for x in bonds if x.has_h])
+        angles = [self.ff.angles[x[0]] for x in self.angles]
+        self.fangles = set([x[0] for x in angles if x.has_h])
 
     @property
     def bond_total(self):
@@ -770,37 +783,19 @@ class Data(Struct, Base):
         contents = base64.b64encode(self.hdl.read().encode("utf-8"))
         return b','.join([b'lammps_datafile', contents])
 
-    def writeFixShake(self):
-        """
-        Write the fix shake so that the bonds and angles associated with hydrogen
-        atoms keep constant.
-        """
-        fix_bonds = set()
-        for oid, id in self.bnd_types.items():
-            bond = self.ff.bonds[oid]
-            atoms = [self.ff.atoms[x] for x in [bond.id1, bond.id2]]
-            if any(x.symbol == symbols.HYDROGEN for x in atoms):
-                fix_bonds.add(id)
-
-        fix_angles = set()
-        for oid, id in self.ang_types.items():
-            angle = self.ff.angles[oid]
-            ids = [angle.id1, angle.id2, angle.id3]
-            atoms = [self.ff.atoms[x] for x in ids]
-            if any(x.symbol == symbols.HYDROGEN for x in atoms):
-                fix_angles.add(id)
-
-        btype_ids = ' '.join(map(str, fix_bonds))
-        atype_ids = ' '.join(map(str, fix_angles))
-        super().writeFixShake(bond=btype_ids, angle=atype_ids)
-
     def writeRun(self, *arg, **kwarg):
         """
         Write command to further equilibrate the system with molecules
         information considered.
         """
+        btypes = [self.bnd_types[y] for x in self.molecules for y in x.fbonds]
+        atypes = [self.ang_types[y] for x in self.molecules for y in x.fangles]
         testing = self.conformer_total == 1 and self.atom_total < 100
-        super().writeRun(*arg, testing=testing, **kwarg)
+        super().writeRun(*arg,
+                         btypes=btypes,
+                         atypes=atypes,
+                         testing=testing,
+                         **kwarg)
 
 
 class DataFileReader(Base):
