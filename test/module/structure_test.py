@@ -3,15 +3,25 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import rdMolTransforms, AllChem
 
-from nemd import rdkitutils
 from nemd import structure
+from nemd import rdkitutils
+
+
+MOL_ONLY = Chem.MolFromSmiles('CCCCC')
+MOL_WITH_CONF = Chem.MolFromSmiles('CCCCC')
+with rdkitutils.rdkit_warnings_ignored():
+    Chem.AllChem.EmbedMolecule(MOL_WITH_CONF)
+MOL_WITH_CONFS = Chem.MolFromSmiles('CCCCC')
+with rdkitutils.rdkit_warnings_ignored():
+    Chem.AllChem.EmbedMolecule(MOL_WITH_CONFS)
+MOL_WITH_CONFS.AddConformer(MOL_WITH_CONFS.GetConformer(0), assignId=True)
 
 
 class TestConformer:
 
     @pytest.fixture
     def conf(self):
-        mol = structure.Mol(Chem.MolFromSmiles('CCCCC'))
+        mol = structure.Mol(MOL_ONLY)
         conf = structure.Conformer(mol.GetNumAtoms())
         return mol.AddConformer(conf)
 
@@ -46,22 +56,13 @@ class TestConformer:
 
 class TestMol:
 
-    MOL_ONLY = Chem.MolFromSmiles('CCCCC')
-    MOL_WITH_CONF = Chem.MolFromSmiles('CCCCC')
-    with rdkitutils.rdkit_warnings_ignored():
-        Chem.AllChem.EmbedMolecule(MOL_WITH_CONF)
-    STRUCT = structure.Struct()
-    MOL_WITH_CONFS = Chem.MolFromSmiles('CCCCC')
-    with rdkitutils.rdkit_warnings_ignored():
-        Chem.AllChem.EmbedMolecule(MOL_WITH_CONFS)
-    MOL_WITH_CONFS.AddConformer(MOL_WITH_CONFS.GetConformer(0), assignId=True)
     STRUCT_WITH_MOL = structure.Struct()
     STRUCT_WITH_MOL.addMol(MOL_WITH_CONFS)
 
     @pytest.mark.parametrize(
         "imol, struct, num_conf, gids, mgid",
         [(MOL_ONLY, None, 0, [], None), (MOL_WITH_CONF, None, 1, [1], 5),
-         (MOL_WITH_CONF, STRUCT, 1, [1], 5),
+         (MOL_WITH_CONF, structure.Struct(), 1, [1], 5),
          (MOL_WITH_CONFS, STRUCT_WITH_MOL, 2, [3, 4], 20)])
     def testSetUp(self, imol, struct, num_conf, gids, mgid):
         mol = structure.Mol(imol, struct=struct, delay=True)
@@ -74,7 +75,7 @@ class TestMol:
 
     @pytest.fixture
     def mol(self):
-        return structure.Mol(self.MOL_WITH_CONFS, struct=self.STRUCT_WITH_MOL)
+        return structure.Mol(MOL_WITH_CONFS, struct=self.STRUCT_WITH_MOL)
 
     def testSetConformerId(self, mol):
         assert mol.conf_id == 0

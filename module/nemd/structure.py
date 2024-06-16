@@ -246,11 +246,11 @@ class Struct:
         :param ff 'OplsParser': the force field class.
         """
         self.ff = ff
-        self.mols = {}
+        self.molecules = []
         self.density = None
         if struct is None:
             return
-        for mol in struct.mols.values():
+        for mol in struct.molecules:
             self.addMol(mol)
 
     @classmethod
@@ -265,18 +265,14 @@ class Struct:
             struct.addMol(mol)
         return struct
 
-    def addMol(self, mol, mol_id=0):
+    def addMol(self, mol):
         """
         Initialize molecules and conformers with id and map set.
 
         :param mol 'Mol': the molecule to be added.
-        :param mol_id int: the starting id of the molecules.
         """
-        if self.mols:
-            mol_id = max(self.mols.keys()) + 1
         mol = self.MolClass(mol, struct=self, ff=self.ff)
-        self.mols[mol_id] = mol
-        return mol_id
+        self.molecules.append(mol)
 
     def getIds(self, cid=1, gid=1):
         """
@@ -300,16 +296,6 @@ class Struct:
             molecules.
         """
         return [x for y in self.molecules for x in y.GetConformers()]
-
-    @property
-    def molecules(self):
-        """
-        Return all conformers of all molecules.
-
-        :return list of Chem.rdchem.Conformer: the conformers of all
-            molecules.
-        """
-        return [x for x in self.mols.values()]
 
     @property
     def atoms(self):

@@ -90,7 +90,7 @@ class Data(xtal.Struct, lammpsdata.Base):
         Write box information.
         """
 
-        boxes = [x.getBox() for x in self.mols.values()]
+        boxes = [x.getBox() for x in self.molecules]
         box = boxes[0]
         repeated = np.repeat(box.reshape(1, -1), len(boxes), axis=0)
         if not (repeated == boxes).all():

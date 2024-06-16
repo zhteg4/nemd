@@ -707,7 +707,7 @@ class PackedStruct(structure.Struct):
         """
         Set periodic boundary box size.
         """
-        weight = sum(x.mw * x.GetNumConformers() for x in self.mols.values())
+        weight = sum(x.mw * x.GetNumConformers() for x in self.molecules)
         vol = weight / self.density / scipy.constants.Avogadro
         edge = math.pow(vol, 1 / 3)  # centimeter
         edge *= scipy.constants.centi / scipy.constants.angstrom
@@ -751,7 +751,7 @@ class PackedStruct(structure.Struct):
         Set references to all molecular and conformers.
         """
 
-        for mol in self.mols.values():
+        for mol in self.molecules:
             mol.df_reader = self.df_reader
             mol.frm = self.frm
             mol.dcell = self.dcell
@@ -840,7 +840,7 @@ class GrownStruct(PackedStruct):
         """
         See parent class for details.
         """
-        for mol in self.mols.values():
+        for mol in self.molecules:
             mol.init_tf = self.init_tf
         super().setReferences()
 
