@@ -21,7 +21,6 @@ from nemd import logutils
 from nemd import structure
 from nemd import lammpsdata
 
-
 logger = logutils.createModuleLogger(file_path=__file__)
 
 
@@ -44,7 +43,6 @@ class ConfError(RuntimeError):
 
 class GriddedConf(structure.Conformer):
     ...
-
 
 
 class PackedConf(structure.Conformer):
@@ -371,7 +369,17 @@ class GrownConf(PackedConf):
         )
 
 
-class GriddedMol(structure.Mol):
+class Mol(structure.Mol):
+
+    def __init__(self, *args, ff=None, **kwargs):
+        """
+        :param ff 'OplsParser': the force field class.
+        """
+        super().__init__(*args, **kwargs)
+        self.ff = ff
+
+
+class GriddedMol(Mol):
     """
     A subclass of rdkit.Chem.rdchem.Mol to handle gridded conformers.
     """
@@ -439,7 +447,7 @@ class GriddedMol(structure.Mol):
         return math.ceil(self.GetNumConformers() / np.prod(self.mol_num))
 
 
-class PackedMol(structure.Mol):
+class PackedMol(Mol):
     """
     A subclass of rdkit.Chem.rdchem.Mol with additional attributes and methods.
     """
@@ -590,8 +598,14 @@ class GrownMol(PackedMol):
 
 class Struct(structure.Struct):
 
-    def __init__(self, *args, options=None, **kwargs):
+    def __init__(self, *args, ff=None, options=None, **kwargs):
+        """
+        :param ff 'OplsParser': the force field class.
+        :param options 'argparse.Namespace': command line options
+        """
+        self.MolClass = functools.partial(self.MolClass, ff=ff)
         super().__init__(*args, **kwargs)
+        self.ff = ff
         self.options = options
         self.density = None
         self.df_reader = None
@@ -608,6 +622,7 @@ class Struct(structure.Struct):
         contents = lmw.writeData(nofile=True)
         self.df_reader = lammpsdata.DataFileReader(contents=contents)
         self.df_reader.run()
+
 
 class GriddedStruct(Struct):
     """

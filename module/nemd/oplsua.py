@@ -785,7 +785,7 @@ class OplsParser:
         :return float: the total weight.
         """
         atypes = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
-        return sum(self.atoms[x].mass for x in atypes)
+        return round(sum(self.atoms[x].mass for x in atypes), 4)
 
     @property
     def improper_symbols(self):

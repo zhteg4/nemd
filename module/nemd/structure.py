@@ -130,16 +130,14 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
     ConfClass = Conformer
 
-    def __init__(self, *args, struct=None, ff=None, delay=False, **kwargs):
+    def __init__(self, *args, struct=None, delay=False, **kwargs):
         """
         :param struct 'Struct': owning structure
-        :param ff 'OplsParser': the force field class.
         :delay bool: customization is delayed for later setup or testing.
         """
         # conformers in super(Mol, self).GetConformers() are rebuilt
         super().__init__(*args, **kwargs)
         self.struct = struct
-        self.ff = ff
         self.delay = delay
         self.conf_id = 0
         self.confs = {}
@@ -242,12 +240,11 @@ class Struct:
 
     MolClass = Mol
 
-    def __init__(self, struct=None, ff=None):
+    def __init__(self, struct=None):
         """
         :param struct 'Struct': the structure with molecules.
         :param ff 'OplsParser': the force field class.
         """
-        self.ff = ff
         self.molecules = []
         self.density = None
         if struct is None:
@@ -273,7 +270,7 @@ class Struct:
 
         :param mol 'Mol': the molecule to be added.
         """
-        mol = self.MolClass(mol, struct=self, ff=self.ff)
+        mol = self.MolClass(mol, struct=self)
         self.molecules.append(mol)
 
     def getIds(self, cid=1, gid=1):

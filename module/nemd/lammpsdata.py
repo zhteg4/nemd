@@ -4,6 +4,7 @@ import scipy
 import types
 import base64
 import itertools
+import functools
 import collections
 import numpy as np
 from rdkit import Chem
@@ -35,8 +36,12 @@ class Mol(structure.Mol):
     TYPE_ID = oplsua.TYPE_ID
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, ff=None, **kwargs):
+        """
+        :param ff 'OplsParser': the force field class.
+        """
         super().__init__(*args, **kwargs)
+        self.ff = ff
         self.symbol_impropers = {}
         self.bonds = []
         self.angles = []
@@ -370,6 +375,14 @@ class Mol(structure.Mol):
 class Struct(structure.Struct):
 
     MolClass = Mol
+
+    def __init__(self, *args, ff=None, **kwargs):
+        """
+        :param ff 'OplsParser': the force field class.
+        """
+        self.MolClass = functools.partial(self.MolClass, ff=ff)
+        super().__init__(*args, **kwargs)
+        self.ff = ff
 
     @property
     def bond_total(self):
@@ -887,7 +900,7 @@ class DataFileReader(Base):
         :return float: the total weight.
         """
         type_ids = [x.type_id for x in self.atom]
-        return sum(self.masses[x].mass for x in type_ids)
+        return round(sum(self.masses[x].mass for x in type_ids), 4)
 
     mw = molecular_weight
 

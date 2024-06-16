@@ -175,7 +175,7 @@ class AmorphousCell(object):
         for cru, cru_num, mol_num in zip(self.options.cru,
                                          self.options.cru_num,
                                          self.options.mol_num):
-            mol = Mol(cru, cru_num, mol_num, options=self.options, ff=self.ff)
+            mol = Mol(cru, cru_num, mol_num, options=self.options)
             self.mols.append(mol)
 
     def setGriddedCell(self):
@@ -274,13 +274,7 @@ class Mol(structure.Mol):
     IS_MONO = pnames.IS_MONO
     MONO_ID = pnames.MONO_ID
 
-    def __init__(self,
-                 cru,
-                 cru_num,
-                 mol_num,
-                 ff=None,
-                 options=None,
-                 delay=False):
+    def __init__(self, cru, cru_num, mol_num, options=None, delay=False):
         """
         :param cru str: the smiles string for monomer
         :param cru_num int: the number of monomers per polymer
@@ -293,15 +287,12 @@ class Mol(structure.Mol):
         self.cru = cru
         self.cru_num = cru_num
         self.mol_num = mol_num
-        self.ff = ff
         self.options = options
         self.polym_Hs = None
         self.box = None
         self.cru_mol = None
         self.smiles = None
         self.buffer = lammpsdata.Data.BUFFER
-        if self.ff is None:
-            self.ff = oplsua.get_opls_parser()
         if delay:
             return
         self.build()
@@ -364,7 +355,7 @@ class Mol(structure.Mol):
         """
 
         if not self.cru_mol.GetBoolProp(self.IS_MONO):
-            super().__init__(self.cru_mol, ff=self.ff)
+            super().__init__(self.cru_mol)
             return
         # Duplicate and index monomers
         mols = []
@@ -404,7 +395,7 @@ class Mol(structure.Mol):
             orgin_atom_num = polym.GetNumAtoms()
             polym = Chem.DeleteSubstructs(
                 polym, Chem.MolFromSmiles(symbols.WILD_CARD))
-        super().__init__(polym, ff=self.ff)
+        super().__init__(polym)
         log(f"Polymer SMILES: {Chem.MolToSmiles(self)}")
 
     def assignAtomType(self):

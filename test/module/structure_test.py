@@ -6,7 +6,6 @@ from rdkit.Chem import rdMolTransforms, AllChem
 from nemd import structure
 from nemd import rdkitutils
 
-
 MOL_ONLY = Chem.MolFromSmiles('CCCCC')
 MOL_WITH_CONF = Chem.MolFromSmiles('CCCCC')
 with rdkitutils.rdkit_warnings_ignored():

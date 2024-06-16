@@ -13,8 +13,9 @@ class Data(xtal.Struct, lammpsdata.Base):
     CUSTOM_EXT = f'.{lammpsdata.Base.DUMP}'
 
     def __init__(self, struct, *args, ff=None, tasks=None, **kwargs):
-        xtal.Struct.__init__(self, struct, ff=ff)
+        xtal.Struct.__init__(self, struct)
         lammpsdata.Base.__init__(self, *args, **kwargs)
+        self.ff = ff
         self.tasks = tasks
         self.units = self.METAL
         self.atom_style = self.ATOMIC
