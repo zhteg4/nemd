@@ -355,6 +355,17 @@ class Mol(structure.Mol):
         """
         return len(self.impropers) * self.GetNumConformers()
 
+    @property
+    def molecular_weight(self):
+        """
+        The molecular weight of the polymer.
+
+        :return float: the total weight.
+        """
+        return self.ff.molecular_weight(self)
+
+    mw = molecular_weight
+
 
 class Struct(structure.Struct):
 
@@ -406,6 +417,17 @@ class Struct(structure.Struct):
             self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atoms
         ]
         return any(charges)
+
+    @property
+    def molecular_weight(self):
+        """
+        The molecular weight of the polymer.
+
+        :return float: the total weight.
+        """
+        return sum([x.mw * x.GetNumConformers() for x in self.molecules])
+
+    mw = molecular_weight
 
 
 class Base(lammpsin.In):
@@ -558,10 +580,12 @@ class Data(Struct, Base):
             line = [f'{x:.2f}' if isinstance(x, float) else x for x in line]
             self.hdl.write(f"{' '.join(line)}\n")
         self.hdl.write("\n")
+        if self.density is None:
+            return
         # Calculate density as the revised box may alter the box size.
-        weight = sum([x.mw * x.GetNumConformers() for x in self.molecules])
-        edges = [x * 2 * nconstant.ANG_TO_CM for x in box_hf]
-        density = weight / math.prod(edges) / scipy.constants.Avogadro
+        vol = math.prod([x * 2 * nconstant.ANG_TO_CM for x in box_hf])
+        density = self.molecular_weight / vol / scipy.constants.Avogadro
+        # import pdb; pdb.set_trace()
         if np.isclose(self.density, density):
             return
         msg = f'The density of the final data file is {density:.4g} kg/cm^3'

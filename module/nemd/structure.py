@@ -4,6 +4,7 @@ This module handles molecular topology and structural editing.
 import rdkit
 import functools
 import numpy as np
+from rdkit.Chem import Descriptors
 
 from nemd import logutils
 from nemd import rdkitutils
@@ -135,6 +136,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         :param ff 'OplsParser': the force field class.
         :delay bool: customization is delayed for later setup or testing.
         """
+        # conformers in super(Mol, self).GetConformers() are rebuilt
         super().__init__(*args, **kwargs)
         self.struct = struct
         self.ff = ff
@@ -219,8 +221,6 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
         :return float: the total weight.
         """
-        if self.ff:
-            return self.ff.molecular_weight(self)
         return rdkit.Chem.Descriptors.ExactMolWt(self)
 
     mw = molecular_weight

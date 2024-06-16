@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import rdMolTransforms, AllChem, Descriptors
+from rdkit.Chem import rdMolTransforms, AllChem
 
 from nemd import structure
 from nemd import rdkitutils

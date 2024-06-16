@@ -16,10 +16,11 @@ from rdkit import Chem
 from scipy.spatial.transform import Rotation
 
 from nemd import traj
-from nemd import structure
 from nemd import pnames
 from nemd import logutils
+from nemd import structure
 from nemd import lammpsdata
+
 
 logger = logutils.createModuleLogger(file_path=__file__)
 
@@ -39,6 +40,11 @@ class ConfError(RuntimeError):
     When max number of the failure for this conformer has been reached.
     """
     pass
+
+
+class GriddedConf(structure.Conformer):
+    ...
+
 
 
 class PackedConf(structure.Conformer):
@@ -64,8 +70,8 @@ class PackedConf(structure.Conformer):
         """
         Place molecules one molecule into the cell without clash.
 
-        :param max_trial int: the max trial number for each molecule to be placed
-            into the cell.
+        :param max_trial int: the max trial number for each molecule to be
+            placed into the cell.
         :raise ConfError: if the conformer always has clashes with the existing
             atoms in the cell after the maximum trial.
         """
@@ -99,7 +105,8 @@ class PackedConf(structure.Conformer):
         Rotate the conformer by three initial vectors and three target vectors.
 
         :param ivect 3x3 'numpy.ndarray': Each row is one initial vector
-        :param tvect 3x3 'numpy.ndarray': Each row is one corresponding target vector
+        :param tvect 3x3 'numpy.ndarray': Each row is one corresponding target
+            vector
         """
         mtrx = np.identity(4)
         rotation, _ = Rotation.align_vectors(tvect, ivect)
@@ -108,7 +115,7 @@ class PackedConf(structure.Conformer):
 
     def hasClashes(self, aids=None):
         """
-        Whether the conformer has any clashes with the existing atoms in the cell.
+        Whether the conformer has any clashes with the existing atoms.
 
         :param aids: the conformer atom ids.
         :return bool: True if clashes are found.
@@ -581,14 +588,28 @@ class GrownMol(PackedMol):
         return not in_ring and single
 
 
-class DensityError(RuntimeError):
-    """
-    When max number of the failure at this density has been reached.
-    """
-    pass
+class Struct(structure.Struct):
 
+    def __init__(self, *args, options=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.options = options
+        self.density = None
+        self.df_reader = None
 
-class GriddedStruct(structure.Struct):
+    def setDataReader(self):
+        """
+        Set data reader with clash parameters.
+        """
+        if self.df_reader is not None:
+            return
+        lmw = lammpsdata.Data(self, ff=self.ff, options=self.options)
+        for mol in lmw.molecules:
+            mol.adjustBondLength()
+        contents = lmw.writeData(nofile=True)
+        self.df_reader = lammpsdata.DataFileReader(contents=contents)
+        self.df_reader.run()
+
+class GriddedStruct(Struct):
     """
     Grid the space and fill sub-cells with molecules as rigid bodies.
     """
@@ -607,6 +628,7 @@ class GriddedStruct(structure.Struct):
         self.setVectors()
         self.setBox()
         self.setConformers()
+        self.setDataReader()
         self.setDensity()
 
     def setSize(self):
@@ -654,13 +676,19 @@ class GriddedStruct(structure.Struct):
         """
         Set the density of the structure.
         """
-        weight = sum(x.mw * x.GetNumConformers() for x in self.molecules)
         vol = np.prod(self.box[1::2])
         vol *= math.pow(scipy.constants.centi / scipy.constants.angstrom, 3)
-        self.density = weight * scipy.constants.Avogadro / vol
+        self.density = self.df_reader.mw * scipy.constants.Avogadro / vol
 
 
-class PackedStruct(structure.Struct):
+class DensityError(RuntimeError):
+    """
+    When max number of the failure at this density has been reached.
+    """
+    pass
+
+
+class PackedStruct(Struct):
     """
     Pack molecules by random rotation and translation.
     """
@@ -668,14 +696,13 @@ class PackedStruct(structure.Struct):
     MolClass = PackedMol
     MAX_TRIAL_PER_DENSITY = 50
 
-    def __init__(self, *args, options=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         """
         :param options 'argparse.Namespace': command line options
         """
         # Force field -> Molecular weight -> Box -> Frame -> Distance cell
         super().__init__(*args, **kwargs)
-        self.options = options
-        self.df_reader = None
+        self.box = None
 
     def runWithDensity(self, density):
         """
@@ -696,37 +723,31 @@ class PackedStruct(structure.Struct):
         Create amorphous cell by randomly placing molecules with random
         orientations.
         """
-        self.setBox()
         self.setDataReader()
+        self.setBox()
         self.updateConformers()
         self.setFrameAndDcell()
         self.setReferences()
         self.setConformers()
 
+    def setDataReader(self):
+        """
+        See parent class for details.
+        """
+        super().setDataReader()
+        if self.df_reader.radii is not None:
+            return
+        self.df_reader.setClashParams()
+
     def setBox(self):
         """
         Set periodic boundary box size.
         """
-        weight = sum(x.mw * x.GetNumConformers() for x in self.molecules)
-        vol = weight / self.density / scipy.constants.Avogadro
+        vol = self.df_reader.mw / self.density / scipy.constants.Avogadro
         edge = math.pow(vol, 1 / 3)  # centimeter
         edge *= scipy.constants.centi / scipy.constants.angstrom
         self.box = [0, edge, 0, edge, 0, edge]
         log_debug(f'Cubic box of size {edge:.2f} angstrom is created.')
-
-    def setDataReader(self):
-        """
-        Set data reader with clash parameters.
-        """
-        if self.df_reader is not None:
-            return
-        lmw = lammpsdata.Data(self, ff=self.ff, options=self.options)
-        for mol in lmw.molecules:
-            mol.adjustBondLength()
-        contents = lmw.writeData(nofile=True)
-        self.df_reader = lammpsdata.DataFileReader(contents=contents)
-        self.df_reader.run()
-        self.df_reader.setClashParams()
 
     def updateConformers(self):
         """
@@ -814,8 +835,8 @@ class GrownStruct(PackedStruct):
         Create amorphous cell by randomly placing initiators of the conformers,
         and grow the conformers by adding fragments one by one.
         """
-        self.setBox()
         self.setDataReader()
+        self.setBox()
         self.updateConformers()
         self.setFrameAndDcell()
         self.setReferences()
