@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import rdMolTransforms, AllChem
+from rdkit.Chem import rdMolTransforms, AllChem, Descriptors
 
 from nemd import structure
 from nemd import rdkitutils
@@ -101,5 +101,44 @@ class TestMol:
         mol.EmbedMolecule()
         assert mol.GetNumConformers() == 1
 
+    def testMolecularWeight(self, mol):
+        assert mol.mw == 72.093900384
+
     def testAtomTotal(self, mol):
         assert mol.atom_total == 10
+
+
+class TestStruct:
+
+    @pytest.fixture
+    def struct(self):
+        return structure.Struct.fromMols([MOL_WITH_CONFS, MOL_ONLY])
+
+    def testFromMols(self):
+        struct = structure.Struct.fromMols([MOL_WITH_CONFS, MOL_ONLY])
+        assert len(struct.molecules) == 2
+
+    def testAddMol(self, struct):
+        struct = structure.Struct()
+        struct.addMol(MOL_WITH_CONFS)
+        assert len(struct.molecules) == 1
+        struct.addMol(MOL_ONLY)
+        assert len(struct.molecules) == 2
+
+    def testGetIds(self, struct):
+        assert struct.getIds() == (3, 11)
+
+    def testConformers(self, struct):
+        assert len(struct.conformers) == 2
+
+    def testAtoms(self, struct):
+        assert len(struct.atoms) == 10
+
+    def testAtomTotal(self, struct):
+        assert struct.atom_total == 10
+
+    def testGetPositions(self, struct):
+        assert struct.getPositions().shape == (10, 3)
+
+    def testConformerTotal(self, struct):
+        assert struct.conformer_total == 2

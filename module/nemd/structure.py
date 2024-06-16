@@ -219,7 +219,9 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
         :return float: the total weight.
         """
-        return self.ff.molecular_weight(self)
+        if self.ff:
+            return self.ff.molecular_weight(self)
+        return rdkit.Chem.Descriptors.ExactMolWt(self)
 
     mw = molecular_weight
 
