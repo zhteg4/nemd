@@ -6,6 +6,7 @@ import functools
 import numpy as np
 
 from nemd import logutils
+from nemd import rdkitutils
 
 logger = logutils.createModuleLogger(file_path=__file__)
 
@@ -31,12 +32,16 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         self.id_map = None
         self.gid = 1
 
-    def setGids(self, gid):
+    def setUp(self, mol, cid=1, gid=1):
         """
-        Set the global ids of the atoms in this conformer.
+        Set up the conformer global ids.
 
-        :param start_gid int: the starting global id.
+        :param mol `Chem.rdchem.Mol`: the original molecule.
+        :param cid int: the conformer gid to start with.
+        :param gid int: the starting global id.
         """
+        self.mol = mol
+        self.gid = cid
         if self.mol is None:
             return
         gids = [x for x in range(gid, gid + self.mol.GetNumAtoms())]
@@ -131,7 +136,6 @@ class Mol(rdkit.Chem.rdchem.Mol):
         :delay bool: customization is delayed for later setup or testing.
         """
         super().__init__(*args, **kwargs)
-        # Save original reference otherwise this conf interface may be deleted.
         self.struct = struct
         self.ff = ff
         self.delay = delay
@@ -140,28 +144,24 @@ class Mol(rdkit.Chem.rdchem.Mol):
         if delay:
             return
         if args:
-            self.setUp(args[0])
+            self.setUp(args[0].GetConformers())
 
-    def setUp(self, mol, cid=1, gid=1):
+    def setUp(self, confs, cid=1, gid=1):
         """
         Set up the conformers including global ids and references.
 
-        :param mol `Chem.rdchem.Mol`: the original molecule.
+        :param confs `Chem.rdchem.Conformers`: the conformers from the original
+            molecule.
         :param cid int: the conformer gid to start with.
         :param gid int: the starting global id.
         """
-        if mol is None:
-            return
-        if self.struct and self.struct.conformers:
-            cid = max([x.gid for x in self.struct.conformers]) + 1
-            gid = max([x.id_map.max() for x in self.struct.conformers]) + 1
-        confs = [self.ConfClass(x) for x in mol.GetConformers()]
-        for conf_id, conf in enumerate(confs, start=cid):
-            conf.mol = self
-            conf.gid = conf_id
-            conf.setGids(gid)
+        if self.struct:
+            cid, gid = self.struct.getIds()
+        for cid, conf in enumerate(confs, start=cid):
+            conf = self.ConfClass(conf)
+            conf.setUp(self, cid=cid, gid=gid)
+            self.confs[conf.GetId()] = conf
             gid += self.GetNumAtoms()
-        self.confs = {x.GetId(): x for x in confs}
 
     def setConformerId(self, conf_id):
         """
@@ -180,8 +180,6 @@ class Mol(rdkit.Chem.rdchem.Mol):
         """
         if conf_id is None:
             conf_id = self.conf_id
-        if self.confs is None:
-            self.initConfs()
         return self.confs[conf_id]
 
     def AddConformer(self, conf, **kwargs):
@@ -192,16 +190,9 @@ class Mol(rdkit.Chem.rdchem.Mol):
         :return `rdkit.Chem.rdchem.Conformer`: the added conformer.
         """
         # AddConformer handles the super().GetOwningMol()
-        id = super().AddConformer(conf, **kwargs)
-        if not isinstance(conf, self.ConfClass) or conf.mol is None:
-            # ConfClass() sets owning molecule, customized methods, and props
-            conf = self.ConfClass(super().GetConformer(id))
-        # GetId() returns the new id
-        conf.SetId(id)
-        # GetOwningMol() returns current mol
-        conf.mol = self
-        self.confs[id] = conf
-        return conf
+        id = super(Mol, self).AddConformer(conf, **kwargs)
+        self.setUp([super(Mol, self).GetConformer(id)])
+        return self.GetConformer(id)
 
     def GetConformers(self):
         """
@@ -209,8 +200,6 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
         :return list of conformers: the conformers of the molecule.
         """
-        if self.confs is None:
-            self.initConfs()
         return list(self.confs.values())
 
     def EmbedMolecule(self, **kwargs):
@@ -218,10 +207,10 @@ class Mol(rdkit.Chem.rdchem.Mol):
         Embed the molecule to generate a conformer.
         """
         # EmbedMolecule clear previous conformers, and only add one.
-        rdkit.Chem.AllChem.EmbedMolecule(self, **kwargs)
+        with rdkitutils.rdkit_warnings_ignored():
+            rdkit.Chem.AllChem.EmbedMolecule(self, **kwargs)
         self.confs.clear()
-        self.confs[0] = super().GetConformer(0)
-        self.setUp(self)
+        self.setUp(super().GetConformers())
 
     @property
     def molecular_weight(self):
@@ -288,6 +277,19 @@ class Struct:
         mol = self.MolClass(mol, struct=self, ff=self.ff)
         self.mols[mol_id] = mol
         return mol_id
+
+    def getIds(self, cid=1, gid=1):
+        """
+        Get the global ids to start with.
+
+        :param cid int: the conformer gid to start with.
+        :param gid int: the starting global id.
+        :retrun int, int: the conformer gid, the global atom id.
+        """
+        if self.conformers:
+            cid = max([x.gid for x in self.conformers]) + 1
+            gid = max([x.id_map.max() for x in self.conformers]) + 1
+        return cid, gid
 
     @property
     def conformers(self):

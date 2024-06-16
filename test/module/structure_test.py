@@ -1,7 +1,9 @@
 import pytest
 import numpy as np
 from rdkit import Chem
-from rdkit.Chem import rdMolTransforms
+from rdkit.Chem import rdMolTransforms, AllChem
+
+from nemd import rdkitutils
 from nemd import structure
 
 
@@ -13,13 +15,13 @@ class TestConformer:
         conf = structure.Conformer(mol.GetNumAtoms())
         return mol.AddConformer(conf)
 
-    def testSetGids(self, conf):
-        conf.setGids(2)
+    def testSetUp(self, conf):
+        conf.setUp(conf.GetOwningMol(), cid=1, gid=2)
         np.testing.assert_array_equal(conf.id_map, [2, 3, 4, 5, 6])
         assert conf.id_map[1] == 3
 
     def testAids(self, conf):
-        conf.setGids(1)
+        conf.setUp(conf.GetOwningMol(), cid=1, gid=1)
         np.testing.assert_array_equal(conf.aids, [0, 1, 2, 3, 4])
 
     def testSetPositions(self, conf):
@@ -39,19 +41,64 @@ class TestConformer:
         conf.setPositions(xyz)
         conf.setBondLength((0, 1), 2)
         np.testing.assert_almost_equal(
-            Chem.rdMolTransforms.GetBondLength(conf, 0, 1), 2)
+            rdMolTransforms.GetBondLength(conf, 0, 1), 2)
 
 
 class TestMol:
-    pass
 
-    # def testAddConformer(self, conf):
-    #     mol = structure.Mol(Chem.MolFromSmiles('CCCCO'))
-    #     assert conf.GetOwningMol() != mol
-    #     mol.AddConformer(conf)
-    #     assert conf.GetOwningMol() == mol
+    MOL_ONLY = Chem.MolFromSmiles('CCCCC')
+    MOL_WITH_CONF = Chem.MolFromSmiles('CCCCC')
+    with rdkitutils.rdkit_warnings_ignored():
+        Chem.AllChem.EmbedMolecule(MOL_WITH_CONF)
+    STRUCT = structure.Struct()
+    MOL_WITH_CONFS = Chem.MolFromSmiles('CCCCC')
+    with rdkitutils.rdkit_warnings_ignored():
+        Chem.AllChem.EmbedMolecule(MOL_WITH_CONFS)
+    MOL_WITH_CONFS.AddConformer(MOL_WITH_CONFS.GetConformer(0), assignId=True)
+    STRUCT_WITH_MOL = structure.Struct()
+    STRUCT_WITH_MOL.addMol(MOL_WITH_CONFS)
 
-    # def testSetOwningMol(self, conf):
-    #     mol = structure.Mol(Chem.MolFromSmiles('CCCCO'))
-    #     conf.setOwningMol(mol)
-    #     assert conf.GetOwningMol() == mol
+    @pytest.mark.parametrize(
+        "imol, struct, num_conf, gids, mgid",
+        [(MOL_ONLY, None, 0, [], None), (MOL_WITH_CONF, None, 1, [1], 5),
+         (MOL_WITH_CONF, STRUCT, 1, [1], 5),
+         (MOL_WITH_CONFS, STRUCT_WITH_MOL, 2, [3, 4], 20)])
+    def testSetUp(self, imol, struct, num_conf, gids, mgid):
+        mol = structure.Mol(imol, struct=struct, delay=True)
+        assert not mol.confs
+        mol.setUp(imol.GetConformers())
+        assert mol.GetNumConformers() == num_conf
+        assert [x.gid for x in mol.GetConformers()] == gids
+        if mgid:
+            assert max([x.id_map.max() for x in mol.GetConformers()]) == mgid
+
+    @pytest.fixture
+    def mol(self):
+        return structure.Mol(self.MOL_WITH_CONFS, struct=self.STRUCT_WITH_MOL)
+
+    def testSetConformerId(self, mol):
+        assert mol.conf_id == 0
+        mol.setConformerId(1)
+        assert mol.conf_id == 1
+
+    def testGetConformer(self, mol):
+        mol.setConformerId(1)
+        assert mol.GetConformer().GetId() == 1
+        assert mol.GetConformer(0).GetId() == 0
+
+    def testAddConformer(self, mol):
+        conf = mol.AddConformer(structure.Conformer(mol.GetNumAtoms()))
+        assert mol.GetNumConformers() == 3
+        assert conf.gid == 3
+        assert conf.id_map.max() == 15
+
+    def testEmbedMolecule(self, mol):
+        mol.EmbedMolecule()
+        assert mol.GetNumConformers() == 1
+        mol.AddConformer(mol.GetConformer(0))
+        assert mol.GetNumConformers() == 2
+        mol.EmbedMolecule()
+        assert mol.GetNumConformers() == 1
+
+    def testAtomTotal(self, mol):
+        assert mol.atom_total == 10
