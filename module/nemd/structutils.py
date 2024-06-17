@@ -613,9 +613,7 @@ class Struct(structure.Struct):
         """
         if self.lmw is not None:
             return
-        self.lmw = lammpsdata.Data(self,
-                                         ff=self.ff,
-                                         options=self.options)
+        self.lmw = lammpsdata.Data(self, ff=self.ff, options=self.options)
         for mol in self.lmw.molecules:
             mol.adjustBondLength()
 

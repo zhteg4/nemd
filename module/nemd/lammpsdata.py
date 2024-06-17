@@ -1297,19 +1297,6 @@ class DataFileReader(Base):
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
-    def setPairCoeffs(self):
-        """
-        Paser the pair coefficient section.
-        """
-        if self.PAIR_COEFFS not in self.mk_idxes:
-            return
-        sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
-        for lid in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
-            id, ene, dist = self.lines[lid].split()
-            self.vdws[int(id)] = types.SimpleNamespace(id=int(id),
-                                                       dist=float(dist),
-                                                       ene=float(ene))
-
     def setVdwRadius(self, mix=Data.GEOMETRIC, scale=1.):
         """
         Set the vdw radius based on the mixing rule and vdw radii.
@@ -1322,7 +1309,7 @@ class DataFileReader(Base):
             between two sites.
         """
         if mix == Data.GEOMETRIC:
-            # LammpsData.GEOMETRIC is optimized for speed and is supported
+            # Data.GEOMETRIC is optimized for speed and is supported
             atom_types = sorted(set([x.type_id for x in self.atoms.values()]))
             radii = [0] + [self.vdws[x].dist for x in atom_types]
             radii = np.full((len(radii), len(radii)), radii, dtype='float16')
