@@ -620,9 +620,13 @@ class Struct(structure.Struct):
         lmw = lammpsdata.Data(self, ff=self.ff, options=self.options)
         for mol in lmw.molecules:
             mol.adjustBondLength()
+        lmw.setTypeMap()
+        lmw.setClashParams()
         contents = lmw.writeData(nofile=True)
         self.df_reader = lammpsdata.DataFileReader(contents=contents)
         self.df_reader.run()
+        self.df_reader.setClashParams()
+        assert lmw.excluded == self.df_reader.excluded
 
 
 class GriddedStruct(Struct):

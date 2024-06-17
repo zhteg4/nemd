@@ -30,8 +30,32 @@ def log_debug(msg):
     logger.debug(msg)
 
 
+class Conformer(structure.Conformer):
+
+    @property
+    def bonds(self):
+        bonds = self.GetOwningMol().bonds
+        return [x[:1] + tuple([self.id_map[y] for y in x[1:]]) for x in bonds]
+
+    @property
+    def angles(self):
+        angles = self.GetOwningMol().angles
+        return [x[:1] + tuple([self.id_map[y] for y in x[1:]]) for x in angles]
+
+    @property
+    def impropers(self):
+        imprps = self.GetOwningMol().impropers
+        return [x[:1] + tuple([self.id_map[y] for y in x[1:]]) for x in imprps]
+
+    @property
+    def dihedrals(self):
+        dihes = self.GetOwningMol().dihedrals
+        return [x[:1] + tuple([self.id_map[y] for y in x[1:]]) for x in dihes]
+
+
 class Mol(structure.Mol):
 
+    ConfClass = Conformer
     RES_NUM = oplsua.RES_NUM
     TYPE_ID = oplsua.TYPE_ID
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
@@ -492,6 +516,8 @@ class Base(lammpsin.In):
 
 class Data(Struct, Base):
 
+    SCALE = 0.45
+
     def __init__(self, struct, *args, ff=None, box=None, **kwargs):
         """
         :param struct Struct: struct object with moelcules and conformers.
@@ -510,6 +536,7 @@ class Data(Struct, Base):
         self.hdl = None
         self.density = struct.density if struct else None
         self.warnings = []
+        self.excluded = collections.defaultdict(set)
 
     def writeData(self, nofile=False):
         """
@@ -845,6 +872,101 @@ class Data(Struct, Base):
                                             atypes=atypes,
                                             testing=testing)
         super().writeRun(*arg, struct_info=struct_info, **kwarg)
+
+    def setClashParams(self, include14=False, scale=SCALE):
+        """
+        Set clash check related parameters including pair radii and exclusion.
+
+        :param include14 bool: whether to include atom separated by 2 bonds for
+            clash check.
+        :param scale float: the scale param on vdw radius in clash check.
+        """
+        self.setClashExclusion(include14=not include14)
+        # self.setPairCoeffs()
+        # self.setVdwRadius(scale=scale)
+
+    def setClashExclusion(self, include14=True):
+        """
+        Bonded atoms and atoms in angles are in the exclusion. If include14=True,
+        the dihedral angles are in the exclusion as well.
+
+        :param include14 bool: If True, 1-4 interaction in a dihedral angle count
+            as exclusion.
+        """
+        pairs = set()
+        for conf in self.conformers:
+            bonds = [tuple(sorted(x[1:])) for x in conf.bonds]
+            pairs = pairs.union(bonds)
+            angles = [tuple(sorted(x[1::2])) for x in conf.angles]
+            pairs = pairs.union(angles)
+            imprps = [itertools.combinations(x[1:], 2) for x in conf.impropers]
+            pairs = pairs.union([tuple(sorted(y)) for x in imprps for y in x])
+            if include14:
+                dihes = [tuple(sorted(x[1::3])) for x in conf.dihedrals]
+                pairs = pairs.union(dihes)
+        for id1, id2 in pairs:
+            self.excluded[id1].add(id2)
+            self.excluded[id2].add(id1)
+
+    def setPairCoeffs(self):
+        """
+        Paser the pair coefficient section.
+        """
+        if self.PAIR_COEFFS not in self.mk_idxes:
+            return
+        sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
+        for lid in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
+            id, ene, dist = self.lines[lid].split()
+            self.vdws[int(id)] = types.SimpleNamespace(id=int(id),
+                                                       dist=float(dist),
+                                                       ene=float(ene))
+
+    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=1.):
+        """
+        Set the vdw radius based on the mixing rule and vdw radii.
+
+        :param mix str: the mixing rules, including GEOMETRIC, ARITHMETIC, and
+            SIXTHPOWER
+        :param scale float: scale the vdw radius by this factor
+
+        NOTE: the scaled radii here are more like diameters (or distance)
+            between two sites.
+        """
+        if mix == Data.GEOMETRIC:
+            # Data.GEOMETRIC is optimized for speed and is supported
+            atom_types = sorted(set([x.type_id for x in self.atoms.values()]))
+            radii = [0] + [self.vdws[x].dist for x in atom_types]
+            radii = np.full((len(radii), len(radii)), radii, dtype='float16')
+            radii[:, 0] = radii[0, :]
+            radii *= radii.transpose()
+            radii = np.sqrt(radii)
+            radii *= pow(2, 1 / 6) * scale
+            radii[radii < self.min_dist] = self.min_dist
+            id_map = {x.id: x.type_id for x in self.atoms.values()}
+            self.radii = Radius(radii, id_map=id_map)
+            return
+
+        radii = collections.defaultdict(dict)
+        for id1, vdw1 in self.vdws.items():
+            for id2, vdw2 in self.vdws.items():
+                if mix == self.GEOMETRIC:
+                    dist = pow(vdw1.dist * vdw2.dist, 0.5)
+                elif mix == self.ARITHMETIC:
+                    dist = (vdw1.dist + vdw2.dist) / 2
+                elif mix == self.SIXTHPOWER:
+                    dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
+                    dist = pow(dist, 1 / 6)
+                dist *= pow(2, 1 / 6) * scale
+                if dist < self.min_dist:
+                    dist = self.min_dist
+                radii[id1][id2] = round(dist, 4)
+
+        self.radii = collections.defaultdict(dict)
+        for atom1 in self.atoms.values():
+            for atom2 in self.atoms.values():
+                self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
+                    atom2.type_id]
+        self.radii = dict(self.radii)
 
 
 class DataFileReader(Base):

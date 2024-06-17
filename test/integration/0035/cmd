@@ -1,0 +1,2 @@
+# polymer builder on mixture via grid
+run_nemd polymer_builder_driver.py 'CCCCCC(C)O' [Ar] -mol_num 1 10 -force_field OPLSUA,TIP3P -cell grid -seed 4321 -DEBUG

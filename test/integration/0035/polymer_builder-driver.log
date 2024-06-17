@@ -1,0 +1,33 @@
+2024-06-16 20:37:52,996 INFO ..........Command Options..........
+2024-06-16 20:37:52,996 INFO cru: CCCCCC(C)O, [Ar]
+2024-06-16 20:37:52,996 INFO cru_num: 1, 1
+2024-06-16 20:37:52,996 INFO mol_num: 1, 10
+2024-06-16 20:37:52,996 INFO seed: 4321
+2024-06-16 20:37:52,996 INFO cell: grid
+2024-06-16 20:37:52,996 INFO density: 0.5
+2024-06-16 20:37:52,996 INFO timestep: 1
+2024-06-16 20:37:52,996 INFO stemp: 10
+2024-06-16 20:37:52,996 INFO temp: 300
+2024-06-16 20:37:52,996 INFO tdamp: 100
+2024-06-16 20:37:52,997 INFO press: 1
+2024-06-16 20:37:52,997 INFO pdamp: 1000
+2024-06-16 20:37:52,997 INFO lj_cut: 11.0
+2024-06-16 20:37:52,997 INFO coul_cut: 11.0
+2024-06-16 20:37:52,997 INFO relax_time: 1
+2024-06-16 20:37:52,997 INFO prod_time: 1
+2024-06-16 20:37:52,997 INFO prod_ens: NVE
+2024-06-16 20:37:52,997 INFO force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+2024-06-16 20:37:52,997 INFO interactive: False
+2024-06-16 20:37:52,997 INFO jobname: polymer_builder
+2024-06-16 20:37:52,997 INFO debug: True
+2024-06-16 20:37:52,997 INFO python: 2
+2024-06-16 20:37:52,997 INFO cpu: 7
+2024-06-16 20:37:52,997 INFO JobStart: 20:37:52 06/16/24
+2024-06-16 20:37:52,997 INFO ...................................
+2024-06-16 20:37:53,036 DEBUG ERROR [20:37:53] UFFTYPER: Unrecognized atom type: Ar3+4 (0)
+2024-06-16 20:37:53,048 WARNING The half box size (5.84 Å) is smaller than the 11.0 Å interaction cutoff.
+2024-06-16 20:37:53,048 WARNING The density of the final data file is 0.2862 kg/cm^3
+2024-06-16 20:37:53,049 INFO Data file written into polymer_builder.data
+2024-06-16 20:37:53,049 INFO In script written into polymer_builder.in
+2024-06-16 20:37:53,049 INFO Finished.
+2024-06-16 20:37:53,049 INFO 20:37:53 06/16/24
