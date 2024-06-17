@@ -139,8 +139,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         super().__init__(*args, **kwargs)
         self.struct = struct
         self.delay = delay
-        self.conf_id = 0
-        self.confs = {}
+        self.confs = []
         if delay:
             return
         if args:
@@ -160,27 +159,17 @@ class Mol(rdkit.Chem.rdchem.Mol):
         for cid, conf in enumerate(confs, start=cid):
             conf = self.ConfClass(conf)
             conf.setUp(self, cid=cid, gid=gid)
-            self.confs[conf.GetId()] = conf
+            self.confs.append(conf)
             gid += self.GetNumAtoms()
 
-    def setConformerId(self, conf_id):
-        """
-        Set the selected conformer id.
-
-        :param conf_id int: the conformer id to select.
-        """
-        self.conf_id = conf_id
-
-    def GetConformer(self, conf_id=None):
+    def GetConformer(self, id=0):
         """
         Get the conformer of the molecule.
 
-        :param conf_id int: the conformer id to get.
+        :param id int: the conformer id to get.
         :return `rdkitChem.rdchem.Conformer`: the selected conformer.
         """
-        if conf_id is None:
-            conf_id = self.conf_id
-        return self.confs[conf_id]
+        return self.confs[id]
 
     def AddConformer(self, conf, **kwargs):
         """
@@ -200,7 +189,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
         :return list of conformers: the conformers of the molecule.
         """
-        return list(self.confs.values())
+        return self.confs[:]
 
     def EmbedMolecule(self, **kwargs):
         """

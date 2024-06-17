@@ -147,7 +147,10 @@ class Frame(pd.DataFrame):
         """
         with cls.open_traj(filename=filename, contents=contents) as fh:
             while True:
-                lines = [fh.readline() for _ in range(9)]
+                try:
+                    lines = [fh.readline() for _ in range(9)]
+                except EOFError:
+                    return
                 if not all(lines):
                     return
                 atom_num = int(lines[3].rstrip())

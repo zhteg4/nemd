@@ -393,19 +393,19 @@ class GriddedMol(Mol):
         # The xyz shift within one box
         self.vecs = []
 
-    def setConformers(self, vector):
+    def setConformers(self, vectors):
         """
-        Fill a box of the max molecule size with the conformers based on the
-        shifting vector.
+        Place the conformers into boxes based on the shifting vectors.
 
-        :param vector np.ndarray: the translational vector to move the conformer
-            by multiple boxes distances.
+        :param list of vectors np.ndarray: the translational vectors to move the
+            conformer by multiple boxes distances.
         """
-        mol_num_per_box = np.prod(self.mol_num)
-        for idx in range(min([self.GetNumConformers(), mol_num_per_box])):
-            vecs = vector + self.vecs[idx]
-            self.GetConformer().translate(vecs)
-            self.conf_id += 1
+        mol_num = np.prod(self.mol_num)
+        for box_id in range(self.box_num):
+            vector = vectors.pop()
+            for conf, vec in zip(self.confs[box_id * mol_num:], self.vecs):
+                vecs = vector + vec
+                conf.translate(vecs)
 
     def setConfNumPerEdge(self, size):
         """
@@ -609,6 +609,7 @@ class Struct(structure.Struct):
         self.options = options
         self.density = None
         self.df_reader = None
+        self.box = None
 
     def setDataReader(self):
         """
@@ -676,16 +677,13 @@ class GriddedStruct(Struct):
         """
         idxes = [list(range(x)) for x in map(int, self.box[1::2] / self.size)]
         # vectors shifts molecules by the largest box size
-        self.vectors = [x * self.size for x in itertools.product(*idxes)]
+        vectors = [x * self.size for x in itertools.product(*idxes)]
+        np.random.shuffle(vectors)
         # boxes are filled in random order with all molecules in random order
         molecules = self.molecules[:]
-        while molecules:
-            mol = np.random.choice(molecules)
-            np.random.shuffle(self.vectors)
-            vector = self.vectors.pop()
-            mol.setConformers(vector)
-            if mol.conf_id == mol.GetNumConformers():
-                molecules.remove(mol)
+        np.random.shuffle(molecules)
+        for mol in molecules:
+            mol.setConformers(vectors)
 
     def setDensity(self):
         """
@@ -717,7 +715,6 @@ class PackedStruct(Struct):
         """
         # Force field -> Molecular weight -> Box -> Frame -> Distance cell
         super().__init__(*args, **kwargs)
-        self.box = None
 
     def runWithDensity(self, density):
         """
