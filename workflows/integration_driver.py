@@ -16,11 +16,9 @@ import re
 import sys
 import glob
 import datetime
-import argparse
 
 from nemd import symbols
 from nemd import logutils
-from nemd import jobutils
 from nemd import itestutils
 from nemd import jobcontrol
 from nemd import parserutils

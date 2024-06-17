@@ -32,25 +32,48 @@ def log_debug(msg):
 
 class Conformer(structure.Conformer):
 
+    TYPE_ID = oplsua.TYPE_ID
+
+    @property
+    def atoms(self):
+        mol = self.GetOwningMol()
+        gids = self.id_map[[x.GetIdx() for x in mol.GetAtoms()]].reshape(-1, 1)
+        cids = np.array([self.gid] * mol.GetNumAtoms()).reshape(-1, 1)
+        type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
+        fchrg = [mol.ff.charges[x] for x in type_ids]
+        nchrg = [mol.nbr_charge[x.GetIdx()] for x in mol.GetAtoms()]
+        charges = np.array([sum(x) for x in zip(fchrg, nchrg)]).reshape(-1, 1)
+        xyz = self.GetPositions()
+        type_ids = np.array(type_ids).reshape(-1, 1)
+        return np.concatenate((gids, cids, type_ids, charges, xyz), axis=1)
+
     @property
     def bonds(self):
-        bonds = self.GetOwningMol().bonds
-        return [x[:1] + tuple([self.id_map[y] for y in x[1:]]) for x in bonds]
+        bonds = np.array(self.GetOwningMol().bonds)
+        if bonds.any():
+            bonds[:, 1:] = self.id_map[bonds[:, 1:]]
+        return bonds
 
     @property
     def angles(self):
-        angles = self.GetOwningMol().angles
-        return [x[:1] + tuple([self.id_map[y] for y in x[1:]]) for x in angles]
-
-    @property
-    def impropers(self):
-        imprps = self.GetOwningMol().impropers
-        return [x[:1] + tuple([self.id_map[y] for y in x[1:]]) for x in imprps]
+        angles = np.array(self.GetOwningMol().angles)
+        if angles.any():
+            angles[:, 1:] = self.id_map[angles[:, 1:]]
+        return angles
 
     @property
     def dihedrals(self):
-        dihes = self.GetOwningMol().dihedrals
-        return [x[:1] + tuple([self.id_map[y] for y in x[1:]]) for x in dihes]
+        dihes = np.array(self.GetOwningMol().dihedrals)
+        if dihes.any():
+            dihes[:, 1:] = self.id_map[dihes[:, 1:]]
+        return dihes
+
+    @property
+    def impropers(self):
+        imprps = np.array(self.GetOwningMol().impropers)
+        if imprps.any():
+            imprps[:, 1:] = self.id_map[imprps[:, 1:]]
+        return imprps
 
 
 class Mol(structure.Mol):
@@ -537,6 +560,7 @@ class Data(Struct, Base):
         self.density = struct.density if struct else None
         self.warnings = []
         self.excluded = collections.defaultdict(set)
+        self.radii = None
 
     def writeData(self, nofile=False):
         """
@@ -757,20 +781,11 @@ class Data(Struct, Base):
         """
 
         self.hdl.write(f"{self.ATOMS.capitalize()}\n\n")
-        for mol in self.molecules:
-            data = np.zeros((mol.GetNumAtoms(), 7))
-            type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
-            data[:, 2] = [self.atm_types[x] for x in type_ids]
-            aids = [x.GetIdx() for x in mol.GetAtoms()]
-            nbr_charge = [mol.nbr_charge[x] for x in aids]
-            ff_charge = [self.ff.charges[x] for x in type_ids]
-            data[:, 3] = [x + y for x, y in zip(nbr_charge, ff_charge)]
-            for conformer in mol.GetConformers():
-                data[:, 0] = conformer.id_map[aids]
-                data[:, 1] = conformer.gid
-                data[:, 4:] = conformer.GetPositions()
-                np.savetxt(self.hdl, data, fmt=fmt)
-                self.total_charge += data[:, 3].sum()
+        for conf in self.conformers:
+            data = conf.atoms
+            data[:, 2] = [self.atm_types[x] for x in data[:, 2]]
+            np.savetxt(self.hdl, data, fmt=fmt)
+            self.total_charge += data[:, 3].sum()
             # Atom ids in starts from atom ids in previous template molecules
         self.hdl.write(f"\n")
         if not round(self.total_charge, 4):
@@ -778,25 +793,23 @@ class Data(Struct, Base):
         msg = f'The system has a net charge of {self.total_charge:.4f}'
         self.warnings.append(msg)
 
-    def writeBonds(self):
+    def writeBonds(self, fmt='%i %i %i %i'):
         """
         Write bond coefficients.
+
+        :param fmt str: the format of bond line in LAMMPS data file.
         """
         if not self.bond_total:
             return
-
         self.hdl.write(f"{self.BONDS.capitalize()}\n\n")
-        bond_id = 1
-        for mol in self.molecules:
-            for conf in mol.GetConformers():
-                for bond_type, *ids in mol.bonds:
-                    bond_type = self.bnd_types[bond_type]
-                    ids = ' '.join(map(str, conf.id_map[ids]))
-                    self.hdl.write(f"{bond_id} {bond_type} {ids}\n")
-                    bond_id += 1
+        bonds = [x.bonds for x in self.conformers if x.bonds.any()]
+        bonds = np.concatenate(bonds, axis=0)
+        bonds[:, 0] = [self.bnd_types[x] for x in bonds[:, 0]]
+        ids = np.arange(bonds.shape[0]).reshape(-1, 1) + 1
+        np.savetxt(self.hdl, np.concatenate([ids, bonds], axis=1), fmt=fmt)
         self.hdl.write(f"\n")
 
-    def writeAngles(self):
+    def writeAngles(self, fmt='%i %i %i %i %i'):
         """
         Write angle coefficients.
         """
@@ -804,17 +817,14 @@ class Data(Struct, Base):
             return
         self.hdl.write(f"{self.ANGLES.capitalize()}\n\n")
         # Some angles may be filtered out by improper
-        id = 1
-        for mol in self.molecules:
-            for conf in mol.GetConformers():
-                for type_id, *ids in mol.angles:
-                    angle_type = self.ang_types[type_id]
-                    ids = ' '.join(map(str, conf.id_map[ids]))
-                    self.hdl.write(f"{id} {angle_type} {ids}\n")
-                    id += 1
+        angles = [x.angles for x in self.conformers if x.angles.any()]
+        angles = np.concatenate(angles, axis=0)
+        angles[:, 0] = [self.ang_types[x] for x in angles[:, 0]]
+        ids = np.arange(angles.shape[0]).reshape(-1, 1) + 1
+        np.savetxt(self.hdl, np.concatenate([ids, angles], axis=1), fmt=fmt)
         self.hdl.write(f"\n")
 
-    def writeDihedrals(self):
+    def writeDihedrals(self, fmt='%i %i %i %i %i %i'):
         """
         Write dihedral coefficients.
         """
@@ -822,17 +832,14 @@ class Data(Struct, Base):
             return
 
         self.hdl.write(f"{self.DIHEDRALS.capitalize()}\n\n")
-        id = 1
-        for mol in self.molecules:
-            for conf in mol.GetConformers():
-                for type_id, *ids in mol.dihedrals:
-                    dihe_type = self.dihe_types[type_id]
-                    ids = ' '.join(map(str, conf.id_map[ids]))
-                    self.hdl.write(f"{id} {dihe_type} {ids}\n")
-                    id += 1
+        dihes = [x.dihedrals for x in self.conformers if x.dihedrals.any()]
+        dihes = np.concatenate(dihes, axis=0)
+        dihes[:, 0] = [self.dihe_types[x] for x in dihes[:, 0]]
+        ids = np.arange(dihes.shape[0]).reshape(-1, 1) + 1
+        np.savetxt(self.hdl, np.concatenate([ids, dihes], axis=1), fmt=fmt)
         self.hdl.write(f"\n")
 
-    def writeImpropers(self):
+    def writeImpropers(self, fmt='%i %i %i %i %i %i'):
         """
         Write improper coefficients.
         """
@@ -840,14 +847,11 @@ class Data(Struct, Base):
             return
 
         self.hdl.write(f"{self.IMPROPERS.capitalize()}\n\n")
-        id = 1
-        for mol in self.molecules:
-            for conf in mol.GetConformers():
-                for type_id, *ids in mol.impropers:
-                    impr_type = self.impr_types[type_id]
-                    ids = ' '.join(map(str, conf.id_map[ids]))
-                    self.hdl.write(f"{id} {impr_type} {ids}\n")
-                    id += 1
+        imprps = [x.impropers for x in self.conformers if x.impropers.any()]
+        imprps = np.concatenate(imprps, axis=0)
+        imprps[:, 0] = [self.impr_types[x] for x in imprps[:, 0]]
+        ids = np.arange(imprps.shape[0]).reshape(-1, 1) + 1
+        np.savetxt(self.hdl, np.concatenate([ids, imprps], axis=1), fmt=fmt)
         self.hdl.write(f"\n")
 
     def getContents(self):
@@ -882,8 +886,7 @@ class Data(Struct, Base):
         :param scale float: the scale param on vdw radius in clash check.
         """
         self.setClashExclusion(include14=not include14)
-        # self.setPairCoeffs()
-        # self.setVdwRadius(scale=scale)
+        self.setVdwRadius(scale=scale)
 
     def setClashExclusion(self, include14=True):
         """
@@ -908,20 +911,7 @@ class Data(Struct, Base):
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
-    def setPairCoeffs(self):
-        """
-        Paser the pair coefficient section.
-        """
-        if self.PAIR_COEFFS not in self.mk_idxes:
-            return
-        sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
-        for lid in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
-            id, ene, dist = self.lines[lid].split()
-            self.vdws[int(id)] = types.SimpleNamespace(id=int(id),
-                                                       dist=float(dist),
-                                                       ene=float(ene))
-
-    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=1.):
+    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=1., min_dist=1.4):
         """
         Set the vdw radius based on the mixing rule and vdw radii.
 
@@ -934,15 +924,15 @@ class Data(Struct, Base):
         """
         if mix == Data.GEOMETRIC:
             # Data.GEOMETRIC is optimized for speed and is supported
-            atom_types = sorted(set([x.type_id for x in self.atoms.values()]))
-            radii = [0] + [self.vdws[x].dist for x in atom_types]
+            radii = [0] + [self.ff.vdws[x].dist for x in self.atm_types.keys()]
             radii = np.full((len(radii), len(radii)), radii, dtype='float16')
             radii[:, 0] = radii[0, :]
             radii *= radii.transpose()
             radii = np.sqrt(radii)
             radii *= pow(2, 1 / 6) * scale
-            radii[radii < self.min_dist] = self.min_dist
-            id_map = {x.id: x.type_id for x in self.atoms.values()}
+            radii[radii < min_dist] = min_dist
+            imap = {y[0]: y[2] for x in self.conformers for y in x.atoms}
+            id_map = {int(x): self.atm_types[int(y)] for x, y in imap.items()}
             self.radii = Radius(radii, id_map=id_map)
             return
 
@@ -1086,6 +1076,20 @@ class DataFileReader(Base):
             self.masses[int(id)] = types.SimpleNamespace(id=int(id),
                                                          mass=float(mass),
                                                          ele=ele)
+
+    def setPairCoeffs(self):
+        """
+        Paser the pair coefficient section.
+        """
+
+        if self.PAIR_COEFFS not in self.mk_idxes:
+            return
+        sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
+        for lid in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
+            id, ene, dist = self.lines[lid].split()
+            self.vdws[int(id)] = types.SimpleNamespace(id=int(id),
+                                                       dist=float(dist),
+                                                       ene=float(ene))
 
     def getBox(self):
         """
@@ -1318,7 +1322,7 @@ class DataFileReader(Base):
             between two sites.
         """
         if mix == Data.GEOMETRIC:
-            # Data.GEOMETRIC is optimized for speed and is supported
+            # LammpsData.GEOMETRIC is optimized for speed and is supported
             atom_types = sorted(set([x.type_id for x in self.atoms.values()]))
             radii = [0] + [self.vdws[x].dist for x in atom_types]
             radii = np.full((len(radii), len(radii)), radii, dtype='float16')
@@ -1352,16 +1356,6 @@ class DataFileReader(Base):
                 self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
                     atom2.type_id]
         self.radii = dict(self.radii)
-
-    def getMolXYZ(self, id):
-        """
-        Get the xyz coordinates of a molecule.
-
-        :param id int: the molecule id.
-        :return np.ndarray: the xyz coordinates of the molecule.
-        """
-
-        return np.array([self.atoms[x].xyz for x in self.mols[id]])
 
 
 class Radius(np.ndarray):

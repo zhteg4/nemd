@@ -1,0 +1,2 @@
+# the number of clashes counts the same
+cmp('custom_dump_clash.csv', 'custom_dump_clash.csv')

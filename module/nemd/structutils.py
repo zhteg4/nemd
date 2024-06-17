@@ -41,10 +41,6 @@ class ConfError(RuntimeError):
     pass
 
 
-class GriddedConf(structure.Conformer):
-    ...
-
-
 class PackedConf(structure.Conformer):
 
     MAX_TRIAL_PER_CONF = 1000
@@ -54,13 +50,13 @@ class PackedConf(structure.Conformer):
         self.id_map = None
         self.frm = None
         self.dcell = None
-        self.df_reader = None
+        self.lmw = None
 
     def setReferences(self):
         """
         Set the references to the conformer.
         """
-        self.df_reader = self.mol.df_reader
+        self.lmw = self.mol.lmw
         self.frm = self.mol.frm
         self.dcell = self.mol.dcell
 
@@ -125,8 +121,8 @@ class PackedConf(structure.Conformer):
             clashes = self.dcell.getClashes(xyz,
                                             name=name,
                                             included=self.dcell.extg_gids,
-                                            radii=self.df_reader.radii,
-                                            excluded=self.df_reader.excluded)
+                                            radii=self.lmw.radii,
+                                            excluded=self.lmw.excluded)
             if clashes:
                 return True
         return False
@@ -261,7 +257,7 @@ class GrownConf(PackedConf):
             return
         # with open('placeInitFrag.xyz', 'w') as out_fh:
         #     self.frm.write(out_fh,
-        #                    dreader=self.df_reader,
+        #                    dreader=self.lmw,
         #                    visible=list(self.dcell.extg_gids),
         #                    points=points)
         msg = f'Only {len(self.dcell.extg_gids)} / {len(self.dcell.gids)} placed'
@@ -459,7 +455,7 @@ class PackedMol(Mol):
         :param ff 'OplsParser': the force field class.
         """
         super().__init__(*args, **kwargs)
-        self.df_reader = None
+        self.lmw = None
         self.frm = None
         self.dcell = None
 
@@ -608,25 +604,20 @@ class Struct(structure.Struct):
         self.ff = ff
         self.options = options
         self.density = None
-        self.df_reader = None
+        self.lmw = None
         self.box = None
 
     def setDataReader(self):
         """
         Set data reader with clash parameters.
         """
-        if self.df_reader is not None:
+        if self.lmw is not None:
             return
-        lmw = lammpsdata.Data(self, ff=self.ff, options=self.options)
-        for mol in lmw.molecules:
+        self.lmw = lammpsdata.Data(self,
+                                         ff=self.ff,
+                                         options=self.options)
+        for mol in self.lmw.molecules:
             mol.adjustBondLength()
-        lmw.setTypeMap()
-        lmw.setClashParams()
-        contents = lmw.writeData(nofile=True)
-        self.df_reader = lammpsdata.DataFileReader(contents=contents)
-        self.df_reader.run()
-        self.df_reader.setClashParams()
-        assert lmw.excluded == self.df_reader.excluded
 
 
 class GriddedStruct(Struct):
@@ -695,7 +686,7 @@ class GriddedStruct(Struct):
         """
         vol = np.prod(self.box[1::2])
         vol *= math.pow(scipy.constants.centi / scipy.constants.angstrom, 3)
-        self.density = self.df_reader.mw * scipy.constants.Avogadro / vol
+        self.density = self.lmw.mw * scipy.constants.Avogadro / vol
 
 
 class DensityError(RuntimeError):
@@ -719,6 +710,8 @@ class PackedStruct(Struct):
         """
         # Force field -> Molecular weight -> Box -> Frame -> Distance cell
         super().__init__(*args, **kwargs)
+        self.frm = None
+        self.dcell = None
 
     def runWithDensity(self, density):
         """
@@ -751,15 +744,16 @@ class PackedStruct(Struct):
         See parent class for details.
         """
         super().setDataReader()
-        if self.df_reader.radii is not None:
+        if self.lmw.radii is not None:
             return
-        self.df_reader.setClashParams()
+        self.lmw.setTypeMap()
+        self.lmw.setClashParams()
 
     def setBox(self):
         """
         Set periodic boundary box size.
         """
-        vol = self.df_reader.mw / self.density / scipy.constants.Avogadro
+        vol = self.lmw.mw / self.density / scipy.constants.Avogadro
         edge = math.pow(vol, 1 / 3)  # centimeter
         edge *= scipy.constants.centi / scipy.constants.angstrom
         self.box = [0, edge, 0, edge, 0, edge]
@@ -769,8 +763,8 @@ class PackedStruct(Struct):
         """
         Rest the state of the conformers.
         """
-        for conf in self.conformers:
-            xyz = self.df_reader.getMolXYZ(conf.gid)
+        for conf, oconf in zip(self.conformers, self.lmw.conformers):
+            xyz = oconf.GetPositions()
             conf.setPositions(xyz)
             conf.oxyz = xyz[:]
 
@@ -789,7 +783,7 @@ class PackedStruct(Struct):
         """
 
         for mol in self.molecules:
-            mol.df_reader = self.df_reader
+            mol.lmw = self.lmw
             mol.frm = self.frm
             mol.dcell = self.dcell
             for conf in mol.GetConformers():
@@ -866,7 +860,7 @@ class GrownStruct(PackedStruct):
         # memory saving flaot16 to regular float32
         # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
         # Separated by 1 max_clash_dist, meaning no clashes.
-        cut = float(self.df_reader.radii.max())
+        cut = float(self.lmw.radii.max())
         super().setFrameAndDcell(cut=cut)
         self.dcell.setGraph(len(self.conformers))
         data = np.full((len(self.conformers), 3), np.inf)

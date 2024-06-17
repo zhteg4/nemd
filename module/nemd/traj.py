@@ -794,7 +794,7 @@ class DistanceCell:
         if excluded is not None:
             neighbors = neighbors.difference(excluded[name])
         if not neighbors:
-            return
+            return []
         neighbors = list(neighbors)
         dists = self.frm.getDists(neighbors, xyz).round(4)
         if radii is None:
