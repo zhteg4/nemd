@@ -29,7 +29,7 @@ FlAG_DATA_FILE = traj.FlAG_DATA_FILE
 FlAG_TASK = '-task'
 FlAG_SEL = '-sel'
 FLAG_LAST_PCT = '-last_pct'
-FLAG_SLICE = '-slice'
+FLAG_SLICES = '-slices'
 
 CLASH = analyzer.Clash.NAME
 VIEW = analyzer.View.NAME
@@ -155,7 +155,7 @@ class CustomDump(object):
             start = int(steps[sidx])
 
         frms = traj.slice_frames(self.options.custom_dump,
-                                 slice=self.options.slice,
+                                 slices=self.options.slices,
                                  start=start)
         self.frms = [x for x in frms]
         if len(self.frms) == 0:
@@ -293,7 +293,7 @@ def get_parser(parser=None):
         default=0.2,
         help=f"{', '.join(LAST_FRM_TASKS)} average results from "
         f"last frames of this percentage.")
-    parser.add_argument(FLAG_SLICE,
+    parser.add_argument(FLAG_SLICES,
                         metavar='START:END:INTERVAL',
                         type=parserutils.type_slice,
                         help=f"Slice the trajectory frames for analysis.")

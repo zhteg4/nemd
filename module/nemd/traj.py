@@ -49,20 +49,20 @@ def frame_steps(filename):
     return np.loadtxt(io.StringIO(info.stdout.decode("utf-8")), dtype=int)
 
 
-def slice_frames(filename=None, contents=None, slice=slice, start=0):
+def slice_frames(filename=None, contents=None, slices=None, start=0):
     """
     Get and slice the trajectory frames.
 
     :param filename str: the filename to read frames
     :param contents `bytes`: parse the contents if filename not provided
-    :param slice list: start, stop, and interval
+    :param slices list: start, stop, and interval
     :param start int: only frames with step >= this value will be fully read
     :return iterator of 'Frame': each frame has coordinates and box info
     """
     frm_iter = get_frames(filename=filename, contents=contents, start=start)
-    if not slice:
+    if not slices:
         return frm_iter
-    return itertools.islice(frm_iter, *slice)
+    return itertools.islice(frm_iter, *slices)
 
 
 def get_frames(filename=None, contents=None, start=0):
