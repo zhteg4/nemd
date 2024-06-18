@@ -602,12 +602,12 @@ class Struct(structure.Struct, Base):
         if self.box is not None:
             box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
         box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        if min(box_hf) < min([self.lj_cut, self.coul_cut]):
+        cut_off = min([self.options.lj_cut, self.options.coul_cut])
+        if min(box_hf) < cut_off:
             # One particle interacts with another particle within cutoff twice:
             # within the box and across the PBC
             msg = f"The half box size ({min(box_hf):.2f} {symbols.ANGSTROM}) " \
-                  f"is smaller than the {min([self.lj_cut, self.coul_cut])} " \
-                  f"{symbols.ANGSTROM} interaction cutoff."
+                  f"is smaller than the {cut_off} {symbols.ANGSTROM} cutoff."
             self.warnings.append(msg)
 
         if self.conformer_total != 1:

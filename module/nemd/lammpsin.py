@@ -430,15 +430,12 @@ class In:
     DUMP_ID, DUMP_Q = FixWriter.DUMP_ID, FixWriter.DUMP_Q
     MINIMIZE = 'minimize'
 
-    def __init__(self, jobname='tmp', options=None):
+    def __init__(self, options=None):
         """
-        :param jobname str: jobname based on which out filenames are defined
         :param options 'argparse.Namespace': command line options
         """
-        self.jobname = jobname
         self.options = options
-        if self.options:
-            self.jobname = self.options.jobname
+        self.jobname = self.options.jobname
         self.lammps_in = self.jobname + self.IN_EXT
         self.datafile = self.jobname + self.DATA_EXT
         self.lammps_dump = self.jobname + self.CUSTOM_EXT
@@ -448,14 +445,6 @@ class In:
         self.angle_style = self.HARMONIC
         self.dihedral_style = self.OPLS
         self.improper_style = self.CVFF
-        self.lj_cut = getattr(self.options, 'lj_cut', self.DEFAULT_LJ_CUT)
-        self.coul_cut = getattr(self.options, 'coul_cut',
-                                self.DEFAULT_COUL_CUT)
-        lj_coul_cut = f"{self.lj_cut} {self.coul_cut}"
-        self.pair_style = {
-            self.LJ_CUT: f"{self.LJ_CUT} {self.lj_cut}",
-            self.LJ_CUT_COUL_LONG: f"{self.LJ_CUT_COUL_LONG} {lj_coul_cut}"
-        }
         self.in_fh = None
         self.is_debug = environutils.is_debug()
 
@@ -490,8 +479,11 @@ class In:
         self.in_fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
         self.in_fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
         self.in_fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
-        pair_style = self.LJ_CUT_COUL_LONG if self.hasCharge() else self.LJ_CUT
-        self.in_fh.write(f"{self.PAIR_STYLE} {self.pair_style[pair_style]}\n")
+        pair_style, cuts = self.LJ_CUT, self.options.coul_cut
+        if self.hasCharge():
+            pair_style = self.LJ_CUT_COUL_LONG
+            cuts = f"{self.options.lj_cut} {self.options.coul_cut}"
+        self.in_fh.write(f"{self.PAIR_STYLE} {pair_style} {cuts}\n")
         self.in_fh.write(f"{self.PAIR_MODIFY} {self.MIX} {self.GEOMETRIC}\n")
         self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5\n")
         if self.hasCharge():
