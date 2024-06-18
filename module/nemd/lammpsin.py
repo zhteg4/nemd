@@ -437,6 +437,8 @@ class In:
         """
         self.jobname = jobname
         self.options = options
+        if self.options:
+            self.jobname = self.options.jobname
         self.lammps_in = self.jobname + self.IN_EXT
         self.datafile = self.jobname + self.DATA_EXT
         self.lammps_dump = self.jobname + self.CUSTOM_EXT

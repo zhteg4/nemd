@@ -419,77 +419,6 @@ class Mol(structure.Mol):
     mw = molecular_weight
 
 
-class Struct(structure.Struct):
-
-    MolClass = Mol
-
-    def __init__(self, *args, ff=None, **kwargs):
-        """
-        :param ff 'OplsParser': the force field class.
-        """
-        self.MolClass = functools.partial(self.MolClass, ff=ff)
-        super().__init__(*args, **kwargs)
-        self.ff = ff
-
-    @property
-    def bond_total(self):
-        """
-        Total number of bonds in the structure.
-
-        :return int: Total number of bonds across all molecules and conformers.
-        """
-        return sum(x.bond_total for x in self.molecules)
-
-    @property
-    def angle_total(self):
-        """
-        Total number of angels in the structure.
-
-        :return int: Total number of angels across all molecules and conformers.
-        """
-        return sum(x.angle_total for x in self.molecules)
-
-    @property
-    def dihedral_total(self):
-        """
-        Total number of dihedral angels in the structure.
-
-        :return int: Total number of dihedral angels across all molecules and
-            conformers.
-        """
-        return sum(x.dihedral_total for x in self.molecules)
-
-    @property
-    def improper_total(self):
-        """
-        Total number of improper angels in the structure.
-
-        :return int: Total number of improper angels across all molecules and
-            conformers.
-        """
-        return sum(x.improper_total for x in self.molecules)
-
-    def hasCharge(self):
-        """
-        Whether any atom has charge.
-        """
-        charges = [
-            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atoms
-        ]
-        return any(charges)
-
-    @property
-    def molecular_weight(self):
-        """
-        The molecular weight of the polymer.
-
-        :return float: the total weight.
-        """
-        return sum([x.mw * x.GetNumConformers() for x in self.molecules])
-
-    mw = molecular_weight
-
-
 class Base(lammpsin.In):
 
     LAMMPS_DESCRIPTION = 'LAMMPS Description # %s'
@@ -537,19 +466,20 @@ class Base(lammpsin.In):
     ]
 
 
-class Data(Struct, Base):
+class Struct(structure.Struct, Base):
 
+    MolClass = Mol
     SCALE = 0.45
 
-    def __init__(self, struct, *args, ff=None, box=None, **kwargs):
+    def __init__(self, struct=None, ff=None, options=None, **kwargs):
         """
         :param struct Struct: struct object with moelcules and conformers.
-        :param ff 'oplsua.OplsParser': the force field information
-        :param box list: the PBC limits (xlo, xhi, ylo, yhi, zlo, zhi)
+        :param ff 'OplsParser': the force field class.
         """
-        Struct.__init__(self, struct, ff=ff)
-        Base.__init__(self, *args, **kwargs)
-        self.box = box
+        self.MolClass = functools.partial(self.MolClass, ff=ff)
+        super().__init__(struct=struct, **kwargs)
+        Base.__init__(self, options=options, **kwargs)
+        self.ff = ff
         self.total_charge = 0.
         self.atm_types = None
         self.bnd_types = None
@@ -557,7 +487,6 @@ class Data(Struct, Base):
         self.dihe_types = None
         self.impr_types = None
         self.hdl = None
-        self.density = struct.density if struct else None
         self.warnings = []
         self.excluded = collections.defaultdict(set)
         self.radii = None
@@ -958,6 +887,64 @@ class Data(Struct, Base):
                     atom2.type_id]
         self.radii = dict(self.radii)
 
+    @property
+    def bond_total(self):
+        """
+        Total number of bonds in the structure.
+
+        :return int: Total number of bonds across all molecules and conformers.
+        """
+        return sum(x.bond_total for x in self.molecules)
+
+    @property
+    def angle_total(self):
+        """
+        Total number of angels in the structure.
+
+        :return int: Total number of angels across all molecules and conformers.
+        """
+        return sum(x.angle_total for x in self.molecules)
+
+    @property
+    def dihedral_total(self):
+        """
+        Total number of dihedral angels in the structure.
+
+        :return int: Total number of dihedral angels across all molecules and
+            conformers.
+        """
+        return sum(x.dihedral_total for x in self.molecules)
+
+    @property
+    def improper_total(self):
+        """
+        Total number of improper angels in the structure.
+
+        :return int: Total number of improper angels across all molecules and
+            conformers.
+        """
+        return sum(x.improper_total for x in self.molecules)
+
+    def hasCharge(self):
+        """
+        Whether any atom has charge.
+        """
+        charges = [
+            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atoms
+        ]
+        return any(charges)
+
+    @property
+    def molecular_weight(self):
+        """
+        The molecular weight of the polymer.
+
+        :return float: the total weight.
+        """
+        return sum([x.mw * x.GetNumConformers() for x in self.molecules])
+
+    mw = molecular_weight
+
 
 class DataFileReader(Base):
     """
@@ -1297,7 +1284,7 @@ class DataFileReader(Base):
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
-    def setVdwRadius(self, mix=Data.GEOMETRIC, scale=1.):
+    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=1.):
         """
         Set the vdw radius based on the mixing rule and vdw radii.
 
@@ -1308,8 +1295,8 @@ class DataFileReader(Base):
         NOTE: the scaled radii here are more like diameters (or distance)
             between two sites.
         """
-        if mix == Data.GEOMETRIC:
-            # Data.GEOMETRIC is optimized for speed and is supported
+        if mix == lammpsin.In.GEOMETRIC:
+            # lammpsin.In.GEOMETRIC is optimized for speed and is supported
             atom_types = sorted(set([x.type_id for x in self.atoms.values()]))
             radii = [0] + [self.vdws[x].dist for x in atom_types]
             radii = np.full((len(radii), len(radii)), radii, dtype='float16')

@@ -34,6 +34,10 @@ def log_debug(msg):
     logger.debug(msg)
 
 
+class GriddedConf(lammpsdata.Conformer):
+    ...
+
+
 class ConfError(RuntimeError):
     """
     When max number of the failure for this conformer has been reached.
@@ -375,10 +379,11 @@ class Mol(structure.Mol):
         self.ff = ff
 
 
-class GriddedMol(Mol):
+class GriddedMol(lammpsdata.Mol):
     """
     A subclass of rdkit.Chem.rdchem.Mol to handle gridded conformers.
     """
+    ConfClass = GriddedConf
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -592,30 +597,17 @@ class GrownMol(PackedMol):
         return not in_ring and single
 
 
-class Struct(structure.Struct):
+class Struct(lammpsdata.Struct):
 
-    def __init__(self, *args, ff=None, options=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         """
         :param ff 'OplsParser': the force field class.
         :param options 'argparse.Namespace': command line options
         """
-        self.MolClass = functools.partial(self.MolClass, ff=ff)
         super().__init__(*args, **kwargs)
-        self.ff = ff
-        self.options = options
         self.density = None
         self.lmw = None
         self.box = None
-
-    def setDataReader(self):
-        """
-        Set data reader with clash parameters.
-        """
-        if self.lmw is not None:
-            return
-        self.lmw = lammpsdata.Data(self, ff=self.ff, options=self.options)
-        for mol in self.lmw.molecules:
-            mol.adjustBondLength()
 
 
 class GriddedStruct(Struct):
@@ -637,7 +629,6 @@ class GriddedStruct(Struct):
         self.setVectors()
         self.setBox()
         self.setConformers()
-        self.setDataReader()
         self.setDensity()
 
     def setSize(self):
@@ -684,7 +675,7 @@ class GriddedStruct(Struct):
         """
         vol = np.prod(self.box[1::2])
         vol *= math.pow(scipy.constants.centi / scipy.constants.angstrom, 3)
-        self.density = self.lmw.mw * scipy.constants.Avogadro / vol
+        self.density = self.mw * scipy.constants.Avogadro / vol
 
 
 class DensityError(RuntimeError):

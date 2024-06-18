@@ -184,7 +184,9 @@ class AmorphousCell(object):
         """
         if self.options.cell != GRID:
             return
-        self.struct = structutils.GriddedStruct.fromMols(self.mols, ff=self.ff)
+        self.struct = structutils.GriddedStruct.fromMols(self.mols,
+                                                         ff=self.ff,
+                                                         options=self.options)
         self.struct.run()
 
     def setPackedCell(self, mini_density=MINIMUM_DENSITY):
@@ -240,19 +242,15 @@ class AmorphousCell(object):
         """
         Write amorphous cell into data file.
         """
-        lmw = lammpsdata.Data(self.struct,
-                              ff=self.ff,
-                              jobname=self.options.jobname,
-                              box=self.struct.box,
-                              options=self.options)
-        lmw.writeData()
-        for warning in lmw.warnings:
+        self.struct.writeData()
+        for warning in self.struct.warnings:
             log_warning(f'{warning}')
-        lmw.writeIn()
-        log(f'Data file written into {lmw.datafile}')
-        log(f'In script written into {lmw.lammps_in}')
-        jobutils.add_outfile(lmw.datafile, jobname=self.options.jobname)
-        jobutils.add_outfile(lmw.lammps_in,
+        self.struct.writeIn()
+        log(f'Data file written into {self.struct.datafile}')
+        log(f'In script written into {self.struct.lammps_in}')
+        jobutils.add_outfile(self.struct.datafile,
+                             jobname=self.options.jobname)
+        jobutils.add_outfile(self.struct.lammps_in,
                              jobname=self.options.jobname,
                              set_file=True)
 
@@ -292,7 +290,7 @@ class Mol(structure.Mol):
         self.box = None
         self.cru_mol = None
         self.smiles = None
-        self.buffer = lammpsdata.Data.BUFFER
+        self.buffer = lammpsdata.Base.BUFFER
         if delay:
             return
         self.build()
