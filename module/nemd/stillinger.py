@@ -6,16 +6,14 @@ from nemd import symbols
 from nemd import lammpsdata
 
 
-class Data(xtal.Struct, lammpsdata.Base):
+class Struct(xtal.Struct):
 
     XYZ = 'XYZ'
     FORCE = 'force'
     CUSTOM_EXT = f'.{lammpsdata.Base.DUMP}'
 
-    def __init__(self, struct, *args, ff=None, tasks=None, **kwargs):
-        xtal.Struct.__init__(self, struct)
-        lammpsdata.Base.__init__(self, *args, **kwargs)
-        self.ff = ff
+    def __init__(self, *args, tasks=None, **kwargs):
+        super().__init__(self, *args, **kwargs)
         self.tasks = tasks
         self.units = self.METAL
         self.atom_style = self.ATOMIC

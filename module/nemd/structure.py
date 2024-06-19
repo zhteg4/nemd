@@ -140,7 +140,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         self.struct = struct
         self.delay = delay
         self.confs = []
-        if delay:
+        if self.delay:
             return
         if args:
             self.setUp(args[0].GetConformers())

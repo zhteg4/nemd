@@ -459,7 +459,7 @@ class Conformer(object):
         self.relax_dir = '_relax'
         self.data_file = 'polym.data'
         self.conformer = None
-        self.lmw = None
+        self.cru_mol = None
 
     def run(self):
         """
@@ -486,7 +486,8 @@ class Conformer(object):
         for atom, catom in zip(atoms, neighbors):
             atom.SetAtomicNum(catom.GetAtomicNum())
             atom.SetBoolProp(self.CAP, True)
-        self.cru_mol = structutils.GrownMol(cru_mol)
+        self.cru_mol = structutils.GrownMol(cru_mol, delay=True)
+        self.cru_mol.setGraph()
 
     def setCruConformer(self):
         """

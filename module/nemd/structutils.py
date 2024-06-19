@@ -836,13 +836,19 @@ class GrownStruct(PackedStruct):
         Create amorphous cell by randomly placing initiators of the conformers,
         and grow the conformers by adding fragments one by one.
         """
-        self.setDataReader()
         self.setBox()
-        self.updateConformers()
+        self.setTypeMap()
+        self.setClashParams()
+        self.adjustBondLength()
         self.setFrameAndDcell()
         self.setReferences()
         self.fragmentize()
         self.setConformers()
+
+    def adjustBondLength(self):
+        super().adjustBondLength()
+        for conf in self.conformers:
+            conf.oxyz = conf.GetPositions()
 
     def setFrameAndDcell(self):
         """
@@ -851,7 +857,7 @@ class GrownStruct(PackedStruct):
         # memory saving flaot16 to regular float32
         # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
         # Separated by 1 max_clash_dist, meaning no clashes.
-        cut = float(self.lmw.radii.max())
+        cut = float(self.radii.max())
         super().setFrameAndDcell(cut=cut)
         self.dcell.setGraph(len(self.conformers))
         data = np.full((len(self.conformers), 3), np.inf)

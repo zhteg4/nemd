@@ -13,6 +13,7 @@ from rdkit import Chem
 from nemd import jobutils
 from nemd import constants
 from nemd import structure
+from nemd import lammpsdata
 from nemd import alamodeutils
 
 
@@ -21,7 +22,7 @@ class Mol(structure.Mol):
     LATTICE_PARAMETERS = 'lattice_params'
     DIMENSIONS = 'dimensions'
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, ff=None, **kwargs):
         lt_params = kwargs.pop(self.LATTICE_PARAMETERS, None)
         dimensions = kwargs.pop(self.DIMENSIONS, None)
         super().__init__(*args, **kwargs)
@@ -49,7 +50,7 @@ class Mol(structure.Mol):
         return mol
 
 
-class Struct(structure.Struct):
+class Struct(lammpsdata.Struct):
 
     MolClass = Mol
 

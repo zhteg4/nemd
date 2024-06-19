@@ -99,6 +99,8 @@ class Mol(structure.Mol):
         self.rvrs_angles = {}
         self.fbonds = set()
         self.fangles = set()
+        if self.delay:
+            return
         self.setTopo()
 
     def setTopo(self):
@@ -503,6 +505,8 @@ class Struct(structure.Struct, Base):
         """
         Set the type map for atoms, bonds, angles, dihedrals, and impropers.
         """
+        if self.atm_types:
+            return
         atypes = sorted(set(x.GetIntProp(self.TYPE_ID) for x in self.atoms))
         self.atm_types = {y: x for x, y in enumerate(atypes, start=1)}
         btypes = set(y[0] for x in self.molecules for y in x.bonds)
@@ -808,6 +812,8 @@ class Struct(structure.Struct, Base):
         :param include14 bool: If True, 1-4 interaction in a dihedral angle count
             as exclusion.
         """
+        if self.excluded:
+            return
         pairs = set()
         for conf in self.conformers:
             bonds = [tuple(sorted(x[1:])) for x in conf.bonds]
@@ -834,6 +840,8 @@ class Struct(structure.Struct, Base):
         NOTE: the scaled radii here are more like diameters (or distance)
             between two sites.
         """
+        if self.radii is not None:
+            return
         if mix == lammpsin.In.GEOMETRIC:
             # Data.GEOMETRIC is optimized for speed and is supported
             radii = [0] + [self.ff.vdws[x].dist for x in self.atm_types.keys()]
