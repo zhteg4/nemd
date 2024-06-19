@@ -45,7 +45,7 @@ class ConfError(RuntimeError):
     pass
 
 
-class PackedConf(structure.Conformer):
+class PackedConf(lammpsdata.Conformer):
 
     MAX_TRIAL_PER_CONF = 1000
 
@@ -54,13 +54,15 @@ class PackedConf(structure.Conformer):
         self.id_map = None
         self.frm = None
         self.dcell = None
-        self.lmw = None
+        self.radii = None
+        self.excluded = None
 
     def setReferences(self):
         """
         Set the references to the conformer.
         """
-        self.lmw = self.mol.lmw
+        self.radii = self.mol.radii
+        self.excluded = self.mol.excluded
         self.frm = self.mol.frm
         self.dcell = self.mol.dcell
 
@@ -125,8 +127,8 @@ class PackedConf(structure.Conformer):
             clashes = self.dcell.getClashes(xyz,
                                             name=name,
                                             included=self.dcell.extg_gids,
-                                            radii=self.lmw.radii,
-                                            excluded=self.lmw.excluded)
+                                            radii=self.radii,
+                                            excluded=self.excluded)
             if clashes:
                 return True
         return False
@@ -369,17 +371,27 @@ class GrownConf(PackedConf):
         )
 
 
-class Mol(structure.Mol):
+class Mol(lammpsdata.Mol):
 
-    def __init__(self, *args, ff=None, **kwargs):
+    def adjustBondLength(self):
         """
-        :param ff 'OplsParser': the force field class.
+        Adjust bond length according to the force field parameters.
         """
-        super().__init__(*args, **kwargs)
-        self.ff = ff
+        # Set the bond lengths of one conformer
+        tpl = self.GetConformer()
+        for bond in self.GetBonds():
+            bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
+            aids = set([x.GetIdx() for x in bonded])
+            bond_type = self.rvrs_bonds[tuple(sorted(aids))]
+            dist = self.ff.bonds[bond_type].dist
+            tpl.setBondLength([x.GetIdx() for x in bonded], dist)
+        # Update all conformers
+        xyz = tpl.GetPositions()
+        for conf in self.GetConformers():
+            conf.setPositions(xyz)
 
 
-class GriddedMol(lammpsdata.Mol):
+class GriddedMol(Mol):
     """
     A subclass of rdkit.Chem.rdchem.Mol to handle gridded conformers.
     """
@@ -609,6 +621,13 @@ class Struct(lammpsdata.Struct):
         self.lmw = None
         self.box = None
 
+    def adjustBondLength(self):
+        """
+        Adjust the bond lenangths of all conformers.
+        """
+        for mol in self.molecules:
+            mol.adjustBondLength()
+
 
 class GriddedStruct(Struct):
     """
@@ -721,41 +740,23 @@ class PackedStruct(Struct):
         Create amorphous cell by randomly placing molecules with random
         orientations.
         """
-        self.setDataReader()
         self.setBox()
-        self.updateConformers()
+        self.setTypeMap()
+        self.setClashParams()
+        self.adjustBondLength()
         self.setFrameAndDcell()
         self.setReferences()
         self.setConformers()
-
-    def setDataReader(self):
-        """
-        See parent class for details.
-        """
-        super().setDataReader()
-        if self.lmw.radii is not None:
-            return
-        self.lmw.setTypeMap()
-        self.lmw.setClashParams()
 
     def setBox(self):
         """
         Set periodic boundary box size.
         """
-        vol = self.lmw.mw / self.density / scipy.constants.Avogadro
+        vol = self.mw / self.density / scipy.constants.Avogadro
         edge = math.pow(vol, 1 / 3)  # centimeter
         edge *= scipy.constants.centi / scipy.constants.angstrom
         self.box = [0, edge, 0, edge, 0, edge]
         log_debug(f'Cubic box of size {edge:.2f} angstrom is created.')
-
-    def updateConformers(self):
-        """
-        Rest the state of the conformers.
-        """
-        for conf, oconf in zip(self.conformers, self.lmw.conformers):
-            xyz = oconf.GetPositions()
-            conf.setPositions(xyz)
-            conf.oxyz = xyz[:]
 
     def setFrameAndDcell(self, **kwargs):
         """
@@ -772,7 +773,8 @@ class PackedStruct(Struct):
         """
 
         for mol in self.molecules:
-            mol.lmw = self.lmw
+            mol.radii = self.radii
+            mol.excluded = self.excluded
             mol.frm = self.frm
             mol.dcell = self.dcell
             for conf in mol.GetConformers():

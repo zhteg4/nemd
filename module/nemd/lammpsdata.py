@@ -159,23 +159,6 @@ class Mol(structure.Mol):
             self.bonds.append(tuple([bond.id, *aids]))
             self.rvrs_bonds[tuple(aids)] = bond.id
 
-    def adjustBondLength(self):
-        """
-        Adjust bond length according to the force field parameters.
-        """
-        # Set the bond lengths of one conformer
-        tpl = self.GetConformer()
-        for bond in self.GetBonds():
-            bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
-            aids = set([x.GetIdx() for x in bonded])
-            bond_type = self.rvrs_bonds[tuple(sorted(aids))]
-            dist = self.ff.bonds[bond_type].dist
-            tpl.setBondLength([x.GetIdx() for x in bonded], dist)
-        # Update all conformers
-        xyz = tpl.GetPositions()
-        for conf in self.GetConformers():
-            conf.setPositions(xyz)
-
     def setAngles(self):
         """
         Set angle force field matches.
@@ -851,7 +834,7 @@ class Struct(structure.Struct, Base):
         NOTE: the scaled radii here are more like diameters (or distance)
             between two sites.
         """
-        if mix == Data.GEOMETRIC:
+        if mix == lammpsin.In.GEOMETRIC:
             # Data.GEOMETRIC is optimized for speed and is supported
             radii = [0] + [self.ff.vdws[x].dist for x in self.atm_types.keys()]
             radii = np.full((len(radii), len(radii)), radii, dtype='float16')
