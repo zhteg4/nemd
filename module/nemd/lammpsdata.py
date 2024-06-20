@@ -89,6 +89,8 @@ class Mol(structure.Mol):
         """
         super().__init__(*args, **kwargs)
         self.ff = ff
+        if self.ff is None and self.struct and hasattr(self.struct, 'ff'):
+            self.ff = self.struct.ff
         self.symbol_impropers = {}
         self.bonds = []
         self.angles = []
@@ -461,7 +463,6 @@ class Struct(structure.Struct, Base):
         :param struct Struct: struct object with moelcules and conformers.
         :param ff 'OplsParser': the force field class.
         """
-        self.MolClass = functools.partial(self.MolClass, ff=ff)
         super().__init__(struct=struct, **kwargs)
         Base.__init__(self, options=options, **kwargs)
         self.ff = ff

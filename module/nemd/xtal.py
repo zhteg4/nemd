@@ -22,7 +22,7 @@ class Mol(structure.Mol):
     LATTICE_PARAMETERS = 'lattice_params'
     DIMENSIONS = 'dimensions'
 
-    def __init__(self, *args, ff=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         lt_params = kwargs.pop(self.LATTICE_PARAMETERS, None)
         dimensions = kwargs.pop(self.DIMENSIONS, None)
         super().__init__(*args, **kwargs)
