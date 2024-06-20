@@ -52,10 +52,10 @@ class PackedConf(lammpsdata.Conformer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.id_map = None
-        self.frm = None
         self.dcell = None
         self.radii = None
         self.excluded = None
+        self.oxyz = None
 
     def setReferences(self):
         """
@@ -63,7 +63,6 @@ class PackedConf(lammpsdata.Conformer):
         """
         self.radii = self.mol.radii
         self.excluded = self.mol.excluded
-        self.frm = self.mol.frm
         self.dcell = self.mol.dcell
 
     def setConformer(self, max_trial=MAX_TRIAL_PER_CONF):
@@ -78,7 +77,7 @@ class PackedConf(lammpsdata.Conformer):
         for _ in range(max_trial):
             self.translate(-np.array(self.centroid()))
             self.rotateRandomly()
-            pnt = self.frm.getPoint()
+            pnt = self.dcell.frm.getPoint()
             self.translate(pnt)
             self.updateFrm()
             if self.hasClashes():
@@ -122,7 +121,7 @@ class PackedConf(lammpsdata.Conformer):
         """
         aids = self.aids if aids is None else aids
         gids = self.id_map[aids]
-        values = self.frm.vloc(gids)
+        values = self.dcell.frm.vloc(gids)
         for name, xyz in zip(gids, values):
             clashes = self.dcell.getClashes(xyz,
                                             name=name,
@@ -141,7 +140,7 @@ class PackedConf(lammpsdata.Conformer):
         """
         if aids is None:
             aids = self.aids
-        self.frm.update(self.id_map[aids], self.GetPositions()[aids, :])
+        self.dcell.frm.update(self.id_map[aids], self.GetPositions()[aids, :])
 
     def updateDcell(self, aids=None):
         """
@@ -154,6 +153,9 @@ class PackedConf(lammpsdata.Conformer):
         self.dcell.atomCellUpdate(self.id_map[aids])
         self.dcell.addGids(self.id_map[aids])
 
+    def reset(self):
+        self.setPositions(self.oxyz)
+
 
 class GrownConf(PackedConf):
 
@@ -165,17 +167,16 @@ class GrownConf(PackedConf):
         self.init_aids = None
         self.failed_num = 0
         self.frags = []
-        self.oxyz = self.GetPositions()
 
     def reset(self):
         """
         Rest the attributes that are changed during one grow attempt.
         """
+        super().reset()
         self.failed_num = 0
         self.frags = [self.ifrag]
         if self.ifrag:
             self.ifrag.reset()
-        self.setPositions(self.oxyz)
 
     def setReferences(self):
         """
@@ -373,6 +374,12 @@ class GrownConf(PackedConf):
 
 class Mol(lammpsdata.Mol):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.delay:
+            return
+        self.adjustBondLength()
+
     def adjustBondLength(self):
         """
         Adjust bond length according to the force field parameters.
@@ -472,9 +479,12 @@ class PackedMol(Mol):
         :param ff 'OplsParser': the force field class.
         """
         super().__init__(*args, **kwargs)
-        self.lmw = None
-        self.frm = None
         self.dcell = None
+
+    def adjustBondLength(self):
+        super().adjustBondLength()
+        for conf in self.GetConformers():
+            conf.oxyz = conf.GetPositions()
 
 
 class GrownMol(PackedMol):
@@ -618,15 +628,7 @@ class Struct(lammpsdata.Struct):
         """
         super().__init__(*args, **kwargs)
         self.density = None
-        self.lmw = None
         self.box = None
-
-    def adjustBondLength(self):
-        """
-        Adjust the bond lenangths of all conformers.
-        """
-        for mol in self.molecules:
-            mol.adjustBondLength()
 
 
 class GriddedStruct(Struct):
@@ -718,7 +720,6 @@ class PackedStruct(Struct):
         """
         # Force field -> Molecular weight -> Box -> Frame -> Distance cell
         super().__init__(*args, **kwargs)
-        self.frm = None
         self.dcell = None
 
     def runWithDensity(self, density):
@@ -743,7 +744,6 @@ class PackedStruct(Struct):
         self.setBox()
         self.setTypeMap()
         self.setClashParams()
-        self.adjustBondLength()
         self.setFrameAndDcell()
         self.setReferences()
         self.setConformers()
@@ -763,8 +763,8 @@ class PackedStruct(Struct):
         Set the trajectory frame and distance cell.
         """
         id = [x for x in range(1, self.atom_total + 1)]
-        self.frm = traj.Frame(xyz=self.getPositions(), index=id, box=self.box)
-        self.dcell = traj.DistanceCell(self.frm, **kwargs)
+        frm = traj.Frame(xyz=self.getPositions(), index=id, box=self.box)
+        self.dcell = traj.DistanceCell(frm, **kwargs)
         self.dcell.setUp()
 
     def setReferences(self):
@@ -775,7 +775,6 @@ class PackedStruct(Struct):
         for mol in self.molecules:
             mol.radii = self.radii
             mol.excluded = self.excluded
-            mol.frm = self.frm
             mol.dcell = self.dcell
             for conf in mol.GetConformers():
                 conf.setReferences()
@@ -790,7 +789,7 @@ class PackedStruct(Struct):
         """
         trial_id, conf_num, finished, nth = 1, len(self.conformers), [], -1
         for trial_id in range(1, max_trial + 1):
-            self.dcell.reset()
+            self.reset()
             for conf_id, conf in enumerate(self.conformers):
                 try:
                     conf.setConformer()
@@ -821,6 +820,15 @@ class PackedStruct(Struct):
                     raise DensityError
         raise DensityError
 
+    def reset(self):
+        """
+        Reset the state so that a new attempt can happen.
+        """
+        ...
+        for conf in self.conformers:
+            conf.reset()
+        self.dcell.reset()
+
 
 class GrownStruct(PackedStruct):
 
@@ -839,16 +847,10 @@ class GrownStruct(PackedStruct):
         self.setBox()
         self.setTypeMap()
         self.setClashParams()
-        self.adjustBondLength()
         self.setFrameAndDcell()
         self.setReferences()
         self.fragmentize()
         self.setConformers()
-
-    def adjustBondLength(self):
-        super().adjustBondLength()
-        for conf in self.conformers:
-            conf.oxyz = conf.GetPositions()
 
     def setFrameAndDcell(self):
         """
@@ -947,9 +949,7 @@ class GrownStruct(PackedStruct):
         Reset the state so that a new growing attempt can happen.
         """
         ...
-        for conf in self.conformers:
-            conf.reset()
-        self.dcell.reset()
+        super().reset()
         self.placeInitFrags()
 
 
