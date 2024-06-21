@@ -520,26 +520,33 @@ class Frame(pd.DataFrame):
                     float_format='%.3f')
 
 
-class DistanceCell:
+class DistanceCell(Frame):
     """
     Class to quick search neighbors based on distance criteria and perform clash
     checking.
     """
 
     SCALE = lammpsdata.DataFileReader.SCALE
-    BOX = Frame.BOX
     AUTO = 'auto'
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
                      (0, 0, -1)]
 
-    def __init__(self, frm=None, gids=None, cut=6., res=AUTO):
+    def __init__(self,
+                 xyz=None,
+                 box=None,
+                 index=None,
+                 gids=None,
+                 cut=6.,
+                 res=AUTO):
         """
         :param frm 'Frame': trajectory frame
         :param gids list: global atom ids to analyze
         :param cut float: the cutoff distance to search neighbors
         :param res float: the res of the grid step
         """
-        self.frm = frm
+        if box is None:
+            box = xyz.attrs[self.BOX]
+        super().__init__(xyz=xyz, box=box, index=index)
         self.cut = cut
         self.gids = gids
         self.res = res
@@ -547,11 +554,11 @@ class DistanceCell:
         self.neigh_ids = None
         self.atom_cell = None
         self.graph = None
-        self.frm_vals = None
+        self.vals = None
         self.cell_vals = None
         self.extg_gids = set()
         if self.gids is None:
-            self.gids = list(range(1, self.frm.shape[0] + 1))
+            self.gids = list(range(1, self.shape[0] + 1))
 
     def setUp(self):
         self.setSpan()
@@ -566,7 +573,7 @@ class DistanceCell:
         Set span based on PBCs.
         Span: the max PBC edge - the min PBC edge in each dimesion.
         """
-        box = self.frm.attrs[self.BOX]
+        box = self.attrs[self.BOX]
         self.span = np.array([box[i * 2 + 1] - box[i * 2] for i in range(3)])
         self.hspan = self.span / 2
 
@@ -643,24 +650,24 @@ class DistanceCell:
         self.atom_cell.shape = [X index, Y index, Z index, all atom ids]
         """
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
-            ids = ((self.frm) / self.grids).round().astype(int) % self.indexes
+            ids = ((self) / self.grids).round().astype(int) % self.indexes
             self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
                                       dtype=bool)
             for row in ids.loc[self.gids].itertuples():
                 self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
             return
 
-        atom_ids = numba.int32(self.frm.index)
-        self.atom_cell = self.setAtomCellNumba(atom_ids, self.frm.values,
+        atom_ids = numba.int32(self.index)
+        self.atom_cell = self.setAtomCellNumba(atom_ids, self.values,
                                                self.grids, self.indexes_numba)
 
     def saveState(self):
-        self.frm_vals = self.frm.values.copy()
+        self.vals = self.values.copy()
         self.cell_vals = self.atom_cell.copy()
 
     def reset(self):
         self.extg_gids.clear()
-        self.frm.iloc[:] = self.frm_vals.copy()
+        self.iloc[:] = self.vals.copy()
         self.atom_cell[:] = self.cell_vals.copy()
         if self.graph is not None:
             self.graph = self.orig_graph.copy()
@@ -694,8 +701,7 @@ class DistanceCell:
 
         :param gids list: global atom ids to be added to the atom cell
         """
-        ids = (self.frm.vloc(gids) /
-               self.grids).round().astype(int) % self.indexes
+        ids = (self.vloc(gids) / self.grids).round().astype(int) % self.indexes
         for id, (ix, iy, iz) in zip(gids, ids):
             self.atom_cell[ix, iy, iz][id] = True
 
@@ -705,8 +711,7 @@ class DistanceCell:
 
         :param gids list: global atom ids to be removed from the atom cell
         """
-        ids = (self.frm.vloc(gids) /
-               self.grids).round().astype(int) % self.indexes
+        ids = (self.vloc(gids) / self.grids).round().astype(int) % self.indexes
         for id, (ix, iy, iz) in zip(gids, ids):
             self.atom_cell[ix, iy, iz][id] = False
 
@@ -796,7 +801,7 @@ class DistanceCell:
         if not neighbors:
             return []
         neighbors = list(neighbors)
-        dists = self.frm.getDists(neighbors, xyz).round(4)
+        dists = self.getDists(neighbors, xyz).round(4)
         if radii is None:
             thresholds = [threshold] * len(neighbors)
         else:
@@ -850,7 +855,7 @@ class DistanceCell:
         """
         Remove nodes occupied by existing atoms.
         """
-        xyzs = self.frm.loc[list(self.extg_gids)]
+        xyzs = self.loc[list(self.extg_gids)]
         nodes = (xyzs / self.ggrids).round().astype(int)
         nodes = set([tuple(x[1]) for x in nodes.iterrows()])
         rnodes = []
@@ -894,5 +899,5 @@ class DistanceCell:
         Get the distances between existing atoms with the given ids.
         """
         oids = list(self.extg_gids.difference(ids))
-        dists = [self.frm.getDists(oids, self.frm.loc[x]) for x in ids]
+        dists = [self.getDists(oids, self.loc[x]) for x in ids]
         return np.concatenate(dists)

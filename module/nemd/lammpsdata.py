@@ -479,8 +479,9 @@ class Struct(structure.Struct, Base):
         self.radii = None
 
     def addMol(self, mol):
-        super().addMol(mol)
-        self.setTypeMap(self.molecules[-1])
+        mol = super().addMol(mol)
+        self.setTypeMap(mol)
+        return mol
 
     def writeData(self, nofile=False):
         """

@@ -77,7 +77,7 @@ class PackedConf(lammpsdata.Conformer):
         for _ in range(max_trial):
             self.translate(-np.array(self.centroid()))
             self.rotateRandomly()
-            pnt = self.dcell.frm.getPoint()
+            pnt = self.dcell.getPoint()
             self.translate(pnt)
             self.updateFrm()
             if self.hasClashes():
@@ -121,7 +121,7 @@ class PackedConf(lammpsdata.Conformer):
         """
         aids = self.aids if aids is None else aids
         gids = self.id_map[aids]
-        values = self.dcell.frm.vloc(gids)
+        values = self.dcell.vloc(gids)
         for name, xyz in zip(gids, values):
             clashes = self.dcell.getClashes(xyz,
                                             name=name,
@@ -140,7 +140,7 @@ class PackedConf(lammpsdata.Conformer):
         """
         if aids is None:
             aids = self.aids
-        self.dcell.frm.update(self.id_map[aids], self.GetPositions()[aids, :])
+        self.dcell.update(self.id_map[aids], self.GetPositions()[aids, :])
 
     def updateDcell(self, aids=None):
         """
@@ -637,8 +637,9 @@ class Struct(lammpsdata.Struct):
         :param include14 bool: whether to include atom separated by 2 bonds for
             clash check.
         """
-        super().addMol(mol)
-        self.setClashExclusion(self.molecules[-1], include14=not include14)
+        mol = super().addMol(mol)
+        self.setClashExclusion(mol, include14=not include14)
+        return mol
 
     def finalize(self):
         self.setVdwRadius()
@@ -774,8 +775,10 @@ class PackedStruct(Struct):
         Set the trajectory frame and distance cell.
         """
         id = [x for x in range(1, self.atom_total + 1)]
-        frm = traj.Frame(xyz=self.getPositions(), index=id, box=self.box)
-        self.dcell = traj.DistanceCell(frm, **kwargs)
+        self.dcell = traj.DistanceCell(xyz=self.getPositions(),
+                                       index=id,
+                                       box=self.box,
+                                       **kwargs)
         self.dcell.setUp()
 
     def setReferences(self):

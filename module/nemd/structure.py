@@ -263,6 +263,7 @@ class Struct:
         """
         mol = self.MolClass(mol, struct=self)
         self.molecules.append(mol)
+        return mol
 
     def finalize(self):
         pass
