@@ -451,6 +451,7 @@ class Base(lammpsin.In):
         IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
         IMPROPERS_CAP
     ]
+    MIN_DIST = 1.4
 
 
 class Struct(structure.Struct, Base):
@@ -834,18 +835,7 @@ class Struct(structure.Struct, Base):
                                             testing=testing)
         super().writeRun(*arg, struct_info=struct_info, **kwarg)
 
-    def setClashParams(self, include14=False, scale=SCALE):
-        """
-        Set clash check related parameters including pair radii and exclusion.
-
-        :param include14 bool: whether to include atom separated by 2 bonds for
-            clash check.
-        :param scale float: the scale param on vdw radius in clash check.
-        """
-        self.setClashExclusion(include14=not include14)
-        self.setVdwRadius(scale=scale)
-
-    def setClashExclusion(self, include14=True):
+    def setClashExclusion(self, mol, include14=True):
         """
         Bonded atoms and atoms in angles are in the exclusion. If include14=True,
         the dihedral angles are in the exclusion as well.
@@ -853,10 +843,8 @@ class Struct(structure.Struct, Base):
         :param include14 bool: If True, 1-4 interaction in a dihedral angle count
             as exclusion.
         """
-        if self.excluded:
-            return
         pairs = set()
-        for conf in self.conformers:
+        for conf in mol.GetConformers():
             bonds = [tuple(sorted(x[1:])) for x in conf.bonds]
             pairs = pairs.union(bonds)
             angles = [tuple(sorted(x[1::2])) for x in conf.angles]
@@ -870,7 +858,7 @@ class Struct(structure.Struct, Base):
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
-    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=1., min_dist=1.4):
+    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=SCALE):
         """
         Set the vdw radius based on the mixing rule and vdw radii.
 
@@ -881,8 +869,6 @@ class Struct(structure.Struct, Base):
         NOTE: the scaled radii here are more like diameters (or distance)
             between two sites.
         """
-        if self.radii is not None:
-            return
         if mix == lammpsin.In.GEOMETRIC:
             # Data.GEOMETRIC is optimized for speed and is supported
             atom_types = np.nonzero(self.atm_types)[0]
@@ -892,7 +878,7 @@ class Struct(structure.Struct, Base):
             radii *= radii.transpose()
             radii = np.sqrt(radii)
             radii *= pow(2, 1 / 6) * scale
-            radii[radii < min_dist] = min_dist
+            radii[radii < self.MIN_DIST] = self.MIN_DIST
             imap = {y[0]: y[2] for x in self.conformers for y in x.atoms}
             id_map = {int(x): self.atm_types[int(y)] for x, y in imap.items()}
             self.radii = Radius(radii, id_map=id_map)
@@ -909,8 +895,8 @@ class Struct(structure.Struct, Base):
                     dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
                     dist = pow(dist, 1 / 6)
                 dist *= pow(2, 1 / 6) * scale
-                if dist < self.min_dist:
-                    dist = self.min_dist
+                if dist < self.MIN_DIST:
+                    dist = self.MIN_DIST
                 radii[id1][id2] = round(dist, 4)
 
         self.radii = collections.defaultdict(dict)
@@ -986,15 +972,12 @@ class DataFileReader(Base):
 
     SCALE = 0.45
 
-    def __init__(self, data_file=None, min_dist=1.4, contents=None):
+    def __init__(self, data_file=None, contents=None):
         """
         :param data_file str: data file with path
-        :param min_dist: the minimum distance as clash (some h-bond has zero vdw
-            params and the water O..H hydrogen bond is above 1.4)
         :param contents `bytes`: parse the contents if data_file not provided.
         """
         self.data_file = data_file
-        self.min_dist = min_dist
         self.contents = contents
         self.lines = None
         self.masses = {}
@@ -1035,11 +1018,6 @@ class DataFileReader(Base):
         return round(sum(self.masses[x].mass for x in type_ids), 4)
 
     mw = molecular_weight
-
-    def setMinimumDist(self):
-        for id in self.vdws.keys():
-            if self.vdws[id].dist < self.min_dist:
-                self.vdws[id].dist = self.min_dist
 
     def read(self):
         """
@@ -1337,7 +1315,7 @@ class DataFileReader(Base):
             radii *= radii.transpose()
             radii = np.sqrt(radii)
             radii *= pow(2, 1 / 6) * scale
-            radii[radii < self.min_dist] = self.min_dist
+            radii[radii < self.MIN_DIST] = self.MIN_DIST
             id_map = {x.id: x.type_id for x in self.atoms.values()}
             self.radii = Radius(radii, id_map=id_map)
             return
@@ -1353,8 +1331,8 @@ class DataFileReader(Base):
                     dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
                     dist = pow(dist, 1 / 6)
                 dist *= pow(2, 1 / 6) * scale
-                if dist < self.min_dist:
-                    dist = self.min_dist
+                if dist < self.MIN_DIST:
+                    dist = self.MIN_DIST
                 radii[id1][id2] = round(dist, 4)
 
         self.radii = collections.defaultdict(dict)

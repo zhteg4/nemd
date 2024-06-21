@@ -240,6 +240,7 @@ class Struct:
             return
         for mol in struct.molecules:
             self.addMol(mol)
+        self.finalize()
 
     @classmethod
     def fromMols(cls, mols, *args, **kwargs):
@@ -251,6 +252,7 @@ class Struct:
         struct = cls(*args, **kwargs)
         for mol in mols:
             struct.addMol(mol)
+        struct.finalize()
         return struct
 
     def addMol(self, mol):
@@ -261,6 +263,9 @@ class Struct:
         """
         mol = self.MolClass(mol, struct=self)
         self.molecules.append(mol)
+
+    def finalize(self):
+        pass
 
     def getIds(self, cid=1, gid=1):
         """

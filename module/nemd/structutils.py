@@ -630,6 +630,19 @@ class Struct(lammpsdata.Struct):
         self.density = None
         self.box = None
 
+    def addMol(self, mol, include14=False):
+        """
+        Set class exclusions in addition.
+
+        :param include14 bool: whether to include atom separated by 2 bonds for
+            clash check.
+        """
+        super().addMol(mol)
+        self.setClashExclusion(self.molecules[-1], include14=not include14)
+
+    def finalize(self):
+        self.setVdwRadius()
+
 
 class GriddedStruct(Struct):
     """
@@ -738,11 +751,10 @@ class PackedStruct(Struct):
 
     def run(self):
         """
-        Create amorphous cell by randomly placing molecules with random
-        orientations.
+        Create amorphous cell by randomly placing initiators of the conformers,
+        and grow the conformers by adding fragments one by one.
         """
         self.setBox()
-        self.setClashParams()
         self.setFrameAndDcell()
         self.setReferences()
         self.setConformers()
@@ -838,17 +850,9 @@ class GrownStruct(PackedStruct):
         super().__init__(*args, **kwargs)
         self.init_tf = None
 
-    def run(self):
-        """
-        Create amorphous cell by randomly placing initiators of the conformers,
-        and grow the conformers by adding fragments one by one.
-        """
-        self.setBox()
-        self.setClashParams()
-        self.setFrameAndDcell()
-        self.setReferences()
+    def finalize(self):
+        super().finalize()
         self.fragmentize()
-        self.setConformers()
 
     def setFrameAndDcell(self):
         """
