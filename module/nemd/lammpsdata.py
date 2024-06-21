@@ -489,6 +489,7 @@ class Struct(structure.Struct, Base):
         """
 
         with io.StringIO() if nofile else open(self.datafile, 'w') as self.hdl:
+            self.reorderType()
             self.writeDescription()
             self.writeTopoType()
             self.writeBox()
@@ -509,30 +510,42 @@ class Struct(structure.Struct, Base):
         """
         Set the type map for atoms, bonds, angles, dihedrals, and impropers.
         """
-        atypes = sorted(set(
-            x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()))
+        atypes = set(x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms())
+        atypes = sorted(atypes.difference(np.nonzero(self.atm_types)[0]))
         start = self.atm_types.max() + 1
         self.atm_types[atypes] = list(range(start, start + len(atypes)))
 
-        btypes = sorted(set(y[0] for x in mol.GetConformers()
-                            for y in x.bonds))
+        btypes = set(x[0] for x in mol.bonds)
+        btypes = sorted(btypes.difference(np.nonzero(self.bnd_types)[0]))
         start = self.bnd_types.max() + 1
         self.bnd_types[btypes] = list(np.arange(start, start + len(btypes)))
 
-        antypes = sorted(
-            set(y[0] for x in mol.GetConformers() for y in x.angles))
+        antypes = set(y[0] for x in mol.GetConformers() for y in x.angles)
+        antypes = sorted(antypes.difference(np.nonzero(self.ang_types)[0]))
         start = self.ang_types.max() + 1
         self.ang_types[antypes] = list(np.arange(start, start + len(antypes)))
 
-        dtps = sorted(
-            set(y[0] for x in mol.GetConformers() for y in x.dihedrals))
+        dtps = set(y[0] for x in mol.GetConformers() for y in x.dihedrals)
+        dtps = sorted(dtps.difference(np.nonzero(self.dihe_types)[0]))
         start = self.dihe_types.max() + 1
         self.dihe_types[dtps] = list(np.arange(start, start + len(dtps)))
 
-        itps = sorted(
-            set(y[0] for x in mol.GetConformers() for y in x.impropers))
+        itps = set(y[0] for x in mol.GetConformers() for y in x.impropers)
+        itps = sorted(itps.difference(np.nonzero(self.impr_types)[0]))
         start = self.impr_types.max() + 1
         self.impr_types[itps] = list(np.arange(start, start + len(itps)))
+
+    def reorderType(self):
+        indexes = np.nonzero(self.atm_types)[0]
+        self.atm_types[indexes] = np.arange(1, len(indexes) + 1)
+        indexes = np.nonzero(self.bnd_types)[0]
+        self.bnd_types[indexes] = np.arange(1, len(indexes) + 1)
+        indexes = np.nonzero(self.ang_types)[0]
+        self.ang_types[indexes] = np.arange(1, len(indexes) + 1)
+        indexes = np.nonzero(self.dihe_types)[0]
+        self.dihe_types[indexes] = np.arange(1, len(indexes) + 1)
+        indexes = np.nonzero(self.impr_types)[0]
+        self.impr_types[indexes] = np.arange(1, len(indexes) + 1)
 
     def writeDescription(self):
         """
