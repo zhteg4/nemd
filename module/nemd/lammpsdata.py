@@ -467,11 +467,11 @@ class Struct(structure.Struct, Base):
         Base.__init__(self, options=options, **kwargs)
         self.ff = ff
         self.total_charge = 0.
-        self.atm_types = np.zeros(max(self.ff.atoms) + 1, dtype=int)
-        self.bnd_types = np.zeros(max(self.ff.bonds) + 1, dtype=int)
-        self.ang_types = np.zeros(max(self.ff.angles) + 1, dtype=int)
-        self.dihe_types = np.zeros(max(self.ff.dihedrals) + 1, dtype=int)
-        self.impr_types = np.zeros(max(self.ff.impropers) + 1, dtype=int)
+        self.atm_types = None
+        self.bnd_types = None
+        self.ang_types = None
+        self.dihe_types = None
+        self.impr_types = None
         self.hdl = None
         self.warnings = []
         self.excluded = collections.defaultdict(set)
@@ -510,26 +510,32 @@ class Struct(structure.Struct, Base):
         """
         Set the type map for atoms, bonds, angles, dihedrals, and impropers.
         """
+        if self.atm_types is None:
+            self.atm_types = np.zeros(max(self.ff.atoms) + 1, dtype=int)
         atypes = set(x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms())
         atypes = sorted(atypes.difference(np.nonzero(self.atm_types)[0]))
         start = self.atm_types.max() + 1
         self.atm_types[atypes] = list(range(start, start + len(atypes)))
-
+        if self.bnd_types is None:
+            self.bnd_types = np.zeros(max(self.ff.bonds) + 1, dtype=int)
         btypes = set(x[0] for x in mol.bonds)
         btypes = sorted(btypes.difference(np.nonzero(self.bnd_types)[0]))
         start = self.bnd_types.max() + 1
         self.bnd_types[btypes] = list(np.arange(start, start + len(btypes)))
-
+        if self.ang_types is None:
+            self.ang_types = np.zeros(max(self.ff.angles) + 1, dtype=int)
         antypes = set(y[0] for x in mol.GetConformers() for y in x.angles)
         antypes = sorted(antypes.difference(np.nonzero(self.ang_types)[0]))
         start = self.ang_types.max() + 1
         self.ang_types[antypes] = list(np.arange(start, start + len(antypes)))
-
+        if self.dihe_types is None:
+            self.dihe_types = np.zeros(max(self.ff.dihedrals) + 1, dtype=int)
         dtps = set(y[0] for x in mol.GetConformers() for y in x.dihedrals)
         dtps = sorted(dtps.difference(np.nonzero(self.dihe_types)[0]))
         start = self.dihe_types.max() + 1
         self.dihe_types[dtps] = list(np.arange(start, start + len(dtps)))
-
+        if self.impr_types is None:
+            self.impr_types = np.zeros(max(self.ff.impropers) + 1, dtype=int)
         itps = set(y[0] for x in mol.GetConformers() for y in x.impropers)
         itps = sorted(itps.difference(np.nonzero(self.impr_types)[0]))
         start = self.impr_types.max() + 1

@@ -54,6 +54,16 @@ class Struct(lammpsdata.Struct):
 
     MolClass = Mol
 
+    def setTypeMap(self, mol):
+        if self.atm_types is None:
+            self.atm_types = np.array([0])
+        atomic_num = set(x.GetAtomicNum() for x in mol.GetAtoms())
+        num = max(atomic_num) - self.atm_types.max()
+        if num > 0:
+            self.atm_types = np.concatenate((self.atm_types, np.zeros([num])))
+        start = self.atm_types.max() + 1
+        self.atm_types[list(atomic_num)] = np.arange(len(atomic_num)) + start
+
 
 class CrystalBuilder(object):
 

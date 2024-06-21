@@ -121,7 +121,8 @@ class Struct(xtal.Struct):
             conformer = mol.GetConformer()
             aids = [x.GetIdx() for x in mol.GetAtoms()]
             data[:, 0] = conformer.id_map[aids]
-            data[:, 1] = conformer.gid
+            atomic_num = [x.GetAtomicNum() for x in mol.GetAtoms()]
+            data[:, 1] = self.atm_types[atomic_num]
             data[:, 2:] = conformer.GetPositions()
             np.savetxt(self.data_fh, data, fmt='%i %i %.3f %.3f %.3f')
         self.data_fh.write(f"\n")
