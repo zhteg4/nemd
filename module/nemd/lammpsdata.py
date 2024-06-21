@@ -467,15 +467,19 @@ class Struct(structure.Struct, Base):
         Base.__init__(self, options=options, **kwargs)
         self.ff = ff
         self.total_charge = 0.
-        self.atm_types = None
-        self.bnd_types = None
-        self.ang_types = None
-        self.dihe_types = None
-        self.impr_types = None
+        self.atm_types = np.zeros(max(self.ff.atoms) + 1, dtype=int)
+        self.bnd_types = np.zeros(max(self.ff.bonds) + 1, dtype=int)
+        self.ang_types = np.zeros(max(self.ff.angles) + 1, dtype=int)
+        self.dihe_types = np.zeros(max(self.ff.dihedrals) + 1, dtype=int)
+        self.impr_types = np.zeros(max(self.ff.impropers) + 1, dtype=int)
         self.hdl = None
         self.warnings = []
         self.excluded = collections.defaultdict(set)
         self.radii = None
+
+    def addMol(self, mol):
+        super().addMol(mol)
+        self.setTypeMap(self.molecules[-1])
 
     def writeData(self, nofile=False):
         """
@@ -485,7 +489,6 @@ class Struct(structure.Struct, Base):
         """
 
         with io.StringIO() if nofile else open(self.datafile, 'w') as self.hdl:
-            self.setTypeMap()
             self.writeDescription()
             self.writeTopoType()
             self.writeBox()
@@ -502,22 +505,34 @@ class Struct(structure.Struct, Base):
             self.writeImpropers()
             return self.getContents() if nofile else None
 
-    def setTypeMap(self):
+    def setTypeMap(self, mol):
         """
         Set the type map for atoms, bonds, angles, dihedrals, and impropers.
         """
-        if self.atm_types:
-            return
-        atypes = sorted(set(x.GetIntProp(self.TYPE_ID) for x in self.atoms))
-        self.atm_types = {y: x for x, y in enumerate(atypes, start=1)}
-        btypes = set(y[0] for x in self.molecules for y in x.bonds)
-        self.bnd_types = {y: x for x, y in enumerate(sorted(btypes), start=1)}
-        antypes = set(y[0] for x in self.molecules for y in x.angles)
-        self.ang_types = {y: x for x, y in enumerate(sorted(antypes), start=1)}
-        dtps = set(y[0] for x in self.molecules for y in x.dihedrals)
-        self.dihe_types = {y: x for x, y in enumerate(sorted(dtps), start=1)}
-        itps = set(y[0] for x in self.molecules for y in x.impropers)
-        self.impr_types = {y: x for x, y in enumerate(sorted(itps), start=1)}
+        atypes = sorted(set(
+            x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()))
+        start = self.atm_types.max() + 1
+        self.atm_types[atypes] = list(range(start, start + len(atypes)))
+
+        btypes = sorted(set(y[0] for x in mol.GetConformers()
+                            for y in x.bonds))
+        start = self.bnd_types.max() + 1
+        self.bnd_types[btypes] = list(np.arange(start, start + len(btypes)))
+
+        antypes = sorted(
+            set(y[0] for x in mol.GetConformers() for y in x.angles))
+        start = self.ang_types.max() + 1
+        self.ang_types[antypes] = list(np.arange(start, start + len(antypes)))
+
+        dtps = sorted(
+            set(y[0] for x in mol.GetConformers() for y in x.dihedrals))
+        start = self.dihe_types.max() + 1
+        self.dihe_types[dtps] = list(np.arange(start, start + len(dtps)))
+
+        itps = sorted(
+            set(y[0] for x in mol.GetConformers() for y in x.impropers))
+        start = self.impr_types.max() + 1
+        self.impr_types[itps] = list(np.arange(start, start + len(itps)))
 
     def writeDescription(self):
         """
@@ -536,11 +551,11 @@ class Struct(structure.Struct, Base):
         """
         Write topologic data. e.g. number of atoms, angles...
         """
-        self.hdl.write(f"{len(self.atm_types)} {self.ATOM_TYPES}\n")
-        self.hdl.write(f"{len(self.bnd_types)} {self.BOND_TYPES}\n")
-        self.hdl.write(f"{len(self.ang_types)} {self.ANGLE_TYPES}\n")
-        self.hdl.write(f"{len(self.dihe_types)} {self.DIHE_TYPES}\n")
-        self.hdl.write(f"{len(self.impr_types)} {self.IMPROP_TYPES}\n")
+        self.hdl.write(f"{self.atm_types.max()} {self.ATOM_TYPES}\n")
+        self.hdl.write(f"{self.bnd_types.max()} {self.BOND_TYPES}\n")
+        self.hdl.write(f"{self.ang_types.max()} {self.ANGLE_TYPES}\n")
+        self.hdl.write(f"{self.dihe_types.max()} {self.DIHE_TYPES}\n")
+        self.hdl.write(f"{self.impr_types.max()} {self.IMPROP_TYPES}\n")
         self.hdl.write("\n")
 
     def writeBox(self, min_box=None, buffer=None):
@@ -609,7 +624,8 @@ class Struct(structure.Struct, Base):
         Write out mass information.
         """
         self.hdl.write(f"{self.MASSES}\n\n")
-        for oid, id in self.atm_types.items():
+        indexes = np.nonzero(self.atm_types)[0]
+        for oid, id in zip(indexes, self.atm_types[indexes]):
             atom = self.ff.atoms[oid]
             dscrptn = f"{atom.description} {atom.symbol} {oid}"
             self.hdl.write(f"{id} {atom.mass} # {dscrptn}\n")
@@ -620,7 +636,8 @@ class Struct(structure.Struct, Base):
         Write pair coefficients.
         """
         self.hdl.write(f"{self.PAIR_COEFFS}\n\n")
-        for oid, id in self.atm_types.items():
+        indexes = np.nonzero(self.atm_types)[0]
+        for oid, id in zip(indexes, self.atm_types[indexes]):
             vdw = self.ff.vdws[oid]
             self.hdl.write(f"{id} {vdw.ene:.4f} {vdw.dist:.4f}\n")
         self.hdl.write("\n")
@@ -630,24 +647,26 @@ class Struct(structure.Struct, Base):
         Write bond coefficients.
         """
 
-        if not self.bnd_types:
+        if not self.bnd_types.any():
             return
 
         self.hdl.write(f"{self.BOND_COEFFS}\n\n")
-        for oid, id in self.bnd_types.items():
+        indexes = np.nonzero(self.bnd_types)[0]
+        for oid, id in zip(indexes, self.bnd_types[indexes]):
             bond = self.ff.bonds[oid]
-            self.hdl.write(f"{id}  {bond.ene} {bond.dist}\n")
+            self.hdl.write(f"{id} {bond.ene} {bond.dist}\n")
         self.hdl.write("\n")
 
     def writeAngleCoeffs(self):
         """
         Write angle coefficients.
         """
-        if not self.ang_types:
+        if not self.ang_types.any():
             return
 
         self.hdl.write(f"{self.ANGLE_COEFFS}\n\n")
-        for oid, id in self.ang_types.items():
+        indexes = np.nonzero(self.ang_types)[0]
+        for oid, id in zip(indexes, self.ang_types[indexes]):
             angle = self.ff.angles[oid]
             self.hdl.write(f"{id} {angle.ene} {angle.angle}\n")
         self.hdl.write("\n")
@@ -656,11 +675,12 @@ class Struct(structure.Struct, Base):
         """
         Write dihedral coefficients.
         """
-        if not self.dihe_types:
+        if not self.dihe_types.any():
             return
 
         self.hdl.write(f"{self.DIHEDRAL_COEFFS}\n\n")
-        for oid, id in self.dihe_types.items():
+        indexes = np.nonzero(self.dihe_types)[0]
+        for oid, id in zip(indexes, self.dihe_types[indexes]):
             params = [0., 0., 0., 0.]
             # LAMMPS: K1, K2, K3, K4 in 0.5*K1[1+cos(x)] + 0.5*K2[1-cos(2x)]...
             # OPLS: [1 + cos(nx-gama)]
@@ -678,11 +698,12 @@ class Struct(structure.Struct, Base):
         """
         Write improper coefficients.
         """
-        if not self.impr_types:
+        if not self.impr_types.any():
             return
 
         self.hdl.write(f"{self.IMPROPER_COEFFS}\n\n")
-        for oid, id in self.impr_types.items():
+        indexes = np.nonzero(self.impr_types)[0]
+        for oid, id in zip(indexes, self.impr_types[indexes]):
             impr = self.ff.impropers[oid]
             # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
@@ -700,7 +721,7 @@ class Struct(structure.Struct, Base):
         self.hdl.write(f"{self.ATOMS.capitalize()}\n\n")
         for conf in self.conformers:
             data = conf.atoms
-            data[:, 2] = [self.atm_types[x] for x in data[:, 2]]
+            data[:, 2] = self.atm_types[data[:, 2].astype(int)]
             np.savetxt(self.hdl, data, fmt=fmt)
             self.total_charge += data[:, 3].sum()
             # Atom ids in starts from atom ids in previous template molecules
@@ -721,7 +742,7 @@ class Struct(structure.Struct, Base):
         self.hdl.write(f"{self.BONDS.capitalize()}\n\n")
         bonds = [x.bonds for x in self.conformers if x.bonds.any()]
         bonds = np.concatenate(bonds, axis=0)
-        bonds[:, 0] = [self.bnd_types[x] for x in bonds[:, 0]]
+        bonds[:, 0] = self.bnd_types[bonds[:, 0]]
         ids = np.arange(bonds.shape[0]).reshape(-1, 1) + 1
         np.savetxt(self.hdl, np.concatenate([ids, bonds], axis=1), fmt=fmt)
         self.hdl.write(f"\n")
@@ -736,7 +757,7 @@ class Struct(structure.Struct, Base):
         # Some angles may be filtered out by improper
         angles = [x.angles for x in self.conformers if x.angles.any()]
         angles = np.concatenate(angles, axis=0)
-        angles[:, 0] = [self.ang_types[x] for x in angles[:, 0]]
+        angles[:, 0] = self.ang_types[angles[:, 0]]
         ids = np.arange(angles.shape[0]).reshape(-1, 1) + 1
         np.savetxt(self.hdl, np.concatenate([ids, angles], axis=1), fmt=fmt)
         self.hdl.write(f"\n")
@@ -751,7 +772,7 @@ class Struct(structure.Struct, Base):
         self.hdl.write(f"{self.DIHEDRALS.capitalize()}\n\n")
         dihes = [x.dihedrals for x in self.conformers if x.dihedrals.any()]
         dihes = np.concatenate(dihes, axis=0)
-        dihes[:, 0] = [self.dihe_types[x] for x in dihes[:, 0]]
+        dihes[:, 0] = self.dihe_types[dihes[:, 0]]
         ids = np.arange(dihes.shape[0]).reshape(-1, 1) + 1
         np.savetxt(self.hdl, np.concatenate([ids, dihes], axis=1), fmt=fmt)
         self.hdl.write(f"\n")
@@ -766,7 +787,7 @@ class Struct(structure.Struct, Base):
         self.hdl.write(f"{self.IMPROPERS.capitalize()}\n\n")
         imprps = [x.impropers for x in self.conformers if x.impropers.any()]
         imprps = np.concatenate(imprps, axis=0)
-        imprps[:, 0] = [self.impr_types[x] for x in imprps[:, 0]]
+        imprps[:, 0] = self.impr_types[imprps[:, 0]]
         ids = np.arange(imprps.shape[0]).reshape(-1, 1) + 1
         np.savetxt(self.hdl, np.concatenate([ids, imprps], axis=1), fmt=fmt)
         self.hdl.write(f"\n")
@@ -845,7 +866,8 @@ class Struct(structure.Struct, Base):
             return
         if mix == lammpsin.In.GEOMETRIC:
             # Data.GEOMETRIC is optimized for speed and is supported
-            radii = [0] + [self.ff.vdws[x].dist for x in self.atm_types.keys()]
+            atom_types = np.nonzero(self.atm_types)[0]
+            radii = [0] + [self.ff.vdws[x].dist for x in atom_types]
             radii = np.full((len(radii), len(radii)), radii, dtype='float16')
             radii[:, 0] = radii[0, :]
             radii *= radii.transpose()

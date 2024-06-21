@@ -742,7 +742,6 @@ class PackedStruct(Struct):
         orientations.
         """
         self.setBox()
-        self.setTypeMap()
         self.setClashParams()
         self.setFrameAndDcell()
         self.setReferences()
@@ -845,7 +844,6 @@ class GrownStruct(PackedStruct):
         and grow the conformers by adding fragments one by one.
         """
         self.setBox()
-        self.setTypeMap()
         self.setClashParams()
         self.setFrameAndDcell()
         self.setReferences()
