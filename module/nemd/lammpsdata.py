@@ -4,7 +4,6 @@ import scipy
 import types
 import base64
 import itertools
-import functools
 import collections
 import numpy as np
 from rdkit import Chem

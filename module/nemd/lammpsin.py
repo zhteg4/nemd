@@ -544,6 +544,8 @@ class In:
 
         :param struct_info 'types.Namespace': structure information.
         """
+        if struct_info is None:
+            struct_info = types.SimpleNamespace(btypes=None, atypes=None, testing=False)
         options = {x: y for x, y in self.options._get_kwargs()}
         options = types.SimpleNamespace(**options, **struct_info.__dict__)
         fwriter = FixWriter(self.in_fh, options=options)
