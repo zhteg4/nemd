@@ -1,25 +1,14 @@
 """
-This module handles molecular topology and structural editing.
+This module handles conformer, molecule and structure.
 """
 import rdkit
 import functools
 import numpy as np
+import pandas as pd
 from rdkit.Chem import Descriptors
 
-from nemd import logutils
+from nemd import symbols
 from nemd import rdkitutils
-
-logger = logutils.createModuleLogger(file_path=__file__)
-
-
-def log_debug(msg):
-    """
-    Print this message into the log file in debug mode.
-    :param msg str: the msg to be printed
-    """
-    if logger is None:
-        return
-    logger.debug(msg)
 
 
 class Conformer(rdkit.Chem.rdchem.Conformer):
@@ -35,7 +24,7 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
 
     def setUp(self, mol, cid=1, gid=1):
         """
-        Set up the conformer global ids.
+        Set up the conformer global id, global atoms ids, and owning molecule.
 
         :param mol `Chem.rdchem.Mol`: the original molecule.
         :param cid int: the conformer gid to start with.
@@ -56,13 +45,23 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         """
         Return the atom ids of this conformer.
 
+        :return list of int: the atom ids of this conformer.
+        """
+        return np.where(self.id_map != -1)[0].tolist()
+
+    @property
+    @functools.cache
+    def gids(self):
+        """
+        Return the global atom ids of this conformer.
+
         :return list of int: the global atom ids of this conformer.
         """
-        return list(np.where(self.id_map != -1)[0])
+        return self.id_map[self.id_map != -1].tolist()
 
     def HasOwningMol(self):
         """
-        Returns whether or not this conformer belongs to a molecule.
+        Returns whether this conformer belongs to a molecule.
 
         :return `bool`: the molecule this conformer belongs to.
         """
@@ -93,20 +92,22 @@ class Mol(rdkit.Chem.rdchem.Mol):
 
     ConfClass = Conformer
 
-    def __init__(self, *args, struct=None, delay=False, **kwargs):
+    def __init__(self, mol=None, struct=None, delay=False, **kwargs):
         """
+        :param struct 'Mol': the molecule instance
         :param struct 'Struct': owning structure
-        :delay bool: customization is delayed for later setup or testing.
+        :param delay bool: customization is delayed for later setup or testing.
         """
         # conformers in super(Mol, self).GetConformers() are rebuilt
-        super().__init__(*args, **kwargs)
+        super().__init__(mol, **kwargs)
         self.struct = struct
         self.delay = delay
         self.confs = []
         if self.delay:
             return
-        if args:
-            self.setUp(args[0].GetConformers())
+        if mol is None:
+            return
+        self.setUp(mol.GetConformers())
 
     def setUp(self, confs, cid=1, gid=1):
         """
@@ -130,7 +131,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         Get the conformer of the molecule.
 
         :param id int: the conformer id to get.
-        :return `rdkitChem.rdchem.Conformer`: the selected conformer.
+        :return `Conformer`: the selected conformer.
         """
         return self.confs[id]
 
@@ -139,7 +140,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         Add conformer to the molecule.
 
         :param conf `rdkit.Chem.rdchem.Conformer`: the conformer to add.
-        :return `rdkit.Chem.rdchem.Conformer`: the added conformer.
+        :return `Conformer`: the added conformer.
         """
         # AddConformer handles the super().GetOwningMol()
         id = super(Mol, self).AddConformer(conf, **kwargs)
@@ -195,7 +196,6 @@ class Struct:
     def __init__(self, struct=None):
         """
         :param struct 'Struct': the structure with molecules.
-        :param ff 'OplsParser': the force field class.
         """
         self.molecules = []
         self.density = None
@@ -211,6 +211,7 @@ class Struct:
         Create structure instance from molecules.
 
         :param mols list of 'Chem.rdchem.Mol': the molecules to be added.
+        :return 'Struct': the structure containing the molecules.
         """
         struct = cls(*args, **kwargs)
         for mol in mols:
@@ -223,12 +224,16 @@ class Struct:
         Initialize molecules and conformers with id and map set.
 
         :param mol 'Mol': the molecule to be added.
+        :return 'Mol': the added molecule.
         """
         mol = self.MolClass(mol, struct=self)
         self.molecules.append(mol)
         return mol
 
     def finalize(self):
+        """
+        Finalize the structure after all molecules are added.
+        """
         pass
 
     def getIds(self, cid=1, gid=1):
@@ -249,8 +254,7 @@ class Struct:
         """
         Return all conformers of all molecules.
 
-        :return list of Chem.rdchem.Conformer: the conformers of all
-            molecules.
+        :return list of `Conformer`: the conformers of all molecules.
         """
         return [x for y in self.molecules for x in y.GetConformers()]
 
@@ -279,9 +283,12 @@ class Struct:
         """
         Get the positions of all conformers.
 
-        :return np.ndarray: the positions of all conformers.
+        :return 'pandas.core.frame.DataFrame': the positions of all conformers.
         """
-        return np.concatenate([x.GetPositions() for x in self.conformers])
+        return pd.concat([
+            pd.DataFrame(x.GetPositions(), index=x.gids, columns=symbols.XYZU)
+            for x in self.conformers
+        ])
 
     @property
     def conformer_total(self):

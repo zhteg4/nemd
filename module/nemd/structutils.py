@@ -88,10 +88,6 @@ class PackedConf(GriddedConf):
         super().__init__(*args, **kwargs)
         self.oxyz = None
 
-    @property
-    def gids(self):
-        return self.id_map[self.aids]
-
     def setConformer(self, max_trial=MAX_TRIAL_PER_CONF):
         """
         Place molecules one molecule into the cell without clash.
@@ -710,6 +706,16 @@ class PackedStruct(Struct):
         super().finalize()
         self.setDistanceCell()
 
+    def setDistanceCell(self, **kwargs):
+        """
+        Set the distance cell with the trajectory frame.
+        """
+        self.dcell = traj.DistanceCell(xyz=self.getPositions(),
+                                       box=self.box,
+                                       radii=self.radii,
+                                       excluded=self.excluded,
+                                       **kwargs)
+
     def runWithDensity(self, density):
         """
         Create amorphous cell of the target density by randomly placing
@@ -742,16 +748,6 @@ class PackedStruct(Struct):
         edge *= scipy.constants.centi / scipy.constants.angstrom
         self.box = [0, edge, 0, edge, 0, edge]
         log_debug(f'Cubic box of size {edge:.2f} angstrom is created.')
-
-    def setDistanceCell(self, **kwargs):
-        """
-        Set the distance cell with the trajectory frame.
-        """
-        self.dcell = traj.DistanceCell(xyz=self.getPositions(),
-                                       box=self.box,
-                                       radii=self.radii,
-                                       excluded=self.excluded,
-                                       **kwargs)
 
     def setUpDcell(self):
         self.dcell.setBox(box=self.box)

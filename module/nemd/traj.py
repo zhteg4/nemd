@@ -94,9 +94,9 @@ class Frame(pd.DataFrame):
     BOX = 'box'
     STEP = 'step'
     SPAN = 'span'
-    XU = 'xu'
-    YU = 'yu'
-    ZU = 'zu'
+    XU = symbols.XU
+    YU = symbols.YU
+    ZU = symbols.ZU
     XYZU = [XU, YU, ZU]
     ELEMENT = 'element'
     SIZE = 'size'
@@ -123,6 +123,11 @@ class Frame(pd.DataFrame):
             box = xyz.attrs[self.BOX]
         if index is None and not isinstance(xyz, Frame):
             index = range(1, xyz.shape[0] + 1)
+        if isinstance(xyz, pd.DataFrame) and (xyz.columns != columns).any():
+            xyz = xyz.rename(columns={
+                x: y
+                for x, y in zip(xyz.columns, columns)
+            })
         super().__init__(data=xyz, index=index, columns=columns, dtype=dtype)
         self.setBox(box)
         self.setStep(step)
@@ -559,6 +564,7 @@ class DistanceCell(Frame):
         self.radii = radii
         self.excluded = excluded
         self.span = None
+        self.hspan = None
         self.neigh_ids = None
         self.atom_cell = None
         self.graph = None

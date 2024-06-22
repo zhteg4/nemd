@@ -25,3 +25,7 @@ AND = '&'
 PLUS_MIN = '\u00B1'
 ELEMENT_OF = '\u2208'
 ANGSTROM = '\u212B'
+XU = 'xu'
+YU = 'yu'
+ZU = 'zu'
+XYZU = [XU, YU, ZU]
