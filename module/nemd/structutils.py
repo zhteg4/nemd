@@ -268,8 +268,7 @@ class GrownConf(PackedConf):
         """
         while frag.vals:
             frag.setDihedralDeg()
-            self.mol.struct.dcell.update(self.id_map[self.aids],
-                                         self.GetPositions())
+            self.mol.struct.dcell.update(self.gids, self.GetPositions())
             if self.hasClashes(frag.aids):
                 continue
             self.mol.struct.dcell.add(self.id_map[frag.aids])
@@ -313,8 +312,7 @@ class GrownConf(PackedConf):
         log_debug(f"Relocate the initiator of {self.gid} conformer "
                   f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
                   f"close contact: {dists.min():.2f}) ")
-        log_debug(
-            f'{len(self.dcell.gids)} / {self.dcell.shape[0]} atoms placed.')
+        log_debug(f'{self.mol.struct.dcell.ratio} atoms placed.')
 
 
 class Mol(lammpsdata.Mol):
