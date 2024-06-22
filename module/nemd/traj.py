@@ -108,7 +108,7 @@ class Frame(pd.DataFrame):
                  xyz=None,
                  box=None,
                  index=None,
-                 columns=None,
+                 columns=XYZU,
                  step=None,
                  dtype=float):
         """
@@ -119,14 +119,10 @@ class Frame(pd.DataFrame):
         :param step int: the number of simulation step that this frame is at
         :param dtype str: the data type of the frame
         """
-        try:
-            name = xyz.values.index.name
-        except AttributeError:
-            name = None
-        if name is None and index is None and xyz is not None:
+        if box is None and isinstance(xyz, Frame):
+            box = xyz.attrs[self.BOX]
+        if index is None and not isinstance(xyz, Frame):
             index = range(1, xyz.shape[0] + 1)
-        if columns is None:
-            columns = self.XYZU
         super().__init__(data=xyz, index=index, columns=columns, dtype=dtype)
         self.setBox(box)
         self.setStep(step)
@@ -531,6 +527,15 @@ class DistanceCell(Frame):
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
                      (0, 0, -1)]
 
+    # https://pandas.pydata.org/docs/development/extending.html
+    _internal_names = pd.DataFrame._internal_names + [
+        "extg_gids", 'cut', 'res', 'span', 'neigh_ids', 'atom_cell', 'graph',
+        'vals', 'cell_vals', 'span', 'hspan', 'grids', 'indexes',
+        'indexes_numba', 'neigh_map', 'gindexes', 'ggrids', 'orig_graph',
+        'grids'
+    ]
+    _internal_names_set = set(_internal_names)
+
     def __init__(self,
                  xyz=None,
                  box=None,
@@ -544,8 +549,6 @@ class DistanceCell(Frame):
         :param cut float: the cutoff distance to search neighbors
         :param res float: the res of the grid step
         """
-        if box is None:
-            box = xyz.attrs[self.BOX]
         super().__init__(xyz=xyz, box=box, index=index)
         self.cut = cut
         self.gids = gids
@@ -695,6 +698,10 @@ class DistanceCell(Frame):
             atom_cell[cid[0], cid[1], cid[2]][aid] = True
         return atom_cell
 
+    def add(self, gids):
+        self.atomCellUpdate(gids)
+        self.addGids(gids)
+
     def atomCellUpdate(self, gids):
         """
         Add atoms cell to the atom cell.
@@ -704,6 +711,10 @@ class DistanceCell(Frame):
         ids = (self.vloc(gids) / self.grids).round().astype(int) % self.indexes
         for id, (ix, iy, iz) in zip(gids, ids):
             self.atom_cell[ix, iy, iz][id] = True
+
+    def remove(self, gids):
+        self.atomCellRemove(gids)
+        self.removeGids(gids)
 
     def atomCellRemove(self, gids):
         """

@@ -57,6 +57,10 @@ class PackedConf(lammpsdata.Conformer):
         self.excluded = None
         self.oxyz = None
 
+    @property
+    def gids(self):
+        return self.id_map[self.aids]
+
     def setReferences(self):
         """
         Set the references to the conformer.
@@ -79,10 +83,10 @@ class PackedConf(lammpsdata.Conformer):
             self.rotateRandomly()
             pnt = self.dcell.getPoint()
             self.translate(pnt)
-            self.updateFrm()
+            self.dcell.update(self.gids, self.GetPositions())
             if self.hasClashes():
                 continue
-            self.updateDcell()
+            self.dcell.add(self.gids)
             return
         raise ConfError
 
@@ -131,27 +135,6 @@ class PackedConf(lammpsdata.Conformer):
             if clashes:
                 return True
         return False
-
-    def updateFrm(self, aids=None):
-        """
-        Update the coordinate frame based on the current conformer.
-
-        :param aids list: the atom ids whose coordinates are used.
-        """
-        if aids is None:
-            aids = self.aids
-        self.dcell.update(self.id_map[aids], self.GetPositions()[aids, :])
-
-    def updateDcell(self, aids=None):
-        """
-        Update the distance cell based on the current conformer.
-
-        :param aids list: the atom ids to be updated with.
-        """
-        if aids is None:
-            aids = self.aids
-        self.dcell.atomCellUpdate(self.id_map[aids])
-        self.dcell.addGids(self.id_map[aids])
 
     def reset(self):
         self.setPositions(self.oxyz)
@@ -256,10 +239,10 @@ class GrownConf(PackedConf):
             self.translate(-centroid)
             self.rotateRandomly()
             self.translate(point)
-            self.updateFrm()
+            self.dcell.update(self.gids, self.GetPositions())
             if self.hasClashes(self.init_aids):
                 continue
-            self.updateDcell(self.init_aids)
+            self.dcell.add(self.id_map[self.init_aids])
             self.init_tf.loc[self.gid] = point
             return
         # with open('placeInitFrag.xyz', 'w') as out_fh:
@@ -315,10 +298,10 @@ class GrownConf(PackedConf):
         """
         while frag.vals:
             frag.setDihedralDeg()
-            self.updateFrm()
+            self.dcell.update(self.id_map[self.aids], self.GetPositions())
             if self.hasClashes(frag.aids):
                 continue
-            self.updateDcell(frag.aids)
+            self.dcell.add(self.id_map[frag.aids])
             self.frags += frag.nfrags
             return True
 
@@ -341,21 +324,12 @@ class GrownConf(PackedConf):
         ratom_aids = [y for x in nxt_frags for y in x.aids]
         if not found:
             ratom_aids += frag.conf.init_aids
-        self.remove(ratom_aids)
+        self.dcell.remove(self.id_map[ratom_aids])
         # 3）Fragment after the next fragments were added to the growing
         # frags before this backmove step.
         nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
         self.frags = [frag] + [x for x in self.frags if x not in nnxt_frags]
         return found
-
-    def remove(self, aids):
-        """
-        Remove atoms from the atom cell and existing record.
-
-        :param aids list: aids of the atoms to be removed
-        """
-        self.dcell.atomCellRemove(self.id_map[aids])
-        self.dcell.removeGids(self.id_map[aids])
 
     def reportRelocation(self):
         """
