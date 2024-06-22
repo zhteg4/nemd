@@ -925,3 +925,7 @@ class DistanceCell(Frame):
         oids = list(self.gids.difference(ids))
         dists = [self.getDists(oids, self.loc[x]) for x in ids]
         return np.concatenate(dists)
+
+    @property
+    def ratio(self):
+        return f'{len(self.gids)} / {self.shape[0]}'

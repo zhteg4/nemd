@@ -18,7 +18,6 @@ from scipy.spatial.transform import Rotation
 from nemd import traj
 from nemd import pnames
 from nemd import logutils
-from nemd import structure
 from nemd import lammpsdata
 
 logger = logutils.createModuleLogger(file_path=__file__)
@@ -59,12 +58,6 @@ class PackedConf(lammpsdata.Conformer):
     def gids(self):
         return self.id_map[self.aids]
 
-    def setReferences(self):
-        """
-        Set the references to the conformer.
-        """
-        self.dcell = self.mol.dcell
-
     def setConformer(self, max_trial=MAX_TRIAL_PER_CONF):
         """
         Place molecules one molecule into the cell without clash.
@@ -77,12 +70,12 @@ class PackedConf(lammpsdata.Conformer):
         for _ in range(max_trial):
             self.translate(-np.array(self.centroid()))
             self.rotateRandomly()
-            pnt = self.dcell.getPoint()
+            pnt = self.mol.struct.dcell.getPoint()
             self.translate(pnt)
-            self.dcell.update(self.gids, self.GetPositions())
+            self.mol.struct.dcell.update(self.gids, self.GetPositions())
             if self.hasClashes():
                 continue
-            self.dcell.add(self.gids)
+            self.mol.struct.dcell.add(self.gids)
             return
         raise ConfError
 
@@ -121,9 +114,9 @@ class PackedConf(lammpsdata.Conformer):
         """
         aids = self.aids if aids is None else aids
         gids = self.id_map[aids]
-        values = self.dcell.vloc(gids)
+        values = self.mol.struct.dcell.vloc(gids)
         for name, xyz in zip(gids, values):
-            clashes = self.dcell.getClashes(xyz, name=name)
+            clashes = self.mol.struct.dcell.getClashes(xyz, name=name)
             if clashes:
                 return True
         return False
@@ -152,14 +145,6 @@ class GrownConf(PackedConf):
         self.frags = [self.ifrag]
         if self.ifrag:
             self.ifrag.reset()
-
-    def setReferences(self):
-        """
-        Pass aid-to-gid map, radii, excluded atoms, and distance cell from the
-        molecule object to this conformer.
-        """
-        super().setReferences()
-        self.init_tf = self.mol.init_tf
 
     def fragmentize(self):
         """
@@ -224,27 +209,21 @@ class GrownConf(PackedConf):
             dead molecule.
         """
 
-        self.dcell.rmClashNodes()
-        points = self.dcell.getVoids()
+        self.mol.struct.dcell.rmClashNodes()
+        points = self.mol.struct.dcell.getVoids()
         for point in points:
             centroid = np.array(self.centroid(aids=self.init_aids))
             self.translate(-centroid)
             self.rotateRandomly()
             self.translate(point)
-            self.dcell.update(self.gids, self.GetPositions())
+            self.mol.struct.dcell.update(self.gids, self.GetPositions())
             if self.hasClashes(self.init_aids):
                 continue
-            self.dcell.add(self.id_map[self.init_aids])
-            self.init_tf.loc[self.gid] = point
+            self.mol.struct.dcell.add(self.id_map[self.init_aids])
+            self.mol.struct.init_tf.loc[self.gid] = point
             return
-        # with open('placeInitFrag.xyz', 'w') as out_fh:
-        #     self.frm.write(out_fh,
-        #                    dreader=self.lmw,
-        #                    visible=list(self.dcell.extg_gids),
-        #                    points=points)
-        msg = f'Only {len(self.dcell.gids)} / {self.dcell.shape[0]} placed'
-        log_debug(msg)
-        raise ConfError(msg)
+        log_debug(f'Only {self.mol.struct.dcell.ratio} placed')
+        raise ConfError
 
     def setFrag(self, max_trial=MAX_TRIAL_PER_CONF):
         """
@@ -268,16 +247,15 @@ class GrownConf(PackedConf):
             return
 
         # The molecule has grown to a dead end
-
         if self.failed_num > max_trial:
-            msg = f'Placed {len(self.dcell.gids)} / {self.dcell.shape[0]} ' \
-                  f'atoms reaching max trial number for conformer {self.gid}.'
-            log_debug(msg)
+            log_debug(
+                f'Placed {self.mol.struct.dcell.ratio} atoms reaching max'
+                f' trial number for conformer {self.gid}.')
             raise ConfError
         self.failed_num += 1
         self.ifrag.reset()
         # The method backmove() deletes some extg_gids
-        self.dcell.resetGraph()
+        self.mol.struct.dcell.resetGraph()
         self.placeInitFrag()
         self.reportRelocation()
 
@@ -290,10 +268,11 @@ class GrownConf(PackedConf):
         """
         while frag.vals:
             frag.setDihedralDeg()
-            self.dcell.update(self.id_map[self.aids], self.GetPositions())
+            self.mol.struct.dcell.update(self.id_map[self.aids],
+                                         self.GetPositions())
             if self.hasClashes(frag.aids):
                 continue
-            self.dcell.add(self.id_map[frag.aids])
+            self.mol.struct.dcell.add(self.id_map[frag.aids])
             self.frags += frag.nfrags
             return True
 
@@ -316,7 +295,7 @@ class GrownConf(PackedConf):
         ratom_aids = [y for x in nxt_frags for y in x.aids]
         if not found:
             ratom_aids += frag.conf.init_aids
-        self.dcell.remove(self.id_map[ratom_aids])
+        self.mol.struct.dcell.remove(self.id_map[ratom_aids])
         # 3）Fragment after the next fragments were added to the growing
         # frags before this backmove step.
         nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
@@ -328,8 +307,9 @@ class GrownConf(PackedConf):
         Report the status after relocate an initiator fragment.
         """
 
-        idists = self.init_tf.pairDists()
-        dists = self.dcell.getDistsWithIds(self.id_map[self.init_aids])
+        idists = self.mol.struct.init_tf.pairDists()
+        dists = self.mol.struct.dcell.getDistsWithIds(
+            self.id_map[self.init_aids])
         log_debug(f"Relocate the initiator of {self.gid} conformer "
                   f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
                   f"close contact: {dists.min():.2f}) ")
@@ -722,7 +702,6 @@ class PackedStruct(Struct):
         """
         self.setBox()
         self.setFrameAndDcell()
-        self.setReferences()
         self.setConformers()
 
     def setBox(self):
@@ -739,24 +718,12 @@ class PackedStruct(Struct):
         """
         Set the trajectory frame and distance cell.
         """
-        id = [x for x in range(1, self.atom_total + 1)]
         self.dcell = traj.DistanceCell(xyz=self.getPositions(),
-                                       index=id,
                                        box=self.box,
                                        radii=self.radii,
                                        excluded=self.excluded,
                                        **kwargs)
         self.dcell.setUp()
-
-    def setReferences(self):
-        """
-        Set references to all molecular and conformers.
-        """
-
-        for mol in self.molecules:
-            mol.dcell = self.dcell
-            for conf in mol.GetConformers():
-                conf.setReferences()
 
     def setConformers(self, max_trial=MAX_TRIAL_PER_DENSITY):
         """
@@ -835,14 +802,6 @@ class GrownStruct(PackedStruct):
         data = np.full((len(self.conformers), 3), np.inf)
         index = [x.gid for x in self.conformers]
         self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
-
-    def setReferences(self):
-        """
-        See parent class for details.
-        """
-        for mol in self.molecules:
-            mol.init_tf = self.init_tf
-        super().setReferences()
 
     def fragmentize(self):
         """
