@@ -7,12 +7,12 @@ This module handles molecular topology and structural editing.
 """
 import math
 import scipy
+import rdkit
 import warnings
 import itertools
 import functools
 import numpy as np
 import networkx as nx
-from rdkit import Chem
 from scipy.spatial.transform import Rotation
 
 from nemd import traj
@@ -34,7 +34,43 @@ def log_debug(msg):
 
 
 class GriddedConf(lammpsdata.Conformer):
-    ...
+
+    def centroid(self, aids=None, ignoreHs=False):
+        """
+        Compute the centroid of the whole conformer ar the selected atoms.
+
+        :param atom_ids list: the selected atom ids
+        :param ignoreHs bool: whether to ignore Hs in the calculation.
+        :return np.ndarray: the centroid of the selected atoms.
+        """
+        weights = None
+        if aids is not None:
+            bv = rdkit.DataStructs.ExplicitBitVect(self.GetNumAtoms())
+            bv.SetBitsFromList(aids)
+            weights = rdkit.rdBase._vectd()
+            weights.extend(bv.ToList())
+        return rdkit.Chem.rdMolTransforms.ComputeCentroid(self,
+                                                          weights=weights,
+                                                          ignoreHs=ignoreHs)
+
+    def translate(self, vect):
+        """
+        Do translation on this conformer using this vector.
+
+        :param vect 'numpy.ndarray': translational vector
+        """
+        mtrx = np.identity(4)
+        mtrx[:-1, 3] = vect
+        rdkit.Chem.rdMolTransforms.TransformConformer(self, mtrx)
+
+    def setBondLength(self, bonded, val):
+        """
+        Set bond length of the given dihedral.
+
+        :param bonded tuple of int: the bonded atom indices.
+        :param val val: the bond distance.
+        """
+        rdkit.Chem.rdMolTransforms.SetBondLength(self, *bonded, val)
 
 
 class ConfError(RuntimeError):
@@ -44,14 +80,12 @@ class ConfError(RuntimeError):
     pass
 
 
-class PackedConf(lammpsdata.Conformer):
+class PackedConf(GriddedConf):
 
     MAX_TRIAL_PER_CONF = 1000
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.id_map = None
-        self.dcell = None
         self.oxyz = None
 
     @property
@@ -90,7 +124,7 @@ class PackedConf(lammpsdata.Conformer):
             seed = np.random.randint(0, 2**32 - 1)
         mtrx = np.identity(4)
         mtrx[:-1, :-1] = Rotation.random(random_state=seed).as_matrix()
-        Chem.rdMolTransforms.TransformConformer(self, mtrx)
+        rdkit.Chem.rdMolTransforms.TransformConformer(self, mtrx)
 
     def rotate(self, ivect, tvect):
         """
@@ -103,7 +137,7 @@ class PackedConf(lammpsdata.Conformer):
         mtrx = np.identity(4)
         rotation, _ = Rotation.align_vectors(tvect, ivect)
         mtrx[:-1, :-1] = rotation.as_matrix()
-        Chem.rdMolTransforms.TransformConformer(self, mtrx)
+        rdkit.Chem.rdMolTransforms.TransformConformer(self, mtrx)
 
     def hasClashes(self, aids=None):
         """
@@ -151,8 +185,8 @@ class GrownConf(PackedConf):
         Break the molecule into the smallest rigid fragments if not, copy to
         current conformer, and set up the fragment objects.
         """
-        self.GetOwningMol().fragmentize()
         mol = self.GetOwningMol()
+        mol.fragmentize()
         self.init_aids = mol.init_aids.copy()
         self.ifrag = mol.ifrag.copyInit(self)
         self.frags = [self.ifrag]
@@ -179,7 +213,7 @@ class GrownConf(PackedConf):
         :param dihe tuple of int: the dihedral atom indices.
         :param val float: the angle degree.
         """
-        Chem.rdMolTransforms.SetDihedralDeg(self, *dihe, val)
+        rdkit.Chem.rdMolTransforms.SetDihedralDeg(self, *dihe, val)
 
     def getDihedralDeg(self, dihe):
         """
@@ -188,7 +222,7 @@ class GrownConf(PackedConf):
         :param dihe tuple of int: the dihedral atom indices.
         :param return float: the angle degree.
         """
-        return Chem.rdMolTransforms.GetDihedralDeg(self, *dihe)
+        return rdkit.Chem.rdMolTransforms.GetDihedralDeg(self, *dihe)
 
     @functools.cache
     def getNumFrags(self):
@@ -417,13 +451,6 @@ class PackedMol(Mol):
 
     ConfClass = PackedConf
 
-    def __init__(self, *args, **kwargs):
-        """
-        :param ff 'OplsParser': the force field class.
-        """
-        super().__init__(*args, **kwargs)
-        self.dcell = None
-
     def adjustBondLength(self):
         super().adjustBondLength()
         for conf in self.GetConformers():
@@ -434,7 +461,7 @@ class GrownMol(PackedMol):
 
     ConfClass = GrownConf
     # https://ctr.fandom.com/wiki/Break_rotatable_bonds_and_report_the_fragments
-    PATT = Chem.MolFromSmarts(
+    PATT = rdkit.Chem.MolFromSmarts(
         '[!$([NH]!@C(=O))&!D1&!$(*#*)]-&!@[!$([NH]!@C(=O))&!D1&!$(*#*)]')
     IS_MONO = pnames.IS_MONO
     MONO_ID = pnames.MONO_ID
@@ -679,6 +706,10 @@ class PackedStruct(Struct):
         super().__init__(*args, **kwargs)
         self.dcell = None
 
+    def finalize(self):
+        super().finalize()
+        self.setDistanceCell()
+
     def runWithDensity(self, density):
         """
         Create amorphous cell of the target density by randomly placing
@@ -699,7 +730,7 @@ class PackedStruct(Struct):
         and grow the conformers by adding fragments one by one.
         """
         self.setBox()
-        self.setFrameAndDcell()
+        self.setUpDcell()
         self.setConformers()
 
     def setBox(self):
@@ -712,15 +743,18 @@ class PackedStruct(Struct):
         self.box = [0, edge, 0, edge, 0, edge]
         log_debug(f'Cubic box of size {edge:.2f} angstrom is created.')
 
-    def setFrameAndDcell(self, **kwargs):
+    def setDistanceCell(self, **kwargs):
         """
-        Set the trajectory frame and distance cell.
+        Set the distance cell with the trajectory frame.
         """
         self.dcell = traj.DistanceCell(xyz=self.getPositions(),
                                        box=self.box,
                                        radii=self.radii,
                                        excluded=self.excluded,
                                        **kwargs)
+
+    def setUpDcell(self):
+        self.dcell.setBox(box=self.box)
         self.dcell.setUp()
 
     def setConformers(self, max_trial=MAX_TRIAL_PER_DENSITY):
@@ -787,15 +821,18 @@ class GrownStruct(PackedStruct):
         super().finalize()
         self.fragmentize()
 
-    def setFrameAndDcell(self):
-        """
-        Set distance cell parameters.
-        """
+    def setDcell(self):
         # memory saving flaot16 to regular float32
         # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
         # Separated by 1 max_clash_dist, meaning no clashes.
         cut = float(self.radii.max())
-        super().setFrameAndDcell(cut=cut)
+        super().setDcell(cut=cut)
+
+    def setUpDcell(self):
+        """
+        Set distance cell parameters.
+        """
+        super().setUpDcell()
         self.dcell.setGraph(len(self.conformers))
         data = np.full((len(self.conformers), 3), np.inf)
         index = [x.gid for x in self.conformers]

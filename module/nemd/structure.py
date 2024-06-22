@@ -85,43 +85,6 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         for id in range(xyz.shape[0]):
             self.SetAtomPosition(id, xyz[id, :])
 
-    def centroid(self, aids=None, ignoreHs=False):
-        """
-        Compute the centroid of the whole conformer ar the selected atoms.
-
-        :param atom_ids list: the selected atom ids
-        :param ignoreHs bool: whether to ignore Hs in the calculation.
-        :return np.ndarray: the centroid of the selected atoms.
-        """
-        weights = None
-        if aids is not None:
-            bv = rdkit.DataStructs.ExplicitBitVect(self.GetNumAtoms())
-            bv.SetBitsFromList(aids)
-            weights = rdkit.rdBase._vectd()
-            weights.extend(bv.ToList())
-        return rdkit.Chem.rdMolTransforms.ComputeCentroid(self,
-                                                          weights=weights,
-                                                          ignoreHs=ignoreHs)
-
-    def translate(self, vect):
-        """
-        Do translation on this conformer using this vector.
-
-        :param vect 'numpy.ndarray': translational vector
-        """
-        mtrx = np.identity(4)
-        mtrx[:-1, 3] = vect
-        rdkit.Chem.rdMolTransforms.TransformConformer(self, mtrx)
-
-    def setBondLength(self, bonded, val):
-        """
-        Set bond length of the given dihedral.
-
-        :param bonded tuple of int: the bonded atom indices.
-        :param val val: the bond distance.
-        """
-        rdkit.Chem.rdMolTransforms.SetBondLength(self, *bonded, val)
-
 
 class Mol(rdkit.Chem.rdchem.Mol):
     """
