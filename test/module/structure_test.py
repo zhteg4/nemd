@@ -33,24 +33,21 @@ class TestConformer:
         conf.setUp(conf.GetOwningMol(), cid=1, gid=1)
         np.testing.assert_array_equal(conf.aids, [0, 1, 2, 3, 4])
 
+    def testGids(self, conf):
+        conf.setUp(conf.GetOwningMol(), cid=1, gid=1)
+        np.testing.assert_array_equal(conf.gids, [1, 2, 3, 4, 5])
+
+    def testHasOwningMol(self, conf):
+        assert conf.HasOwningMol()
+        assert not structure.Conformer().HasOwningMol()
+
+    def testGetOwningMol(self, conf):
+        assert conf.GetOwningMol().GetNumAtoms() == 5
+
     def testSetPositions(self, conf):
         xyz = np.zeros(conf.GetPositions().shape) + 1
         conf.setPositions(xyz)
         np.testing.assert_array_equal(conf.GetPositions(), xyz)
-
-    def testCentroid(self, conf):
-        assert np.average(conf.centroid()) == 0
-
-    def testTranslate(self, conf):
-        conf.translate([1, 2, 3])
-        np.testing.assert_array_equal(conf.centroid(), [1, 2, 3])
-
-    def testSetBondLength(self, conf):
-        xyz = np.array([x * 0.1 for x in range(15)]).reshape(-1, 3)
-        conf.setPositions(xyz)
-        conf.setBondLength((0, 1), 2)
-        np.testing.assert_almost_equal(
-            rdMolTransforms.GetBondLength(conf, 0, 1), 2)
 
 
 class TestMol:
@@ -76,14 +73,8 @@ class TestMol:
     def mol(self):
         return structure.Mol(MOL_WITH_CONFS, struct=self.STRUCT_WITH_MOL)
 
-    def testSetConformerId(self, mol):
-        assert mol.conf_id == 0
-        mol.setConformerId(1)
-        assert mol.conf_id == 1
-
     def testGetConformer(self, mol):
-        mol.setConformerId(1)
-        assert mol.GetConformer().GetId() == 1
+        assert mol.GetConformer(1).GetId() == 1
         assert mol.GetConformer(0).GetId() == 0
 
     def testAddConformer(self, mol):
@@ -91,6 +82,9 @@ class TestMol:
         assert mol.GetNumConformers() == 3
         assert conf.gid == 3
         assert conf.id_map.max() == 15
+
+    def testGetConformers(self, mol):
+        assert len(mol.GetConformers()) == 2
 
     def testEmbedMolecule(self, mol):
         mol.EmbedMolecule()

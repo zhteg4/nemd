@@ -124,10 +124,8 @@ class Frame(pd.DataFrame):
         if index is None and not isinstance(xyz, Frame):
             index = range(1, xyz.shape[0] + 1)
         if isinstance(xyz, pd.DataFrame) and (xyz.columns != columns).any():
-            xyz = xyz.rename(columns={
-                x: y
-                for x, y in zip(xyz.columns, columns)
-            })
+            columns = {x: y for x, y in zip(xyz.columns, columns)}
+            xyz = xyz.rename(columns=columns)
         super().__init__(data=xyz, index=index, columns=columns, dtype=dtype)
         self.setBox(box)
         self.setStep(step)
