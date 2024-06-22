@@ -242,7 +242,7 @@ class GrownConf(PackedConf):
         #                    dreader=self.lmw,
         #                    visible=list(self.dcell.extg_gids),
         #                    points=points)
-        msg = f'Only {len(self.dcell.extg_gids)} / {len(self.dcell.gids)} placed'
+        msg = f'Only {len(self.dcell.gids)} / {self.dcell.shape[0]} placed'
         log_debug(msg)
         raise ConfError(msg)
 
@@ -270,7 +270,7 @@ class GrownConf(PackedConf):
         # The molecule has grown to a dead end
 
         if self.failed_num > max_trial:
-            msg = f'Placed {len(self.dcell.extg_gids)} / {len(self.dcell.gids)} ' \
+            msg = f'Placed {len(self.dcell.gids)} / {self.dcell.shape[0]} ' \
                   f'atoms reaching max trial number for conformer {self.gid}.'
             log_debug(msg)
             raise ConfError
@@ -334,8 +334,7 @@ class GrownConf(PackedConf):
                   f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
                   f"close contact: {dists.min():.2f}) ")
         log_debug(
-            f'{len(self.dcell.extg_gids)} / {len(self.dcell.gids)} atoms placed.'
-        )
+            f'{len(self.dcell.gids)} / {self.dcell.shape[0]} atoms placed.')
 
 
 class Mol(lammpsdata.Mol):

@@ -524,15 +524,16 @@ class DistanceCell(Frame):
 
     SCALE = lammpsdata.DataFileReader.SCALE
     AUTO = 'auto'
+    ALL = 'all'
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
                      (0, 0, -1)]
 
     # https://pandas.pydata.org/docs/development/extending.html
     _internal_names = pd.DataFrame._internal_names + [
-        "extg_gids", 'cut', 'res', 'span', 'neigh_ids', 'atom_cell', 'graph',
-        'vals', 'cell_vals', 'span', 'hspan', 'grids', 'indexes',
-        'indexes_numba', 'neigh_map', 'gindexes', 'ggrids', 'orig_graph',
-        'grids', 'radii', 'excluded', 'gids'
+        'cut', 'res', 'span', 'neigh_ids', 'atom_cell', 'graph', 'vals',
+        'cell_vals', 'span', 'hspan', 'grids', 'indexes', 'indexes_numba',
+        'neigh_map', 'gindexes', 'ggrids', 'orig_graph', 'grids', 'radii',
+        'excluded', 'gids'
     ]
     _internal_names_set = set(_internal_names)
 
@@ -563,9 +564,11 @@ class DistanceCell(Frame):
         self.graph = None
         self.vals = None
         self.cell_vals = None
-        self.extg_gids = set()
-        if self.gids is None:
-            self.gids = list(range(1, self.shape[0] + 1))
+        match self.gids:
+            case self.ALL:
+                self.gids = set(range(1, self.shape[0] + 1))
+            case None:
+                self.gids = set()
 
     def setUp(self):
         self.setSpan()
@@ -657,10 +660,10 @@ class DistanceCell(Frame):
         self.atom_cell.shape = [X index, Y index, Z index, all atom ids]
         """
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
-            ids = ((self) / self.grids).round().astype(int) % self.indexes
+            ids = (self / self.grids).round().astype(int) % self.indexes
             self.atom_cell = np.zeros((*self.indexes, ids.shape[0] + 1),
                                       dtype=bool)
-            for row in ids.loc[self.gids].itertuples():
+            for row in ids.loc[list(self.gids)].itertuples():
                 self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
             return
 
@@ -673,7 +676,7 @@ class DistanceCell(Frame):
         self.cell_vals = self.atom_cell.copy()
 
     def reset(self):
-        self.extg_gids.clear()
+        self.gids.clear()
         self.iloc[:] = self.vals.copy()
         self.atom_cell[:] = self.cell_vals.copy()
         if self.graph is not None:
@@ -800,7 +803,7 @@ class DistanceCell(Frame):
         :return list of tuple: clashed atom ids, distance, and threshold
         """
         if included is None:
-            included = self.extg_gids
+            included = self.gids
         if excluded is None:
             excluded = self.excluded
         if radii is None:
@@ -835,13 +838,13 @@ class DistanceCell(Frame):
         """
         Remove one global id from the existing global ids.
         """
-        self.extg_gids = self.extg_gids.difference(gids)
+        self.gids = self.gids.difference(gids)
 
     def addGids(self, gids):
         """
         Add one global id to the existing global ids.
         """
-        self.extg_gids.update(gids)
+        self.gids.update(gids)
 
     def setGraph(self, mol_num, min_num=1000):
         """
@@ -876,7 +879,7 @@ class DistanceCell(Frame):
         """
         Remove nodes occupied by existing atoms.
         """
-        xyzs = self.loc[list(self.extg_gids)]
+        xyzs = self.loc[list(self.gids)]
         nodes = (xyzs / self.ggrids).round().astype(int)
         nodes = set([tuple(x[1]) for x in nodes.iterrows()])
         rnodes = []
@@ -919,6 +922,6 @@ class DistanceCell(Frame):
         """
         Get the distances between existing atoms with the given ids.
         """
-        oids = list(self.extg_gids.difference(ids))
+        oids = list(self.gids.difference(ids))
         dists = [self.getDists(oids, self.loc[x]) for x in ids]
         return np.concatenate(dists)

@@ -414,7 +414,7 @@ class Clash(Base):
             clash threshold
         """
         clashes = []
-        dcell = traj.DistanceCell(frm=frm)
+        dcell = traj.DistanceCell(frm, gids=self.gids)
         dcell.setUp()
         for _, row in frm.iterrows():
             clashes += dcell.getClashes(row,
