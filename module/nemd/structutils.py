@@ -53,8 +53,6 @@ class PackedConf(lammpsdata.Conformer):
         super().__init__(*args, **kwargs)
         self.id_map = None
         self.dcell = None
-        self.radii = None
-        self.excluded = None
         self.oxyz = None
 
     @property
@@ -65,8 +63,6 @@ class PackedConf(lammpsdata.Conformer):
         """
         Set the references to the conformer.
         """
-        self.radii = self.mol.radii
-        self.excluded = self.mol.excluded
         self.dcell = self.mol.dcell
 
     def setConformer(self, max_trial=MAX_TRIAL_PER_CONF):
@@ -127,11 +123,7 @@ class PackedConf(lammpsdata.Conformer):
         gids = self.id_map[aids]
         values = self.dcell.vloc(gids)
         for name, xyz in zip(gids, values):
-            clashes = self.dcell.getClashes(xyz,
-                                            name=name,
-                                            included=self.dcell.extg_gids,
-                                            radii=self.radii,
-                                            excluded=self.excluded)
+            clashes = self.dcell.getClashes(xyz, name=name)
             if clashes:
                 return True
         return False
@@ -752,6 +744,8 @@ class PackedStruct(Struct):
         self.dcell = traj.DistanceCell(xyz=self.getPositions(),
                                        index=id,
                                        box=self.box,
+                                       radii=self.radii,
+                                       excluded=self.excluded,
                                        **kwargs)
         self.dcell.setUp()
 
@@ -761,8 +755,6 @@ class PackedStruct(Struct):
         """
 
         for mol in self.molecules:
-            mol.radii = self.radii
-            mol.excluded = self.excluded
             mol.dcell = self.dcell
             for conf in mol.GetConformers():
                 conf.setReferences()

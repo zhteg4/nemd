@@ -532,7 +532,7 @@ class DistanceCell(Frame):
         "extg_gids", 'cut', 'res', 'span', 'neigh_ids', 'atom_cell', 'graph',
         'vals', 'cell_vals', 'span', 'hspan', 'grids', 'indexes',
         'indexes_numba', 'neigh_map', 'gindexes', 'ggrids', 'orig_graph',
-        'grids'
+        'grids', 'radii', 'excluded', 'gids'
     ]
     _internal_names_set = set(_internal_names)
 
@@ -542,7 +542,9 @@ class DistanceCell(Frame):
                  index=None,
                  gids=None,
                  cut=6.,
-                 res=AUTO):
+                 res=AUTO,
+                 radii=None,
+                 excluded=None):
         """
         :param frm 'Frame': trajectory frame
         :param gids list: global atom ids to analyze
@@ -553,6 +555,8 @@ class DistanceCell(Frame):
         self.cut = cut
         self.gids = gids
         self.res = res
+        self.radii = radii
+        self.excluded = excluded
         self.span = None
         self.neigh_ids = None
         self.atom_cell = None
@@ -795,6 +799,12 @@ class DistanceCell(Frame):
         :param threshold clash radii: clash criteria when radii not defined
         :return list of tuple: clashed atom ids, distance, and threshold
         """
+        if included is None:
+            included = self.extg_gids
+        if excluded is None:
+            excluded = self.excluded
+        if radii is None:
+            radii = self.radii
         xyz = row.values if name is None else row
         if name is None:
             name = row.name
