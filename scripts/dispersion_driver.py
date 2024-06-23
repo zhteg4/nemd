@@ -161,7 +161,7 @@ class Dispersion(object):
         for datafile in self.datafiles:
             index = re.search(pattern, datafile).groups()[0]
             jobname = f"{self.options.jobname}{index}"
-            self.lmp_dat.resetFilenames(jobname)
+            self.lmp_dat.setFilenames(jobname)
             self.lmp_dat.datafile = f"{jobname}{self.LAMMPS_EXT}"
             self.lmp_dat.writeLammpsIn()
             self.dumpfiles.append(self.lmp_dat.lammps_dump)

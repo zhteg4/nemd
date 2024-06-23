@@ -94,4 +94,3 @@ class TestOplsParser:
     def testSetDihedral(self, raw_prsr):
         raw_prsr.setDihedral()
         assert 630 == len(raw_prsr.dihedrals)
-

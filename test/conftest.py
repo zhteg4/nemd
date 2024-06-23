@@ -1,6 +1,7 @@
 import pytest
 from nemd import fileutils
 
+
 @pytest.fixture
 def tmp_dir(request, tmpdir):
     """

@@ -5,12 +5,14 @@ import pytest
 from nemd import fileutils
 from nemd import parserutils
 
+
 def get_options(args=None):
     if args is None:
         args = []
     parser = parserutils.get_parser()
     parserutils.add_md_arguments(parser)
     return parser.parse_args(args)
+
 
 # class TestLammpsIn:
 #

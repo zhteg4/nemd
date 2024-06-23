@@ -10,6 +10,172 @@ from nemd import environutils
 from nemd import lammpsfix
 
 
+class In:
+    """
+    Class to write out LAMMPS in script.
+    """
+
+    IN_EXT = '.in'
+    DATA_EXT = '.data'
+
+    UNITS = 'units'
+    METAL = 'metal'
+    ATOMIC = 'atomic'
+
+    ATOM_STYLE = 'atom_style'
+    BOND_STYLE = 'bond_style'
+    ANGLE_STYLE = 'angle_style'
+    DIHEDRAL_STYLE = 'dihedral_style'
+    IMPROPER_STYLE = 'improper_style'
+
+    PAIR_STYLE = 'pair_style'
+    PAIR_MODIFY = 'pair_modify'
+    SPECIAL_BONDS = 'special_bonds'
+    KSPACE_STYLE = 'kspace_style'
+
+    READ_DATA = 'read_data'
+    TIMESTEP = 'timestep'
+    THERMO_MODIFY = 'thermo_modify'
+    THERMO = 'thermo'
+    LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
+    LJ_CUT = 'lj/cut'
+    GEOMETRIC = 'geometric'
+    ARITHMETIC = 'arithmetic'
+    SIXTHPOWER = 'sixthpower'
+
+    MIX = 'mix'
+    PPPM = 'pppm'
+    REAL = 'real'
+    FULL = 'full'
+    OPLS = 'opls'
+    CVFF = 'cvff'
+    FIRE = 'fire'
+    MIN_STYLE = 'min_style'
+    HARMONIC = 'harmonic'
+    LJ_COUL = 'lj/coul'
+    CUSTOM_EXT = '.custom.gz'
+    DUMP = 'dump'
+    DUMP_MODIFY = 'dump_modify'
+    DEFAULT_CUT = 11.
+    DEFAULT_LJ_CUT = DEFAULT_CUT
+    DEFAULT_COUL_CUT = DEFAULT_CUT
+    DUMP_ID, DUMP_Q = lammpsfix.DUMP_ID, lammpsfix.DUMP_Q
+    MINIMIZE = 'minimize'
+
+    def __init__(self, options=None):
+        """
+        :param options 'argparse.Namespace': command line options
+        """
+        self.options = options
+        self.lammps_in = None
+        self.datafile = None
+        self.lammps_dump = None
+        self.in_fh = None
+        self.units = self.REAL
+        self.atom_style = self.FULL
+        self.bond_style = self.HARMONIC
+        self.angle_style = self.HARMONIC
+        self.dihedral_style = self.OPLS
+        self.improper_style = self.CVFF
+        self.is_debug = environutils.is_debug()
+        self.setFilenames(self.options.jobname)
+
+    def setFilenames(self, jobname):
+        """
+        Set the filenames based on the jobname.
+
+        :param jobname str: new jobname based on which out filenames are defined
+        """
+        self.lammps_in = jobname + self.IN_EXT
+        self.datafile = jobname + self.DATA_EXT
+        self.lammps_dump = jobname + self.CUSTOM_EXT
+
+    def writeIn(self):
+        """
+        Write out LAMMPS in script.
+        """
+        with open(self.lammps_in, 'w') as self.in_fh:
+            self.writeSetup()
+            self.readData()
+            self.writeTimestep()
+            self.writeMinimize()
+            self.writeRun()
+
+    def writeSetup(self):
+        """
+        Write the setup section for the in script .
+        """
+        self.in_fh.write(f"{self.UNITS} {self.units}\n")
+        self.in_fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
+        self.in_fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
+        self.in_fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
+        self.in_fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
+        self.in_fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
+        pair_style, cuts = self.LJ_CUT, self.options.coul_cut
+        if self.hasCharge():
+            pair_style = self.LJ_CUT_COUL_LONG
+            cuts = f"{self.options.lj_cut} {self.options.coul_cut}"
+        self.in_fh.write(f"{self.PAIR_STYLE} {pair_style} {cuts}\n")
+        self.in_fh.write(f"{self.PAIR_MODIFY} {self.MIX} {self.GEOMETRIC}\n")
+        self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5\n")
+        if self.hasCharge():
+            self.in_fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
+
+    def hasCharge(self):
+        """
+        Whether any atom has non-zero charge. This method should be overwritten
+        when force field and structure are available.
+
+        :return bool: True if any atom has non-zero charge.
+        """
+
+        return True
+
+    def readData(self):
+        """
+        Write data file related information.
+        """
+        self.in_fh.write(f"{self.READ_DATA} {self.datafile}\n\n")
+
+    def writeMinimize(self, min_style=FIRE, dump=True):
+        """
+        Write commands related to minimization.
+
+        :param min_style str: cg, fire, spin, etc.
+        :param dump bool: Whether dump out trajectory.
+        """
+        if dump:
+            self.in_fh.write(
+                f"{self.DUMP} {self.DUMP_ID} all custom {self.DUMP_Q} "
+                f"dump{self.CUSTOM_EXT} id xu yu zu\n")
+            self.in_fh.write(f"{self.DUMP_MODIFY} 1 sort id\n")
+        self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
+        self.in_fh.write(f"{self.MINIMIZE} 1.0e-6 1.0e-8 1000000 10000000\n\n")
+
+    def writeTimestep(self):
+        """
+        Write commands related to timestep.
+        """
+        self.in_fh.write(f'{self.TIMESTEP} {self.options.timestep}\n')
+        self.in_fh.write(f'{self.THERMO_MODIFY} flush yes\n')
+        self.in_fh.write(f'{self.THERMO} 1000\n')
+
+    def writeRun(self, struct_info=None):
+        """
+        Write command to further equilibrate the system.
+
+        :param struct_info 'types.Namespace': structure information.
+        """
+        if struct_info is None:
+            struct_info = types.SimpleNamespace(btypes=None,
+                                                atypes=None,
+                                                testing=False)
+        options = {x: y for x, y in self.options._get_kwargs()}
+        options = types.SimpleNamespace(**options, **struct_info.__dict__)
+        fwriter = FixWriter(self.in_fh, options=options)
+        fwriter.run()
+
+
 class FixWriter:
     """
     This the wrapper for LAMMPS fix command writer. which usually includes an
@@ -376,177 +542,3 @@ class FixWriter:
             ids += [x for x in reversed(ids)]
             cmd = cmd % tuple(ids) if ids else cmd
             self.fh.write(cmd + '\n')
-
-
-class In:
-    """
-    Class to write out LAMMPS in script.
-    """
-
-    IN_EXT = '.in'
-    DATA_EXT = '.data'
-
-    UNITS = 'units'
-    METAL = 'metal'
-    ATOMIC = 'atomic'
-
-    ATOM_STYLE = 'atom_style'
-    BOND_STYLE = 'bond_style'
-    ANGLE_STYLE = 'angle_style'
-    DIHEDRAL_STYLE = 'dihedral_style'
-    IMPROPER_STYLE = 'improper_style'
-
-    PAIR_STYLE = 'pair_style'
-    PAIR_MODIFY = 'pair_modify'
-    SPECIAL_BONDS = 'special_bonds'
-    KSPACE_STYLE = 'kspace_style'
-
-    READ_DATA = 'read_data'
-    TIMESTEP = 'timestep'
-    THERMO_MODIFY = 'thermo_modify'
-    THERMO = 'thermo'
-    LJ_CUT_COUL_LONG = 'lj/cut/coul/long'
-    LJ_CUT = 'lj/cut'
-    GEOMETRIC = 'geometric'
-    ARITHMETIC = 'arithmetic'
-    SIXTHPOWER = 'sixthpower'
-
-    MIX = 'mix'
-    PPPM = 'pppm'
-    REAL = 'real'
-    FULL = 'full'
-    OPLS = 'opls'
-    CVFF = 'cvff'
-    FIRE = 'fire'
-    MIN_STYLE = 'min_style'
-    HARMONIC = 'harmonic'
-    LJ_COUL = 'lj/coul'
-    CUSTOM_EXT = '.custom.gz'
-    DUMP = 'dump'
-    DUMP_MODIFY = 'dump_modify'
-    DEFAULT_CUT = 11.
-    DEFAULT_LJ_CUT = DEFAULT_CUT
-    DEFAULT_COUL_CUT = DEFAULT_CUT
-    DUMP_ID, DUMP_Q = FixWriter.DUMP_ID, FixWriter.DUMP_Q
-    MINIMIZE = 'minimize'
-
-    def __init__(self, options=None):
-        """
-        :param options 'argparse.Namespace': command line options
-        """
-        self.options = options
-        self.jobname = self.options.jobname
-        self.lammps_in = self.jobname + self.IN_EXT
-        self.datafile = self.jobname + self.DATA_EXT
-        self.lammps_dump = self.jobname + self.CUSTOM_EXT
-        self.units = self.REAL
-        self.atom_style = self.FULL
-        self.bond_style = self.HARMONIC
-        self.angle_style = self.HARMONIC
-        self.dihedral_style = self.OPLS
-        self.improper_style = self.CVFF
-        self.in_fh = None
-        self.is_debug = environutils.is_debug()
-
-    def resetFilenames(self, jobname):
-        """
-        Reset the filenames based on the new jobname.
-
-        "param jobname str: new jobname based on which out filenames are defined
-        """
-        self.lammps_in = jobname + self.IN_EXT
-        self.datafile = jobname + self.DATA_EXT
-        self.lammps_dump = jobname + self.CUSTOM_EXT
-
-    def writeIn(self):
-        """
-        Write out LAMMPS in script.
-        """
-        with open(self.lammps_in, 'w') as self.in_fh:
-            self.writeDescriptions()
-            self.readData()
-            self.writeTimestep()
-            self.writeMinimize()
-            self.writeRun()
-
-    def writeDescriptions(self):
-        """
-        Write in script description section.
-        """
-        self.in_fh.write(f"{self.UNITS} {self.units}\n")
-        self.in_fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
-        self.in_fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
-        self.in_fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
-        self.in_fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
-        self.in_fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
-        pair_style, cuts = self.LJ_CUT, self.options.coul_cut
-        if self.hasCharge():
-            pair_style = self.LJ_CUT_COUL_LONG
-            cuts = f"{self.options.lj_cut} {self.options.coul_cut}"
-        self.in_fh.write(f"{self.PAIR_STYLE} {pair_style} {cuts}\n")
-        self.in_fh.write(f"{self.PAIR_MODIFY} {self.MIX} {self.GEOMETRIC}\n")
-        self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5\n")
-        if self.hasCharge():
-            self.in_fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
-
-    def hasCharge(self):
-        """
-        Whether any atom has non-zero charge. This method should be overwritten
-        when force field and structure are available.
-
-        :return bool: True if any atom has non-zero charge.
-        """
-
-        return True
-
-    def readData(self):
-        """
-        Write data file related information.
-        """
-        self.in_fh.write(f"{self.READ_DATA} {self.datafile}\n\n")
-
-    def writeMinimize(self, min_style=FIRE, dump=True):
-        """
-        Write commands related to minimization.
-
-        :param min_style str: cg, fire, spin, etc.
-        :param dump bool: Whether dump out trajectory.
-        """
-        if dump:
-            self.in_fh.write(
-                f"{self.DUMP} {self.DUMP_ID} all custom {self.DUMP_Q} "
-                f"dump{self.CUSTOM_EXT} id xu yu zu\n")
-            self.in_fh.write(f"{self.DUMP_MODIFY} 1 sort id\n")
-        self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
-        self.in_fh.write(f"{self.MINIMIZE} 1.0e-6 1.0e-8 1000000 10000000\n\n")
-
-    def writeTimestep(self):
-        """
-        Write commands related to timestep.
-        """
-        self.in_fh.write(f'{self.TIMESTEP} {self.options.timestep}\n')
-        self.in_fh.write(f'{self.THERMO_MODIFY} flush yes\n')
-        self.in_fh.write(f'{self.THERMO} 1000\n')
-
-    def dumpImproper(self):
-        """
-        Compute and dump improper values with type.
-        """
-        self.in_fh.write(f'{self.COMPUTE} 1 all property/local itype '
-                         f'iatom1 iatom2 iatom3 iatom4\n')
-        self.in_fh.write(f'{self.COMPUTE} 2 all improper/local chi\n')
-        self.in_fh.write(f'{self.DUMP} 1i all local 1000 tmp.dump '
-                         f'index c_1[1] c_2\n')
-
-    def writeRun(self, struct_info=None):
-        """
-        Write command to further equilibrate the system.
-
-        :param struct_info 'types.Namespace': structure information.
-        """
-        if struct_info is None:
-            struct_info = types.SimpleNamespace(btypes=None, atypes=None, testing=False)
-        options = {x: y for x, y in self.options._get_kwargs()}
-        options = types.SimpleNamespace(**options, **struct_info.__dict__)
-        fwriter = FixWriter(self.in_fh, options=options)
-        fwriter.run()
