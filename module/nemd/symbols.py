@@ -29,3 +29,6 @@ XU = 'xu'
 YU = 'yu'
 ZU = 'zu'
 XYZU = [XU, YU, ZU]
+SPC = 'SPC'
+SPCE = 'SPCE'
+TIP3P = 'TIP3P'

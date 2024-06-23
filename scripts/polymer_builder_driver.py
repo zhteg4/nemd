@@ -156,7 +156,7 @@ class AmorphousCell(object):
         self.ff = ff
         self.mols = []
         if self.ff is None:
-            self.ff = oplsua.get_opls_parser()
+            self.ff = oplsua.get_parser(wmodel=self.options.force_field.model)
 
     def run(self):
         """
@@ -262,7 +262,6 @@ class Mol(structure.Mol):
 
     TYPE_ID = oplsua.TYPE_ID
     RES_NUM = oplsua.RES_NUM
-    WATER_TIP3P = oplsua.OplsTyper.WATER_TIP3P
     IMPLICIT_H = oplsua.IMPLICIT_H
     MOL_NUM = 'mol_num'
     MONO_ATOM_IDX = 'mono_atom_idx'
@@ -302,7 +301,6 @@ class Mol(structure.Mol):
         self.setCruMol()
         self.markMonomer()
         self.polymerize()
-        self.assignAtomType()
         self.embedMol()
         self.setConformers()
 
@@ -396,14 +394,6 @@ class Mol(structure.Mol):
         super().__init__(polym)
         log(f"Polymer SMILES: {Chem.MolToSmiles(self)}")
 
-    def assignAtomType(self):
-        """
-        Assign atom types to the structure.
-        """
-        wmodel = self.options.force_field.model
-        ff_typer = oplsua.OplsTyper(self, wmodel=wmodel)
-        ff_typer.run()
-
     def embedMol(self):
         """
         Embed the molecule with coordinates.
@@ -455,7 +445,6 @@ class Conformer(object):
         self.polym = polym
         self.original_cru_mol = original_cru_mol
         self.options = options
-        self.ff = oplsua.get_opls_parser()
         self.relax_dir = '_relax'
         self.data_file = 'polym.data'
         self.conformer = None

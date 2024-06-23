@@ -166,7 +166,7 @@ def type_monomer_smiles(arg, allow_mol=False, canonize=True):
 FF_MODEL = collections.namedtuple('FF_MODEL', ['ff', 'model'])
 
 
-def type_force_field(arg, ff_model=oplsua.OplsTyper.FF_MODEL):
+def type_force_field(arg, ff_model=oplsua.Typer.FF_MODEL):
     args = arg.split(',')
     ff_type = args[0]
     if ff_type not in ff_model:
@@ -267,7 +267,7 @@ def add_md_arguments(parser):
         oplsua.FlAG_FORCE_FIELD,
         metavar=oplsua.FlAG_FORCE_FIELD[1:].upper(),
         type=type_force_field,
-        default=oplsua.OplsTyper.OPLSUA_TIP3P,
+        default=oplsua.Typer.OPLSUA_TIP3P,
         help='The force field type (and water model separated with comma).')
 
 

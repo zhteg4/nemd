@@ -165,6 +165,16 @@ class Mol(rdkit.Chem.rdchem.Mol):
         self.confs.clear()
         self.setUp(super().GetConformers())
 
+    @classmethod
+    def MolFromSmiles(cls, smiles):
+        """
+        Create a molecule from SMILES.
+
+        :param smiles str: the SMILES string.
+        :return `Mol`: the molecule instance.
+        """
+        return cls(rdkit.Chem.MolFromSmiles(smiles))
+
     @property
     def molecular_weight(self):
         """

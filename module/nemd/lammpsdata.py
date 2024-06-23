@@ -11,22 +11,9 @@ from scipy import constants
 
 from nemd import oplsua
 from nemd import symbols
-from nemd import logutils
 from nemd import lammpsin
 from nemd import structure
 from nemd import constants as nconstant
-
-logger = logutils.createModuleLogger(file_path=__file__)
-
-
-def log_debug(msg):
-    """
-    Print this message into the log file in debug mode.
-    :param msg str: the msg to be printed
-    """
-    if logger is None:
-        return
-    logger.debug(msg)
 
 
 class Conformer(structure.Conformer):
@@ -35,6 +22,14 @@ class Conformer(structure.Conformer):
 
     @property
     def atoms(self):
+        """
+        Return atom information in the format of numpy array.
+
+        :return `numpy.ndarray`: information such as atom global ids, molecule
+            ids, atom type ids, charges, coordinates.
+        """
+        if not self.HasOwningMol():
+            return
         mol = self.GetOwningMol()
         gids = self.id_map[[x.GetIdx() for x in mol.GetAtoms()]].reshape(-1, 1)
         cids = np.array([self.gid] * mol.GetNumAtoms()).reshape(-1, 1)
@@ -48,6 +43,14 @@ class Conformer(structure.Conformer):
 
     @property
     def bonds(self):
+        """
+        Return bond information in the format of numpy array.
+
+        :return 'numpy.ndarray': information such as bond ids and bonded atom
+            ids.
+        """
+        if not self.HasOwningMol():
+            return
         bonds = np.array(self.GetOwningMol().bonds)
         if bonds.any():
             bonds[:, 1:] = self.id_map[bonds[:, 1:]]
@@ -55,6 +58,14 @@ class Conformer(structure.Conformer):
 
     @property
     def angles(self):
+        """
+        Return angle information in the format of numpy array.
+
+        :return 'numpy.ndarray': information such as angle ids and connected
+            atom ids.
+        """
+        if not self.HasOwningMol():
+            return
         angles = np.array(self.GetOwningMol().angles)
         if angles.any():
             angles[:, 1:] = self.id_map[angles[:, 1:]]
@@ -62,6 +73,14 @@ class Conformer(structure.Conformer):
 
     @property
     def dihedrals(self):
+        """
+        Return dihedral angle information in the format of numpy array.
+
+        :return 'numpy.ndarray': information such as dihedral ids and connected
+            atom ids.
+        """
+        if not self.HasOwningMol():
+            return
         dihes = np.array(self.GetOwningMol().dihedrals)
         if dihes.any():
             dihes[:, 1:] = self.id_map[dihes[:, 1:]]
@@ -69,6 +88,14 @@ class Conformer(structure.Conformer):
 
     @property
     def impropers(self):
+        """
+        Return improper angle information in the format of numpy array.
+
+        :return 'numpy.ndarray': information such as improper ids and connected
+            atom ids.
+        """
+        if not self.HasOwningMol():
+            return
         imprps = np.array(self.GetOwningMol().impropers)
         if imprps.any():
             imprps[:, 1:] = self.id_map[imprps[:, 1:]]
@@ -84,12 +111,10 @@ class Mol(structure.Mol):
 
     def __init__(self, *args, ff=None, **kwargs):
         """
-        :param ff 'OplsParser': the force field class.
+        :param ff 'Parser': the force field class.
         """
         super().__init__(*args, **kwargs)
         self.ff = ff
-        if self.ff is None and self.struct and hasattr(self.struct, 'ff'):
-            self.ff = self.struct.ff
         self.symbol_impropers = {}
         self.bonds = []
         self.angles = []
@@ -100,6 +125,10 @@ class Mol(structure.Mol):
         self.rvrs_angles = {}
         self.fbonds = set()
         self.fangles = set()
+        if self.ff is None and self.struct and hasattr(self.struct, 'ff'):
+            self.ff = self.struct.ff
+        if self.ff is None:
+            self.ff = oplsua.get_parser()
         if self.delay:
             return
         self.setTopo()
@@ -108,6 +137,7 @@ class Mol(structure.Mol):
         """
         Set charge, bond, angle, dihedral, improper, and other topology params.
         """
+        self.typeAtoms()
         self.balanceCharge()
         self.setBonds()
         self.setAngles()
@@ -115,6 +145,12 @@ class Mol(structure.Mol):
         self.setImpropers()
         self.removeAngles()
         self.setFixGeom()
+
+    def typeAtoms(self):
+        """
+        Assign atom types and other force field parameters.
+        """
+        self.ff.type(self)
 
     def balanceCharge(self):
         """
@@ -275,7 +311,7 @@ class Mol(structure.Mol):
             # Sp2 N in Amino Acid
             neighbor_symbols = [x.GetSymbol() for x in neighbors]
             counted = self.ff.countSymbols(
-                [str(oplsua.OplsParser.getAtomConnt(atom)), atom_symbol] +
+                [str(oplsua.Parser.getAtomConnt(atom)), atom_symbol] +
                 neighbor_symbols)
             improper_type_id = self.ff.improper_symbols[counted][0]
             # FIXME: see docstring for current investigation. (NO ACTIONS TAKEN)
@@ -601,7 +637,6 @@ class Struct(structure.Struct, Base):
         # Calculate density as the revised box may alter the box size.
         vol = math.prod([x * 2 * nconstant.ANG_TO_CM for x in box_hf])
         density = self.molecular_weight / vol / scipy.constants.Avogadro
-        # import pdb; pdb.set_trace()
         if np.isclose(self.density, density):
             return
         msg = f'The density of the final data file is {density:.4g} kg/cm^3'

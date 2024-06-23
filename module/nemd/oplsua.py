@@ -64,17 +64,19 @@ def log_debug(msg):
     logger.debug(msg)
 
 
-def get_opls_parser():
+def get_parser(wmodel=symbols.TIP3P):
     """
     Read and parser opls force field file.
+
+    :param wmodel str: the model type for water
     :return 'OplsParser': the parser with force field information
     """
-    opls_parser = OplsParser()
-    opls_parser.read()
-    return opls_parser
+    parser = Parser(wmodel=wmodel)
+    parser.read()
+    return parser
 
 
-class OplsTyper:
+class Typer:
     """
     Type the atoms and map SMILES fragments.
     """
@@ -156,9 +158,9 @@ class OplsTyper:
     DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,), (88, 107,): (6, 22,),
         (86, 107,): (6, 25,), (9, 26): (1, 9), (9, 107): (9, 9)}
     # https://docs.lammps.org/Howto_tip3p.html
-    TIP3P = 'TIP3P'
-    SPC = 'SPC'
-    SPCE = 'SPCE'
+    SPC = symbols.SPC
+    SPCE = symbols.SPCE
+    TIP3P = symbols.TIP3P
     WATER_TIP3P = f'Water ({TIP3P})'
     WATER_SPC = f'Water ({SPC})'
     WATER_SPCE = f'Water ({SPCE})'
@@ -170,12 +172,12 @@ class OplsTyper:
     FF_MODEL = {OPLSUA: WMODELS.keys()}
     OPLSUA_TIP3P = f'{OPLSUA},{TIP3P}'
 
-    def __init__(self, mol, wmodel=TIP3P):
+    def __init__(self, wmodel=TIP3P):
         """
         :param mol 'rdkit.Chem.rdchem.Mol': molecule to assign FF types
         :param wmodel str: the model type for water
         """
-        self.mol = mol
+        self.mol = None
         self.SMILES = self.SMILES_TEMPLATE.copy()
         if wmodel == self.TIP3P:
             return
@@ -184,11 +186,11 @@ class OplsTyper:
         ][0]
         self.SMILES[idx] = self.WMODELS[wmodel]
 
-    def run(self):
+    def type(self, mol):
         """
         Assign atom types for force field assignment.
         """
-
+        self.mol = mol
         self.doTyping()
         self.reassignResnum()
 
@@ -344,7 +346,7 @@ class OplsTyper:
         atom.SetIntProp(self.DIHE_ATM_ID, self.DIHE_ATOM[type_id])
 
 
-class OplsParser:
+class Parser(Typer):
     """
     Parse force field file and map atomic details.
     """
@@ -368,16 +370,15 @@ class OplsParser:
         UREY_MK, IMPROPER_MK, TORSIONAL_MK, ATOMIC_MK, BIOPOLYMER_MK
     ]
 
-    BOND_AID = OplsTyper.BOND_AID
-    ANGLE_ATM_ID = OplsTyper.ANGLE_ATM_ID
-    DIHE_ATM_ID = OplsTyper.DIHE_ATM_ID
     IMPLICIT_H = IMPLICIT_H
     TYPE_ID = TYPE_ID
 
-    def __init__(self, filepath=None):
+    def __init__(self, filepath=None, wmodel=symbols.TIP3P):
         """
         :param filepath str: the path to the force field file.
+        :param wmodel str: the model type for water
         """
+        super().__init__(wmodel=wmodel)
         self.filepath = filepath
         if self.filepath is None:
             self.filepath = self.FILE_PATH
@@ -411,7 +412,7 @@ class OplsParser:
         Read and set raw content.
         """
 
-        with open(self.FILE_PATH, 'r') as fp:
+        with open(self.filepath, 'r') as fp:
             lns = [x.strip(' \n') for x in fp.readlines()]
         mls = {m: i for i, l in enumerate(lns) for m in self.MARKERS if m in l}
         for bmarker, emarker in zip(self.MARKERS[:-1], self.MARKERS[1:]):
@@ -574,7 +575,7 @@ class OplsParser:
 
         atypes = sorted([x.GetIntProp(self.BOND_AID) for x in bonded_atoms])
         try:
-            atypes = OplsTyper.BOND_ATOMS[tuple(atypes)]
+            atypes = Typer.BOND_ATOMS[tuple(atypes)]
         except KeyError:
             # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
             pass
@@ -685,7 +686,7 @@ class OplsParser:
 
         tids = tuple([x.GetIntProp(self.ANGLE_ATM_ID) for x in atoms])
         try:
-            tids = OplsTyper.ANGLE_ATOMS[tids]
+            tids = self.ANGLE_ATOMS[tids]
         except KeyError:
             # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
             pass
@@ -765,7 +766,7 @@ class OplsParser:
         dihes = self.dihe_map[:, tids[1], tids[2], :]
         partial_matches = [self.dihedrals[x] for x in dihes[dihes != 0]]
         if not partial_matches:
-            rpm_ids = OplsTyper.DIHE_ATOMS[tuple(tids[1:3])]
+            rpm_ids = self.DIHE_ATOMS[tuple(tids[1:3])]
             dihes = self.dihe_map[:, rpm_ids[0], rpm_ids[1], :]
             partial_matches = [self.dihedrals[x] for x in dihes[dihes != 0]]
         if not partial_matches:
