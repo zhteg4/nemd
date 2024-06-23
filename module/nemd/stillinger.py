@@ -24,7 +24,7 @@ class Struct(xtal.Struct):
         """
         Write out LAMMPS in script.
         """
-        with open(self.lammps_in, 'w') as self.in_fh:
+        with open(self.lammps_in, 'w') as self.fh:
             self.setElements()
             self.writeDescriptions()
             self.readData()
@@ -36,13 +36,13 @@ class Struct(xtal.Struct):
         """
         Write in script description section.
         """
-        self.in_fh.write(f"{self.UNITS} {self.units}\n")
-        self.in_fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
-        self.in_fh.write("boundary p p p\n")
+        self.fh.write(f"{self.UNITS} {self.units}\n")
+        self.fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
+        self.fh.write("boundary p p p\n")
 
     def writePairStyle(self):
-        self.in_fh.write("pair_style sw\n")
-        self.in_fh.write(f"pair_coeff * * {self.ff} Si\n")
+        self.fh.write("pair_style sw\n")
+        self.fh.write(f"pair_coeff * * {self.ff} Si\n")
 
     def writeDump(self):
         dump = f"{self.DUMP} 1 all custom 1 {self.lammps_dump} id "
@@ -50,11 +50,11 @@ class Struct(xtal.Struct):
             dump += "xu yu zu "
         if self.FORCE in self.tasks:
             dump += "fx fy fz "
-        self.in_fh.write(f"{dump}\n")
-        self.in_fh.write(f"dump_modify 1 format float '%20.15f'\n")
+        self.fh.write(f"{dump}\n")
+        self.fh.write(f"dump_modify 1 format float '%20.15f'\n")
 
     def writeEnergy(self):
-        self.in_fh.write("run 0\n")
+        self.fh.write("run 0\n")
 
     def writeData(self, *args, **kwargs):
         with open(self.datafile, 'w') as self.data_fh:

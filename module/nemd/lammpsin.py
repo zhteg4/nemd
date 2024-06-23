@@ -70,7 +70,7 @@ class In:
         self.lammps_in = None
         self.datafile = None
         self.lammps_dump = None
-        self.in_fh = None
+        self.fh = None
         self.units = self.REAL
         self.atom_style = self.FULL
         self.bond_style = self.HARMONIC
@@ -94,7 +94,7 @@ class In:
         """
         Write out LAMMPS in script.
         """
-        with open(self.lammps_in, 'w') as self.in_fh:
+        with open(self.lammps_in, 'w') as self.fh:
             self.writeSetup()
             self.readData()
             self.writeTimestep()
@@ -105,21 +105,21 @@ class In:
         """
         Write the setup section for the in script .
         """
-        self.in_fh.write(f"{self.UNITS} {self.units}\n")
-        self.in_fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
-        self.in_fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
-        self.in_fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
-        self.in_fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
-        self.in_fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
+        self.fh.write(f"{self.UNITS} {self.units}\n")
+        self.fh.write(f"{self.ATOM_STYLE} {self.atom_style}\n")
+        self.fh.write(f"{self.BOND_STYLE} {self.bond_style}\n")
+        self.fh.write(f"{self.ANGLE_STYLE} {self.angle_style}\n")
+        self.fh.write(f"{self.DIHEDRAL_STYLE} {self.dihedral_style}\n")
+        self.fh.write(f"{self.IMPROPER_STYLE} {self.improper_style}\n")
         pair_style, cuts = self.LJ_CUT, self.options.coul_cut
         if self.hasCharge():
             pair_style = self.LJ_CUT_COUL_LONG
             cuts = f"{self.options.lj_cut} {self.options.coul_cut}"
-        self.in_fh.write(f"{self.PAIR_STYLE} {pair_style} {cuts}\n")
-        self.in_fh.write(f"{self.PAIR_MODIFY} {self.MIX} {self.GEOMETRIC}\n")
-        self.in_fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5\n")
+        self.fh.write(f"{self.PAIR_STYLE} {pair_style} {cuts}\n")
+        self.fh.write(f"{self.PAIR_MODIFY} {self.MIX} {self.GEOMETRIC}\n")
+        self.fh.write(f"{self.SPECIAL_BONDS} {self.LJ_COUL} 0 0 0.5\n")
         if self.hasCharge():
-            self.in_fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
+            self.fh.write(f"{self.KSPACE_STYLE} {self.PPPM} 0.0001\n")
 
     def hasCharge(self):
         """
@@ -135,7 +135,7 @@ class In:
         """
         Write data file related information.
         """
-        self.in_fh.write(f"{self.READ_DATA} {self.datafile}\n\n")
+        self.fh.write(f"{self.READ_DATA} {self.datafile}\n\n")
 
     def writeMinimize(self, min_style=FIRE, dump=True):
         """
@@ -145,20 +145,20 @@ class In:
         :param dump bool: Whether dump out trajectory.
         """
         if dump:
-            self.in_fh.write(
+            self.fh.write(
                 f"{self.DUMP} {self.DUMP_ID} all custom {self.DUMP_Q} "
                 f"dump{self.CUSTOM_EXT} id xu yu zu\n")
-            self.in_fh.write(f"{self.DUMP_MODIFY} 1 sort id\n")
-        self.in_fh.write(f"{self.MIN_STYLE} {min_style}\n")
-        self.in_fh.write(f"{self.MINIMIZE} 1.0e-6 1.0e-8 1000000 10000000\n\n")
+            self.fh.write(f"{self.DUMP_MODIFY} 1 sort id\n")
+        self.fh.write(f"{self.MIN_STYLE} {min_style}\n")
+        self.fh.write(f"{self.MINIMIZE} 1.0e-6 1.0e-8 1000000 10000000\n\n")
 
     def writeTimestep(self):
         """
         Write commands related to timestep.
         """
-        self.in_fh.write(f'{self.TIMESTEP} {self.options.timestep}\n')
-        self.in_fh.write(f'{self.THERMO_MODIFY} flush yes\n')
-        self.in_fh.write(f'{self.THERMO} 1000\n')
+        self.fh.write(f'{self.TIMESTEP} {self.options.timestep}\n')
+        self.fh.write(f'{self.THERMO_MODIFY} flush yes\n')
+        self.fh.write(f'{self.THERMO} 1000\n')
 
     def writeRun(self, struct_info=None):
         """
@@ -172,14 +172,14 @@ class In:
                                                 testing=False)
         options = {x: y for x, y in self.options._get_kwargs()}
         options = types.SimpleNamespace(**options, **struct_info.__dict__)
-        fwriter = FixWriter(self.in_fh, options=options)
+        fwriter = FixWriter(self.fh, options=options)
         fwriter.run()
 
 
 class FixWriter:
     """
     This the wrapper for LAMMPS fix command writer. which usually includes an
-    unfix after the run command.
+    "unfix" after the run command.
     """
     FIX_RIGID_SHAKE = lammpsfix.FIX_RIGID_SHAKE
     VELOCITY = lammpsfix.VELOCITY
