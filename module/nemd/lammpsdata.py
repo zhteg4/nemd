@@ -385,7 +385,7 @@ class Mol(structure.Mol):
 
     def setFixGeom(self):
         """
-        The lengths or angle values are these geometry remain unchanged during
+        The lengths or angle values of these geometries remain unchanged during
         simulation.
         """
         bonds = [self.ff.bonds[x[0]] for x in self.bonds]

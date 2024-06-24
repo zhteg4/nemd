@@ -171,25 +171,27 @@ class Mol(rdkit.Chem.rdchem.Mol):
         Create a molecule from SMILES.
 
         :param smiles str: the SMILES string.
+        :param united bool: hide keep Hydrogen atoms in CH, CH3, CH3, and CH4.
         :return `Mol`: the molecule instance.
         """
+
         mol = rdkit.Chem.MolFromSmiles(smiles)
         if not united:
             return cls(mol, **kwargs)
 
-        # Add Hs to the non-aromatic non-carbon atoms (e.g. O, N, S)
+        # Hide Hs in CH, CH3, CH3, and CH4
         for atom in mol.GetAtoms():
             if atom.GetSymbol() != symbols.CARBON or atom.GetIsAromatic():
                 continue
             atom.SetIntProp(symbols.IMPLICIT_H, atom.GetNumImplicitHs())
             atom.SetNoImplicit(True)
-        # FIXME: support different chiralties for monomers
-        chiralty_info = rdkit.Chem.FindMolChiralCenters(mol,
-                                                        includeUnassigned=True)
-        for chiralty in chiralty_info:
+
+        # FIXME: support different chiralities for monomers
+        chiral = rdkit.Chem.FindMolChiralCenters(mol, includeUnassigned=True)
+        for chirality in chiral:
             # CIP stereochemistry assignment for the molecule’s atoms (R/S)
             # and double bonds (Z/E)
-            mol.GetAtomWithIdx(chiralty[0]).SetProp('_CIPCode', 'R')
+            mol.GetAtomWithIdx(chirality[0]).SetProp('_CIPCode', 'R')
 
         return cls(rdkit.Chem.AddHs(mol), **kwargs)
 
