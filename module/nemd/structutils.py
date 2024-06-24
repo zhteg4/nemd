@@ -238,6 +238,7 @@ class GrownConf(PackedConf):
         :raise ValueError: when no void to place the initiator fragment of the
             dead molecule.
         """
+
         self.mol.struct.dcell.rmClashNodes()
         points = self.mol.struct.dcell.getVoids()
         for point in points:
@@ -760,7 +761,6 @@ class PackedStruct(Struct):
         :raise DensityError: if the max number of trials at this density is
             reached or the chance of achieving the goal is too low.
         """
-        import pdb; pdb.set_trace()
         trial_id, conf_num, finished, nth = 1, len(self.conformers), [], -1
         for trial_id in range(1, max_trial + 1):
             self.reset()
@@ -877,6 +877,7 @@ class GrownStruct(PackedStruct):
             reached.
         """
         log_debug("*" * 10 + f" {self.density} " + "*" * 10)
+
         for _ in range(max_trial):
             self.reset()
             conformers = self.conformers[:]
@@ -907,6 +908,7 @@ class GrownStruct(PackedStruct):
         """
         Reset the state so that a new growing attempt can happen.
         """
+        ...
         super().reset()
         self.placeInitFrags()
 

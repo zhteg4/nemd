@@ -120,7 +120,7 @@ class Frame(pd.DataFrame):
         :param dtype str: the data type of the frame
         """
         if box is None and isinstance(xyz, Frame):
-            box = xyz.attrs[self.BOX]
+            box = xyz.box
         if index is None and not isinstance(xyz, pd.DataFrame):
             index = range(1, xyz.shape[0] + 1)
         if isinstance(xyz, pd.DataFrame) and (xyz.columns != columns).any():
@@ -138,7 +138,30 @@ class Frame(pd.DataFrame):
         self.span = None
         self.id_map = None
         self.setBox(self.box)
-        self.setIdmap()
+        self.setIdMap()
+
+    def setBox(self, box):
+        """
+        Set the box span from box limits.
+
+        :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
+        """
+        self.box = box
+        if self.box is None:
+            return
+        self.span = np.array([box[i * 2 + 1] - box[i * 2] for i in range(3)])
+
+    def setIdMap(self):
+        """
+        The map from atom gid to xyz row id. This is much faster than iterrows
+        or iloc indexing.
+        """
+
+        if not self.index.any():
+            return
+        id = {label: i for i, label in enumerate(self.index)}
+        id_map = np.array([id.get(x, -1) for x in range(self.index.max() + 1)])
+        self.id_map = id_map
 
     @property
     def _constructor(self):
@@ -264,9 +287,8 @@ class Frame(pd.DataFrame):
         :param atom_id int: atom id
         :return row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
         """
-
         point = np.random.rand(3) * self.span
-        point = [x + y for x, y in zip(point, self.attrs[self.BOX][::2])]
+        point = [x + y for x, y in zip(point, self.box[::2])]
 
         return np.array(point)
 
@@ -284,17 +306,6 @@ class Frame(pd.DataFrame):
         Update the coordinate frame based on the give gids and xyz.
         """
         self.values[self.id_map[gids], :] = xyz
-
-    def setBox(self, box):
-        """
-        Set the box span from box limits.
-
-        :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
-        """
-        self.box = box
-        if box is None:
-            return
-        self.span = np.array([box[i * 2 + 1] - box[i * 2] for i in range(3)])
 
     def getVolume(self):
         """
@@ -319,9 +330,10 @@ class Frame(pd.DataFrame):
         :return list of list: each sublist contains two points describing one
             edge.
         """
-        if self.box is None:
+        box = self.getBox()
+        if box is None:
             return []
-        return lammpsdata.DataFileReader.getEdgesFromList(self.box)
+        return lammpsdata.DataFileReader.getEdgesFromList(box)
 
     def getDists(self, ids, xyz):
         """
@@ -336,9 +348,8 @@ class Frame(pd.DataFrame):
 
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
             for id in range(3):
-                dists[:, id] = np.frompyfunc(
-                    lambda x: math.remainder(x, self.span[id]), 1,
-                    1)(dists[:, id])
+                func = lambda x: math.remainder(x, self.span[id])
+                dists[:, id] = np.frompyfunc(func, 1, 1)(dists[:, id])
             return np.linalg.norm(dists, axis=1)
 
         return np.array(self.remainderIEEE(dists, self.span))
@@ -378,20 +389,8 @@ class Frame(pd.DataFrame):
         for idx, (id, row) in enumerate(self.loc[ids].ivals()):
             oids = [x for x in dcell.getNeighbors(row)
                     if x > id] if cut else ids[idx + 1:]
-            dists.append(self.getDists(oids, row, span=self.span))
+            dists.append(self.getDists(oids, row))
         return np.concatenate(dists)
-
-    def setIdmap(self):
-        """
-        The map from atom gid to xyz row id. This is much faster than iterrows
-        or iloc indexing.
-
-        :return 'numpy.ndarray': the map from atom id to xyz row id
-        """
-        if not self.index.any():
-            return
-        id = {label: i for i, label in enumerate(self.index)}
-        self.id_map = np.array([id.get(x, -1) for x in range(self.index.max() + 1)])
 
     def wrapCoords(self, broken_bonds=False, dreader=None):
         """
@@ -446,16 +445,17 @@ class Frame(pd.DataFrame):
         if dreader is None:
             return
 
+        span = np.array([x for x in self.attrs[self.SPAN].values()])
         centers = pd.concat(
             [self.loc[x].mean(axis=0) for x in dreader.mols.values()],
             axis=1).transpose()
         centers.index = dreader.mols.keys()
-        theta = centers / self.span * 2 * np.pi
+        theta = centers / span * 2 * np.pi
         cos_theta = np.cos(theta)
         sin_theta = np.sin(theta)
         theta = np.arctan2(sin_theta.mean(), cos_theta.mean())
-        mcenters = theta * self.span / 2 / np.pi
-        cshifts = ((mcenters - centers) / self.span).round() * span
+        mcenters = theta * span / 2 / np.pi
+        cshifts = ((mcenters - centers) / span).round() * span
         for id, mol in dreader.mols.items():
             cshift = cshifts.loc[id]
             self.loc[mol] += cshift
@@ -509,11 +509,10 @@ class DistanceCell(Frame):
                      (0, 0, -1)]
 
     # https://pandas.pydata.org/docs/development/extending.html
-    _internal_names = pd.DataFrame._internal_names + [
-        'cut', 'res', 'neigh_ids', 'atom_cell', 'graph', 'vals',
-        'cell_vals', 'grids', 'indexes', 'indexes_numba',
-        'neigh_map', 'gindexes', 'ggrids', 'orig_graph', 'grids', 'radii',
-        'excluded', 'gids'
+    _internal_names = Frame._internal_names + [
+        'cut', 'res', 'neigh_ids', 'atom_cell', 'graph', 'vals', 'cell_vals',
+        'span', 'grids', 'indexes', 'indexes_numba', 'neigh_map', 'gindexes',
+        'ggrids', 'orig_graph', 'grids', 'radii', 'excluded', 'gids'
     ]
     _internal_names_set = set(_internal_names)
 

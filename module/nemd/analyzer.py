@@ -265,7 +265,7 @@ class RDF(Base):
         :param dres float: the distance cell resolution
         """
         frms = self.frms[self.sidx:]
-        span = np.array([[x for x in x.getSpan().values()] for x in frms])
+        span = np.array([[x for x in x.span] for x in frms])
         vol = np.prod(span, axis=1)
         self.log(f'The volume fluctuates: [{vol.min():.2f} {vol.max():.2f}] '
                  f'{symbols.ANGSTROM}^3')
