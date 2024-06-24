@@ -97,6 +97,16 @@ class TestMol:
     def testMolecularWeight(self, mol):
         assert mol.mw == 72.093900384
 
+    @pytest.mark.parametrize(
+        'smiles,united,out',
+        [('CC([H])([H])[H]', True, 'CC'),
+         ('CC([H])([H])[H]', False, '[H]C([H])([H])C([H])([H])[H]'),
+         ('OC(=O)CC', True, '[H]OC(=O)CC'),
+         ('OC(=O)CC', False, '[H]OC(=O)C([H])([H])C([H])([H])[H]')])
+    def testMolFromSmiles(self, smiles, united, out):
+        assert Chem.MolToSmiles(
+            structure.Mol.MolFromSmiles(smiles, united=united)) == out
+
     def testAtomTotal(self, mol):
         assert mol.atom_total == 10
 

@@ -175,9 +175,11 @@ class Mol(rdkit.Chem.rdchem.Mol):
         :return `Mol`: the molecule instance.
         """
 
-        mol = rdkit.Chem.MolFromSmiles(smiles)
+        mol = rdkit.Chem.RemoveHs(rdkit.Chem.MolFromSmiles(smiles))
+        mol = rdkit.Chem.MolFromSmiles(rdkit.Chem.MolToSmiles(mol))
+
         if not united:
-            return cls(mol, **kwargs)
+            return cls(rdkit.Chem.AddHs(mol), **kwargs)
 
         # Hide Hs in CH, CH3, CH3, and CH4
         for atom in mol.GetAtoms():
