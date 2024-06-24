@@ -18,23 +18,6 @@ from nemd import logutils
 from nemd import fileutils
 from nemd import constants as nconstants
 
-FLAG_TIMESTEP = '-timestep'
-FLAG_STEMP = '-stemp'
-FLAG_TEMP = '-temp'
-FLAG_TDAMP = '-tdamp'
-FLAG_PRESS = '-press'
-FLAG_PDAMP = '-pdamp'
-FLAG_LJ_CUT = '-lj_cut'
-FLAG_COUL_CUT = '-coul_cut'
-FLAG_RELAX_TIME = '-relax_time'
-FLAG_PROD_TIME = '-prod_time'
-FLAG_PROD_ENS = '-prod_ens'
-FlAG_FORCE_FIELD = '-force_field'
-
-RES_NUM = 'res_num'
-IMPLICIT_H = 'implicit_h'
-TYPE_ID = 'type_id'
-
 ATOM_TYPE = namedtuple('ATOM_TYPE', [
     'id', 'formula', 'symbol', 'description', 'atomic_number', 'mass', 'conn'
 ])
@@ -50,6 +33,95 @@ DIHEDRAL = namedtuple('DIHEDRAL',
                       ['id', 'id1', 'id2', 'id3', 'id4', 'constants'])
 
 UA = namedtuple('UA', ['sml', 'mp', 'hs', 'dsc'])
+
+RES_NUM = 'res_num'
+TYPE_ID = 'type_id'
+BOND_AID = 'bond_aid'
+ANGLE_ATM_ID = 'angle_atm_id'
+DIHE_ATM_ID = 'dihe_atm_id'
+IMPLICIT_H = symbols.IMPLICIT_H
+LARGE_NUM = nconstants.LARGE_NUM
+
+# https://docs.lammps.org/Howto_tip3p.html
+SPC = symbols.SPC
+SPCE = symbols.SPCE
+TIP3P = symbols.TIP3P
+WATER_TIP3P = f'Water ({TIP3P})'
+WATER_SPC = f'Water ({SPC})'
+WATER_SPCE = f'Water ({SPCE})'
+UA_WATER_TIP3P = UA(sml='O', mp=(77, ), hs={77: 78}, dsc='Water (TIP3P)')
+UA_WATER_SPC = UA(sml='O', mp=(79, ), hs={79: 80}, dsc=WATER_SPC)
+UA_WATER_SPCE = UA(sml='O', mp=(214, ), hs={214: 215}, dsc=WATER_SPCE)
+WMODELS = {TIP3P: UA_WATER_TIP3P, SPC: UA_WATER_SPC, SPCE: UA_WATER_SPCE}
+# yapf: disable
+SMILES_TEMPLATE = [
+    # Single Atom Particle
+    UA(sml='[Li+]', mp=(197,), hs=None, dsc='Li+ Lithium Ion'),
+    UA(sml='[Na+]', mp=(198,), hs=None, dsc='Na+ Sodium Ion'),
+    UA(sml='[K+]', mp=(199,), hs=None, dsc='K+ Potassium Ion'),
+    UA(sml='[Rb+]', mp=(200,), hs=None, dsc='Rb+ Rubidium Ion'),
+    UA(sml='[Cs+]', mp=(201,), hs=None, dsc='Cs+ Cesium Ion'),
+    UA(sml='[Mg+2]', mp=(202,), hs=None, dsc='Mg+2 Magnesium Ion'),
+    UA(sml='[Ca+2]', mp=(203,), hs=None, dsc='Ca+2 Calcium Ion'),
+    UA(sml='[Sr+2]', mp=(204,), hs=None, dsc='Sr+2 Strontium Ion'),
+    UA(sml='[Ba+2]', mp=(205,), hs=None, dsc='Ba+2 Barium Ion'),
+    UA(sml='[F-]', mp=(206,), hs=None, dsc='F- Fluoride Ion'),
+    UA(sml='[Cl-]', mp=(207,), hs=None, dsc='Cl- Chloride Ion'),
+    UA(sml='[Br-]', mp=(208,), hs=None, dsc='Br- Bromide Ion'),
+    UA(sml='[He]', mp=(209,), hs=None, dsc='Helium Atom'),
+    UA(sml='[Ne]', mp=(210,), hs=None, dsc='Neon Atom'),
+    UA(sml='[Ar]', mp=(211,), hs=None, dsc='Argon Atom'),
+    UA(sml='[Kr]', mp=(212,), hs=None, dsc='Krypton Atom'),
+    UA(sml='[Xe]', mp=(213,), hs=None, dsc='Xenon Atom'),
+    # Alkane
+    UA(sml='C', mp=(81,), hs=None, dsc='CH4 Methane'),
+    UA(sml='CC', mp=(82, 82,), hs=None, dsc='Ethane'),
+    UA(sml='CCC', mp=(83, 86, 83,), hs=None, dsc='Propane'),
+    UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
+    UA(sml='CC(C)C', mp=(84, 88, 84, 84,), hs=None, dsc='Isobutane'),
+    UA(sml='CC(C)(C)C', mp=(85, 90, 85, 85, 85,), hs=None, dsc='Neopentane'),
+    # Alkene
+    UA(sml='CC=CC', mp=(84, 89, 89, 84,), hs=None, dsc='2-Butene'),
+    # Aldehydes (with formyl group)
+    # Ketone
+    UA(sml='CC(=O)C', mp=(129, 127, 128, 129,), hs=None, dsc='Acetone'),
+    UA(sml='CCC(=O)CC', mp=(7, 130, 127, 128, 130, 7,), hs=None,
+       dsc='Diethyl Ketone'),
+    # t-Butyl Ketone CC(C)CC(=O)C(C)(C)C described by Neopentane, Acetone, and Diethyl Ketone
+    # Alcohol
+    UA_WATER_TIP3P,
+    UA(sml='CO', mp=(106, 104,), hs={104: 105}, dsc='Methanol'),
+    UA(sml='CCO', mp=(83, 107, 104,), hs={104: 105}, dsc='Ethanol'),
+    UA(sml='CC(C)O', mp=(84, 108, 84, 104,), hs={104: 105}, dsc='Isopropanol'),
+    # Carboxylic Acids
+    # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
+    UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid'),
+    # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
+    UA(sml='CC(=O)O', mp=(137, 133, 134, 135), hs={135: 136},
+       dsc='Ethanoic acid'),
+    # Large Molecules
+    UA(sml='CN(C)C=O', mp=(156, 148, 156, 153, 151,), hs=None,
+       dsc='N,N-Dimethylformamide')
+]
+
+ATOM_TOTAL = {i: i for i in range(1, 216)}
+BOND_ATOM = ATOM_TOTAL.copy()
+# "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
+BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3,
+                  108: 107, 127: 1, 128: 2, 129: 7, 130: 9, 85: 9, 90: 64})
+ANGLE_ATOM = ATOM_TOTAL.copy()
+ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72,
+                   108: 107, 127: 1, 129: 7, 130: 9})
+DIHE_ATOM = ATOM_TOTAL.copy()
+DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72,
+                  108: 107, 127: 1, 130: 9, 86: 9, 88: 9, 90: 9})
+# C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
+BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17], (86, 107): [86, 86]}
+ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86), (84, 107, 86): (86, 88, 83),
+               (86, 107, 86): (86, 88, 83)}
+DIHE_ATOMS = {(26, 86,): (1, 6,), (26, 88,): (1, 6,), (88, 107,): (6, 22,),
+              (86, 107,): (6, 25,), (9, 26): (1, 9), (9, 107): (9, 9)}
+# yapf: enable
 
 logger = logutils.createModuleLogger(file_path=__file__)
 
@@ -81,116 +153,22 @@ class Typer:
     Type the atoms and map SMILES fragments.
     """
 
-    OPLSUA = 'OPLSUA'
-    TYPE_ID = TYPE_ID
-    RES_NUM = RES_NUM
-    BOND_AID = 'bond_aid'
-    ANGLE_ATM_ID = 'angle_atm_id'
-    DIHE_ATM_ID = 'dihe_atm_id'
-    IMPLICIT_H = IMPLICIT_H
-    LARGE_NUM = nconstants.LARGE_NUM
-
-    # yapf: disable
-    UA_WATER_TIP3P = UA(sml='O', mp=(77,), hs={77: 78}, dsc='Water (TIP3P)')
-    SMILES_TEMPLATE = [
-        # Single Atom Particle
-              UA(sml='[Li+]', mp=(197,), hs=None, dsc='Li+ Lithium Ion'),
-              UA(sml='[Na+]', mp=(198,), hs=None, dsc='Na+ Sodium Ion'),
-              UA(sml='[K+]', mp=(199,), hs=None, dsc='K+ Potassium Ion'),
-              UA(sml='[Rb+]', mp=(200,), hs=None, dsc='Rb+ Rubidium Ion'),
-              UA(sml='[Cs+]', mp=(201,), hs=None, dsc='Cs+ Cesium Ion'),
-              UA(sml='[Mg+2]', mp=(202,), hs=None, dsc='Mg+2 Magnesium Ion'),
-              UA(sml='[Ca+2]', mp=(203,), hs=None, dsc='Ca+2 Calcium Ion'),
-              UA(sml='[Sr+2]', mp=(204,), hs=None, dsc='Sr+2 Strontium Ion'),
-              UA(sml='[Ba+2]', mp=(205,), hs=None, dsc='Ba+2 Barium Ion'),
-              UA(sml='[F-]', mp=(206,), hs=None, dsc='F- Fluoride Ion'),
-              UA(sml='[Cl-]', mp=(207,), hs=None, dsc='Cl- Chloride Ion'),
-              UA(sml='[Br-]', mp=(208,), hs=None, dsc='Br- Bromide Ion'),
-              UA(sml='[He]', mp=(209,), hs=None, dsc='Helium Atom'),
-              UA(sml='[Ne]', mp=(210,), hs=None, dsc='Neon Atom'),
-              UA(sml='[Ar]', mp=(211,), hs=None, dsc='Argon Atom'),
-              UA(sml='[Kr]', mp=(212,), hs=None, dsc='Krypton Atom'),
-              UA(sml='[Xe]', mp=(213,), hs=None, dsc='Xenon Atom'),
-        # Alkane
-              UA(sml='C', mp=(81, ), hs=None, dsc='CH4 Methane'),
-              UA(sml='CC', mp=(82, 82,), hs=None, dsc='Ethane'),
-              UA(sml='CCC', mp=(83, 86, 83,), hs=None, dsc='Propane'),
-              UA(sml='CCCC', mp=(83, 86, 86, 83,), hs=None, dsc='n-Butane'),
-              UA(sml='CC(C)C', mp=(84, 88, 84, 84, ), hs=None, dsc='Isobutane'),
-              UA(sml='CC(C)(C)C', mp=(85, 90, 85, 85, 85,), hs=None, dsc='Neopentane'),
-        # Alkene
-              UA(sml='CC=CC', mp=(84, 89, 89, 84,), hs=None, dsc='2-Butene'),
-        # Aldehydes (with formyl group)
-        # Ketone
-              UA(sml='CC(=O)C', mp=(129, 127, 128, 129,), hs=None, dsc='Acetone'),
-              UA(sml='CCC(=O)CC', mp=(7, 130, 127, 128, 130, 7, ), hs=None, dsc='Diethyl Ketone'),
-        # t-Butyl Ketone CC(C)CC(=O)C(C)(C)C described by Neopentane, Acetone, and Diethyl Ketone
-        # Alcohol
-              UA_WATER_TIP3P,
-              UA(sml='CO', mp=(106, 104,), hs={104: 105}, dsc='Methanol'),
-              UA(sml='CCO', mp=(83, 107, 104,), hs={104: 105}, dsc='Ethanol'),
-              UA(sml='CC(C)O', mp=(84, 108, 84, 104,), hs={104:105}, dsc='Isopropanol'),
-        # Carboxylic Acids
-        # "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
-              UA(sml='O=CO', mp=(134, 133, 135), hs={135: 136}, dsc='Carboxylic Acid'),
-              # "Methyl", "=O Carboxylic Acid", "C Carboxylic Acid" , "-O- Carboxylic Acid"
-              UA(sml='CC(=O)O', mp=(137, 133, 134, 135), hs={135: 136}, dsc='Ethanoic acid'),
-        # Large Molecules
-              UA(sml='CN(C)C=O', mp=(156, 148, 156, 153, 151,), hs=None, dsc='N,N-Dimethylformamide')
-    ]
-
-    SMILES_TEMPLATE = list(reversed(SMILES_TEMPLATE))
-    ATOM_TOTAL = {i: i for i in range(1, 216)}
-    BOND_ATOM = ATOM_TOTAL.copy()
-    # "O Peptide Amide" "COH (zeta) Tyr" "OH Tyr"  "H(O) Ser/Thr/Tyr"
-    BOND_ATOM.update({134: 2, 133: 26, 135: 23, 136: 24, 153: 72, 148: 3,
-        108: 107, 127: 1, 128: 2, 129: 7, 130: 9, 85: 9, 90: 64})
-    ANGLE_ATOM = ATOM_TOTAL.copy()
-    ANGLE_ATOM.update({134: 2, 133: 17, 135: 76, 136: 24, 148: 3, 153: 72,
-        108: 107, 127:1, 129:7, 130: 9})
-    DIHE_ATOM = ATOM_TOTAL.copy()
-    DIHE_ATOM.update({134: 11, 133: 26, 135: 76, 136: 24, 148: 3, 153: 72,
-        108: 107, 127: 1, 130: 9, 86: 9, 88: 9, 90: 9})
-    # C-OH (Tyr) is used as HO-C=O, which needs CH2-COOH map as alpha-COOH bond
-    BOND_ATOMS = {(26, 86): [16, 17], (26, 88): [16, 17], (86, 107): [86, 86]}
-    ANGLE_ATOMS = {(84, 107, 84): (86, 88, 86), (84, 107, 86): (86, 88, 83),
-        (86, 107, 86): (86, 88, 83)}
-    DIHE_ATOMS = {(26,86,): (1,6,), (26,88,): (1,6,), (88, 107,): (6, 22,),
-        (86, 107,): (6, 25,), (9, 26): (1, 9), (9, 107): (9, 9)}
-    # https://docs.lammps.org/Howto_tip3p.html
-    SPC = symbols.SPC
-    SPCE = symbols.SPCE
-    TIP3P = symbols.TIP3P
-    WATER_TIP3P = f'Water ({TIP3P})'
-    WATER_SPC = f'Water ({SPC})'
-    WATER_SPCE = f'Water ({SPCE})'
-    UA_WATER_SPC = UA(sml='O', mp=(79, ), hs={79: 80}, dsc=WATER_SPC)
-    UA_WATER_SPCE = UA(sml='O', mp=(214,), hs={214: 215}, dsc=WATER_SPCE)
-    # yapf: enable
-
-    WMODELS = {TIP3P: UA_WATER_TIP3P, SPC: UA_WATER_SPC, SPCE: UA_WATER_SPCE}
-    FF_MODEL = {OPLSUA: WMODELS.keys()}
-    OPLSUA_TIP3P = f'{OPLSUA},{TIP3P}'
-
-    def __init__(self, wmodel=TIP3P):
+    def __init__(self, mol, wmodel=TIP3P):
         """
         :param mol 'rdkit.Chem.rdchem.Mol': molecule to assign FF types
         :param wmodel str: the model type for water
         """
-        self.mol = None
-        self.SMILES = self.SMILES_TEMPLATE.copy()
-        if wmodel == self.TIP3P:
+        self.mol = mol
+        self.SMILES = list(reversed(SMILES_TEMPLATE))
+        if wmodel == TIP3P:
             return
-        idx = [
-            x for x, y in enumerate(self.SMILES) if y.dsc == self.WATER_TIP3P
-        ][0]
-        self.SMILES[idx] = self.WMODELS[wmodel]
+        id = next(x for x, y in enumerate(self.SMILES) if y.dsc == WATER_TIP3P)
+        self.SMILES[id] = WMODELS[wmodel]
 
-    def type(self, mol):
+    def run(self):
         """
         Assign atom types for force field assignment.
         """
-        self.mol = mol
         self.doTyping()
         self.reassignResnum()
 
@@ -203,8 +181,7 @@ class Typer:
         res_num = 1
         for sml in self.SMILES:
             frag = Chem.MolFromSmiles(sml.sml)
-            matches = self.mol.GetSubstructMatches(frag,
-                                                   maxMatches=self.LARGE_NUM)
+            matches = self.mol.GetSubstructMatches(frag, maxMatches=LARGE_NUM)
             matches = [self.filterMatch(x, frag) for x in matches]
             res_num, matom_ids = self.markMatches(matches, sml, res_num)
             if not matom_ids:
@@ -214,7 +191,7 @@ class Typer:
                 [f'{x}*{y}' for x, y in cnt.items()])
             marked_smiles[sml.sml] = cnt_exp
             marked_atom_ids += [y for x in matom_ids for y in x]
-            if all(x.HasProp(self.TYPE_ID) for x in self.mol.GetAtoms()):
+            if all(x.HasProp(TYPE_ID) for x in self.mol.GetAtoms()):
                 break
         log_debug(
             f"{len(marked_atom_ids)} out of {self.mol.GetNumAtoms()} atoms marked"
@@ -229,7 +206,7 @@ class Typer:
         res_atom = collections.defaultdict(list)
         for atom in self.mol.GetAtoms():
             try:
-                res_num = atom.GetIntProp(self.RES_NUM)
+                res_num = atom.GetIntProp(RES_NUM)
             except KeyError:
                 raise KeyError(
                     f'Typing missed for {atom.GetSymbol()} atom {atom.GetIdx()}'
@@ -237,7 +214,7 @@ class Typer:
             res_atom[res_num].append(atom.GetIdx())
         cbonds = [
             x for x in self.mol.GetBonds() if x.GetBeginAtom().GetIntProp(
-                self.RES_NUM) != x.GetEndAtom().GetIntProp(self.RES_NUM)
+                RES_NUM) != x.GetEndAtom().GetIntProp(RES_NUM)
         ]
         emol = Chem.EditableMol(Chem.Mol(self.mol))
         [
@@ -246,7 +223,7 @@ class Typer:
         ]
         frags = Chem.GetMolFrags(emol.GetMol())
         [
-            self.mol.GetAtomWithIdx(y).SetIntProp(self.RES_NUM, i)
+            self.mol.GetAtomWithIdx(y).SetIntProp(RES_NUM, i)
             for i, x in enumerate(frags, 1) for y in x
         ]
         log_debug(f"{len(frags)} residues reassigned.")
@@ -309,7 +286,7 @@ class Typer:
                 continue
             atom = self.mol.GetAtomWithIdx(atom_id)
             try:
-                atom.GetIntProp(self.TYPE_ID)
+                atom.GetIntProp(TYPE_ID)
             except KeyError:
                 self.markAtom(atom, type_id, res_num)
                 marked.append(atom_id)
@@ -338,15 +315,15 @@ class Typer:
         """
 
         # TYPE_ID defines vdw and charge
-        atom.SetIntProp(self.TYPE_ID, type_id)
-        atom.SetIntProp(self.RES_NUM, res_num)
+        atom.SetIntProp(TYPE_ID, type_id)
+        atom.SetIntProp(RES_NUM, res_num)
         # BOND_AID defines bonding parameters
-        atom.SetIntProp(self.BOND_AID, self.BOND_ATOM[type_id])
-        atom.SetIntProp(self.ANGLE_ATM_ID, self.ANGLE_ATOM[type_id])
-        atom.SetIntProp(self.DIHE_ATM_ID, self.DIHE_ATOM[type_id])
+        atom.SetIntProp(BOND_AID, BOND_ATOM[type_id])
+        atom.SetIntProp(ANGLE_ATM_ID, ANGLE_ATOM[type_id])
+        atom.SetIntProp(DIHE_ATM_ID, DIHE_ATOM[type_id])
 
 
-class Parser(Typer):
+class Parser:
     """
     Parse force field file and map atomic details.
     """
@@ -370,18 +347,12 @@ class Parser(Typer):
         UREY_MK, IMPROPER_MK, TORSIONAL_MK, ATOMIC_MK, BIOPOLYMER_MK
     ]
 
-    IMPLICIT_H = IMPLICIT_H
-    TYPE_ID = TYPE_ID
-
-    def __init__(self, filepath=None, wmodel=symbols.TIP3P):
+    def __init__(self, wmodel=symbols.TIP3P):
         """
         :param filepath str: the path to the force field file.
         :param wmodel str: the model type for water
         """
-        super().__init__(wmodel=wmodel)
-        self.filepath = filepath
-        if self.filepath is None:
-            self.filepath = self.FILE_PATH
+        self.wmodel = wmodel
         self.raw_content = {}
         self.atoms = {}
         self.vdws = {}
@@ -392,6 +363,16 @@ class Parser(Typer):
         self.dihedrals = {}
         self.charges = {}
         self.symbol_impropers = None
+        self.bnd_map = None
+        self.ang_map = None
+
+    def type(self, mol):
+        """
+        Type the molecule based on the force field typer.
+
+        :param mol 'rdkit.Chem.rdchem.Mol': the molecule to type.
+        """
+        Typer(mol, wmodel=self.wmodel).run()
 
     def read(self):
         """
@@ -412,7 +393,7 @@ class Parser(Typer):
         Read and set raw content.
         """
 
-        with open(self.filepath, 'r') as fp:
+        with open(self.FILE_PATH, 'r') as fp:
             lns = [x.strip(' \n') for x in fp.readlines()]
         mls = {m: i for i, l in enumerate(lns) for m in self.MARKERS if m in l}
         for bmarker, emarker in zip(self.MARKERS[:-1], self.MARKERS[1:]):
@@ -571,11 +552,11 @@ class Parser(Typer):
         """
         # BOND_AID defines bonding parameters marked during atom typing
         bonded_atoms = sorted(bonded_atoms,
-                              key=lambda x: x.GetIntProp(self.BOND_AID))
+                              key=lambda x: x.GetIntProp(BOND_AID))
 
-        atypes = sorted([x.GetIntProp(self.BOND_AID) for x in bonded_atoms])
+        atypes = sorted([x.GetIntProp(BOND_AID) for x in bonded_atoms])
         try:
-            atypes = Typer.BOND_ATOMS[tuple(atypes)]
+            atypes = BOND_ATOMS[tuple(atypes)]
         except KeyError:
             # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
             pass
@@ -608,7 +589,7 @@ class Parser(Typer):
                 atom_id = bond.id1
             atom = [
                 x for x in bonded_atoms
-                if x.GetIntProp(self.BOND_AID) not in [bond.id1, bond.id2]
+                if x.GetIntProp(BOND_AID) not in [bond.id1, bond.id2]
             ][0]
             ssymbol = self.atoms[atom_id].symbol == atom.GetSymbol()
             scnnt = self.atoms[atom_id].conn == self.getAtomConnt(atom)
@@ -623,8 +604,8 @@ class Parser(Typer):
         self.debugPrintReplacement(bonded_atoms, matches)
         return matches
 
-    @classmethod
-    def getAtomConnt(cls, atom):
+    @staticmethod
+    def getAtomConnt(atom):
         """
         Get the atomic connectivity information.
 
@@ -633,8 +614,8 @@ class Parser(Typer):
             implicit hydrogen.
         """
 
-        implicit_h_num = atom.GetIntProp(cls.IMPLICIT_H) if atom.HasProp(
-            cls.IMPLICIT_H) else atom.GetNumImplicitHs()
+        implicit_h_num = atom.GetIntProp(IMPLICIT_H) if atom.HasProp(
+            IMPLICIT_H) else atom.GetNumImplicitHs()
         return atom.GetDegree() + implicit_h_num
 
     def debugPrintReplacement(self, atoms, matches):
@@ -654,7 +635,7 @@ class Parser(Typer):
         # C4~C4 84~88 replaced by C4.0~C4.0 86~88
         log_debug(
             f"{'~'.join(smbl_cnnts)} "
-            f"{'~'.join(map(str, [x.GetIntProp(self.TYPE_ID) for x in atoms]))} "
+            f"{'~'.join(map(str, [x.GetIntProp(TYPE_ID) for x in atoms]))} "
             f"replaced by {'~'.join(map(str, nsmbl_cnnts))} {'~'.join(map(str, ids))}"
         )
 
@@ -669,7 +650,7 @@ class Parser(Typer):
         neighbors = atom.GetNeighbors()
         if len(neighbors) < 2:
             return []
-        neighbors = sorted(neighbors, key=lambda x: x.GetIntProp(self.TYPE_ID))
+        neighbors = sorted(neighbors, key=lambda x: x.GetIntProp(TYPE_ID))
         return [[x, atom, y] for x, y in itertools.combinations(neighbors, 2)]
 
     def getMatchedAngles(self, atoms):
@@ -680,13 +661,13 @@ class Parser(Typer):
         :return list of 'oplsua.ANGLE': the matched parameters.
         """
 
-        end_ids = [x.GetIntProp(self.ANGLE_ATM_ID) for x in atoms[::2]]
+        end_ids = [x.GetIntProp(ANGLE_ATM_ID) for x in atoms[::2]]
         if end_ids[0] > end_ids[1]:
             atoms = list(reversed(atoms))
 
-        tids = tuple([x.GetIntProp(self.ANGLE_ATM_ID) for x in atoms])
+        tids = tuple([x.GetIntProp(ANGLE_ATM_ID) for x in atoms])
         try:
-            tids = self.ANGLE_ATOMS[tids]
+            tids = ANGLE_ATOMS[tids]
         except KeyError:
             # C-OH (Tyr) is used as HO-C=O, needing CH2-COOH map as alpha-COOH bond
             pass
@@ -755,7 +736,7 @@ class Parser(Typer):
         :return list of 'oplsua.DIHEDRAL': the matched parameters.
         """
 
-        tids = [x.GetIntProp(self.DIHE_ATM_ID) for x in atoms]
+        tids = [x.GetIntProp(DIHE_ATM_ID) for x in atoms]
         if tids[1] > tids[2]:
             # Flip the direction due to middle torsion atom id order
             tids = tids[::-1]
@@ -766,7 +747,7 @@ class Parser(Typer):
         dihes = self.dihe_map[:, tids[1], tids[2], :]
         partial_matches = [self.dihedrals[x] for x in dihes[dihes != 0]]
         if not partial_matches:
-            rpm_ids = self.DIHE_ATOMS[tuple(tids[1:3])]
+            rpm_ids = DIHE_ATOMS[tuple(tids[1:3])]
             dihes = self.dihe_map[:, rpm_ids[0], rpm_ids[1], :]
             partial_matches = [self.dihedrals[x] for x in dihes[dihes != 0]]
         if not partial_matches:
@@ -785,7 +766,7 @@ class Parser(Typer):
         :parm mol: rdkit.Chem.rdchem.Mol one rdkit molecule.
         :return float: the total weight.
         """
-        atypes = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
+        atypes = [x.GetIntProp(TYPE_ID) for x in mol.GetAtoms()]
         return round(sum(self.atoms[x].mass for x in atypes), 4)
 
     @property

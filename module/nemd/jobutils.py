@@ -7,6 +7,7 @@ This module adds jobcontrol related command line flags and job utilities.
 """
 import json
 from signac import job
+
 from nemd import environutils
 
 RUN_NEMD = 'run_nemd'

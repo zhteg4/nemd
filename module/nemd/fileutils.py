@@ -10,6 +10,7 @@ from collections import namedtuple
 from matplotlib import pyplot as plt
 
 from nemd import units
+from nemd import symbols
 from nemd import logutils
 from nemd import environutils
 
@@ -22,7 +23,7 @@ REX_AREA = r'The cross sectional area is (?P<name>\d*\.?\d*) Angstroms\^2\n'
 NEMD_SRC = 'NEMD_SRC'
 MODULE = 'module'
 OPLSAA = 'oplsaa'
-OPLSUA = 'oplsua'
+OPLSUA = symbols.OPLSUA
 RRM_EXT = '.prm'
 FF = 'ff'
 LOG = '.log'

@@ -308,21 +308,7 @@ class Mol(structure.Mol):
         """
         Set monomer mol based on the input smiles.
         """
-        cru_mol = Chem.MolFromSmiles(self.cru)
-        for atom in cru_mol.GetAtoms():
-            if atom.GetSymbol() != symbols.CARBON or atom.GetIsAromatic():
-                continue
-            atom.SetIntProp(self.IMPLICIT_H, atom.GetNumImplicitHs())
-            atom.SetNoImplicit(True)
-        # FIXME: support different chiralties for monomers
-        chiralty_info = Chem.FindMolChiralCenters(cru_mol,
-                                                  includeUnassigned=True)
-        for chiralty in chiralty_info:
-            # CIP stereochemistry assignment for the molecule’s atoms (R/S)
-            # and double bonds (Z/E)
-            cru_mol.GetAtomWithIdx(chiralty[0]).SetProp('_CIPCode', 'R')
-
-        self.cru_mol = Chem.AddHs(cru_mol)
+        self.cru_mol = structure.Mol.MolFromSmiles(self.cru)
 
     def markMonomer(self):
         """
@@ -349,7 +335,6 @@ class Mol(structure.Mol):
         """
         Polymerize from the monomer mol.
         """
-
         if not self.cru_mol.GetBoolProp(self.IS_MONO):
             super().__init__(self.cru_mol)
             return
@@ -387,7 +372,7 @@ class Mol(structure.Mol):
         polym = edcombo.GetMol()
         # Delete capping atoms
         orgin_atom_num = None
-        while (orgin_atom_num != polym.GetNumAtoms()):
+        while orgin_atom_num != polym.GetNumAtoms():
             orgin_atom_num = polym.GetNumAtoms()
             polym = Chem.DeleteSubstructs(
                 polym, Chem.MolFromSmiles(symbols.WILD_CARD))

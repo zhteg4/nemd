@@ -166,14 +166,32 @@ class Mol(rdkit.Chem.rdchem.Mol):
         self.setUp(super().GetConformers())
 
     @classmethod
-    def MolFromSmiles(cls, smiles):
+    def MolFromSmiles(cls, smiles, united=True, **kwargs):
         """
         Create a molecule from SMILES.
 
         :param smiles str: the SMILES string.
         :return `Mol`: the molecule instance.
         """
-        return cls(rdkit.Chem.MolFromSmiles(smiles))
+        mol = rdkit.Chem.MolFromSmiles(smiles)
+        if not united:
+            return cls(mol, **kwargs)
+
+        # Add Hs to the non-aromatic non-carbon atoms (e.g. O, N, S)
+        for atom in mol.GetAtoms():
+            if atom.GetSymbol() != symbols.CARBON or atom.GetIsAromatic():
+                continue
+            atom.SetIntProp(symbols.IMPLICIT_H, atom.GetNumImplicitHs())
+            atom.SetNoImplicit(True)
+        # FIXME: support different chiralties for monomers
+        chiralty_info = rdkit.Chem.FindMolChiralCenters(mol,
+                                                        includeUnassigned=True)
+        for chiralty in chiralty_info:
+            # CIP stereochemistry assignment for the molecule’s atoms (R/S)
+            # and double bonds (Z/E)
+            mol.GetAtomWithIdx(chiralty[0]).SetProp('_CIPCode', 'R')
+
+        return cls(rdkit.Chem.AddHs(mol), **kwargs)
 
     @property
     def molecular_weight(self):

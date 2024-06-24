@@ -1,6 +1,7 @@
 import re
 import os
 import pytest
+import numpy as np
 from rdkit import Chem
 
 from nemd import oplsua
@@ -30,6 +31,22 @@ class TestConformer:
 
     def testImpropers(self, conf):
         assert conf.impropers.shape == (1, 5)
+
+
+class TestMol:
+
+    @pytest.fixture
+    def mol(self):
+        return lammpsdata.Mol.MolFromSmiles('[H]OC(=O)CC', delay=True)
+
+    def testAtoms(self, mol):
+        mol.typeAtoms()
+        assert len([x.GetIntProp('type_id') for x in mol.GetAtoms()]) == 6
+
+    def testBalanceCharge(self, mol):
+        mol.typeAtoms()
+        mol.balanceCharge()
+        np.testing.assert_almost_equal(mol.nbr_charge[3], 0.08, 5)
 
 
 # class TestDataOne:

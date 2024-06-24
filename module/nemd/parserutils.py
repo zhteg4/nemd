@@ -4,7 +4,6 @@ import argparse
 import collections
 import numpy as np
 from rdkit import Chem
-from nemd import oplsua
 from nemd import symbols
 from nemd import lammpsin
 from nemd import lammpsfix
@@ -21,6 +20,19 @@ FLAG_DEBUG = jobutils.FLAG_DEBUG
 FLAG_PYTHON = jobutils.FLAG_PYTHON
 FLAG_CPU = jobutils.FLAG_CPU
 FLAG_PRJ_PATH = jobutils.FLAG_PRJ_PATH
+
+FLAG_TIMESTEP = '-timestep'
+FLAG_STEMP = '-stemp'
+FLAG_TEMP = '-temp'
+FLAG_TDAMP = '-tdamp'
+FLAG_PRESS = '-press'
+FLAG_PDAMP = '-pdamp'
+FLAG_LJ_CUT = '-lj_cut'
+FLAG_COUL_CUT = '-coul_cut'
+FLAG_RELAX_TIME = '-relax_time'
+FLAG_PROD_TIME = '-prod_time'
+FLAG_PROD_ENS = '-prod_ens'
+FlAG_FORCE_FIELD = '-force_field'
 
 
 class ArgumentDefaultsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
@@ -166,7 +178,7 @@ def type_monomer_smiles(arg, allow_mol=False, canonize=True):
 FF_MODEL = collections.namedtuple('FF_MODEL', ['ff', 'model'])
 
 
-def type_force_field(arg, ff_model=oplsua.Typer.FF_MODEL):
+def type_force_field(arg, ff_model=symbols.FF_MODEL):
     args = arg.split(',')
     ff_type = args[0]
     if ff_type not in ff_model:
@@ -198,76 +210,76 @@ def type_slice(arg):
 
 
 def add_md_arguments(parser):
-    parser.add_argument(oplsua.FLAG_TIMESTEP,
+    parser.add_argument(FLAG_TIMESTEP,
                         metavar='fs',
                         type=type_positive_float,
                         default=1,
                         help=f'Timestep for the MD simulation.')
     parser.add_argument(
-        oplsua.FLAG_STEMP,
+        FLAG_STEMP,
         metavar='K',
         type=type_positive_float,
         default=10,
         # 'Initialize the atoms with this temperature.'
         help=argparse.SUPPRESS)
-    parser.add_argument(oplsua.FLAG_TEMP,
-                        metavar=oplsua.FLAG_TEMP[1:].upper(),
+    parser.add_argument(FLAG_TEMP,
+                        metavar=FLAG_TEMP[1:].upper(),
                         type=type_positive_float,
                         default=300,
                         help=f'The equilibrium temperature target .')
     parser.add_argument(
-        oplsua.FLAG_TDAMP,
-        metavar=oplsua.FLAG_TDAMP[1:].upper(),
+        FLAG_TDAMP,
+        metavar=FLAG_TDAMP[1:].upper(),
         type=type_positive_float,
         default=100,
         # Temperature damping parameter (x timestep to get the param)
         help=argparse.SUPPRESS)
-    parser.add_argument(oplsua.FLAG_PRESS,
+    parser.add_argument(FLAG_PRESS,
                         metavar='at',
                         type=float,
                         default=1,
                         help="The equilibrium pressure target.")
     parser.add_argument(
-        oplsua.FLAG_PDAMP,
-        metavar=oplsua.FLAG_PDAMP[1:].upper(),
+        FLAG_PDAMP,
+        metavar=FLAG_PDAMP[1:].upper(),
         type=type_positive_float,
         default=1000,
         # Pressure damping parameter (x timestep to get the param)
         help=argparse.SUPPRESS)
     parser.add_argument(
-        oplsua.FLAG_LJ_CUT,
-        metavar=oplsua.FLAG_LJ_CUT[1:].upper(),
+        FLAG_LJ_CUT,
+        metavar=FLAG_LJ_CUT[1:].upper(),
         type=type_positive_float,
         default=lammpsin.In.DEFAULT_LJ_CUT,
         # Cut off for the lennard jones
         help=argparse.SUPPRESS)
     parser.add_argument(
-        oplsua.FLAG_COUL_CUT,
-        metavar=oplsua.FLAG_COUL_CUT[1:].upper(),
+        FLAG_COUL_CUT,
+        metavar=FLAG_COUL_CUT[1:].upper(),
         type=type_positive_float,
         default=lammpsin.In.DEFAULT_COUL_CUT,
         # Cut off for the coulombic interaction
         help=argparse.SUPPRESS)
-    parser.add_argument(oplsua.FLAG_RELAX_TIME,
+    parser.add_argument(FLAG_RELAX_TIME,
                         metavar='ns',
                         type=type_positive_float,
                         default=1,
                         help='Relaxation simulation time.')
-    parser.add_argument(oplsua.FLAG_PROD_TIME,
+    parser.add_argument(FLAG_PROD_TIME,
                         metavar='ns',
                         type=type_positive_float,
                         default=1,
                         help='Production simulation time.')
-    parser.add_argument(oplsua.FLAG_PROD_ENS,
-                        metavar=oplsua.FLAG_PROD_ENS[1:].upper(),
+    parser.add_argument(FLAG_PROD_ENS,
+                        metavar=FLAG_PROD_ENS[1:].upper(),
                         choices=lammpsfix.ENSEMBLES,
                         default=lammpsfix.NVE,
                         help='Production ensemble.')
     parser.add_argument(
-        oplsua.FlAG_FORCE_FIELD,
-        metavar=oplsua.FlAG_FORCE_FIELD[1:].upper(),
+        FlAG_FORCE_FIELD,
+        metavar=FlAG_FORCE_FIELD[1:].upper(),
         type=type_force_field,
-        default=oplsua.Typer.OPLSUA_TIP3P,
+        default=symbols.OPLSUA_TIP3P,
         help='The force field type (and water model separated with comma).')
 
 
