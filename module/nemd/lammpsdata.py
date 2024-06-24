@@ -487,12 +487,12 @@ class Base(lammpsin.In):
         IMPROPERS_CAP
     ]
     MIN_DIST = 1.4
+    SCALE = 0.45
 
 
 class Struct(structure.Struct, Base):
 
     MolClass = Mol
-    SCALE = 0.45
 
     def __init__(self, struct=None, ff=None, options=None, **kwargs):
         """
@@ -893,7 +893,7 @@ class Struct(structure.Struct, Base):
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
-    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=SCALE):
+    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=Base.SCALE):
         """
         Set the vdw radius based on the mixing rule and vdw radii.
 
@@ -918,28 +918,6 @@ class Struct(structure.Struct, Base):
             id_map = {int(x): self.atm_types[int(y)] for x, y in imap.items()}
             self.radii = Radius(radii, id_map=id_map)
             return
-
-        radii = collections.defaultdict(dict)
-        for id1, vdw1 in self.vdws.items():
-            for id2, vdw2 in self.vdws.items():
-                if mix == self.GEOMETRIC:
-                    dist = pow(vdw1.dist * vdw2.dist, 0.5)
-                elif mix == self.ARITHMETIC:
-                    dist = (vdw1.dist + vdw2.dist) / 2
-                elif mix == self.SIXTHPOWER:
-                    dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
-                    dist = pow(dist, 1 / 6)
-                dist *= pow(2, 1 / 6) * scale
-                if dist < self.MIN_DIST:
-                    dist = self.MIN_DIST
-                radii[id1][id2] = round(dist, 4)
-
-        self.radii = collections.defaultdict(dict)
-        for atom1 in self.atoms.values():
-            for atom2 in self.atoms.values():
-                self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
-                    atom2.type_id]
-        self.radii = dict(self.radii)
 
     @property
     def bond_total(self):
@@ -1005,8 +983,6 @@ class DataFileReader(Base):
     LAMMPS Data file reader
     """
 
-    SCALE = 0.45
-
     def __init__(self, data_file=None, contents=None):
         """
         :param data_file str: data file with path
@@ -1041,18 +1017,6 @@ class DataFileReader(Base):
         self.setDihedrals()
         self.setImpropers()
         self.setMols()
-
-    @property
-    def molecular_weight(self):
-        """
-        The total molecular weight over all atoms.
-
-        :return float: the total weight.
-        """
-        type_ids = [x.type_id for x in self.atom]
-        return round(sum(self.masses[x].mass for x in type_ids), 4)
-
-    mw = molecular_weight
 
     def read(self):
         """
@@ -1297,7 +1261,7 @@ class DataFileReader(Base):
                 id3=int(id3),
                 id4=int(id4))
 
-    def setClashParams(self, include14=False, scale=SCALE):
+    def setClashParams(self, include14=False, scale=Base.SCALE):
         """
         Set clash check related parameters including pair radii and exclusion.
 
@@ -1330,7 +1294,7 @@ class DataFileReader(Base):
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
-    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=1.):
+    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=Base.SCALE):
         """
         Set the vdw radius based on the mixing rule and vdw radii.
 

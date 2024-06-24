@@ -110,7 +110,8 @@ class Frame(pd.DataFrame):
                  index=None,
                  columns=XYZU,
                  step=None,
-                 dtype=float):
+                 dtype=None,
+                 **kwargs):
         """
         :param xyz nx3 'numpy.ndarray' or 'DataFrame': xyz data
         :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
@@ -121,15 +122,25 @@ class Frame(pd.DataFrame):
         """
         if box is None and isinstance(xyz, Frame):
             box = xyz.attrs[self.BOX]
-        if index is None and not isinstance(xyz, Frame):
+        if index is None and not isinstance(xyz, pd.DataFrame):
             index = range(1, xyz.shape[0] + 1)
         if isinstance(xyz, pd.DataFrame) and (xyz.columns != columns).any():
             columns = {x: y for x, y in zip(xyz.columns, columns)}
             xyz = xyz.rename(columns=columns)
-        super().__init__(data=xyz, index=index, columns=columns, dtype=dtype)
+        if dtype is None and isinstance(xyz, np.ndarray):
+            dtype = float if xyz is None else xyz.dtype
+        super().__init__(data=xyz,
+                         index=index,
+                         columns=columns,
+                         dtype=dtype,
+                         **kwargs)
         self.setBox(box)
         self.setStep(step)
         self.attrs[self.ID_MAP] = None
+
+    @property
+    def _constructor(self):
+        return Frame
 
     @classmethod
     def read(cls, filename=None, contents=None, start=0):
@@ -365,6 +376,7 @@ class Frame(pd.DataFrame):
 
         if span is None:
             span = np.array(list(self.attrs[self.SPAN].values()))
+
         return np.array(self.remainderIEEE(dists, span))
 
     @staticmethod
@@ -398,13 +410,12 @@ class Frame(pd.DataFrame):
         if cut:
             dcell = DistanceCell(self, gids=ids, cut=cut, res=res)
             dcell.setUp()
+        dists = []
         span = np.array(list(self.attrs[self.SPAN].values()))
-        sel, dists = self.loc[ids], []
-        for idx, (id, row) in enumerate(zip(sel.index, sel.values)):
+        for idx, (id, row) in enumerate(self.loc[ids].ivals()):
             oids = [x for x in dcell.getNeighbors(row)
                     if x > id] if cut else ids[idx + 1:]
-            dist = self.getDists(oids, row, span=span)
-            dists.append(dist)
+            dists.append(self.getDists(oids, row, span=span))
         return np.concatenate(dists)
 
     @property
@@ -456,6 +467,14 @@ class Frame(pd.DataFrame):
         :return 'numpy.ndarray': the xyz values
         """
         return self.values[self.id_map[gids], :]
+
+    def ivals(self):
+        """
+        Fast access to the row indexes and values of the frame.
+
+        :return iterator of (int, numpy.ndarray): the index and xyz values
+        """
+        return zip(self.index, self.values)
 
     def glue(self, dreader=None):
         """

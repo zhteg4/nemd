@@ -175,9 +175,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
         :return `Mol`: the molecule instance.
         """
 
-        mol = rdkit.Chem.RemoveHs(rdkit.Chem.MolFromSmiles(smiles))
-        mol = rdkit.Chem.MolFromSmiles(rdkit.Chem.MolToSmiles(mol))
-
+        mol = rdkit.Chem.MolFromSmiles(rdkit.Chem.CanonSmiles(smiles))
         if not united:
             return cls(rdkit.Chem.AddHs(mol), **kwargs)
 

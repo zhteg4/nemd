@@ -413,14 +413,12 @@ class Clash(Base):
         :return list of tuples: each tuple has two atom ids, the distance, and
             clash threshold
         """
-        clashes = []
-        dcell = traj.DistanceCell(frm, gids=self.gids)
+        dcell = traj.DistanceCell(frm,
+                                  gids=self.gids,
+                                  radii=self.df_reader.radii,
+                                  excluded=self.df_reader.excluded)
         dcell.setUp()
-        for _, row in frm.iterrows():
-            clashes += dcell.getClashes(row,
-                                        radii=self.df_reader.radii,
-                                        excluded=self.df_reader.excluded)
-        return clashes
+        return [y for i, v in frm.ivals() for y in dcell.getClashes(v, name=i)]
 
 
 class XYZ(Base):

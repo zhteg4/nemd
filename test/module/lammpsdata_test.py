@@ -88,3 +88,13 @@ class TestMol:
     def testMolecularWeight(self, mol):
         mol.typeAtoms()
         assert mol.mw == 74.079
+
+
+class TestBase:
+
+    @pytest.fixture
+    def base(self):
+        return lammpsdata.Base()
+
+    def testHeader(self, base):
+        assert base.header == ''
