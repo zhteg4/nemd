@@ -6,6 +6,7 @@ import base64
 import itertools
 import collections
 import numpy as np
+import pandas as pd
 from rdkit import Chem
 from scipy import constants
 
@@ -14,6 +15,15 @@ from nemd import symbols
 from nemd import lammpsin
 from nemd import structure
 from nemd import constants as nconstant
+
+ATOM_ID = 'atom_id'
+MOL_ID = 'mol_id'
+TYPE_ID = 'type_id'
+CHARGE = 'charge'
+XU = symbols.XU
+YU = symbols.YU
+ZU = symbols.ZU
+XYZU = symbols.XYZU
 
 
 class Conformer(structure.Conformer):
@@ -31,15 +41,16 @@ class Conformer(structure.Conformer):
         if not self.HasOwningMol():
             return
         mol = self.GetOwningMol()
-        gids = self.id_map[[x.GetIdx() for x in mol.GetAtoms()]].reshape(-1, 1)
-        cids = np.array([self.gid] * mol.GetNumAtoms()).reshape(-1, 1)
-        type_ids = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
-        fchrg = [mol.ff.charges[x] for x in type_ids]
-        nchrg = [mol.nbr_charge[x.GetIdx()] for x in mol.GetAtoms()]
-        charges = np.array([sum(x) for x in zip(fchrg, nchrg)]).reshape(-1, 1)
-        xyz = self.GetPositions()
-        type_ids = np.array(type_ids).reshape(-1, 1)
-        return np.concatenate((gids, cids, type_ids, charges, xyz), axis=1)
+        data = dict(mol_id=np.array([self.gid] * mol.GetNumAtoms()))
+        data[TYPE_ID] = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
+        fchrg = [mol.ff.charges[x] for x in data[TYPE_ID]]
+        aids = [x.GetIdx() for x in mol.GetAtoms()]
+        nchrg = [mol.nbr_charge[x] for x in aids]
+        data[CHARGE] = np.array([sum(x) for x in zip(fchrg, nchrg)])
+        for dim, vals in zip(symbols.XYZU, self.GetPositions().transpose()):
+            data[dim] = vals
+        index = pd.Index(self.id_map[aids], name=ATOM_ID)
+        return pd.DataFrame(data, index=index)
 
     @property
     def bonds(self):
@@ -766,7 +777,7 @@ class Struct(structure.Struct, Base):
             self.hdl.write(f"{id} {impr.ene} {sign} {impr.n_parm}\n")
         self.hdl.write("\n")
 
-    def writeAtoms(self, fmt='%i %i %i %.4f %.3f %.3f %.3f'):
+    def writeAtoms(self, float_format='%.3f'):
         """
         Write atom coefficients.
 
@@ -774,16 +785,15 @@ class Struct(structure.Struct, Base):
         """
 
         self.hdl.write(f"{self.ATOMS.capitalize()}\n\n")
-        for conf in self.conformers:
-            data = conf.atoms
-            data[:, 2] = self.atm_types[data[:, 2].astype(int)]
-            np.savetxt(self.hdl, data, fmt=fmt)
-            self.total_charge += data[:, 3].sum()
-            # Atom ids in starts from atom ids in previous template molecules
+        self.atoms.to_csv(self.hdl,
+                          sep=' ',
+                          header=False,
+                          float_format=float_format,
+                          mode='a')
         self.hdl.write(f"\n")
-        if not round(self.total_charge, 4):
+        if not round(self.atoms[CHARGE].sum(), 4):
             return
-        msg = f'The system has a net charge of {self.total_charge:.4f}'
+        msg = f'The system has a net charge of {self.atoms[CHARGE].sum():.4f}'
         self.warnings.append(msg)
 
     def writeBonds(self, fmt='%i %i %i %i'):
@@ -795,7 +805,7 @@ class Struct(structure.Struct, Base):
         if not self.bond_total:
             return
         self.hdl.write(f"{self.BONDS.capitalize()}\n\n")
-        bonds = [x.bonds for x in self.conformers if x.bonds.any()]
+        bonds = [x.bonds for x in self.conformer if x.bonds.any()]
         bonds = np.concatenate(bonds, axis=0)
         bonds[:, 0] = self.bnd_types[bonds[:, 0]]
         ids = np.arange(bonds.shape[0]).reshape(-1, 1) + 1
@@ -810,7 +820,7 @@ class Struct(structure.Struct, Base):
             return
         self.hdl.write(f"{self.ANGLES.capitalize()}\n\n")
         # Some angles may be filtered out by improper
-        angles = [x.angles for x in self.conformers if x.angles.any()]
+        angles = [x.angles for x in self.conformer if x.angles.any()]
         angles = np.concatenate(angles, axis=0)
         angles[:, 0] = self.ang_types[angles[:, 0]]
         ids = np.arange(angles.shape[0]).reshape(-1, 1) + 1
@@ -825,7 +835,7 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.DIHEDRALS.capitalize()}\n\n")
-        dihes = [x.dihedrals for x in self.conformers if x.dihedrals.any()]
+        dihes = [x.dihedrals for x in self.conformer if x.dihedrals.any()]
         dihes = np.concatenate(dihes, axis=0)
         dihes[:, 0] = self.dihe_types[dihes[:, 0]]
         ids = np.arange(dihes.shape[0]).reshape(-1, 1) + 1
@@ -840,7 +850,7 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.IMPROPERS.capitalize()}\n\n")
-        imprps = [x.impropers for x in self.conformers if x.impropers.any()]
+        imprps = [x.impropers for x in self.conformer if x.impropers.any()]
         imprps = np.concatenate(imprps, axis=0)
         imprps[:, 0] = self.impr_types[imprps[:, 0]]
         ids = np.arange(imprps.shape[0]).reshape(-1, 1) + 1
@@ -914,8 +924,7 @@ class Struct(structure.Struct, Base):
             radii = np.sqrt(radii)
             radii *= pow(2, 1 / 6) * scale
             radii[radii < self.MIN_DIST] = self.MIN_DIST
-            imap = {y[0]: y[2] for x in self.conformers for y in x.atoms}
-            id_map = {int(x): self.atm_types[int(y)] for x, y in imap.items()}
+            id_map = {x: y for x, y in self.atoms[TYPE_ID].items()}
             self.radii = Radius(radii, id_map=id_map)
             return
 
@@ -961,10 +970,7 @@ class Struct(structure.Struct, Base):
         """
         Whether any atom has charge.
         """
-        charges = [
-            self.ff.charges[x.GetIntProp(self.TYPE_ID)] for x in self.atoms
-        ]
-        return any(charges)
+        return np.isclose(self.atoms[CHARGE], 0, 0.001).any()
 
     @property
     def molecular_weight(self):
@@ -976,6 +982,13 @@ class Struct(structure.Struct, Base):
         return sum([x.mw * x.GetNumConformers() for x in self.molecules])
 
     mw = molecular_weight
+
+    @property
+    def atoms(self):
+        data = pd.concat(x.atoms for x in self.conformer)
+        if self.atm_types is not None:
+            data[TYPE_ID] = self.atm_types[data[TYPE_ID]]
+        return data
 
 
 class DataFileReader(Base):

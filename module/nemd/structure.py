@@ -266,39 +266,36 @@ class Struct:
         """
         pass
 
-    def getIds(self, cid=1, gid=1):
+    def getIds(self):
         """
         Get the global ids to start with.
 
-        :param cid int: the conformer gid to start with.
-        :param gid int: the starting global id.
         :retrun int, int: the conformer gid, the global atom id.
         """
-        if self.conformers:
-            cid = max([x.gid for x in self.conformers]) + 1
-            gid = max([x.id_map.max() for x in self.conformers]) + 1
+        cid = max([x.gid for x in self.conformer] or [0]) + 1
+        gid = max([x.id_map.max() for x in self.conformer] or [0]) + 1
         return cid, gid
 
     @property
-    def conformers(self):
+    def conformer(self):
         """
-        Return all conformers of all molecules.
+        Return generator of all conformers from all molecules.
 
-        :return list of `Conformer`: the conformers of all molecules.
+        :return generator of `Conformer`: the conformers of all molecules.
         """
-        return [x for y in self.molecules for x in y.GetConformers()]
+        return (x for y in self.molecules for x in y.GetConformers())
 
     @property
-    def atoms(self):
+    def atom(self):
         """
-        Return atoms of molecules.
+        Return generator of allatoms from molecules.
 
-        Note: the len() of these atoms is different atom_total as atom_toal
+        Note: the number of these atoms is different atom_total as atom_toal
         includes atoms from all conformers.
 
-        :return list of Chem.rdchem.Atom: the atoms from all molecules.
+        :return generator of Chem.rdchem.Atom: the atoms from all molecules.
         """
-        return [y for x in self.molecules for y in x.GetAtoms()]
+        return (y for x in self.molecules for y in x.GetAtoms())
 
     @property
     def atom_total(self):
@@ -317,7 +314,7 @@ class Struct:
         """
         return pd.concat([
             pd.DataFrame(x.GetPositions(), index=x.gids, columns=symbols.XYZU)
-            for x in self.conformers
+            for x in self.conformer
         ])
 
     @property

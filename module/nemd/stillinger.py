@@ -66,7 +66,7 @@ class Struct(xtal.Struct):
             self.writeAtoms()
 
     def setElements(self):
-        elements = [x.GetAtomicNum() for x in self.atoms]
+        elements = [x.GetAtomicNum() for x in self.atom]
         self.elements = list(set(elements))
 
     def writeDescription(self):
@@ -105,7 +105,7 @@ class Struct(xtal.Struct):
         Write out mass information.
         """
         self.data_fh.write(f"{self.MASSES}\n\n")
-        masses = list(set([x.GetMass() for x in self.atoms]))
+        masses = list(set([x.GetMass() for x in self.atom]))
         for id, mass in enumerate(masses, 1):
             self.data_fh.write(f"{id} {mass}\n")
         self.data_fh.write(f"\n")

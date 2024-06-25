@@ -761,10 +761,10 @@ class PackedStruct(Struct):
         :raise DensityError: if the max number of trials at this density is
             reached or the chance of achieving the goal is too low.
         """
-        trial_id, conf_num, finished, nth = 1, len(self.conformers), [], -1
+        trial_id, conf_num, finished, nth = 1, self.conformer_total, [], -1
         for trial_id in range(1, max_trial + 1):
             self.reset()
-            for conf_id, conf in enumerate(self.conformers):
+            for conf_id, conf in enumerate(self.conformer):
                 try:
                     conf.setConformer()
                 except ConfError:
@@ -798,7 +798,7 @@ class PackedStruct(Struct):
         """
         Reset the state so that a new attempt can happen.
         """
-        for conf in self.conformers:
+        for conf in self.conformer:
             conf.reset()
         self.dcell.reset()
 
@@ -828,40 +828,40 @@ class GrownStruct(PackedStruct):
         Set distance cell parameters.
         """
         super().setUpDcell()
-        self.dcell.setGraph(len(self.conformers))
-        data = np.full((len(self.conformers), 3), np.inf)
-        index = [x.gid for x in self.conformers]
+        self.dcell.setGraph(self.conformer_total)
+        data = np.full((self.conformer_total, 3), np.inf)
+        index = [x.gid for x in self.conformer]
         self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
 
     def fragmentize(self):
         """
         Break the molecule into the smallest rigid fragments.
         """
-        if all([x.ifrag for x in self.conformers]):
+        if all([x.ifrag for x in self.conformer]):
             return
 
-        for conf in self.conformers:
+        for conf in self.conformer:
             conf.fragmentize()
-        total_frag_num = sum([x.getNumFrags() for x in self.conformers])
+        total_frag_num = sum([x.getNumFrags() for x in self.conformer])
         log_debug(f"{total_frag_num} fragments in total.")
 
     def placeInitFrags(self):
         """
         Place the initiators into cell.
         """
-        log_debug(f'Placing {len(self.conformers)} initiators...')
+        log_debug(f'Placing {self.conformer_total} initiators...')
 
-        tenth, threshold, = len(self.conformers) / 10., 0
-        for index, conf in enumerate(self.conformers, start=1):
+        tenth, threshold, = self.conformer_total / 10., 0
+        for index, conf in enumerate(self.conformer, start=1):
             conf.placeInitFrag()
             if index >= threshold:
-                new_line = "" if index == len(self.conformers) else ", [!n]"
+                new_line = "" if index == self.conformer_total else ", [!n]"
                 log_debug(
-                    f"{int(index / len(self.conformers) * 100)}%{new_line}")
+                    f"{int(index / self.conformer_total * 100)}%{new_line}")
                 threshold = round(threshold + tenth, 1)
 
-        log_debug(f'{len(self.conformers)} initiators have been placed.')
-        if len(self.conformers) == 1:
+        log_debug(f'{self.conformer_total} initiators have been placed.')
+        if self.conformer_total == 1:
             return
         dist = self.init_tf.pairDists().min()
         log_debug(f'({dist:.2f} as the minimum pair distance)')
@@ -879,7 +879,7 @@ class GrownStruct(PackedStruct):
 
         for _ in range(max_trial):
             self.reset()
-            conformers = self.conformers[:]
+            conformers = list(self.conformer)
             while conformers:
                 conf = conformers.pop(0)
                 try:
@@ -894,8 +894,8 @@ class GrownStruct(PackedStruct):
                     conformers.append(conf)
                     continue
                 # Successfully placed all fragments of one conformer
-                finished_num = len(self.conformers) - len(conformers)
-                failed_num = sum([x.failed_num for x in self.conformers])
+                finished_num = self.conformer_total - len(conformers)
+                failed_num = sum([x.failed_num for x in self.conformer])
                 log_debug(f'{finished_num} finished; {failed_num} failed.')
                 if not conformers:
                     # Successfully placed all conformers.

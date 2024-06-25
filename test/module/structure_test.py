@@ -132,10 +132,10 @@ class TestStruct:
         assert struct.getIds() == (3, 11)
 
     def testConformers(self, struct):
-        assert len(struct.conformers) == 2
+        assert struct.conformer_total == 2
 
     def testAtoms(self, struct):
-        assert len(struct.atoms) == 10
+        assert len([x for x in struct.atom]) == 10
 
     def testAtomTotal(self, struct):
         assert struct.atom_total == 10
