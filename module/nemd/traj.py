@@ -86,6 +86,37 @@ def get_frames(filename=None, contents=None, start=0):
     return Frame.read(filename=filename, contents=contents, start=start)
 
 
+class XYZ(np.ndarray):
+    """
+    Class to get vdw radius from atom id pair.
+    """
+
+    def __new__(cls, input_array, *args, id_map=None, **kwargs):
+        """
+        :param input_array np.ndarray: the radius array with type id as row index
+        :param id_map dict: map atom id to type id
+        """
+        obj = np.asarray(input_array).view(cls)
+        obj.id_map = id_map
+        return obj
+
+    def imap(self, index):
+        if isinstance(index, slice):
+            args = [index.start, index.stop, index.step]
+            return slice(*[x if x is None else self.id_map[x] for x in args])
+        # int, list, or np.ndarray
+        return self.id_map[index]
+
+    def __getitem__(self, index):
+        nindex = tuple(self.imap(x) for x in index)
+        data = super(XYZ, self).__getitem__(nindex)
+        return np.asarray(data)
+
+    def __setitem__(self, index, value):
+        nindex = tuple(self.imap(x) for x in index)
+        super(XYZ, self).__setitem__(nindex, value)
+
+
 class Frame(pd.DataFrame):
     """
     Class to hold coordinate information.
@@ -99,7 +130,7 @@ class Frame(pd.DataFrame):
 
     # https://pandas.pydata.org/docs/development/extending.html
     _internal_names = pd.DataFrame._internal_names + [
-        'box', 'span', 'step', 'id_map'
+        'box', 'span', 'step', 'xyz'
     ]
     _internal_names_set = set(_internal_names)
 
@@ -136,9 +167,9 @@ class Frame(pd.DataFrame):
         self.box = box
         self.step = step
         self.span = None
-        self.id_map = None
+        self.xyz = None
         self.setBox(self.box)
-        self.setIdMap()
+        self.setXYZ()
 
     def setBox(self, box):
         """
@@ -151,17 +182,15 @@ class Frame(pd.DataFrame):
             return
         self.span = np.array([box[i * 2 + 1] - box[i * 2] for i in range(3)])
 
-    def setIdMap(self):
+    def setXYZ(self):
         """
-        The map from atom gid to xyz row id. This is much faster than iterrows
-        or iloc indexing.
+        Coordinate handle faster than iterrows or iloc indexing.
         """
-
         if not self.index.any():
             return
         id = {label: i for i, label in enumerate(self.index)}
         id_map = np.array([id.get(x, -1) for x in range(self.index.max() + 1)])
-        self.id_map = id_map
+        self.xyz = XYZ(self.values, id_map=id_map)
 
     @property
     def _constructor(self):
@@ -305,7 +334,7 @@ class Frame(pd.DataFrame):
         """
         Update the coordinate frame based on the give gids and xyz.
         """
-        self.values[self.id_map[gids], :] = xyz
+        self.xyz[gids, :] = xyz
 
     def getVolume(self):
         """
@@ -344,7 +373,7 @@ class Frame(pd.DataFrame):
         :param xyz (3,) 'pandas.core.series.Series': xyz coordinates and atom id
         :return list of floats: distances
         """
-        dists = self.values[self.id_map[ids], :] - np.array(xyz)
+        dists = self.xyz[ids, :] - np.array(xyz)
 
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
             for id in range(3):
@@ -413,18 +442,10 @@ class Frame(pd.DataFrame):
             return
 
         # The unwrapped xyz can directly perform molecule center operation
-        for mol in dreader.mols.values():
-            center = self.values[self.id_map[mol], :].mean(axis=0)
+        for gids in dreader.mols.values():
+            center = self.xyz[gids, :].mean(axis=0)
             delta = (center % self.span) - center
-            self.values[self.id_map[mol], :] += delta
-
-    def vloc(self, gids):
-        """
-        Fast access to the values of rows by atom global ids.
-
-        :return 'numpy.ndarray': the xyz values
-        """
-        return self.values[self.id_map[gids], :]
+            self.xyz[gids, :] += delta
 
     def ivals(self):
         """
@@ -686,8 +707,8 @@ class DistanceCell(Frame):
 
         :param gids list: global atom ids to be added to the atom cell
         """
-        ids = (self.vloc(gids) / self.grids).round().astype(int) % self.indexes
-        for id, (ix, iy, iz) in zip(gids, ids):
+        ids = (self.xyz[gids, :] / self.grids).round().astype(int)
+        for id, (ix, iy, iz) in zip(gids, ids % self.indexes):
             self.atom_cell[ix, iy, iz][id] = True
 
     def remove(self, gids):
@@ -700,8 +721,8 @@ class DistanceCell(Frame):
 
         :param gids list: global atom ids to be removed from the atom cell
         """
-        ids = (self.vloc(gids) / self.grids).round().astype(int) % self.indexes
-        for id, (ix, iy, iz) in zip(gids, ids):
+        ids = (self.xyz[gids, :] / self.grids).round().astype(int)
+        for id, (ix, iy, iz) in zip(gids, ids % self.indexes):
             self.atom_cell[ix, iy, iz][id] = False
 
     def getNeighbors(self, xyz):

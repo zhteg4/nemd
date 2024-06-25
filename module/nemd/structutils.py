@@ -144,7 +144,7 @@ class PackedConf(GriddedConf):
         """
         aids = self.aids if aids is None else aids
         gids = self.id_map[aids]
-        values = self.mol.struct.dcell.vloc(gids)
+        values = self.mol.struct.dcell.xyz[gids, :]
         for name, xyz in zip(gids, values):
             clashes = self.mol.struct.dcell.getClashes(xyz, name=name)
             if clashes:
@@ -798,7 +798,6 @@ class PackedStruct(Struct):
         """
         Reset the state so that a new attempt can happen.
         """
-        ...
         for conf in self.conformers:
             conf.reset()
         self.dcell.reset()
