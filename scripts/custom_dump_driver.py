@@ -132,12 +132,7 @@ class CustomDump(object):
         """
         if not self.df_reader:
             return
-        if self.options.sel is None:
-            self.gids = [x.id for x in self.df_reader.atom]
-        else:
-            self.gids = [
-                x.id for x in self.df_reader.atom if x.ele in self.options.sel
-            ]
+        self.gids = self.df_reader.gidFromEle(self.options.sel)
         log(f"{len(self.gids)} atoms selected.")
 
     def setFrames(self, start=0):
@@ -283,7 +278,7 @@ def get_parser(parser=None):
                         f'density; {MSD} computes mean squared displacement '
                         f'and diffusion coefficient; {RDF} calculates the '
                         f'radial distribution function. ')
-    parser.add_argument(FlAG_SEL, help=f'Elements for atom selection.')
+    parser.add_argument(FlAG_SEL, help=f'The element of the selected atoms.')
     parser.add_argument(
         FLAG_LAST_PCT,
         metavar=FLAG_LAST_PCT.upper(),

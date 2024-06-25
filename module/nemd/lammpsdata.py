@@ -16,7 +16,7 @@ from nemd import lammpsin
 from nemd import structure
 from nemd import constants as nconstant
 
-ATOM_ID = 'atom_id'
+ID = 'id'
 MOL_ID = 'mol_id'
 TYPE_ID = 'type_id'
 CHARGE = 'charge'
@@ -24,6 +24,7 @@ XU = symbols.XU
 YU = symbols.YU
 ZU = symbols.ZU
 XYZU = symbols.XYZU
+ATOM_COL = [ID, MOL_ID, TYPE_ID, CHARGE, XU, YU, ZU]
 
 
 class Conformer(structure.Conformer):
@@ -49,7 +50,7 @@ class Conformer(structure.Conformer):
         data[CHARGE] = np.array([sum(x) for x in zip(fchrg, nchrg)])
         for dim, vals in zip(symbols.XYZU, self.GetPositions().transpose()):
             data[dim] = vals
-        index = pd.Index(self.id_map[aids], name=ATOM_ID)
+        index = pd.Index(self.id_map[aids], name=ID)
         return pd.DataFrame(data, index=index)
 
     @property
@@ -996,6 +997,9 @@ class DataFileReader(Base):
     """
     LAMMPS Data file reader
     """
+    MASS = 'mass'
+    ELE = 'ele'
+    MASS_COL = [ID, MASS, ELE]
 
     def __init__(self, data_file=None, contents=None):
         """
@@ -1013,7 +1017,6 @@ class DataFileReader(Base):
         self.impropers = {}
         self.vdws = {}
         self.radii = None
-        self.mols = {}
         self.excluded = collections.defaultdict(set)
 
     def run(self):
@@ -1030,7 +1033,6 @@ class DataFileReader(Base):
         self.setAngles()
         self.setDihedrals()
         self.setImpropers()
-        self.setMols()
 
     def read(self):
         """
@@ -1080,13 +1082,13 @@ class DataFileReader(Base):
         Parse the mass section for masses and elements.
         """
         sidx = self.mk_idxes[self.MASSES] + 2
-        for id, lid in enumerate(
-                range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]), 1):
-            splitted = self.lines[lid].split()
-            id, mass, ele = splitted[0], splitted[1], splitted[-2]
-            self.masses[int(id)] = types.SimpleNamespace(id=int(id),
-                                                         mass=float(mass),
-                                                         ele=ele)
+        data = []
+        for idx in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
+            splitted = self.lines[idx].split()
+            data.append([splitted[0], splitted[1], splitted[-2]])
+        self.masses = pd.DataFrame(data, columns=self.MASS_COL)
+        self.masses[ID] = self.masses[ID].astype(int)
+        self.masses[self.MASS] = self.masses[self.MASS].astype(float)
 
     def setPairCoeffs(self):
         """
@@ -1151,14 +1153,14 @@ class DataFileReader(Base):
         Parse the atom section for atom id and molecule id.
         """
         sidx = self.mk_idxes[self.ATOMS_CAP] + 2
-        for lid in range(sidx, sidx + self.struct_dsp[self.ATOMS]):
-            id, mol_id, type_id, charge, x, y, z = self.lines[lid].split()[:7]
-            self.atoms[int(id)] = types.SimpleNamespace(
-                id=int(id),
-                mol_id=int(mol_id),
-                type_id=int(type_id),
-                xyz=(float(x), float(y), float(z)),
-                ele=self.masses[int(type_id)].ele)
+        lines = self.lines[sidx: sidx + self.struct_dsp[self.ATOMS]]
+        self.atoms = pd.read_csv(io.StringIO(''.join(lines)), names=ATOM_COL, sep=r'\s+')
+
+    def gidFromEle(self, ele):
+        if ele is None:
+            return self.atoms[ID].tolist()
+        type_id = self.masses[ID][self.masses[self.ELE] == ele]
+        return self.atoms[ID][self.atoms[TYPE_ID] == type_id.iloc[0]].tolist()
 
     @property
     def atom(self):
@@ -1189,19 +1191,6 @@ class DataFileReader(Base):
         """
 
         return super().molecule
-
-    def setMols(self):
-        """
-        Group atoms into molecules by molecule ids.
-        """
-        mols = collections.defaultdict(list)
-        for atom in self.atoms.values():
-            try:
-                mols[atom.mol_id].append(atom.id)
-            except AttributeError:
-                # atomic style has no molecule ids
-                return
-        self.mols = dict(mols)
 
     def setBonds(self):
         """
@@ -1321,6 +1310,8 @@ class DataFileReader(Base):
         """
         if mix == lammpsin.In.GEOMETRIC:
             # lammpsin.In.GEOMETRIC is optimized for speed and is supported
+            import pdb;
+            pdb.set_trace()
             atom_types = sorted(set([x.type_id for x in self.atoms.values()]))
             radii = [0] + [self.vdws[x].dist for x in atom_types]
             radii = np.full((len(radii), len(radii)), radii, dtype='float16')
@@ -1329,6 +1320,7 @@ class DataFileReader(Base):
             radii = np.sqrt(radii)
             radii *= pow(2, 1 / 6) * scale
             radii[radii < self.MIN_DIST] = self.MIN_DIST
+            import pdb; pdb.set_trace()
             id_map = {x.id: x.type_id for x in self.atoms.values()}
             self.radii = Radius(radii, id_map=id_map)
             return
