@@ -710,7 +710,7 @@ class PackedStruct(Struct):
         """
         Set the distance cell with the trajectory frame.
         """
-        self.dcell = traj.DistanceCell(xyz=self.getPositions(),
+        self.dcell = traj.DistanceCell(data=self.getPositions(),
                                        box=self.box,
                                        radii=self.radii,
                                        excluded=self.excluded,
@@ -831,7 +831,7 @@ class GrownStruct(PackedStruct):
         self.dcell.setGraph(self.conformer_total)
         data = np.full((self.conformer_total, 3), np.inf)
         index = [x.gid for x in self.conformer]
-        self.init_tf = traj.Frame(xyz=data, index=index, box=self.box)
+        self.init_tf = traj.Frame(data=data, index=index, box=self.box)
 
     def fragmentize(self):
         """

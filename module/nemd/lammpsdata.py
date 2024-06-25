@@ -35,8 +35,8 @@ class Conformer(structure.Conformer):
         """
         Return atom information in the format of numpy array.
 
-        :return `numpy.ndarray`: information such as atom global ids, molecule
-            ids, atom type ids, charges, coordinates.
+        :return `pandas.core.frame.DataFrame`: information such as atom global
+            ids, molecule ids, atom type ids, charges, coordinates.
         """
         if not self.HasOwningMol():
             return
@@ -781,7 +781,8 @@ class Struct(structure.Struct, Base):
         """
         Write atom coefficients.
 
-        :param fmt str: the format of atom line in LAMMPS data file.
+        :param float_format str: the format of float (e.g. charges and
+            coordinates).
         """
 
         self.hdl.write(f"{self.ATOMS.capitalize()}\n\n")

@@ -91,13 +91,13 @@ class XYZ(np.ndarray):
     Class to get vdw radius from atom id pair.
     """
 
-    def __new__(cls, input_array, *args, id_map=None, **kwargs):
+    def __new__(cls, frame, *args, **kwargs):
         """
-        :param input_array np.ndarray: the radius array with type id as row index
-        :param id_map dict: map atom id to type id
+        :param frame pandas.core.frame.DataFrame: the original dataframe
         """
-        obj = np.asarray(input_array).view(cls)
-        obj.id_map = id_map
+        obj = np.asarray(frame.values).view(cls)
+        id = {label: i for i, label in enumerate(frame.index)} | {-1: -1}
+        obj.id_map = np.array([id.get(x, -1) for x in range(max(id) + 1)])
         return obj
 
     def imap(self, index):
@@ -135,7 +135,7 @@ class Frame(pd.DataFrame):
     _internal_names_set = set(_internal_names)
 
     def __init__(self,
-                 xyz=None,
+                 data=None,
                  box=None,
                  index=None,
                  columns=XYZU,
@@ -143,23 +143,23 @@ class Frame(pd.DataFrame):
                  dtype=None,
                  **kwargs):
         """
-        :param xyz nx3 'numpy.ndarray' or 'DataFrame': xyz data
+        :param data nx3 'numpy.ndarray' or 'DataFrame': xyz data
         :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
         :param index list: the atom indexes
         :param columns list: the data columns (e.g., xu, yu, zu, element)
         :param step int: the number of simulation step that this frame is at
         :param dtype str: the data type of the frame
         """
-        if box is None and isinstance(xyz, Frame):
-            box = xyz.box
-        if index is None and not isinstance(xyz, pd.DataFrame):
-            index = range(1, xyz.shape[0] + 1)
-        if isinstance(xyz, pd.DataFrame) and (xyz.columns != columns).any():
-            columns = {x: y for x, y in zip(xyz.columns, columns)}
-            xyz = xyz.rename(columns=columns)
-        if dtype is None and isinstance(xyz, np.ndarray):
-            dtype = float if xyz is None else xyz.dtype
-        super().__init__(data=xyz,
+        if box is None and isinstance(data, Frame):
+            box = data.box
+        if index is None and not isinstance(data, pd.DataFrame):
+            index = range(1, data.shape[0] + 1)
+        if isinstance(data, pd.DataFrame) and (data.columns != columns).any():
+            columns = {x: y for x, y in zip(data.columns, columns)}
+            data = data.rename(columns=columns)
+        if dtype is None and isinstance(data, np.ndarray):
+            dtype = float if data is None else data.dtype
+        super().__init__(data=data,
                          index=index,
                          columns=columns,
                          dtype=dtype,
@@ -167,9 +167,8 @@ class Frame(pd.DataFrame):
         self.box = box
         self.step = step
         self.span = None
-        self.xyz = None
+        self.xyz = XYZ(self)
         self.setBox(self.box)
-        self.setXYZ()
 
     def setBox(self, box):
         """
@@ -181,16 +180,6 @@ class Frame(pd.DataFrame):
         if self.box is None:
             return
         self.span = np.array([box[i * 2 + 1] - box[i * 2] for i in range(3)])
-
-    def setXYZ(self):
-        """
-        Coordinate handle faster than iterrows or iloc indexing.
-        """
-        if not self.index.any():
-            return
-        id = {label: i for i, label in enumerate(self.index)}
-        id_map = np.array([id.get(x, -1) for x in range(self.index.max() + 1)])
-        self.xyz = XYZ(self.values, id_map=id_map)
 
     @property
     def _constructor(self):
@@ -243,7 +232,7 @@ class Frame(pd.DataFrame):
                     ])
                     # 'xu', 'yu', 'zu'
                     columns = lines[-1].rstrip().split()[-3:]
-                    frame = cls(xyz=data[:, 1:],
+                    frame = cls(data=data[:, 1:],
                                 box=box,
                                 index=data[:, 0].astype(int),
                                 columns=columns,
@@ -538,7 +527,7 @@ class DistanceCell(Frame):
     _internal_names_set = set(_internal_names)
 
     def __init__(self,
-                 xyz=None,
+                 data=None,
                  box=None,
                  index=None,
                  gids=None,
@@ -547,12 +536,12 @@ class DistanceCell(Frame):
                  radii=None,
                  excluded=None):
         """
-        :param frm 'Frame': trajectory frame
+        :param data 'Frame': trajectory frame
         :param gids list: global atom ids to analyze
         :param cut float: the cutoff distance to search neighbors
         :param res float: the res of the grid step
         """
-        super().__init__(xyz=xyz, box=box, index=index)
+        super().__init__(data=data, box=box, index=index)
         self.cut = cut
         self.gids = gids
         self.res = res
