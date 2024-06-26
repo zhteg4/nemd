@@ -14,6 +14,7 @@ from nemd import oplsua
 from nemd import symbols
 from nemd import lammpsin
 from nemd import structure
+from nemd import numpyutils
 from nemd import constants as nconstant
 
 ID = 'id'
@@ -504,14 +505,7 @@ class Base(lammpsin.In):
 
     def setVdwRadius(self):
         """
-        Set the vdw radius based on the mixing rule and vdw radii.
-
-        :param mix str: the mixing rules, including GEOMETRIC, ARITHMETIC, and
-            SIXTHPOWER
-        :param scale float: scale the vdw radius by this factor
-
-        NOTE: the scaled radii here are more like diameters (or distance)
-            between two sites.
+        Set the vdw radius.
         """
         self.radii = Radius(self.vdws[DIST], self.atoms[TYPE_ID])
 
@@ -1085,8 +1079,11 @@ class DataFileReader(Base):
         if self.PAIR_COEFFS not in self.mk_idxes:
             return
         sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
-        lines = self.lines[sidx: sidx + self.dype_dsp[self.ATOM_TYPES]]
-        self.vdws = pd.read_csv(io.StringIO(''.join(lines)), names=VDW_COL, sep=r'\s+')
+        lines = self.lines[sidx:sidx + self.dype_dsp[self.ATOM_TYPES]]
+        data = pd.read_csv(io.StringIO(''.join(lines)),
+                           names=VDW_COL,
+                           sep=r'\s+')
+        self.vdws = data.set_index(ID)
 
     def getBox(self):
         """
@@ -1137,15 +1134,18 @@ class DataFileReader(Base):
         Parse the atom section for atom id and molecule id.
         """
         sidx = self.mk_idxes[self.ATOMS_CAP] + 2
-        lines = self.lines[sidx: sidx + self.struct_dsp[self.ATOMS]]
-        data = pd.read_csv(io.StringIO(''.join(lines)), names=ATOM_COL, sep=r'\s+')
+        lines = self.lines[sidx:sidx + self.struct_dsp[self.ATOMS]]
+        data = pd.read_csv(io.StringIO(''.join(lines)),
+                           names=ATOM_COL,
+                           sep=r'\s+')
         self.atoms = data.set_index(ID)
 
     def gidFromEle(self, ele):
         if ele is None:
             return self.atoms.index.tolist()
         type_id = self.masses[ID][self.masses[self.ELE] == ele]
-        return self.atoms.index[self.atoms[TYPE_ID] == type_id.iloc[0]].tolist()
+        return self.atoms.index[self.atoms[TYPE_ID] ==
+                                type_id.iloc[0]].tolist()
 
     @property
     def atom(self):
@@ -1282,20 +1282,24 @@ class DataFileReader(Base):
             self.excluded[id2].add(id1)
 
 
-class Radius(np.ndarray):
+class Radius(numpyutils.Array):
     """
     Class to get vdw radius from atom id pair.
+
+    NOTE: the scaled radii here are more of diameters (or distance)
+        between two sites.
     """
+
     MIN_DIST = 1.4
     SCALE = 0.45
 
-    def __new__(cls, dists, ids, *args,  **kwargs):
+    def __new__(cls, dists, types, *args, **kwargs):
         """
-        :param input_array np.ndarray: the radius array with type id as row index
-        :param id_map dict: map atom id to type id
+        :param dists pandas.Series: type id (index), atom radius (value)
+        :param types pandas.Series: global atom id (index), atom type (value)
         """
         # Data.GEOMETRIC is optimized for speed and is supported
-        kwargs = dict(index=range(dists.index.max()+1), fill_value=0)
+        kwargs = dict(index=range(dists.index.max() + 1), fill_value=0)
         radii = dists.reindex(**kwargs).values.tolist()
         radii = np.full((len(radii), len(radii)), radii, dtype='float16')
         radii *= radii.transpose()
@@ -1303,26 +1307,6 @@ class Radius(np.ndarray):
         radii *= pow(2, 1 / 6) * cls.SCALE
         radii[radii < cls.MIN_DIST] = cls.MIN_DIST
         obj = np.asarray(radii).view(cls)
-        obj.id_map = {x: y for x, y in ids.items()}
+        kwargs = dict(index=range(types.index.max() + 1), fill_value=0)
+        obj.id_map = types.reindex(**kwargs).values
         return obj
-
-    def getRadius(self, aid1, aid2):
-        """
-        Get the radius between atoms from two global ids.
-
-        :param aid1 int: one global atom id from the pair.
-        :param aid2 int: the other global atom id from the pair.
-        :return float: the vdw radius between the pair.
-        """
-        return self[self.id_map[aid1], self.id_map[aid2]]
-
-    def setRadius(self, aid1, aid2, val):
-        """
-        Get the radius between atoms from two global ids.
-
-        :param aid1 int: one global atom id from the pair.
-        :param aid2 int: the other global atom id from the pair.
-        :val float: the vdw radius between the pair to be set.
-        """
-        self[self.id_map[aid1], self.id_map[aid2]] = val
-        self[self.id_map[aid2], self.id_map[aid1]] = val

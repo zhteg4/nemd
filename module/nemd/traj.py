@@ -26,8 +26,9 @@ from contextlib import contextmanager
 
 from nemd import symbols
 from nemd import lammpsdata
-from nemd import environutils
+from nemd import numpyutils
 from nemd import numbautils
+from nemd import environutils
 
 FlAG_CUSTOM_DUMP = 'custom_dump'
 FlAG_DATA_FILE = '-data_file'
@@ -86,7 +87,7 @@ def get_frames(filename=None, contents=None, start=0):
     return Frame.read(filename=filename, contents=contents, start=start)
 
 
-class XYZ(np.ndarray):
+class XYZ(numpyutils.Array):
     """
     Class to get vdw radius from atom id pair.
     """
@@ -99,22 +100,6 @@ class XYZ(np.ndarray):
         idx = {label: i for i, label in enumerate(frame.index)} | {-1: -1}
         obj.id_map = np.array([idx.get(x, -1) for x in range(max(idx) + 1)])
         return obj
-
-    def imap(self, index):
-        if isinstance(index, slice):
-            args = [index.start, index.stop, index.step]
-            return slice(*[x if x is None else self.id_map[x] for x in args])
-        # int, list, or np.ndarray
-        return self.id_map[index]
-
-    def __getitem__(self, index):
-        nindex = tuple(self.imap(x) for x in index)
-        data = super(XYZ, self).__getitem__(nindex)
-        return np.asarray(data)
-
-    def __setitem__(self, index, value):
-        nindex = tuple(self.imap(x) for x in index)
-        super(XYZ, self).__setitem__(nindex, value)
 
 
 class Frame(pd.DataFrame):
@@ -809,7 +794,7 @@ class DistanceCell(Frame):
         if radii is None:
             thresholds = [threshold] * len(neighbors)
         else:
-            thresholds = [radii.getRadius(name, x) for x in neighbors]
+            thresholds = [radii[name, x] for x in neighbors]
         clashes = [(name, x, y, z)
                    for x, y, z in zip(neighbors, dists, thresholds) if y < z]
         return clashes
