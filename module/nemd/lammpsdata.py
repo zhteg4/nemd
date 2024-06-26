@@ -501,10 +501,8 @@ class Base(lammpsin.In):
         IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
         IMPROPERS_CAP
     ]
-    MIN_DIST = 1.4
-    SCALE = 0.45
 
-    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=SCALE):
+    def setVdwRadius(self):
         """
         Set the vdw radius based on the mixing rule and vdw radii.
 
@@ -515,19 +513,7 @@ class Base(lammpsin.In):
         NOTE: the scaled radii here are more like diameters (or distance)
             between two sites.
         """
-
-        if mix == lammpsin.In.GEOMETRIC:
-            # Data.GEOMETRIC is optimized for speed and is supported
-            radii = [0] + self.vdws[DIST].tolist()
-            radii = np.full((len(radii), len(radii)), radii, dtype='float16')
-            radii[:, 0] = radii[0, :]
-            radii *= radii.transpose()
-            radii = np.sqrt(radii)
-            radii *= pow(2, 1 / 6) * scale
-            radii[radii < self.MIN_DIST] = self.MIN_DIST
-            id_map = {x: y for x, y in self.atoms[TYPE_ID].items()}
-            self.radii = Radius(radii, id_map=id_map)
-            return
+        self.radii = Radius(self.vdws[DIST], self.atoms[TYPE_ID])
 
 
 class Struct(structure.Struct, Base):
@@ -1263,17 +1249,16 @@ class DataFileReader(Base):
                 id3=int(id3),
                 id4=int(id4))
 
-    def setClashParams(self, include14=False, scale=Base.SCALE):
+    def setClashParams(self, include14=False):
         """
         Set clash check related parameters including pair radii and exclusion.
 
         :param include14 bool: whether to include atom separated by 2 bonds for
             clash check.
-        :param scale float: the scale param on vdw radius in clash check.
         """
         self.setClashExclusion(include14=not include14)
         self.setPairCoeffs()
-        self.setVdwRadius(scale=scale)
+        self.setVdwRadius()
 
     def setClashExclusion(self, include14=True):
         """
@@ -1301,14 +1286,24 @@ class Radius(np.ndarray):
     """
     Class to get vdw radius from atom id pair.
     """
+    MIN_DIST = 1.4
+    SCALE = 0.45
 
-    def __new__(cls, frame, *args, id_map=None, **kwargs):
+    def __new__(cls, dists, ids, *args,  **kwargs):
         """
         :param input_array np.ndarray: the radius array with type id as row index
         :param id_map dict: map atom id to type id
         """
-        obj = np.asarray(frame).view(cls)
-        obj.id_map = id_map
+        # Data.GEOMETRIC is optimized for speed and is supported
+        kwargs = dict(index=range(dists.index.max()+1), fill_value=0)
+        radii = dists.reindex(**kwargs).values.tolist()
+        radii = np.full((len(radii), len(radii)), radii, dtype='float16')
+        radii *= radii.transpose()
+        radii = np.sqrt(radii)
+        radii *= pow(2, 1 / 6) * cls.SCALE
+        radii[radii < cls.MIN_DIST] = cls.MIN_DIST
+        obj = np.asarray(radii).view(cls)
+        obj.id_map = {x: y for x, y in ids.items()}
         return obj
 
     def getRadius(self, aid1, aid2):

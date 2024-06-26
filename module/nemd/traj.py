@@ -96,8 +96,8 @@ class XYZ(np.ndarray):
         :param frame pandas.core.frame.DataFrame: the original dataframe
         """
         obj = np.asarray(frame.values).view(cls)
-        id = {label: i for i, label in enumerate(frame.index)} | {-1: -1}
-        obj.id_map = np.array([id.get(x, -1) for x in range(max(id) + 1)])
+        idx = {label: i for i, label in enumerate(frame.index)} | {-1: -1}
+        obj.id_map = np.array([idx.get(x, -1) for x in range(max(idx) + 1)])
         return obj
 
     def imap(self, index):
@@ -512,7 +512,6 @@ class DistanceCell(Frame):
     checking.
     """
 
-    SCALE = lammpsdata.DataFileReader.SCALE
     AUTO = 'auto'
     ALL = 'all'
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
