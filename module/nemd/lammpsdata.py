@@ -25,6 +25,9 @@ YU = symbols.YU
 ZU = symbols.ZU
 XYZU = symbols.XYZU
 ATOM_COL = [ID, MOL_ID, TYPE_ID, CHARGE, XU, YU, ZU]
+ENE = 'ene'
+DIST = 'dist'
+VDW_COL = [ID, ENE, DIST]
 
 
 class Conformer(structure.Conformer):
@@ -501,10 +504,36 @@ class Base(lammpsin.In):
     MIN_DIST = 1.4
     SCALE = 0.45
 
+    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=SCALE):
+        """
+        Set the vdw radius based on the mixing rule and vdw radii.
+
+        :param mix str: the mixing rules, including GEOMETRIC, ARITHMETIC, and
+            SIXTHPOWER
+        :param scale float: scale the vdw radius by this factor
+
+        NOTE: the scaled radii here are more like diameters (or distance)
+            between two sites.
+        """
+
+        if mix == lammpsin.In.GEOMETRIC:
+            # Data.GEOMETRIC is optimized for speed and is supported
+            radii = [0] + self.vdws[DIST].tolist()
+            radii = np.full((len(radii), len(radii)), radii, dtype='float16')
+            radii[:, 0] = radii[0, :]
+            radii *= radii.transpose()
+            radii = np.sqrt(radii)
+            radii *= pow(2, 1 / 6) * scale
+            radii[radii < self.MIN_DIST] = self.MIN_DIST
+            id_map = {x: y for x, y in self.atoms[TYPE_ID].items()}
+            self.radii = Radius(radii, id_map=id_map)
+            return
+
 
 class Struct(structure.Struct, Base):
 
     MolClass = Mol
+    TO_CSV_KWARGS = dict(sep=' ', header=False, float_format='%.4f', mode='a')
 
     def __init__(self, struct=None, ff=None, options=None, **kwargs):
         """
@@ -703,10 +732,7 @@ class Struct(structure.Struct, Base):
         Write pair coefficients.
         """
         self.hdl.write(f"{self.PAIR_COEFFS}\n\n")
-        indexes = np.nonzero(self.atm_types)[0]
-        for oid, id in zip(indexes, self.atm_types[indexes]):
-            vdw = self.ff.vdws[oid]
-            self.hdl.write(f"{id} {vdw.ene:.4f} {vdw.dist:.4f}\n")
+        self.vdws.to_csv(self.hdl, **self.TO_CSV_KWARGS)
         self.hdl.write("\n")
 
     def writeBondCoeffs(self):
@@ -778,20 +804,13 @@ class Struct(structure.Struct, Base):
             self.hdl.write(f"{id} {impr.ene} {sign} {impr.n_parm}\n")
         self.hdl.write("\n")
 
-    def writeAtoms(self, float_format='%.3f'):
+    def writeAtoms(self):
         """
         Write atom coefficients.
-
-        :param float_format str: the format of float (e.g. charges and
-            coordinates).
         """
 
         self.hdl.write(f"{self.ATOMS.capitalize()}\n\n")
-        self.atoms.to_csv(self.hdl,
-                          sep=' ',
-                          header=False,
-                          float_format=float_format,
-                          mode='a')
+        self.atoms.to_csv(self.hdl, **self.TO_CSV_KWARGS)
         self.hdl.write(f"\n")
         if not round(self.atoms[CHARGE].sum(), 4):
             return
@@ -905,31 +924,6 @@ class Struct(structure.Struct, Base):
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
-    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=Base.SCALE):
-        """
-        Set the vdw radius based on the mixing rule and vdw radii.
-
-        :param mix str: the mixing rules, including GEOMETRIC, ARITHMETIC, and
-            SIXTHPOWER
-        :param scale float: scale the vdw radius by this factor
-
-        NOTE: the scaled radii here are more like diameters (or distance)
-            between two sites.
-        """
-        if mix == lammpsin.In.GEOMETRIC:
-            # Data.GEOMETRIC is optimized for speed and is supported
-            atom_types = np.nonzero(self.atm_types)[0]
-            radii = [0] + [self.ff.vdws[x].dist for x in atom_types]
-            radii = np.full((len(radii), len(radii)), radii, dtype='float16')
-            radii[:, 0] = radii[0, :]
-            radii *= radii.transpose()
-            radii = np.sqrt(radii)
-            radii *= pow(2, 1 / 6) * scale
-            radii[radii < self.MIN_DIST] = self.MIN_DIST
-            id_map = {x: y for x, y in self.atoms[TYPE_ID].items()}
-            self.radii = Radius(radii, id_map=id_map)
-            return
-
     @property
     def bond_total(self):
         """
@@ -991,6 +985,13 @@ class Struct(structure.Struct, Base):
         if self.atm_types is not None:
             data[TYPE_ID] = self.atm_types[data[TYPE_ID]]
         return data
+
+    @property
+    def vdws(self):
+        indexes = np.nonzero(self.atm_types)[0]
+        vdws = [self.ff.vdws[x] for x in indexes]
+        data = [[i, x.ene, x.dist] for i, x in enumerate(vdws, 1)]
+        return pd.DataFrame(data, columns=VDW_COL).set_index(ID)
 
 
 class DataFileReader(Base):
@@ -1098,11 +1099,8 @@ class DataFileReader(Base):
         if self.PAIR_COEFFS not in self.mk_idxes:
             return
         sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
-        for lid in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
-            id, ene, dist = self.lines[lid].split()
-            self.vdws[int(id)] = types.SimpleNamespace(id=int(id),
-                                                       dist=float(dist),
-                                                       ene=float(ene))
+        lines = self.lines[sidx: sidx + self.dype_dsp[self.ATOM_TYPES]]
+        self.vdws = pd.read_csv(io.StringIO(''.join(lines)), names=VDW_COL, sep=r'\s+')
 
     def getBox(self):
         """
@@ -1154,13 +1152,14 @@ class DataFileReader(Base):
         """
         sidx = self.mk_idxes[self.ATOMS_CAP] + 2
         lines = self.lines[sidx: sidx + self.struct_dsp[self.ATOMS]]
-        self.atoms = pd.read_csv(io.StringIO(''.join(lines)), names=ATOM_COL, sep=r'\s+')
+        data = pd.read_csv(io.StringIO(''.join(lines)), names=ATOM_COL, sep=r'\s+')
+        self.atoms = data.set_index(ID)
 
     def gidFromEle(self, ele):
         if ele is None:
-            return self.atoms[ID].tolist()
+            return self.atoms.index.tolist()
         type_id = self.masses[ID][self.masses[self.ELE] == ele]
-        return self.atoms[ID][self.atoms[TYPE_ID] == type_id.iloc[0]].tolist()
+        return self.atoms.index[self.atoms[TYPE_ID] == type_id.iloc[0]].tolist()
 
     @property
     def atom(self):
@@ -1297,68 +1296,18 @@ class DataFileReader(Base):
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
-    def setVdwRadius(self, mix=lammpsin.In.GEOMETRIC, scale=Base.SCALE):
-        """
-        Set the vdw radius based on the mixing rule and vdw radii.
-
-        :param mix str: the mixing rules, including GEOMETRIC, ARITHMETIC, and
-            SIXTHPOWER
-        :param scale float: scale the vdw radius by this factor
-
-        NOTE: the scaled radii here are more like diameters (or distance)
-            between two sites.
-        """
-        if mix == lammpsin.In.GEOMETRIC:
-            # lammpsin.In.GEOMETRIC is optimized for speed and is supported
-            import pdb;
-            pdb.set_trace()
-            atom_types = sorted(set([x.type_id for x in self.atoms.values()]))
-            radii = [0] + [self.vdws[x].dist for x in atom_types]
-            radii = np.full((len(radii), len(radii)), radii, dtype='float16')
-            radii[:, 0] = radii[0, :]
-            radii *= radii.transpose()
-            radii = np.sqrt(radii)
-            radii *= pow(2, 1 / 6) * scale
-            radii[radii < self.MIN_DIST] = self.MIN_DIST
-            import pdb; pdb.set_trace()
-            id_map = {x.id: x.type_id for x in self.atoms.values()}
-            self.radii = Radius(radii, id_map=id_map)
-            return
-
-        radii = collections.defaultdict(dict)
-        for id1, vdw1 in self.vdws.items():
-            for id2, vdw2 in self.vdws.items():
-                if mix == self.GEOMETRIC:
-                    dist = pow(vdw1.dist * vdw2.dist, 0.5)
-                elif mix == self.ARITHMETIC:
-                    dist = (vdw1.dist + vdw2.dist) / 2
-                elif mix == self.SIXTHPOWER:
-                    dist = (pow(vdw1.dist, 6) + pow(vdw2.dist, 6)) / 2
-                    dist = pow(dist, 1 / 6)
-                dist *= pow(2, 1 / 6) * scale
-                if dist < self.MIN_DIST:
-                    dist = self.MIN_DIST
-                radii[id1][id2] = round(dist, 4)
-
-        self.radii = collections.defaultdict(dict)
-        for atom1 in self.atoms.values():
-            for atom2 in self.atoms.values():
-                self.radii[atom1.id][atom2.id] = radii[atom1.type_id][
-                    atom2.type_id]
-        self.radii = dict(self.radii)
-
 
 class Radius(np.ndarray):
     """
     Class to get vdw radius from atom id pair.
     """
 
-    def __new__(cls, input_array, *args, id_map=None, **kwargs):
+    def __new__(cls, frame, *args, id_map=None, **kwargs):
         """
         :param input_array np.ndarray: the radius array with type id as row index
         :param id_map dict: map atom id to type id
         """
-        obj = np.asarray(input_array).view(cls)
+        obj = np.asarray(frame).view(cls)
         obj.id_map = id_map
         return obj
 
