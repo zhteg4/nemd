@@ -29,6 +29,10 @@ ATOM_COL = [ID, MOL_ID, TYPE_ID, CHARGE, XU, YU, ZU]
 ENE = 'ene'
 DIST = 'dist'
 VDW_COL = [ID, ENE, DIST]
+ATOM1 = 'atom1'
+ATOM2 = 'atom2'
+ATOM3 = 'atom3'
+ATOM4 = 'atom4'
 
 
 class Conformer(structure.Conformer):
@@ -67,9 +71,9 @@ class Conformer(structure.Conformer):
         """
         if not self.HasOwningMol():
             return
-        bonds = np.array(self.GetOwningMol().bonds)
-        if bonds.any():
-            bonds[:, 1:] = self.id_map[bonds[:, 1:]]
+        bonds = self.GetOwningMol().bonds.copy()
+        columns = bonds.columns.difference([TYPE_ID])
+        bonds[columns] = self.id_map[bonds[columns]]
         return bonds
 
     @property
@@ -124,6 +128,8 @@ class Mol(structure.Mol):
     RES_NUM = oplsua.RES_NUM
     TYPE_ID = oplsua.TYPE_ID
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
+    BOND_INDEXEX = [TYPE_ID, ATOM1, ATOM2]
+    BONDS_KWARGS = dict(index=[TYPE_ID, ATOM1, ATOM2], dtype=int)
 
     def __init__(self, *args, ff=None, **kwargs):
         """
@@ -132,7 +138,9 @@ class Mol(structure.Mol):
         super().__init__(*args, **kwargs)
         self.ff = ff
         self.symbol_impropers = {}
-        self.bonds = []
+        self.bonds = pd.DataFrame(
+            {x: pd.Series(dtype=int)
+             for x in self.BOND_INDEXEX})
         self.angles = []
         self.dihedrals = []
         self.impropers = []
@@ -211,8 +219,10 @@ class Mol(structure.Mol):
             bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
             bond = self.ff.getMatchedBonds(bonded)[0]
             aids = sorted([bonded[0].GetIdx(), bonded[1].GetIdx()])
-            self.bonds.append(tuple([bond.id, *aids]))
             self.rvrs_bonds[tuple(aids)] = bond.id
+            bond = pd.DataFrame([bond.id, *aids],
+                                **self.BONDS_KWARGS).transpose()
+            self.bonds = pd.concat((self.bonds, bond))
 
     def setAngles(self):
         """
@@ -404,7 +414,7 @@ class Mol(structure.Mol):
         The lengths or angle values of these geometries remain unchanged during
         simulation.
         """
-        bonds = [self.ff.bonds[x[0]] for x in self.bonds]
+        bonds = [self.ff.bonds[x] for x in self.bonds[TYPE_ID]]
         self.fbonds = set([x[0] for x in bonds if x.has_h])
         angles = [self.ff.angles[x[0]] for x in self.angles]
         self.fangles = set([x[0] for x in angles if x.has_h])
@@ -533,11 +543,38 @@ class Struct(structure.Struct, Base):
         self.warnings = []
         self.excluded = collections.defaultdict(set)
         self.radii = None
+        self.initTypeMap()
+
+    def initTypeMap(self):
+        if isinstance(self.ff, oplsua.Parser):
+            self.atm_types = numpyutils.TypeMap(max(self.ff.atoms) + 1)
+            self.bnd_types = numpyutils.TypeMap(max(self.ff.bonds) + 1)
+            self.ang_types = numpyutils.TypeMap(max(self.ff.angles) + 1)
+            self.dihe_types = numpyutils.TypeMap(max(self.ff.dihedrals) + 1)
+            self.impr_types = numpyutils.TypeMap(max(self.ff.impropers) + 1)
+            return
+        self.atm_types = np.array([0])
+        self.bnd_types = np.array([0])
+        self.ang_types = np.array([0])
+        self.dihe_types = np.array([0])
+        self.impr_types = np.array([0])
 
     def addMol(self, mol):
         mol = super().addMol(mol)
         self.setTypeMap(mol)
         return mol
+
+    def setTypeMap(self, mol):
+        """
+        Set the type map for atoms, bonds, angles, dihedrals, and impropers.
+        """
+
+        atypes = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
+        self.atm_types.union(atypes)
+        self.bnd_types.union(mol.bonds[TYPE_ID].values)
+        self.ang_types.union([x[0] for x in mol.angles])
+        self.dihe_types.union([x[0] for x in mol.dihedrals])
+        self.impr_types.union([x[0] for x in mol.impropers])
 
     def writeData(self, nofile=False):
         """
@@ -547,7 +584,6 @@ class Struct(structure.Struct, Base):
         """
 
         with io.StringIO() if nofile else open(self.datafile, 'w') as self.hdl:
-            self.reorderType()
             self.writeDescription()
             self.writeTopoType()
             self.writeBox()
@@ -563,53 +599,6 @@ class Struct(structure.Struct, Base):
             self.writeDihedrals()
             self.writeImpropers()
             return self.getContents() if nofile else None
-
-    def setTypeMap(self, mol):
-        """
-        Set the type map for atoms, bonds, angles, dihedrals, and impropers.
-        """
-        if self.atm_types is None:
-            self.atm_types = np.zeros(max(self.ff.atoms) + 1, dtype=int)
-        atypes = set(x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms())
-        atypes = sorted(atypes.difference(np.nonzero(self.atm_types)[0]))
-        start = self.atm_types.max() + 1
-        self.atm_types[atypes] = list(range(start, start + len(atypes)))
-        if self.bnd_types is None:
-            self.bnd_types = np.zeros(max(self.ff.bonds) + 1, dtype=int)
-        btypes = set(x[0] for x in mol.bonds)
-        btypes = sorted(btypes.difference(np.nonzero(self.bnd_types)[0]))
-        start = self.bnd_types.max() + 1
-        self.bnd_types[btypes] = list(np.arange(start, start + len(btypes)))
-        if self.ang_types is None:
-            self.ang_types = np.zeros(max(self.ff.angles) + 1, dtype=int)
-        antypes = set(y[0] for x in mol.GetConformers() for y in x.angles)
-        antypes = sorted(antypes.difference(np.nonzero(self.ang_types)[0]))
-        start = self.ang_types.max() + 1
-        self.ang_types[antypes] = list(np.arange(start, start + len(antypes)))
-        if self.dihe_types is None:
-            self.dihe_types = np.zeros(max(self.ff.dihedrals) + 1, dtype=int)
-        dtps = set(y[0] for x in mol.GetConformers() for y in x.dihedrals)
-        dtps = sorted(dtps.difference(np.nonzero(self.dihe_types)[0]))
-        start = self.dihe_types.max() + 1
-        self.dihe_types[dtps] = list(np.arange(start, start + len(dtps)))
-        if self.impr_types is None:
-            self.impr_types = np.zeros(max(self.ff.impropers) + 1, dtype=int)
-        itps = set(y[0] for x in mol.GetConformers() for y in x.impropers)
-        itps = sorted(itps.difference(np.nonzero(self.impr_types)[0]))
-        start = self.impr_types.max() + 1
-        self.impr_types[itps] = list(np.arange(start, start + len(itps)))
-
-    def reorderType(self):
-        indexes = np.nonzero(self.atm_types)[0]
-        self.atm_types[indexes] = np.arange(1, len(indexes) + 1)
-        indexes = np.nonzero(self.bnd_types)[0]
-        self.bnd_types[indexes] = np.arange(1, len(indexes) + 1)
-        indexes = np.nonzero(self.ang_types)[0]
-        self.ang_types[indexes] = np.arange(1, len(indexes) + 1)
-        indexes = np.nonzero(self.dihe_types)[0]
-        self.dihe_types[indexes] = np.arange(1, len(indexes) + 1)
-        indexes = np.nonzero(self.impr_types)[0]
-        self.impr_types[indexes] = np.arange(1, len(indexes) + 1)
 
     def writeDescription(self):
         """
@@ -806,11 +795,7 @@ class Struct(structure.Struct, Base):
         if not self.bond_total:
             return
         self.hdl.write(f"{self.BONDS.capitalize()}\n\n")
-        bonds = [x.bonds for x in self.conformer if x.bonds.any()]
-        bonds = np.concatenate(bonds, axis=0)
-        bonds[:, 0] = self.bnd_types[bonds[:, 0]]
-        ids = np.arange(bonds.shape[0]).reshape(-1, 1) + 1
-        np.savetxt(self.hdl, np.concatenate([ids, bonds], axis=1), fmt=fmt)
+        self.bonds.to_csv(self.hdl, **self.TO_CSV_KWARGS)
         self.hdl.write(f"\n")
 
     def writeAngles(self, fmt='%i %i %i %i %i'):
@@ -891,7 +876,8 @@ class Struct(structure.Struct, Base):
         """
         pairs = set()
         for conf in mol.GetConformers():
-            bonds = [tuple(sorted(x[1:])) for x in conf.bonds]
+            columns = conf.bonds.columns.difference([TYPE_ID])
+            bonds = [tuple(sorted(x)) for x in conf.bonds[columns].values]
             pairs = pairs.union(bonds)
             angles = [tuple(sorted(x[1::2])) for x in conf.angles]
             pairs = pairs.union(angles)
@@ -965,6 +951,14 @@ class Struct(structure.Struct, Base):
         if self.atm_types is not None:
             data[TYPE_ID] = self.atm_types[data[TYPE_ID]]
         return data
+
+    @property
+    def bonds(self):
+        bonds = [x.bonds for x in self.conformer if not x.bonds.empty]
+        bonds = pd.concat(bonds, axis=0)
+        bonds[TYPE_ID] = self.bnd_types[bonds[TYPE_ID]]
+        bonds.index = np.arange(bonds.shape[0]) + 1
+        return bonds
 
     @property
     def vdws(self):

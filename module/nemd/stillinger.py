@@ -13,7 +13,7 @@ class Struct(xtal.Struct):
     CUSTOM_EXT = f'.{lammpsdata.Base.DUMP}'
 
     def __init__(self, *args, tasks=None, **kwargs):
-        super().__init__(self, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.tasks = tasks
         self.units = self.METAL
         self.atom_style = self.ATOMIC

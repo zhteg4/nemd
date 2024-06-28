@@ -2,6 +2,9 @@ import numpy as np
 
 
 class Array(np.ndarray):
+    """
+    A subclass of numpy.ndarray that supports mapping the indexes.
+    """
 
     def imap(self, index):
         if isinstance(index, slice):
@@ -18,3 +21,22 @@ class Array(np.ndarray):
     def __setitem__(self, index, value):
         nindex = tuple(self.imap(x) for x in index)
         super(Array, self).__setitem__(nindex, value)
+
+
+class TypeMap(np.ndarray):
+    """
+    A subclass of numpy.ndarray that represents a set of integers as a bit array.
+    """
+
+    def __new__(cls, size, dtype=int):
+        array = np.zeros(size, dtype=dtype)
+        obj = np.asarray(array).view(cls)
+        return obj
+
+    def union(self, indexes):
+        self[indexes] = 1
+        self[self.indexes] = np.arange(1, len(self.indexes) + 1)
+
+    @property
+    def indexes(self):
+        return self.nonzero()[0]

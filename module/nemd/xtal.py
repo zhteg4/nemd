@@ -55,8 +55,6 @@ class Struct(lammpsdata.Struct):
     MolClass = Mol
 
     def setTypeMap(self, mol):
-        if self.atm_types is None:
-            self.atm_types = np.array([0])
         atomic_num = set(x.GetAtomicNum() for x in mol.GetAtoms())
         num = max(atomic_num) - self.atm_types.max()
         if num > 0:
