@@ -71,10 +71,7 @@ class Conformer(structure.Conformer):
         """
         if not self.HasOwningMol():
             return
-        bonds = self.GetOwningMol().bonds.copy()
-        columns = bonds.columns.difference([TYPE_ID])
-        bonds[columns] = self.id_map[bonds[columns]]
-        return bonds
+        return self.GetOwningMol().bonds.mapIds(self.id_map)
 
     @property
     def angles(self):
@@ -122,13 +119,58 @@ class Conformer(structure.Conformer):
         return imprps
 
 
+class Bond(pd.DataFrame):
+
+    DTYPE = 'dtype'
+    COLUMNS = 'columns'
+    DEFAULT_DTYPE = int
+    ATOM_COLS = [ATOM1, ATOM2]
+    COLUMN_LABELS = [TYPE_ID] + ATOM_COLS
+
+    def __init__(self, data=None, **kwargs):
+        if data is None:
+            dtype = kwargs.get(self.DTYPE, self.DEFAULT_DTYPE)
+            data = {x: pd.Series(dtype=dtype) for x in self.COLUMN_LABELS}
+        super().__init__(data=data, **kwargs)
+
+    @classmethod
+    @property
+    def _constructor(cls):
+        """
+        Return the constructor of the class.
+
+        :return 'Bond' class or subclass of 'Bond': the constructor of the class
+        """
+        return cls
+
+    @classmethod
+    def new(cls, *args, **kwargs):
+        return cls(*args, **kwargs)
+
+    def append(self, *args, **kwargs):
+        kwargs.update(dict(index=self.COLUMN_LABELS, dtype=self.DEFAULT_DTYPE),
+                      columns=[self.shape[0]])
+        return self._append(self.new(*args, **kwargs).transpose())
+
+    def mapIds(self, id_map):
+        acopy = self.copy()
+        acopy[self.ATOM_COLS] = id_map[acopy[self.ATOM_COLS]]
+        return acopy
+
+
+class Angle(Bond):
+
+    ATOM_COLS = [ATOM1, ATOM2, ATOM3]
+    COLUMN_LABELS = [TYPE_ID] + ATOM_COLS
+
+
 class Mol(structure.Mol):
 
     ConfClass = Conformer
     RES_NUM = oplsua.RES_NUM
     TYPE_ID = oplsua.TYPE_ID
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
-    BOND_INDEXEX = [TYPE_ID, ATOM1, ATOM2]
+    INDEXES = [TYPE_ID, ATOM1, ATOM2]
     BONDS_KWARGS = dict(index=[TYPE_ID, ATOM1, ATOM2], dtype=int)
 
     def __init__(self, *args, ff=None, **kwargs):
@@ -138,10 +180,8 @@ class Mol(structure.Mol):
         super().__init__(*args, **kwargs)
         self.ff = ff
         self.symbol_impropers = {}
-        self.bonds = pd.DataFrame(
-            {x: pd.Series(dtype=int)
-             for x in self.BOND_INDEXEX})
-        self.angles = []
+        self.bonds = Bond()
+        self.angles = Angle()
         self.dihedrals = []
         self.impropers = []
         self.nbr_charge = collections.defaultdict(float)
@@ -219,10 +259,8 @@ class Mol(structure.Mol):
             bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
             bond = self.ff.getMatchedBonds(bonded)[0]
             aids = sorted([bonded[0].GetIdx(), bonded[1].GetIdx()])
+            self.bonds = self.bonds.append([bond.id, *aids])
             self.rvrs_bonds[tuple(aids)] = bond.id
-            bond = pd.DataFrame([bond.id, *aids],
-                                **self.BONDS_KWARGS).transpose()
-            self.bonds = pd.concat((self.bonds, bond))
 
     def setAngles(self):
         """
@@ -232,7 +270,7 @@ class Mol(structure.Mol):
         for angle_id, atoms in enumerate(angles):
             angle = self.ff.getMatchedAngles(atoms)[0]
             aids = tuple(x.GetIdx() for x in atoms)
-            self.angles.append((angle.id, ) + aids)
+            self.angles = self.angles.append((angle.id, ) + aids)
             self.rvrs_angles[aids] = angle_id
 
     def setDihedrals(self):
@@ -402,12 +440,11 @@ class Mol(structure.Mol):
                 if angle_atom_ids not in self.rvrs_angles:
                     angle_atom_ids = angle_atom_ids[::-1]
                 index = self.rvrs_angles[angle_atom_ids]
-                angle = self.angles[index]
-                if np.isnan(self.ff.angles[angle[0]].ene):
+                type_id = self.angles.loc[index][TYPE_ID]
+                if np.isnan(self.ff.angles[type_id].ene):
                     break
             to_remove.append(index)
-        for index in sorted(to_remove, reverse=True):
-            self.angles.pop(index)
+        self.angles = self.angles.drop(index=to_remove)
 
     def setFixGeom(self):
         """
@@ -416,7 +453,7 @@ class Mol(structure.Mol):
         """
         bonds = [self.ff.bonds[x] for x in self.bonds[TYPE_ID]]
         self.fbonds = set([x[0] for x in bonds if x.has_h])
-        angles = [self.ff.angles[x[0]] for x in self.angles]
+        angles = [self.ff.angles[x] for x in self.angles[TYPE_ID]]
         self.fangles = set([x[0] for x in angles if x.has_h])
 
     @property
@@ -572,7 +609,7 @@ class Struct(structure.Struct, Base):
         atypes = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
         self.atm_types.union(atypes)
         self.bnd_types.union(mol.bonds[TYPE_ID].values)
-        self.ang_types.union([x[0] for x in mol.angles])
+        self.ang_types.union(mol.angles[TYPE_ID].values)
         self.dihe_types.union([x[0] for x in mol.dihedrals])
         self.impr_types.union([x[0] for x in mol.impropers])
 
