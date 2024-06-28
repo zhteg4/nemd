@@ -83,10 +83,7 @@ class Conformer(structure.Conformer):
         """
         if not self.HasOwningMol():
             return
-        angles = np.array(self.GetOwningMol().angles)
-        if angles.any():
-            angles[:, 1:] = self.id_map[angles[:, 1:]]
-        return angles
+        return self.GetOwningMol().angles.mapIds(self.id_map)
 
     @property
     def dihedrals(self):
@@ -113,10 +110,8 @@ class Conformer(structure.Conformer):
         """
         if not self.HasOwningMol():
             return
-        imprps = np.array(self.GetOwningMol().impropers)
-        if imprps.any():
-            imprps[:, 1:] = self.id_map[imprps[:, 1:]]
-        return imprps
+
+        return self.GetOwningMol().impropers.mapIds(self.id_map)
 
 
 class Bond(pd.DataFrame):
@@ -157,11 +152,35 @@ class Bond(pd.DataFrame):
         acopy[self.ATOM_COLS] = id_map[acopy[self.ATOM_COLS]]
         return acopy
 
+    def getPairs(self, slices=None):
+        if slices is None:
+            slices = slice(None)
+        return [tuple(sorted(x[slices])) for x in self[self.ATOM_COLS].values]
+
 
 class Angle(Bond):
 
     ATOM_COLS = [ATOM1, ATOM2, ATOM3]
     COLUMN_LABELS = [TYPE_ID] + ATOM_COLS
+
+    def getPairs(self, slices=None):
+        slices = slice(None, None, 2)
+        return super(Angle, self).getPairs(slices=slices)
+
+
+class Dihedral(Bond):
+
+    ATOM_COLS = [ATOM1, ATOM2, ATOM3, ATOM4]
+    COLUMN_LABELS = [TYPE_ID] + ATOM_COLS
+
+
+class Improper(Dihedral):
+
+    def getPairs(self):
+        ids = [
+            itertools.combinations(x, 2) for x in self[self.ATOM_COLS].values
+        ]
+        return [tuple(sorted(y)) for x in ids for y in x]
 
 
 class Mol(structure.Mol):
@@ -182,8 +201,8 @@ class Mol(structure.Mol):
         self.symbol_impropers = {}
         self.bonds = Bond()
         self.angles = Angle()
-        self.dihedrals = []
-        self.impropers = []
+        self.dihedrals = Dihedral()
+        self.impropers = Improper()
         self.nbr_charge = collections.defaultdict(float)
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
@@ -280,7 +299,7 @@ class Mol(structure.Mol):
         for atoms in self.getDihAtoms():
             dihedral = self.ff.getMatchedDihedrals(atoms)[0]
             aids = tuple([x.GetIdx() for x in atoms])
-            self.dihedrals.append((dihedral.id, ) + aids)
+            self.dihedrals = self.dihedrals.append((dihedral.id, ) + aids)
 
     def getDihAtoms(self):
         """
@@ -404,7 +423,7 @@ class Mol(structure.Mol):
             # the center.
             atoms = [neighbors[0], neighbors[1], atom, neighbors[2]]
             improper = (improper_type_id, ) + tuple(x.GetIdx() for x in atoms)
-            self.impropers.append(improper)
+            self.impropers = self.impropers.append(improper)
 
     def printImpropers(self):
         """
@@ -432,9 +451,8 @@ class Mol(structure.Mol):
         ref: Atomic Forces for Geometry-Dependent Point Multipole and Gaussian
         Multipole Models
         """
-
         to_remove = []
-        for itype, id1, id2, id3, id4 in self.impropers:
+        for _, _, id1, id2, id3, id4 in self.impropers.itertuples():
             for eids in itertools.combinations([id2, id1, id4], 2):
                 angle_atom_ids = tuple([eids[0], id3, eids[1]])
                 if angle_atom_ids not in self.rvrs_angles:
@@ -451,10 +469,10 @@ class Mol(structure.Mol):
         The lengths or angle values of these geometries remain unchanged during
         simulation.
         """
-        bonds = [self.ff.bonds[x] for x in self.bonds[TYPE_ID]]
-        self.fbonds = set([x[0] for x in bonds if x.has_h])
-        angles = [self.ff.angles[x] for x in self.angles[TYPE_ID]]
-        self.fangles = set([x[0] for x in angles if x.has_h])
+        self.fbonds = set(
+            [x for x in self.bonds[TYPE_ID] if self.ff.bonds[x].has_h])
+        self.fangles = set(
+            [x for x in self.angles[TYPE_ID] if self.ff.angles[x].has_h])
 
     @property
     def bond_total(self):
@@ -610,8 +628,8 @@ class Struct(structure.Struct, Base):
         self.atm_types.union(atypes)
         self.bnd_types.union(mol.bonds[TYPE_ID].values)
         self.ang_types.union(mol.angles[TYPE_ID].values)
-        self.dihe_types.union([x[0] for x in mol.dihedrals])
-        self.impr_types.union([x[0] for x in mol.impropers])
+        self.dihe_types.union(mol.dihedrals[TYPE_ID].values)
+        self.impr_types.union(mol.impropers[TYPE_ID].values)
 
     def writeData(self, nofile=False):
         """
@@ -823,7 +841,7 @@ class Struct(structure.Struct, Base):
         msg = f'The system has a net charge of {self.atoms[CHARGE].sum():.4f}'
         self.warnings.append(msg)
 
-    def writeBonds(self, fmt='%i %i %i %i'):
+    def writeBonds(self):
         """
         Write bond coefficients.
 
@@ -835,19 +853,14 @@ class Struct(structure.Struct, Base):
         self.bonds.to_csv(self.hdl, **self.TO_CSV_KWARGS)
         self.hdl.write(f"\n")
 
-    def writeAngles(self, fmt='%i %i %i %i %i'):
+    def writeAngles(self):
         """
         Write angle coefficients.
         """
         if not self.angle_total:
             return
         self.hdl.write(f"{self.ANGLES.capitalize()}\n\n")
-        # Some angles may be filtered out by improper
-        angles = [x.angles for x in self.conformer if x.angles.any()]
-        angles = np.concatenate(angles, axis=0)
-        angles[:, 0] = self.ang_types[angles[:, 0]]
-        ids = np.arange(angles.shape[0]).reshape(-1, 1) + 1
-        np.savetxt(self.hdl, np.concatenate([ids, angles], axis=1), fmt=fmt)
+        self.angles.to_csv(self.hdl, **self.TO_CSV_KWARGS)
         self.hdl.write(f"\n")
 
     def writeDihedrals(self, fmt='%i %i %i %i %i %i'):
@@ -865,7 +878,7 @@ class Struct(structure.Struct, Base):
         np.savetxt(self.hdl, np.concatenate([ids, dihes], axis=1), fmt=fmt)
         self.hdl.write(f"\n")
 
-    def writeImpropers(self, fmt='%i %i %i %i %i %i'):
+    def writeImpropers(self):
         """
         Write improper coefficients.
         """
@@ -873,11 +886,7 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.IMPROPERS.capitalize()}\n\n")
-        imprps = [x.impropers for x in self.conformer if x.impropers.any()]
-        imprps = np.concatenate(imprps, axis=0)
-        imprps[:, 0] = self.impr_types[imprps[:, 0]]
-        ids = np.arange(imprps.shape[0]).reshape(-1, 1) + 1
-        np.savetxt(self.hdl, np.concatenate([ids, imprps], axis=1), fmt=fmt)
+        self.impropers.to_csv(self.hdl, **self.TO_CSV_KWARGS)
         self.hdl.write(f"\n")
 
     def getContents(self):
@@ -913,13 +922,9 @@ class Struct(structure.Struct, Base):
         """
         pairs = set()
         for conf in mol.GetConformers():
-            columns = conf.bonds.columns.difference([TYPE_ID])
-            bonds = [tuple(sorted(x)) for x in conf.bonds[columns].values]
-            pairs = pairs.union(bonds)
-            angles = [tuple(sorted(x[1::2])) for x in conf.angles]
-            pairs = pairs.union(angles)
-            imprps = [itertools.combinations(x[1:], 2) for x in conf.impropers]
-            pairs = pairs.union([tuple(sorted(y)) for x in imprps for y in x])
+            pairs = pairs.union(conf.bonds.getPairs())
+            pairs = pairs.union(conf.angles.getPairs())
+            pairs = pairs.union(conf.impropers.getPairs())
             if include14:
                 dihes = [tuple(sorted(x[1::3])) for x in conf.dihedrals]
                 pairs = pairs.union(dihes)
@@ -996,6 +1001,24 @@ class Struct(structure.Struct, Base):
         bonds[TYPE_ID] = self.bnd_types[bonds[TYPE_ID]]
         bonds.index = np.arange(bonds.shape[0]) + 1
         return bonds
+
+    @property
+    def angles(self):
+        angles = [x.angles for x in self.conformer if not x.angles.empty]
+        angles = pd.concat(angles, axis=0)
+        angles[TYPE_ID] = self.ang_types[angles[TYPE_ID]]
+        angles.index = np.arange(angles.shape[0]) + 1
+        return angles
+
+    @property
+    def impropers(self):
+        impropers = [
+            x.impropers for x in self.conformer if not x.impropers.empty
+        ]
+        impropers = pd.concat(impropers, axis=0)
+        impropers[TYPE_ID] = self.impr_types[impropers[TYPE_ID]]
+        impropers.index = np.arange(impropers.shape[0]) + 1
+        return impropers
 
     @property
     def vdws(self):
