@@ -264,14 +264,14 @@ class FixWriter:
         """
         Write fix shake command to enforce constant bond length and angel values.
         """
-        types = ''
+        fixed_types = ''
         if self.options.btypes:
-            types += f' b {self.options.btypes}'
+            fixed_types += f' b {self.options.btypes}'
         if self.options.atypes:
-            types += f' a {self.options.atypes}'
-        if not types:
+            fixed_types += f' a {self.options.atypes}'
+        if not fixed_types:
             return
-        self.fh.write(self.FIX_RIGID_SHAKE.format(types=types))
+        self.fh.write(self.FIX_RIGID_SHAKE.format(types=fixed_types))
 
     def velocity(self):
         """

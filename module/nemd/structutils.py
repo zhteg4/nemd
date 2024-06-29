@@ -596,18 +596,8 @@ class Struct(lammpsdata.Struct):
         self.density = None
         self.box = None
 
-    def addMol(self, mol, include14=False):
-        """
-        Set class exclusions in addition.
-
-        :param include14 bool: whether to include atom separated by 2 bonds for
-            clash check.
-        """
-        mol = super().addMol(mol)
-        self.setClashExclusion(mol, include14=not include14)
-        return mol
-
-    def finalize(self):
+    def finalize(self, include14=False):
+        self.setClashExclusion(include14=not include14)
         self.setVdwRadius()
 
 

@@ -83,6 +83,17 @@ class Bond(pd.DataFrame):
         vals = [x for x in self[TYPE_ID].unique() if func(x)]
         return pd.DataFrame({self.NAME: vals})
 
+    @classmethod
+    def concat(cls, objs, **kwargs):
+        if not len(objs):
+            return cls(None)
+        return pd.concat(objs, **kwargs)
+
+    @classmethod
+    def read_csv(cls, *args, **kwargs):
+        kwargs.update(dict(names=cls.COLUMN_LABELS, sep=r'\s+'))
+        return cls(pd.read_csv(*args, **kwargs))
+
 
 class Angle(Bond):
 
@@ -114,8 +125,6 @@ class Improper(Dihedral):
 
 
 class Conformer(structure.Conformer):
-
-    TYPE_ID = oplsua.TYPE_ID
 
     @property
     def atoms(self):
@@ -187,7 +196,6 @@ class Mol(structure.Mol):
 
     ConfClass = Conformer
     RES_NUM = oplsua.RES_NUM
-    TYPE_ID = oplsua.TYPE_ID
     IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
     INDEXES = [TYPE_ID, ATOM1, ATOM2]
     BONDS_KWARGS = dict(index=[TYPE_ID, ATOM1, ATOM2], dtype=int)
@@ -240,7 +248,7 @@ class Mol(structure.Mol):
         res_charge = collections.defaultdict(float)
         for atom in self.GetAtoms():
             res_num = atom.GetIntProp(self.RES_NUM)
-            type_id = atom.GetIntProp(self.TYPE_ID)
+            type_id = atom.GetIntProp(TYPE_ID)
             res_charge[res_num] += self.ff.charges[type_id]
 
         res_snacharge = {x: 0 for x, y in res_charge.items() if y}
@@ -258,8 +266,7 @@ class Mol(structure.Mol):
                 if not ncharge:
                     continue
                 # The natom lives in nres with total charge
-                snatom_charge = abs(self.ff.charges[natom.GetIntProp(
-                    self.TYPE_ID)])
+                snatom_charge = abs(self.ff.charges[natom.GetIntProp(TYPE_ID)])
                 if snatom_charge > res_snacharge[nres_num]:
                     res_atom[nres_num] = atom.GetIdx()
                     res_snacharge[nres_num] = snatom_charge
@@ -472,7 +479,7 @@ class Mol(structure.Mol):
 
     @property
     def atoms(self):
-        type_ids = [x.GetIntProp(self.TYPE_ID) for x in self.GetAtoms()]
+        type_ids = [x.GetIntProp(TYPE_ID) for x in self.GetAtoms()]
         fchrg = [self.ff.charges[x] for x in type_ids]
         index = pd.Index([x.GetIdx() for x in self.GetAtoms()], name=ID)
         nchrg = [self.nbr_charge[x] for x in index]
@@ -531,12 +538,20 @@ class Base(lammpsin.In):
 
     LAMMPS_DESCRIPTION = 'LAMMPS Description # %s'
 
+    ATOMS = 'atoms'
+    BONDS = 'bonds'
+    ANGLES = 'angles'
+    DIHEDRALS = 'dihedrals'
+    IMPROPERS = 'impropers'
+    TOPO_CT = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
+
     ATOM_TYPES = 'atom types'
     BOND_TYPES = 'bond types'
     ANGLE_TYPES = 'angle types'
     DIHE_TYPES = 'dihedral types'
     IMPROP_TYPES = 'improper types'
-    TYPE_DSP = [ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHE_TYPES, IMPROP_TYPES]
+    TYPE_CT = [ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHE_TYPES, IMPROP_TYPES]
+    ALL_CT = TOPO_CT + TYPE_CT
 
     XLO_XHI = 'xlo xhi'
     YLO_YHI = 'ylo yhi'
@@ -545,39 +560,55 @@ class Base(lammpsin.In):
     BUFFER = [4., 4., 4.]
 
     MASSES = 'Masses'
-    ATOM_ID = 'atom_id'
-    TYPE_ID = oplsua.TYPE_ID
-
-    ATOMS = 'atoms'
-    BONDS = 'bonds'
-    ANGLES = 'angles'
-    DIHEDRALS = 'dihedrals'
-    IMPROPERS = 'impropers'
-    NUM_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS] + TYPE_DSP
-
-    MASSES = 'Masses'
     PAIR_COEFFS = 'Pair Coeffs'
     BOND_COEFFS = 'Bond Coeffs'
     ANGLE_COEFFS = 'Angle Coeffs'
     DIHEDRAL_COEFFS = 'Dihedral Coeffs'
     IMPROPER_COEFFS = 'Improper Coeffs'
+    TYPE_BLK = [
+        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
+        IMPROPER_COEFFS
+    ]
+    BLK_COUNT = {x: y for x, y in zip(TYPE_BLK, TYPE_CT)}
+
     ATOMS_CAP = ATOMS.capitalize()
     BONDS_CAP = BONDS.capitalize()
     ANGLES_CAP = ANGLES.capitalize()
     DIHEDRALS_CAP = DIHEDRALS.capitalize()
     IMPROPERS_CAP = IMPROPERS.capitalize()
+    TOPO_BLK = [ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP, IMPROPERS_CAP]
+    BLK_COUNT.update({x: y for x, y in zip(TOPO_BLK, TOPO_CT)})
+    BLK_MARKERS = TYPE_BLK + TOPO_BLK
 
-    MARKERS = [
-        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
-        IMPROPER_COEFFS, ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP,
-        IMPROPERS_CAP
-    ]
+    TOPO_TYPE = {
+        BONDS_CAP: Bond,
+        ANGLES_CAP: Angle,
+        DIHEDRALS_CAP: Dihedral,
+        IMPROPERS_CAP: Improper
+    }
 
     def setVdwRadius(self):
         """
         Set the vdw radius.
         """
         self.radii = Radius(self.vdws[DIST], self.atoms[TYPE_ID])
+
+    def setClashExclusion(self, include14=True):
+        """
+        Bonded atoms and atoms in angles are in the exclusion. If include14=True,
+        the dihedral angles are in the exclusion as well.
+
+        :param include14 bool: If True, 1-4 interaction in a dihedral angle count
+            as exclusion.
+        """
+        pairs = set(self.bonds.getPairs())
+        pairs = pairs.union(self.angles.getPairs())
+        pairs = pairs.union(self.impropers.getPairs())
+        if include14:
+            pairs = pairs.union(self.dihedrals.getPairs())
+        for id1, id2 in pairs:
+            self.excluded[id1].add(id2)
+            self.excluded[id2].add(id1)
 
 
 class Struct(structure.Struct, Base):
@@ -629,7 +660,7 @@ class Struct(structure.Struct, Base):
         Set the type map for atoms, bonds, angles, dihedrals, and impropers.
         """
 
-        atypes = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
+        atypes = [x.GetIntProp(TYPE_ID) for x in mol.GetAtoms()]
         self.atm_types.union(atypes)
         self.bnd_types.union(mol.bonds[TYPE_ID].values)
         self.ang_types.union(mol.angles[TYPE_ID].values)
@@ -914,25 +945,6 @@ class Struct(structure.Struct, Base):
                                             testing=testing)
         super().writeRun(*arg, struct_info=struct_info, **kwarg)
 
-    def setClashExclusion(self, mol, include14=True):
-        """
-        Bonded atoms and atoms in angles are in the exclusion. If include14=True,
-        the dihedral angles are in the exclusion as well.
-
-        :param include14 bool: If True, 1-4 interaction in a dihedral angle count
-            as exclusion.
-        """
-        pairs = set()
-        for conf in mol.GetConformers():
-            pairs = pairs.union(conf.bonds.getPairs())
-            pairs = pairs.union(conf.angles.getPairs())
-            pairs = pairs.union(conf.impropers.getPairs())
-            if include14:
-                pairs = pairs.union(conf.dihedrals.getPairs())
-        for id1, id2 in pairs:
-            self.excluded[id1].add(id2)
-            self.excluded[id2].add(id1)
-
     def getFixed(self):
         return pd.concat([x.getFixed() for x in self.molecules])
 
@@ -1000,7 +1012,7 @@ class Struct(structure.Struct, Base):
     @property
     def bonds(self):
         bonds = [x.bonds for x in self.conformer if not x.bonds.empty]
-        bonds = pd.concat(bonds, axis=0)
+        bonds = Bond.concat(bonds, axis=0)
         bonds[TYPE_ID] = self.bnd_types[bonds[TYPE_ID]]
         bonds.index = np.arange(bonds.shape[0]) + 1
         return bonds
@@ -1008,7 +1020,7 @@ class Struct(structure.Struct, Base):
     @property
     def angles(self):
         angles = [x.angles for x in self.conformer if not x.angles.empty]
-        angles = pd.concat(angles, axis=0)
+        angles = Angle.concat(angles, axis=0)
         angles[TYPE_ID] = self.ang_types[angles[TYPE_ID]]
         angles.index = np.arange(angles.shape[0]) + 1
         return angles
@@ -1016,7 +1028,7 @@ class Struct(structure.Struct, Base):
     @property
     def dihedrals(self):
         dihes = [x.dihedrals for x in self.conformer if not x.dihedrals.empty]
-        dihes = pd.concat(dihes, axis=0)
+        dihes = Dihedral.concat(dihes, axis=0)
         dihes[TYPE_ID] = self.dihe_types[dihes[TYPE_ID]]
         dihes.index = np.arange(dihes.shape[0]) + 1
         return dihes
@@ -1024,7 +1036,7 @@ class Struct(structure.Struct, Base):
     @property
     def impropers(self):
         imprps = [x.impropers for x in self.conformer if not x.impropers.empty]
-        imprps = pd.concat(imprps, axis=0)
+        imprps = Improper.concat(imprps, axis=0)
         imprps[TYPE_ID] = self.impr_types[imprps[TYPE_ID]]
         imprps.index = np.arange(imprps.shape[0]) + 1
         return imprps
@@ -1045,8 +1057,8 @@ class DataFileReader(Base):
     MASS = 'mass'
     ELE = 'ele'
     MASS_COL = [ID, MASS, ELE]
-    BLK_RE = re.compile(f"^{'|'.join(Base.MARKERS)}$")
-    NUM_RE = re.compile(f"^[0-9]+\s+({'|'.join(Base.NUM_DSP)})$")
+    BLK_RE = re.compile(f"^{'|'.join(Base.BLK_MARKERS)}$")
+    CT_RE = re.compile(f"^[0-9]+\s+({'|'.join(Base.ALL_CT)})$")
     FLT_RE = "[+-]?[\d\.\d]+"
     BOX_RE = re.compile(f"^{FLT_RE}\s+{FLT_RE}\s+({'|'.join(Base.LO_HI)}).*$")
 
@@ -1060,34 +1072,27 @@ class DataFileReader(Base):
         self.lines = None
         self.masses = {}
         self.atoms = {}
-        self.bonds = {}
-        self.angles = {}
-        self.dihedrals = {}
-        self.impropers = {}
         self.vdws = {}
         self.radii = None
         self.excluded = collections.defaultdict(set)
-        self.mk_idxes = {}
-        self.dsp = {x: 0 for x in self.NUM_DSP}
+        self.blk_idx = {}
+        self.count = {x: 0 for x in self.ALL_CT}
+        self.box = {}
 
     def run(self):
         """
         Main method to read and parse the data file.
         """
-        self.read()
+        self.setLines()
         self.indexLines()
         self.setDescription()
         self.setMasses()
         self.setPairCoeffs()
         self.setAtoms()
-        self.setBonds()
-        self.setAngles()
-        self.setDihedrals()
-        self.setImpropers()
 
-    def read(self):
+    def setLines(self):
         """
-        Read the data file and index lines by section marker.
+        Read the data file or content into lines.
         """
         if self.data_file:
             with open(self.data_file, 'r') as df_fh:
@@ -1100,39 +1105,39 @@ class DataFileReader(Base):
 
     def indexLines(self):
         """
-        Index the lines by section marker.
+        Index the lines by block markers.
         """
         for idx, line in enumerate(self.lines):
             match = self.BLK_RE.match(line)
             if not match:
                 continue
-            self.mk_idxes[match.group()] = idx
+            self.blk_idx[match.group()] = idx
 
     def setDescription(self):
         """
         Parse the description section for topo counts, type counts, and box size
         """
-        for line in self.lines[:min(self.mk_idxes.values())]:
-            matches = self.NUM_RE.findall(line) or self.BOX_RE.findall(line)
-            if not matches:
+        for line in self.lines[:min(self.blk_idx.values())]:
+            match = self.CT_RE.match(line)
+            if match:
+                # 'atoms': 1620, 'bonds': 1593, 'angles': 1566 ...
+                # 'atom types': 7, 'bond types': 6, 'angle types': 5 ...
+                self.count[match.group(1)] = int(line.split(match.group(1))[0])
                 continue
-            # 'atoms': 1620, 'bonds': 1593, 'angles': 1566, 'dihedrals': 2511
-            # 'atom types': 7, 'bond types': 6, 'angle types': 5
-            # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
-            match = matches[0]
-            self.dsp[match] = line.split(match)[0]
-        for num_label in self.NUM_DSP:
-            self.dsp[num_label] = int(self.dsp[num_label])
-        for lh_label in self.LO_HI:
-            self.dsp[lh_label] = [float(x) for x in self.dsp[lh_label].split()]
+            match = self.BOX_RE.match(line)
+            if match:
+                # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
+                val = [float(x) for x in line.split(match.group(1))[0].split()]
+                self.box[match.group(1)] = val
+                continue
 
     def setMasses(self):
         """
         Parse the mass section for masses and elements.
         """
-        sidx = self.mk_idxes[self.MASSES] + 2
+        sidx = self.blk_idx[self.MASSES] + 2
         data = []
-        for idx in range(sidx, sidx + self.dsp[self.ATOM_TYPES]):
+        for idx in range(sidx, sidx + self.count[self.ATOM_TYPES]):
             splitted = self.lines[idx].split()
             data.append([splitted[0], splitted[1], splitted[-2]])
         self.masses = pd.DataFrame(data, columns=self.MASS_COL)
@@ -1144,14 +1149,22 @@ class DataFileReader(Base):
         Paser the pair coefficient section.
         """
 
-        if self.PAIR_COEFFS not in self.mk_idxes:
+        if self.PAIR_COEFFS not in self.blk_idx:
             return
-        sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
-        lines = self.lines[sidx:sidx + self.dsp[self.ATOM_TYPES]]
+        sidx = self.blk_idx[self.PAIR_COEFFS] + 2
+        lines = self.lines[sidx:sidx + self.count[self.ATOM_TYPES]]
         data = pd.read_csv(io.StringIO(''.join(lines)),
                            names=VDW_COL,
                            sep=r'\s+')
         self.vdws = data.set_index(ID)
+
+    def read(self, name):
+        if name not in self.blk_idx:
+            return self.TOPO_TYPE[name].read_csv(io.StringIO(''))
+        sidx = self.blk_idx[name] + 2
+        lines = self.lines[sidx:sidx + self.count[self.BLK_COUNT[name]]]
+        io_str = io.StringIO(''.join(lines))
+        return self.TOPO_TYPE[name].read_csv(io_str)
 
     def getBox(self):
         """
@@ -1165,8 +1178,8 @@ class DataFileReader(Base):
         """
         Parse the atom section for atom id and molecule id.
         """
-        sidx = self.mk_idxes[self.ATOMS_CAP] + 2
-        lines = self.lines[sidx:sidx + self.dsp[self.ATOMS]]
+        sidx = self.blk_idx[self.ATOMS_CAP] + 2
+        lines = self.lines[sidx:sidx + self.count[self.ATOMS]]
         data = pd.read_csv(io.StringIO(''.join(lines)),
                            names=ATOM_COL,
                            sep=r'\s+')
@@ -1180,103 +1193,32 @@ class DataFileReader(Base):
                                 type_id.iloc[0]].tolist()
 
     @property
-    def atom(self):
-        """
-        Handy way to get all atoms.
-
-        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
-        """
-
-        return (x for x in self.atoms.values())
-
-    @property
-    def atom_num(self):
-        """
-        Handy way to get all atoms.
-
-        :return generator of 'rdkit.Chem.rdchem.Atom': all atom in all molecules
-        """
-
-        return len(self.atoms)
-
-    @property
-    def molecule(self):
-        """
-        Handy way to get all molecules.
-
-        :return list of list: each sublist contains one int as atom id
-        """
-
-        return super().molecule
-
-    def setBonds(self):
+    def bonds(self):
         """
         Parse the atom section for atom id and molecule id.
         """
-        try:
-            sidx = self.mk_idxes[self.BONDS_CAP] + 2
-        except KeyError:
-            return
+        return self.read(name=self.BONDS_CAP)
 
-        for lid in range(sidx, sidx + self.dsp[self.BONDS]):
-            idx, type_id, id1, id2 = self.lines[lid].split()
-            self.bonds[int(idx)] = types.SimpleNamespace(id=int(idx),
-                                                        type_id=int(type_id),
-                                                        id1=int(id1),
-                                                        id2=int(id2))
-
-    def setAngles(self):
+    @property
+    def angles(self):
         """
         Parse the angle section for angle id and constructing atoms.
         """
-        try:
-            sidx = self.mk_idxes[self.ANGLES_CAP] + 2
-        except KeyError:
-            return
-        for lid in range(sidx, sidx + self.dsp[self.ANGLES]):
+        return self.read(name=self.ANGLES_CAP)
 
-            idx, type_id, id1, id2, id3 = self.lines[lid].split()[:5]
-            self.angles[int(idx)] = types.SimpleNamespace(id=int(idx),
-                                                         type_id=int(type_id),
-                                                         id1=int(id1),
-                                                         id2=int(id2),
-                                                         id3=int(id3))
-
-    def setDihedrals(self):
+    @property
+    def dihedrals(self):
         """
         Parse the dihedral section for dihedral id and constructing atoms.
         """
-        try:
-            sidx = self.mk_idxes[self.DIHEDRALS_CAP] + 2
-        except KeyError:
-            return
-        for lid in range(sidx, sidx + self.dsp[self.DIHEDRALS]):
-            idx, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
-            self.dihedrals[int(idx)] = types.SimpleNamespace(
-                id=int(idx),
-                type_id=int(type_id),
-                id1=int(id1),
-                id2=int(id2),
-                id3=int(id3),
-                id4=int(id4))
+        return self.read(name=self.DIHEDRALS_CAP)
 
-    def setImpropers(self):
+    @property
+    def impropers(self):
         """
         Parse the improper section for dihedral id and constructing atoms.
         """
-        try:
-            sidx = self.mk_idxes[self.IMPROPERS_CAP] + 2
-        except KeyError:
-            return
-        for lid in range(sidx, sidx + self.dsp[self.IMPROPERS]):
-            idx, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
-            self.impropers[int(idx)] = types.SimpleNamespace(
-                id=int(idx),
-                type_id=int(type_id),
-                id1=int(id1),
-                id2=int(id2),
-                id3=int(id3),
-                id4=int(id4))
+        return self.read(name=self.IMPROPERS_CAP)
 
     def setClashParams(self, include14=False):
         """
@@ -1288,27 +1230,6 @@ class DataFileReader(Base):
         self.setClashExclusion(include14=not include14)
         self.setPairCoeffs()
         self.setVdwRadius()
-
-    def setClashExclusion(self, include14=True):
-        """
-        Bonded atoms and atoms in angles are in the exclusion. If include14=True,
-        the dihedral angles are in the exclusion as well.
-
-        :param include14 bool: If True, 1-4 interaction in a dihedral angle count
-            as exclusion.
-        """
-        pairs = set((x.id1, x.id2) for x in self.bonds.values())
-        pairs = pairs.union((x.id1, x.id3) for x in self.angles.values())
-        pairs = pairs.union([
-            y for x in self.impropers.values()
-            for y in itertools.combinations([x.id1, x.id2, x.id3, x.id4], 2)
-        ])
-        if include14:
-            pairs = pairs.union(
-                (x.id1, x.id4) for x in self.dihedrals.values())
-        for id1, id2 in pairs:
-            self.excluded[id1].add(id2)
-            self.excluded[id2].add(id1)
 
 
 class Radius(numpyutils.Array):
