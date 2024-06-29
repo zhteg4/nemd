@@ -38,12 +38,13 @@ ATOM4 = 'atom4'
 
 class Bond(pd.DataFrame):
 
-    NAME = 'bond'
+    NAME = 'Bonds'
     DTYPE = 'dtype'
     COLUMNS = 'columns'
     DEFAULT_DTYPE = int
     ID_COLS = [ATOM1, ATOM2]
     COLUMN_LABELS = [TYPE_ID] + ID_COLS
+    TO_CSV_KWARGS = dict(sep=' ', header=False, float_format='%.4f', mode='a')
 
     def __init__(self, data=None, **kwargs):
         if data is None:
@@ -94,10 +95,24 @@ class Bond(pd.DataFrame):
         kwargs.update(dict(names=cls.COLUMN_LABELS, sep=r'\s+'))
         return cls(pd.read_csv(*args, **kwargs))
 
+    def setIndex(self):
+        self.index = np.arange(self.shape[0]) + 1
+
+    def to_csv(self, path_or_buf=None, as_block=True, **kwargs):
+        if self.empty:
+            return
+        kwargs.update(self.TO_CSV_KWARGS)
+        if not as_block:
+            super().to_csv(path_or_buf=path_or_buf, **kwargs)
+            return
+        path_or_buf.write(self.NAME.capitalize() + '\n\n')
+        super().to_csv(path_or_buf=path_or_buf, **kwargs)
+        path_or_buf.write('\n')
+
 
 class Angle(Bond):
 
-    NAME = 'angle'
+    NAME = 'Angles'
     ID_COLS = [ATOM1, ATOM2, ATOM3]
     COLUMN_LABELS = [TYPE_ID] + ID_COLS
 
@@ -107,7 +122,7 @@ class Angle(Bond):
 
 class Dihedral(Bond):
 
-    NAME = 'dihedral'
+    NAME = 'Dihedrals'
     ID_COLS = [ATOM1, ATOM2, ATOM3, ATOM4]
     COLUMN_LABELS = [TYPE_ID] + ID_COLS
 
@@ -117,7 +132,7 @@ class Dihedral(Bond):
 
 class Improper(Dihedral):
 
-    NAME = 'improper'
+    NAME = 'Impropers'
 
     def getPairs(self):
         ids = [itertools.combinations(x, 2) for x in self[self.ID_COLS].values]
@@ -804,10 +819,9 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.BOND_COEFFS}\n\n")
-        indexes = np.nonzero(self.bnd_types)[0]
-        for oid, id in zip(indexes, self.bnd_types[indexes]):
-            bond = self.ff.bonds[oid]
-            self.hdl.write(f"{id} {bond.ene} {bond.dist}\n")
+        for idx in self.bnd_types.indexes:
+            bond = self.ff.bonds[idx]
+            self.hdl.write(f"{self.bnd_types[idx]} {bond.ene} {bond.dist}\n")
         self.hdl.write("\n")
 
     def writeAngleCoeffs(self):
@@ -818,10 +832,9 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.ANGLE_COEFFS}\n\n")
-        indexes = np.nonzero(self.ang_types)[0]
-        for oid, id in zip(indexes, self.ang_types[indexes]):
-            angle = self.ff.angles[oid]
-            self.hdl.write(f"{id} {angle.ene} {angle.angle}\n")
+        for idx in self.ang_types.indexes:
+            ang = self.ff.angles[idx]
+            self.hdl.write(f"{self.ang_types[idx]} {ang.ene} {ang.angle}\n")
         self.hdl.write("\n")
 
     def writeDiheCoeffs(self):
@@ -832,19 +845,19 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.DIHEDRAL_COEFFS}\n\n")
-        indexes = np.nonzero(self.dihe_types)[0]
-        for oid, id in zip(indexes, self.dihe_types[indexes]):
+        for idx in self.dihe_types.indexes:
             params = [0., 0., 0., 0.]
             # LAMMPS: K1, K2, K3, K4 in 0.5*K1[1+cos(x)] + 0.5*K2[1-cos(2x)]...
             # OPLS: [1 + cos(nx-gama)]
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
-            for ene_ang_n in self.ff.dihedrals[oid].constants:
+            for ene_ang_n in self.ff.dihedrals[idx].constants:
                 params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
                 if not params[ene_ang_n.n_parm]:
                     continue
                 if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
                     params[ene_ang_n.n_parm] *= -1
-            self.hdl.write(f"{id}  {' '.join(map(str, params))}\n")
+            self.hdl.write(
+                f"{self.dihe_types[idx]}  {' '.join(map(str, params))}\n")
         self.hdl.write("\n")
 
     def writeImpropCoeffs(self):
@@ -855,13 +868,13 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.IMPROPER_COEFFS}\n\n")
-        indexes = np.nonzero(self.impr_types)[0]
-        for oid, id in zip(indexes, self.impr_types[indexes]):
-            impr = self.ff.impropers[oid]
+        for idx in self.impr_types.indexes:
+            impr = self.ff.impropers[idx]
             # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
             sign = 1 if impr.angle == 0. else -1
-            self.hdl.write(f"{id} {impr.ene} {sign} {impr.n_parm}\n")
+            self.hdl.write(
+                f"{self.impr_types[idx]} {impr.ene} {sign} {impr.n_parm}\n")
         self.hdl.write("\n")
 
     def writeAtoms(self):
@@ -880,46 +893,26 @@ class Struct(structure.Struct, Base):
     def writeBonds(self):
         """
         Write bond coefficients.
-
-        :param fmt str: the format of bond line in LAMMPS data file.
         """
-        if not self.bond_total:
-            return
-        self.hdl.write(f"{self.BONDS.capitalize()}\n\n")
-        self.bonds.to_csv(self.hdl, **self.TO_CSV_KWARGS)
-        self.hdl.write(f"\n")
+        self.bonds.to_csv(self.hdl)
 
     def writeAngles(self):
         """
         Write angle coefficients.
         """
-        if not self.angle_total:
-            return
-        self.hdl.write(f"{self.ANGLES.capitalize()}\n\n")
-        self.angles.to_csv(self.hdl, **self.TO_CSV_KWARGS)
-        self.hdl.write(f"\n")
+        self.angles.to_csv(self.hdl)
 
     def writeDihedrals(self):
         """
         Write dihedral coefficients.
         """
-        if not self.dihedral_total:
-            return
-
-        self.hdl.write(f"{self.DIHEDRALS.capitalize()}\n\n")
-        self.dihedrals.to_csv(self.hdl, **self.TO_CSV_KWARGS)
-        self.hdl.write(f"\n")
+        self.dihedrals.to_csv(self.hdl)
 
     def writeImpropers(self):
         """
         Write improper coefficients.
         """
-        if not self.improper_total:
-            return
-
-        self.hdl.write(f"{self.IMPROPERS.capitalize()}\n\n")
-        self.impropers.to_csv(self.hdl, **self.TO_CSV_KWARGS)
-        self.hdl.write(f"\n")
+        self.impropers.to_csv(self.hdl)
 
     def getContents(self):
         """
@@ -1014,7 +1007,7 @@ class Struct(structure.Struct, Base):
         bonds = [x.bonds for x in self.conformer if not x.bonds.empty]
         bonds = Bond.concat(bonds, axis=0)
         bonds[TYPE_ID] = self.bnd_types[bonds[TYPE_ID]]
-        bonds.index = np.arange(bonds.shape[0]) + 1
+        bonds.setIndex()
         return bonds
 
     @property
@@ -1022,7 +1015,7 @@ class Struct(structure.Struct, Base):
         angles = [x.angles for x in self.conformer if not x.angles.empty]
         angles = Angle.concat(angles, axis=0)
         angles[TYPE_ID] = self.ang_types[angles[TYPE_ID]]
-        angles.index = np.arange(angles.shape[0]) + 1
+        angles.setIndex()
         return angles
 
     @property
@@ -1030,7 +1023,7 @@ class Struct(structure.Struct, Base):
         dihes = [x.dihedrals for x in self.conformer if not x.dihedrals.empty]
         dihes = Dihedral.concat(dihes, axis=0)
         dihes[TYPE_ID] = self.dihe_types[dihes[TYPE_ID]]
-        dihes.index = np.arange(dihes.shape[0]) + 1
+        dihes.setIndex()
         return dihes
 
     @property
@@ -1038,7 +1031,7 @@ class Struct(structure.Struct, Base):
         imprps = [x.impropers for x in self.conformer if not x.impropers.empty]
         imprps = Improper.concat(imprps, axis=0)
         imprps[TYPE_ID] = self.impr_types[imprps[TYPE_ID]]
-        imprps.index = np.arange(imprps.shape[0]) + 1
+        imprps.setIndex()
         return imprps
 
     @property
