@@ -1,4 +1,5 @@
 import io
+import re
 import math
 import scipy
 import types
@@ -49,25 +50,20 @@ class Conformer(structure.Conformer):
         """
         if not self.HasOwningMol():
             return
-        mol = self.GetOwningMol()
-        data = dict(mol_id=np.array([self.gid] * mol.GetNumAtoms()))
-        data[TYPE_ID] = [x.GetIntProp(self.TYPE_ID) for x in mol.GetAtoms()]
-        fchrg = [mol.ff.charges[x] for x in data[TYPE_ID]]
-        aids = [x.GetIdx() for x in mol.GetAtoms()]
-        nchrg = [mol.nbr_charge[x] for x in aids]
-        data[CHARGE] = np.array([sum(x) for x in zip(fchrg, nchrg)])
+        atoms = self.GetOwningMol().atoms
+        atoms.insert(0, MOL_ID, self.gid)
         for dim, vals in zip(symbols.XYZU, self.GetPositions().transpose()):
-            data[dim] = vals
-        index = pd.Index(self.id_map[aids], name=ID)
-        return pd.DataFrame(data, index=index)
+            atoms[dim] = vals
+        atoms.index = self.id_map[atoms.index]
+        return atoms
 
     @property
     def bonds(self):
         """
         Return bond information in the format of numpy array.
 
-        :return 'numpy.ndarray': information such as bond ids and bonded atom
-            ids.
+        :return `pandas.core.frame.DataFrame`: information such as bond ids and
+            bonded atom ids.
         """
         if not self.HasOwningMol():
             return
@@ -78,8 +74,8 @@ class Conformer(structure.Conformer):
         """
         Return angle information in the format of numpy array.
 
-        :return 'numpy.ndarray': information such as angle ids and connected
-            atom ids.
+        :return `pandas.core.frame.DataFrame`: information such as angle ids and
+            connected atom ids.
         """
         if not self.HasOwningMol():
             return
@@ -90,27 +86,23 @@ class Conformer(structure.Conformer):
         """
         Return dihedral angle information in the format of numpy array.
 
-        :return 'numpy.ndarray': information such as dihedral ids and connected
-            atom ids.
+        :return `pandas.core.frame.DataFrame`: information such as dihedral ids
+            and connected atom ids.
         """
         if not self.HasOwningMol():
             return
-        dihes = np.array(self.GetOwningMol().dihedrals)
-        if dihes.any():
-            dihes[:, 1:] = self.id_map[dihes[:, 1:]]
-        return dihes
+        return self.GetOwningMol().dihedrals.mapIds(self.id_map)
 
     @property
     def impropers(self):
         """
         Return improper angle information in the format of numpy array.
 
-        :return 'numpy.ndarray': information such as improper ids and connected
-            atom ids.
+        :return `pandas.core.frame.DataFrame`: information such as improper ids
+            and connected atom ids.
         """
         if not self.HasOwningMol():
             return
-
         return self.GetOwningMol().impropers.mapIds(self.id_map)
 
 
@@ -119,8 +111,8 @@ class Bond(pd.DataFrame):
     DTYPE = 'dtype'
     COLUMNS = 'columns'
     DEFAULT_DTYPE = int
-    ATOM_COLS = [ATOM1, ATOM2]
-    COLUMN_LABELS = [TYPE_ID] + ATOM_COLS
+    ID_COLS = [ATOM1, ATOM2]
+    COLUMN_LABELS = [TYPE_ID] + ID_COLS
 
     def __init__(self, data=None, **kwargs):
         if data is None:
@@ -149,19 +141,19 @@ class Bond(pd.DataFrame):
 
     def mapIds(self, id_map):
         acopy = self.copy()
-        acopy[self.ATOM_COLS] = id_map[acopy[self.ATOM_COLS]]
+        acopy[self.ID_COLS] = id_map[acopy[self.ID_COLS]]
         return acopy
 
     def getPairs(self, slices=None):
         if slices is None:
             slices = slice(None)
-        return [tuple(sorted(x[slices])) for x in self[self.ATOM_COLS].values]
+        return [tuple(sorted(x[slices])) for x in self[self.ID_COLS].values]
 
 
 class Angle(Bond):
 
-    ATOM_COLS = [ATOM1, ATOM2, ATOM3]
-    COLUMN_LABELS = [TYPE_ID] + ATOM_COLS
+    ID_COLS = [ATOM1, ATOM2, ATOM3]
+    COLUMN_LABELS = [TYPE_ID] + ID_COLS
 
     def getPairs(self, slices=None):
         slices = slice(None, None, 2)
@@ -170,16 +162,14 @@ class Angle(Bond):
 
 class Dihedral(Bond):
 
-    ATOM_COLS = [ATOM1, ATOM2, ATOM3, ATOM4]
-    COLUMN_LABELS = [TYPE_ID] + ATOM_COLS
+    ID_COLS = [ATOM1, ATOM2, ATOM3, ATOM4]
+    COLUMN_LABELS = [TYPE_ID] + ID_COLS
 
 
 class Improper(Dihedral):
 
     def getPairs(self):
-        ids = [
-            itertools.combinations(x, 2) for x in self[self.ATOM_COLS].values
-        ]
+        ids = [itertools.combinations(x, 2) for x in self[self.ID_COLS].values]
         return [tuple(sorted(y)) for x in ids for y in x]
 
 
@@ -198,11 +188,11 @@ class Mol(structure.Mol):
         """
         super().__init__(*args, **kwargs)
         self.ff = ff
-        self.symbol_impropers = {}
         self.bonds = Bond()
         self.angles = Angle()
         self.dihedrals = Dihedral()
         self.impropers = Improper()
+        self.symbol_impropers = {}
         self.nbr_charge = collections.defaultdict(float)
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
@@ -475,13 +465,22 @@ class Mol(structure.Mol):
             [x for x in self.angles[TYPE_ID] if self.ff.angles[x].has_h])
 
     @property
+    def atoms(self):
+        type_ids = [x.GetIntProp(self.TYPE_ID) for x in self.GetAtoms()]
+        fchrg = [self.ff.charges[x] for x in type_ids]
+        index = pd.Index([x.GetIdx() for x in self.GetAtoms()], name=ID)
+        nchrg = [self.nbr_charge[x] for x in index]
+        chrg = np.array([sum(x) for x in zip(fchrg, nchrg)])
+        return pd.DataFrame({TYPE_ID: type_ids, CHARGE: chrg}, index=index)
+
+    @property
     def bond_total(self):
         """
         Total number of bonds in the molecule.
 
         :return int: number of bonds across conformers.
         """
-        return len(self.bonds) * self.GetNumConformers()
+        return self.bonds.shape[0] * self.GetNumConformers()
 
     @property
     def angle_total(self):
@@ -490,7 +489,7 @@ class Mol(structure.Mol):
 
         :return int: number of angles across conformers.
         """
-        return len(self.angles) * self.GetNumConformers()
+        return self.angles.shape[0] * self.GetNumConformers()
 
     @property
     def dihedral_total(self):
@@ -499,7 +498,7 @@ class Mol(structure.Mol):
 
         :return int: number of dihedral in across conformers.
         """
-        return len(self.dihedrals) * self.GetNumConformers()
+        return self.dihedrals.shape[0] * self.GetNumConformers()
 
     @property
     def improper_total(self):
@@ -508,7 +507,7 @@ class Mol(structure.Mol):
 
         :return int: number of improper angles across conformers.
         """
-        return len(self.impropers) * self.GetNumConformers()
+        return self.impropers.shape[0] * self.GetNumConformers()
 
     @property
     def molecular_weight(self):
@@ -548,7 +547,7 @@ class Base(lammpsin.In):
     ANGLES = 'angles'
     DIHEDRALS = 'dihedrals'
     IMPROPERS = 'impropers'
-    STRUCT_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
+    NUM_DSP = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS] + TYPE_DSP
 
     MASSES = 'Masses'
     PAIR_COEFFS = 'Pair Coeffs'
@@ -863,7 +862,7 @@ class Struct(structure.Struct, Base):
         self.angles.to_csv(self.hdl, **self.TO_CSV_KWARGS)
         self.hdl.write(f"\n")
 
-    def writeDihedrals(self, fmt='%i %i %i %i %i %i'):
+    def writeDihedrals(self):
         """
         Write dihedral coefficients.
         """
@@ -871,11 +870,7 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.DIHEDRALS.capitalize()}\n\n")
-        dihes = [x.dihedrals for x in self.conformer if x.dihedrals.any()]
-        dihes = np.concatenate(dihes, axis=0)
-        dihes[:, 0] = self.dihe_types[dihes[:, 0]]
-        ids = np.arange(dihes.shape[0]).reshape(-1, 1) + 1
-        np.savetxt(self.hdl, np.concatenate([ids, dihes], axis=1), fmt=fmt)
+        self.dihedrals.to_csv(self.hdl, **self.TO_CSV_KWARGS)
         self.hdl.write(f"\n")
 
     def writeImpropers(self):
@@ -990,8 +985,7 @@ class Struct(structure.Struct, Base):
     @property
     def atoms(self):
         data = pd.concat(x.atoms for x in self.conformer)
-        if self.atm_types is not None:
-            data[TYPE_ID] = self.atm_types[data[TYPE_ID]]
+        data[TYPE_ID] = self.atm_types[data[TYPE_ID]]
         return data
 
     @property
@@ -1011,14 +1005,20 @@ class Struct(structure.Struct, Base):
         return angles
 
     @property
+    def dihedrals(self):
+        dihes = [x.dihedrals for x in self.conformer if not x.dihedrals.empty]
+        dihes = pd.concat(dihes, axis=0)
+        dihes[TYPE_ID] = self.dihe_types[dihes[TYPE_ID]]
+        dihes.index = np.arange(dihes.shape[0]) + 1
+        return dihes
+
+    @property
     def impropers(self):
-        impropers = [
-            x.impropers for x in self.conformer if not x.impropers.empty
-        ]
-        impropers = pd.concat(impropers, axis=0)
-        impropers[TYPE_ID] = self.impr_types[impropers[TYPE_ID]]
-        impropers.index = np.arange(impropers.shape[0]) + 1
-        return impropers
+        imprps = [x.impropers for x in self.conformer if not x.impropers.empty]
+        imprps = pd.concat(imprps, axis=0)
+        imprps[TYPE_ID] = self.impr_types[imprps[TYPE_ID]]
+        imprps.index = np.arange(imprps.shape[0]) + 1
+        return imprps
 
     @property
     def vdws(self):
@@ -1035,6 +1035,10 @@ class DataFileReader(Base):
     MASS = 'mass'
     ELE = 'ele'
     MASS_COL = [ID, MASS, ELE]
+    BLK_RE = re.compile(f"^{'|'.join(Base.MARKERS)}$")
+    NUM_RE = re.compile(f"^[0-9]+\s+({'|'.join(Base.NUM_DSP)})$")
+    FLT_RE = "[+-]?[\d\.\d]+"
+    BOX_RE = re.compile(f"^{FLT_RE}\s+{FLT_RE}\s+({'|'.join(Base.LO_HI)}).*$")
 
     def __init__(self, data_file=None, contents=None):
         """
@@ -1053,6 +1057,8 @@ class DataFileReader(Base):
         self.vdws = {}
         self.radii = None
         self.excluded = collections.defaultdict(set)
+        self.mk_idxes = {}
+        self.dsp = {x: 0 for x in self.NUM_DSP}
 
     def run(self):
         """
@@ -1076,41 +1082,39 @@ class DataFileReader(Base):
         if self.data_file:
             with open(self.data_file, 'r') as df_fh:
                 self.lines = df_fh.readlines()
-        else:
-            content_type, content_string = self.contents.split(b',')
-            decoded = base64.b64decode(content_string)
-            self.lines = decoded.decode("utf-8").splitlines()
+                return
+
+        content_type, content_string = self.contents.split(b',')
+        decoded = base64.b64decode(content_string)
+        self.lines = decoded.decode("utf-8").splitlines()
 
     def indexLines(self):
-        self.mk_idxes = {
-            x: i
-            for i, l in enumerate(self.lines)
-            for x in self.MARKERS if l.startswith(x)
-        }
+        """
+        Index the lines by section marker.
+        """
+        for idx, line in enumerate(self.lines):
+            match = self.BLK_RE.match(line)
+            if not match:
+                continue
+            self.mk_idxes[match.group()] = idx
 
     def setDescription(self):
         """
         Parse the description section for topo counts, type counts, and box size
         """
-        dsp_eidx = min(self.mk_idxes.values())
-        # {'atoms': 1620, 'bonds': 1593, 'angles': 1566, 'dihedrals': 2511}
-        self.struct_dsp = {
-            y: int(self.lines[x].split(y)[0])
-            for x in range(dsp_eidx)
-            for y in self.STRUCT_DSP if y in self.lines[x]
-        }
-        # {'atom types': 7, 'bond types': 6, 'angle types': 5}
-        self.dype_dsp = {
-            y: int(self.lines[x].split(y)[0])
-            for x in range(dsp_eidx)
-            for y in self.TYPE_DSP if y in self.lines[x]
-        }
-        # {'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], 'zlo zhi': ..}
-        self.box_dsp = {
-            y: [float(z) for z in self.lines[x].split(y)[0].split()]
-            for x in range(dsp_eidx)
-            for y in self.LO_HI if y in self.lines[x]
-        }
+        for line in self.lines[:min(self.mk_idxes.values())]:
+            matches = self.NUM_RE.findall(line) or self.BOX_RE.findall(line)
+            if not matches:
+                continue
+            # 'atoms': 1620, 'bonds': 1593, 'angles': 1566, 'dihedrals': 2511
+            # 'atom types': 7, 'bond types': 6, 'angle types': 5
+            # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
+            match = matches[0]
+            self.dsp[match] = line.split(match)[0]
+        for num_label in self.NUM_DSP:
+            self.dsp[num_label] = int(self.dsp[num_label])
+        for lh_label in self.LO_HI:
+            self.dsp[lh_label] = [float(x) for x in self.dsp[lh_label].split()]
 
     def setMasses(self):
         """
@@ -1118,7 +1122,7 @@ class DataFileReader(Base):
         """
         sidx = self.mk_idxes[self.MASSES] + 2
         data = []
-        for idx in range(sidx, sidx + self.dype_dsp[self.ATOM_TYPES]):
+        for idx in range(sidx, sidx + self.dsp[self.ATOM_TYPES]):
             splitted = self.lines[idx].split()
             data.append([splitted[0], splitted[1], splitted[-2]])
         self.masses = pd.DataFrame(data, columns=self.MASS_COL)
@@ -1133,7 +1137,7 @@ class DataFileReader(Base):
         if self.PAIR_COEFFS not in self.mk_idxes:
             return
         sidx = self.mk_idxes[self.PAIR_COEFFS] + 2
-        lines = self.lines[sidx:sidx + self.dype_dsp[self.ATOM_TYPES]]
+        lines = self.lines[sidx:sidx + self.dsp[self.ATOM_TYPES]]
         data = pd.read_csv(io.StringIO(''.join(lines)),
                            names=VDW_COL,
                            sep=r'\s+')
@@ -1147,48 +1151,12 @@ class DataFileReader(Base):
         """
         return [y for x in self.box_dsp.values() for y in x]
 
-    def getBoxEdges(self):
-        """
-        Get the edges of the box.
-
-        :return list of list: each sublist contains two points describing one
-            edge.
-        """
-        box = self.getBox()
-        return self.getEdgesFromList(box)
-
-    @staticmethod
-    def getEdgesFromList(lo_hi):
-        """
-        Get the edges from point list of low and high points.
-
-        :param lo_hi list of float: xlo, xhi, ylo, yhi, zlo, zhi
-        :return list of list: each sublist contains two points describing one
-            edge.
-        """
-        lo_hi = [lo_hi[i * 2:i * 2 + 2] for i in range(3)]
-        los = [lh[0] for lh in lo_hi]
-        lo_edges = [[los[:], los[:]] for _ in range(3)]
-        for index, (lo, hi) in enumerate(lo_hi):
-            lo_edges[index][1][index] = hi
-        his = [lh[1] for lh in lo_hi]
-        hi_edges = [[his[:], his[:]] for _ in range(3)]
-        for index, (lo, hi) in enumerate(lo_hi):
-            hi_edges[index][1][index] = lo
-        spnts = collections.deque([x[1] for x in lo_edges])
-        epnts = collections.deque([x[1] for x in hi_edges])
-        epnts.rotate(1)
-        oedges = [[x, y] for x, y in zip(spnts, epnts)]
-        epnts.rotate(1)
-        oedges += [[x, y] for x, y in zip(spnts, epnts)]
-        return lo_edges + hi_edges + oedges
-
     def setAtoms(self):
         """
         Parse the atom section for atom id and molecule id.
         """
         sidx = self.mk_idxes[self.ATOMS_CAP] + 2
-        lines = self.lines[sidx:sidx + self.struct_dsp[self.ATOMS]]
+        lines = self.lines[sidx:sidx + self.dsp[self.ATOMS]]
         data = pd.read_csv(io.StringIO(''.join(lines)),
                            names=ATOM_COL,
                            sep=r'\s+')
@@ -1240,7 +1208,7 @@ class DataFileReader(Base):
         except KeyError:
             return
 
-        for lid in range(sidx, sidx + self.struct_dsp[self.BONDS]):
+        for lid in range(sidx, sidx + self.dsp[self.BONDS]):
             id, type_id, id1, id2 = self.lines[lid].split()
             self.bonds[int(id)] = types.SimpleNamespace(id=int(id),
                                                         type_id=int(type_id),
@@ -1255,11 +1223,10 @@ class DataFileReader(Base):
             sidx = self.mk_idxes[self.ANGLES_CAP] + 2
         except KeyError:
             return
-        for id, lid in enumerate(
-                range(sidx, sidx + self.struct_dsp[self.ANGLES]), 1):
+        for lid in range(sidx, sidx + self.dsp[self.ANGLES]):
 
-            id, type_id, id1, id2, id3 = self.lines[lid].split()[:5]
-            self.angles[int(id)] = types.SimpleNamespace(id=int(id),
+            idx, type_id, id1, id2, id3 = self.lines[lid].split()[:5]
+            self.angles[int(id)] = types.SimpleNamespace(id=int(idx),
                                                          type_id=int(type_id),
                                                          id1=int(id1),
                                                          id2=int(id2),
@@ -1273,11 +1240,10 @@ class DataFileReader(Base):
             sidx = self.mk_idxes[self.DIHEDRALS_CAP] + 2
         except KeyError:
             return
-        for id, lid in enumerate(
-                range(sidx, sidx + self.struct_dsp[self.DIHEDRALS]), 1):
-            id, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
-            self.dihedrals[int(id)] = types.SimpleNamespace(
-                id=int(id),
+        for lid in range(sidx, sidx + self.dsp[self.DIHEDRALS]):
+            idx, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
+            self.dihedrals[int(idx)] = types.SimpleNamespace(
+                id=int(idx),
                 type_id=int(type_id),
                 id1=int(id1),
                 id2=int(id2),
@@ -1292,11 +1258,10 @@ class DataFileReader(Base):
             sidx = self.mk_idxes[self.IMPROPERS_CAP] + 2
         except KeyError:
             return
-        for id, lid in enumerate(
-                range(sidx, sidx + self.struct_dsp[self.IMPROPERS]), 1):
-            id, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
-            self.impropers[int(id)] = types.SimpleNamespace(
-                id=int(id),
+        for lid in range(sidx, sidx + self.dsp[self.IMPROPERS]):
+            idx, type_id, id1, id2, id3, id4 = self.lines[lid].split()[:6]
+            self.impropers[int(idx)] = types.SimpleNamespace(
+                id=int(idx),
                 type_id=int(type_id),
                 id1=int(id1),
                 id2=int(id2),
@@ -1347,10 +1312,10 @@ class Radius(numpyutils.Array):
     MIN_DIST = 1.4
     SCALE = 0.45
 
-    def __new__(cls, dists, types, *args, **kwargs):
+    def __new__(cls, dists, atypes, *args, **kwargs):
         """
         :param dists pandas.Series: type id (index), atom radius (value)
-        :param types pandas.Series: global atom id (index), atom type (value)
+        :param atypes pandas.Series: global atom id (index), atom type (value)
         """
         # Data.GEOMETRIC is optimized for speed and is supported
         kwargs = dict(index=range(dists.index.max() + 1), fill_value=0)
@@ -1361,6 +1326,6 @@ class Radius(numpyutils.Array):
         radii *= pow(2, 1 / 6) * cls.SCALE
         radii[radii < cls.MIN_DIST] = cls.MIN_DIST
         obj = np.asarray(radii).view(cls)
-        kwargs = dict(index=range(types.index.max() + 1), fill_value=0)
-        obj.id_map = types.reindex(**kwargs).values
+        kwargs = dict(index=range(atypes.index.max() + 1), fill_value=0)
+        obj.id_map = atypes.reindex(**kwargs).values
         return obj
