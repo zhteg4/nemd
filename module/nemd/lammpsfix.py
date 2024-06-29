@@ -4,7 +4,7 @@ DUMP_EVERY = "dump_modify {id} every {arg}\n"
 DUMP_ID, DUMP_Q = 1, 1000
 
 FIX = 'fix'
-FIX_RIGID_SHAKE = f'{FIX} rigid all shake 0.0001 10 10000 b {{bond}} a {{angle}}\n'
+FIX_RIGID_SHAKE = f'{FIX} rigid all shake 0.0001 10 10000 {{types}}\n'
 VELOCITY = 'velocity'
 RUN_STEP = "run %i\n"
 UNFIX = "unfix %s\n"

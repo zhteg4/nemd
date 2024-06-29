@@ -36,6 +36,83 @@ ATOM3 = 'atom3'
 ATOM4 = 'atom4'
 
 
+class Bond(pd.DataFrame):
+
+    NAME = 'bond'
+    DTYPE = 'dtype'
+    COLUMNS = 'columns'
+    DEFAULT_DTYPE = int
+    ID_COLS = [ATOM1, ATOM2]
+    COLUMN_LABELS = [TYPE_ID] + ID_COLS
+
+    def __init__(self, data=None, **kwargs):
+        if data is None:
+            dtype = kwargs.get(self.DTYPE, self.DEFAULT_DTYPE)
+            data = {x: pd.Series(dtype=dtype) for x in self.COLUMN_LABELS}
+        super().__init__(data=data, **kwargs)
+
+    @classmethod
+    @property
+    def _constructor(cls):
+        """
+        Return the constructor of the class.
+
+        :return 'Bond' class or subclass of 'Bond': the constructor of the class
+        """
+        return cls
+
+    @classmethod
+    def new(cls, *args, **kwargs):
+        return cls(*args, **kwargs)
+
+    def append(self, *args, **kwargs):
+        kwargs.update(dict(index=self.COLUMN_LABELS, dtype=self.DEFAULT_DTYPE),
+                      columns=[self.shape[0]])
+        return self._append(self.new(*args, **kwargs).transpose())
+
+    def mapIds(self, id_map):
+        acopy = self.copy()
+        acopy[self.ID_COLS] = id_map[acopy[self.ID_COLS]]
+        return acopy
+
+    def getPairs(self, step=1):
+        slices = slice(None, None, step)
+        return [tuple(sorted(x[slices])) for x in self[self.ID_COLS].values]
+
+    def getFixed(self, func):
+        vals = [x for x in self[TYPE_ID].unique() if func(x)]
+        return pd.DataFrame({self.NAME: vals})
+
+
+class Angle(Bond):
+
+    NAME = 'angle'
+    ID_COLS = [ATOM1, ATOM2, ATOM3]
+    COLUMN_LABELS = [TYPE_ID] + ID_COLS
+
+    def getPairs(self, step=2):
+        return super(Angle, self).getPairs(step=step)
+
+
+class Dihedral(Bond):
+
+    NAME = 'dihedral'
+    ID_COLS = [ATOM1, ATOM2, ATOM3, ATOM4]
+    COLUMN_LABELS = [TYPE_ID] + ID_COLS
+
+    def getPairs(self, step=3):
+        return super(Dihedral, self).getPairs(step=step)
+
+
+class Improper(Dihedral):
+
+    NAME = 'improper'
+
+    def getPairs(self):
+        ids = [itertools.combinations(x, 2) for x in self[self.ID_COLS].values]
+        return [tuple(sorted(y)) for x in ids for y in x]
+
+
 class Conformer(structure.Conformer):
 
     TYPE_ID = oplsua.TYPE_ID
@@ -106,73 +183,6 @@ class Conformer(structure.Conformer):
         return self.GetOwningMol().impropers.mapIds(self.id_map)
 
 
-class Bond(pd.DataFrame):
-
-    DTYPE = 'dtype'
-    COLUMNS = 'columns'
-    DEFAULT_DTYPE = int
-    ID_COLS = [ATOM1, ATOM2]
-    COLUMN_LABELS = [TYPE_ID] + ID_COLS
-
-    def __init__(self, data=None, **kwargs):
-        if data is None:
-            dtype = kwargs.get(self.DTYPE, self.DEFAULT_DTYPE)
-            data = {x: pd.Series(dtype=dtype) for x in self.COLUMN_LABELS}
-        super().__init__(data=data, **kwargs)
-
-    @classmethod
-    @property
-    def _constructor(cls):
-        """
-        Return the constructor of the class.
-
-        :return 'Bond' class or subclass of 'Bond': the constructor of the class
-        """
-        return cls
-
-    @classmethod
-    def new(cls, *args, **kwargs):
-        return cls(*args, **kwargs)
-
-    def append(self, *args, **kwargs):
-        kwargs.update(dict(index=self.COLUMN_LABELS, dtype=self.DEFAULT_DTYPE),
-                      columns=[self.shape[0]])
-        return self._append(self.new(*args, **kwargs).transpose())
-
-    def mapIds(self, id_map):
-        acopy = self.copy()
-        acopy[self.ID_COLS] = id_map[acopy[self.ID_COLS]]
-        return acopy
-
-    def getPairs(self, slices=None):
-        if slices is None:
-            slices = slice(None)
-        return [tuple(sorted(x[slices])) for x in self[self.ID_COLS].values]
-
-
-class Angle(Bond):
-
-    ID_COLS = [ATOM1, ATOM2, ATOM3]
-    COLUMN_LABELS = [TYPE_ID] + ID_COLS
-
-    def getPairs(self, slices=None):
-        slices = slice(None, None, 2)
-        return super(Angle, self).getPairs(slices=slices)
-
-
-class Dihedral(Bond):
-
-    ID_COLS = [ATOM1, ATOM2, ATOM3, ATOM4]
-    COLUMN_LABELS = [TYPE_ID] + ID_COLS
-
-
-class Improper(Dihedral):
-
-    def getPairs(self):
-        ids = [itertools.combinations(x, 2) for x in self[self.ID_COLS].values]
-        return [tuple(sorted(y)) for x in ids for y in x]
-
-
 class Mol(structure.Mol):
 
     ConfClass = Conformer
@@ -196,8 +206,6 @@ class Mol(structure.Mol):
         self.nbr_charge = collections.defaultdict(float)
         self.rvrs_bonds = {}
         self.rvrs_angles = {}
-        self.fbonds = set()
-        self.fangles = set()
         if self.ff is None and self.struct and hasattr(self.struct, 'ff'):
             self.ff = self.struct.ff
         if self.ff is None:
@@ -217,7 +225,6 @@ class Mol(structure.Mol):
         self.setDihedrals()
         self.setImpropers()
         self.removeAngles()
-        self.setFixGeom()
 
     def typeAtoms(self):
         """
@@ -454,15 +461,14 @@ class Mol(structure.Mol):
             to_remove.append(index)
         self.angles = self.angles.drop(index=to_remove)
 
-    def setFixGeom(self):
+    def getFixed(self):
         """
         The lengths or angle values of these geometries remain unchanged during
         simulation.
         """
-        self.fbonds = set(
-            [x for x in self.bonds[TYPE_ID] if self.ff.bonds[x].has_h])
-        self.fangles = set(
-            [x for x in self.angles[TYPE_ID] if self.ff.angles[x].has_h])
+        bnd_types = self.bonds.getFixed(lambda x: self.ff.bonds[x].has_h)
+        ang_types = self.angles.getFixed(lambda x: self.ff.angles[x].has_h)
+        return pd.concat([bnd_types, ang_types], axis=1)
 
     @property
     def atoms(self):
@@ -899,8 +905,9 @@ class Struct(structure.Struct, Base):
         Write command to further equilibrate the system with molecules
         information considered.
         """
-        btypes = [self.bnd_types[y] for x in self.molecules for y in x.fbonds]
-        atypes = [self.ang_types[y] for x in self.molecules for y in x.fangles]
+        fixed = self.getFixed()
+        btypes = ' '.join(map(str, fixed[Bond.NAME].dropna().unique()))
+        atypes = ' '.join(map(str, fixed[Angle.NAME].dropna().unique()))
         testing = self.conformer_total == 1 and self.atom_total < 100
         struct_info = types.SimpleNamespace(btypes=btypes,
                                             atypes=atypes,
@@ -921,11 +928,13 @@ class Struct(structure.Struct, Base):
             pairs = pairs.union(conf.angles.getPairs())
             pairs = pairs.union(conf.impropers.getPairs())
             if include14:
-                dihes = [tuple(sorted(x[1::3])) for x in conf.dihedrals]
-                pairs = pairs.union(dihes)
+                pairs = pairs.union(conf.dihedrals.getPairs())
         for id1, id2 in pairs:
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
+
+    def getFixed(self):
+        return pd.concat([x.getFixed() for x in self.molecules])
 
     @property
     def bond_total(self):
@@ -1032,6 +1041,7 @@ class DataFileReader(Base):
     """
     LAMMPS Data file reader
     """
+
     MASS = 'mass'
     ELE = 'ele'
     MASS_COL = [ID, MASS, ELE]
@@ -1209,8 +1219,8 @@ class DataFileReader(Base):
             return
 
         for lid in range(sidx, sidx + self.dsp[self.BONDS]):
-            id, type_id, id1, id2 = self.lines[lid].split()
-            self.bonds[int(id)] = types.SimpleNamespace(id=int(id),
+            idx, type_id, id1, id2 = self.lines[lid].split()
+            self.bonds[int(idx)] = types.SimpleNamespace(id=int(idx),
                                                         type_id=int(type_id),
                                                         id1=int(id1),
                                                         id2=int(id2))
@@ -1226,7 +1236,7 @@ class DataFileReader(Base):
         for lid in range(sidx, sidx + self.dsp[self.ANGLES]):
 
             idx, type_id, id1, id2, id3 = self.lines[lid].split()[:5]
-            self.angles[int(id)] = types.SimpleNamespace(id=int(idx),
+            self.angles[int(idx)] = types.SimpleNamespace(id=int(idx),
                                                          type_id=int(type_id),
                                                          id1=int(id1),
                                                          id2=int(id2),
