@@ -27,30 +27,40 @@ YU = symbols.YU
 ZU = symbols.ZU
 XYZU = symbols.XYZU
 ATOM_COL = [ID, MOL_ID, TYPE_ID, CHARGE, XU, YU, ZU]
-ENE = 'ene'
-DIST = 'dist'
-VDW_COL = [ID, ENE, DIST]
+
 ATOM1 = 'atom1'
 ATOM2 = 'atom2'
 ATOM3 = 'atom3'
 ATOM4 = 'atom4'
 
+ENE = 'ene'
+DIST = 'dist'
 
-class Bond(pd.DataFrame):
 
-    NAME = 'Bonds'
-    DTYPE = 'dtype'
+class Mass(pd.DataFrame):
+
     COLUMNS = 'columns'
-    DEFAULT_DTYPE = int
-    ID_COLS = [ATOM1, ATOM2]
-    COLUMN_LABELS = [TYPE_ID] + ID_COLS
     TO_CSV_KWARGS = dict(sep=' ', header=False, float_format='%.4f', mode='a')
+    NAME = 'Masses'
+    COLUMN_LABELS = ['mass', 'comment']
 
     def __init__(self, data=None, **kwargs):
-        if data is None:
-            dtype = kwargs.get(self.DTYPE, self.DEFAULT_DTYPE)
-            data = {x: pd.Series(dtype=dtype) for x in self.COLUMN_LABELS}
+        if not isinstance(data, pd.DataFrame) and kwargs.get(
+                self.COLUMNS) is None:
+            kwargs[self.COLUMNS] = self.COLUMN_LABELS
         super().__init__(data=data, **kwargs)
+        self.index = pd.RangeIndex(start=1, stop=self.shape[0] + 1)
+
+    def to_csv(self, path_or_buf=None, as_block=True, **kwargs):
+        if self.empty:
+            return
+        kwargs.update(self.TO_CSV_KWARGS)
+        if not as_block:
+            super().to_csv(path_or_buf=path_or_buf, **kwargs)
+            return
+        path_or_buf.write(self.NAME + '\n\n')
+        super().to_csv(path_or_buf=path_or_buf, **kwargs)
+        path_or_buf.write('\n')
 
     @classmethod
     @property
@@ -66,10 +76,29 @@ class Bond(pd.DataFrame):
     def new(cls, *args, **kwargs):
         return cls(*args, **kwargs)
 
+
+class Vdw(Mass):
+
+    NAME = 'Pair Coeffs'
+    COLUMN_LABELS = [ENE, DIST]
+
+
+class Bond(Mass):
+
+    NAME = 'Bonds'
+    DTYPE = 'dtype'
+    DEFAULT_DTYPE = int
+    ID_COLS = [ATOM1, ATOM2]
+    COLUMN_LABELS = [TYPE_ID] + ID_COLS
+
+    def __init__(self, data=None, **kwargs):
+        if data is None:
+            dtype = kwargs.get(self.DTYPE, self.DEFAULT_DTYPE)
+            data = {x: pd.Series(dtype=dtype) for x in self.COLUMN_LABELS}
+        super().__init__(data=data, **kwargs)
+
     def append(self, *args, **kwargs):
-        kwargs.update(dict(index=self.COLUMN_LABELS, dtype=self.DEFAULT_DTYPE),
-                      columns=[self.shape[0]])
-        return self._append(self.new(*args, **kwargs).transpose())
+        return self._append(*args, **kwargs)
 
     def mapIds(self, id_map):
         acopy = self.copy()
@@ -94,20 +123,6 @@ class Bond(pd.DataFrame):
     def read_csv(cls, *args, **kwargs):
         kwargs.update(dict(names=cls.COLUMN_LABELS, sep=r'\s+'))
         return cls(pd.read_csv(*args, **kwargs))
-
-    def setIndex(self):
-        self.index = np.arange(self.shape[0]) + 1
-
-    def to_csv(self, path_or_buf=None, as_block=True, **kwargs):
-        if self.empty:
-            return
-        kwargs.update(self.TO_CSV_KWARGS)
-        if not as_block:
-            super().to_csv(path_or_buf=path_or_buf, **kwargs)
-            return
-        path_or_buf.write(self.NAME.capitalize() + '\n\n')
-        super().to_csv(path_or_buf=path_or_buf, **kwargs)
-        path_or_buf.write('\n')
 
 
 class Angle(Bond):
@@ -149,8 +164,6 @@ class Conformer(structure.Conformer):
         :return `pandas.core.frame.DataFrame`: information such as atom global
             ids, molecule ids, atom type ids, charges, coordinates.
         """
-        if not self.HasOwningMol():
-            return
         atoms = self.GetOwningMol().atoms
         atoms.insert(0, MOL_ID, self.gid)
         for dim, vals in zip(symbols.XYZU, self.GetPositions().transpose()):
@@ -166,8 +179,6 @@ class Conformer(structure.Conformer):
         :return `pandas.core.frame.DataFrame`: information such as bond ids and
             bonded atom ids.
         """
-        if not self.HasOwningMol():
-            return
         return self.GetOwningMol().bonds.mapIds(self.id_map)
 
     @property
@@ -178,8 +189,6 @@ class Conformer(structure.Conformer):
         :return `pandas.core.frame.DataFrame`: information such as angle ids and
             connected atom ids.
         """
-        if not self.HasOwningMol():
-            return
         return self.GetOwningMol().angles.mapIds(self.id_map)
 
     @property
@@ -190,8 +199,6 @@ class Conformer(structure.Conformer):
         :return `pandas.core.frame.DataFrame`: information such as dihedral ids
             and connected atom ids.
         """
-        if not self.HasOwningMol():
-            return
         return self.GetOwningMol().dihedrals.mapIds(self.id_map)
 
     @property
@@ -202,8 +209,6 @@ class Conformer(structure.Conformer):
         :return `pandas.core.frame.DataFrame`: information such as improper ids
             and connected atom ids.
         """
-        if not self.HasOwningMol():
-            return
         return self.GetOwningMol().impropers.mapIds(self.id_map)
 
 
@@ -293,23 +298,29 @@ class Mol(structure.Mol):
         """
         Set bonding information.
         """
-        for bond_id, bond in enumerate(self.GetBonds()):
+        for bond in self.GetBonds():
             bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
             bond = self.ff.getMatchedBonds(bonded)[0]
             aids = sorted([bonded[0].GetIdx(), bonded[1].GetIdx()])
-            self.bonds = self.bonds.append([bond.id, *aids])
-            self.rvrs_bonds[tuple(aids)] = bond.id
+            bond = Bond([[bond.id, *aids]])
+            self.bonds = self.bonds.append(bond)
+
+        bonds = self.bonds.drop(columns=[TYPE_ID])
+        self.rvrs_bonds = {tuple(y): x for x, *y in bonds.itertuples()}
 
     def setAngles(self):
         """
         Set angle force field matches.
         """
         angles = [y for x in self.GetAtoms() for y in self.ff.getAngleAtoms(x)]
-        for angle_id, atoms in enumerate(angles):
+        for atoms in angles:
             angle = self.ff.getMatchedAngles(atoms)[0]
             aids = tuple(x.GetIdx() for x in atoms)
-            self.angles = self.angles.append((angle.id, ) + aids)
-            self.rvrs_angles[aids] = angle_id
+            angle = Angle([[angle.id, *aids]])
+            self.angles = self.angles.append(angle)
+
+        angles = self.angles.drop(columns=[TYPE_ID])
+        self.rvrs_angles = {tuple(y): x for x, *y in angles.itertuples()}
 
     def setDihedrals(self):
         """
@@ -318,7 +329,8 @@ class Mol(structure.Mol):
         for atoms in self.getDihAtoms():
             dihedral = self.ff.getMatchedDihedrals(atoms)[0]
             aids = tuple([x.GetIdx() for x in atoms])
-            self.dihedrals = self.dihedrals.append((dihedral.id, ) + aids)
+            dihedral = Dihedral([[dihedral.id, *aids]])
+            self.dihedrals = self.dihedrals.append(dihedral)
 
     def getDihAtoms(self):
         """
@@ -442,6 +454,7 @@ class Mol(structure.Mol):
             # the center.
             atoms = [neighbors[0], neighbors[1], atom, neighbors[2]]
             improper = (improper_type_id, ) + tuple(x.GetIdx() for x in atoms)
+            improper = Improper([improper])
             self.impropers = self.impropers.append(improper)
 
     def printImpropers(self):
@@ -500,42 +513,6 @@ class Mol(structure.Mol):
         nchrg = [self.nbr_charge[x] for x in index]
         chrg = np.array([sum(x) for x in zip(fchrg, nchrg)])
         return pd.DataFrame({TYPE_ID: type_ids, CHARGE: chrg}, index=index)
-
-    @property
-    def bond_total(self):
-        """
-        Total number of bonds in the molecule.
-
-        :return int: number of bonds across conformers.
-        """
-        return self.bonds.shape[0] * self.GetNumConformers()
-
-    @property
-    def angle_total(self):
-        """
-        Total number of angles in the molecule.
-
-        :return int: number of angles across conformers.
-        """
-        return self.angles.shape[0] * self.GetNumConformers()
-
-    @property
-    def dihedral_total(self):
-        """
-        Total number of dihedral angles in the molecule.
-
-        :return int: number of dihedral in across conformers.
-        """
-        return self.dihedrals.shape[0] * self.GetNumConformers()
-
-    @property
-    def improper_total(self):
-        """
-        Total number of improper angles in the structure.
-
-        :return int: number of improper angles across conformers.
-        """
-        return self.impropers.shape[0] * self.GetNumConformers()
 
     @property
     def molecular_weight(self):
@@ -602,6 +579,10 @@ class Base(lammpsin.In):
         IMPROPERS_CAP: Improper
     }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.radii = None
+
     def setVdwRadius(self):
         """
         Set the vdw radius.
@@ -648,7 +629,6 @@ class Struct(structure.Struct, Base):
         self.hdl = None
         self.warnings = []
         self.excluded = collections.defaultdict(set)
-        self.radii = None
         self.initTypeMap()
 
     def initTypeMap(self):
@@ -713,11 +693,11 @@ class Struct(structure.Struct, Base):
         """
         lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
         self.hdl.write(f"{lmp_dsp}\n\n")
-        self.hdl.write(f"{self.atom_total} {self.ATOMS}\n")
-        self.hdl.write(f"{self.bond_total} {self.BONDS}\n")
-        self.hdl.write(f"{self.angle_total} {self.ANGLES}\n")
-        self.hdl.write(f"{self.dihedral_total} {self.DIHEDRALS}\n")
-        self.hdl.write(f"{self.improper_total} {self.IMPROPERS}\n\n")
+        self.hdl.write(f"{self.atoms.shape[0]} {self.ATOMS}\n")
+        self.hdl.write(f"{self.bonds.shape[0]} {self.BONDS}\n")
+        self.hdl.write(f"{self.angles.shape[0]} {self.ANGLES}\n")
+        self.hdl.write(f"{self.dihedrals.shape[0]} {self.DIHEDRALS}\n")
+        self.hdl.write(f"{self.impropers.shape[0]} {self.IMPROPERS}\n\n")
 
     def writeTopoType(self):
         """
@@ -794,21 +774,13 @@ class Struct(structure.Struct, Base):
         """
         Write out mass information.
         """
-        self.hdl.write(f"{self.MASSES}\n\n")
-        indexes = np.nonzero(self.atm_types)[0]
-        for oid, id in zip(indexes, self.atm_types[indexes]):
-            atom = self.ff.atoms[oid]
-            dscrptn = f"{atom.description} {atom.symbol} {oid}"
-            self.hdl.write(f"{id} {atom.mass} # {dscrptn}\n")
-        self.hdl.write(f"\n")
+        self.masses.to_csv(self.hdl)
 
     def writePairCoeffs(self):
         """
         Write pair coefficients.
         """
-        self.hdl.write(f"{self.PAIR_COEFFS}\n\n")
-        self.vdws.to_csv(self.hdl, **self.TO_CSV_KWARGS)
-        self.hdl.write("\n")
+        self.vdws.to_csv(self.hdl)
 
     def writeBondCoeffs(self):
         """
@@ -881,7 +853,6 @@ class Struct(structure.Struct, Base):
         """
         Write atom coefficients.
         """
-
         self.hdl.write(f"{self.ATOMS.capitalize()}\n\n")
         self.atoms.to_csv(self.hdl, **self.TO_CSV_KWARGS)
         self.hdl.write(f"\n")
@@ -941,44 +912,6 @@ class Struct(structure.Struct, Base):
     def getFixed(self):
         return pd.concat([x.getFixed() for x in self.molecules])
 
-    @property
-    def bond_total(self):
-        """
-        Total number of bonds in the structure.
-
-        :return int: Total number of bonds across all molecules and conformers.
-        """
-        return sum(x.bond_total for x in self.molecules)
-
-    @property
-    def angle_total(self):
-        """
-        Total number of angels in the structure.
-
-        :return int: Total number of angels across all molecules and conformers.
-        """
-        return sum(x.angle_total for x in self.molecules)
-
-    @property
-    def dihedral_total(self):
-        """
-        Total number of dihedral angels in the structure.
-
-        :return int: Total number of dihedral angels across all molecules and
-            conformers.
-        """
-        return sum(x.dihedral_total for x in self.molecules)
-
-    @property
-    def improper_total(self):
-        """
-        Total number of improper angels in the structure.
-
-        :return int: Total number of improper angels across all molecules and
-            conformers.
-        """
-        return sum(x.improper_total for x in self.molecules)
-
     def hasCharge(self):
         """
         Whether any atom has charge.
@@ -1007,7 +940,6 @@ class Struct(structure.Struct, Base):
         bonds = [x.bonds for x in self.conformer if not x.bonds.empty]
         bonds = Bond.concat(bonds, axis=0)
         bonds[TYPE_ID] = self.bnd_types[bonds[TYPE_ID]]
-        bonds.setIndex()
         return bonds
 
     @property
@@ -1015,7 +947,6 @@ class Struct(structure.Struct, Base):
         angles = [x.angles for x in self.conformer if not x.angles.empty]
         angles = Angle.concat(angles, axis=0)
         angles[TYPE_ID] = self.ang_types[angles[TYPE_ID]]
-        angles.setIndex()
         return angles
 
     @property
@@ -1023,7 +954,6 @@ class Struct(structure.Struct, Base):
         dihes = [x.dihedrals for x in self.conformer if not x.dihedrals.empty]
         dihes = Dihedral.concat(dihes, axis=0)
         dihes[TYPE_ID] = self.dihe_types[dihes[TYPE_ID]]
-        dihes.setIndex()
         return dihes
 
     @property
@@ -1031,15 +961,20 @@ class Struct(structure.Struct, Base):
         imprps = [x.impropers for x in self.conformer if not x.impropers.empty]
         imprps = Improper.concat(imprps, axis=0)
         imprps[TYPE_ID] = self.impr_types[imprps[TYPE_ID]]
-        imprps.setIndex()
         return imprps
 
     @property
+    def masses(self):
+        masses = [self.ff.atoms[x] for x in self.atm_types.indexes]
+        masses = Mass([[x.mass, f"# {x.description} {x.symbol} {x.id}"]
+                       for x in masses])
+        return masses
+
+    @property
     def vdws(self):
-        indexes = np.nonzero(self.atm_types)[0]
-        vdws = [self.ff.vdws[x] for x in indexes]
-        data = [[i, x.ene, x.dist] for i, x in enumerate(vdws, 1)]
-        return pd.DataFrame(data, columns=VDW_COL).set_index(ID)
+        vdws = [self.ff.vdws[x] for x in self.atm_types.indexes]
+        vdws = Vdw([[x.ene, x.dist] for x in vdws])
+        return vdws
 
 
 class DataFileReader(Base):
@@ -1066,7 +1001,6 @@ class DataFileReader(Base):
         self.masses = {}
         self.atoms = {}
         self.vdws = {}
-        self.radii = None
         self.excluded = collections.defaultdict(set)
         self.blk_idx = {}
         self.count = {x: 0 for x in self.ALL_CT}
@@ -1147,7 +1081,7 @@ class DataFileReader(Base):
         sidx = self.blk_idx[self.PAIR_COEFFS] + 2
         lines = self.lines[sidx:sidx + self.count[self.ATOM_TYPES]]
         data = pd.read_csv(io.StringIO(''.join(lines)),
-                           names=VDW_COL,
+                           names=[ID] + Vdw.COLUMN_LABELS,
                            sep=r'\s+')
         self.vdws = data.set_index(ID)
 
