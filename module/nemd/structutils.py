@@ -359,12 +359,8 @@ class Mol(lammpsdata.Mol):
         """
         # Set the bond lengths of one conformer
         tpl = self.GetConformer()
-        for bond in self.GetBonds():
-            bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
-            aids = set([x.GetIdx() for x in bonded])
-            bond_type = self.rvrs_bonds[tuple(sorted(aids))]
-            dist = self.ff.bonds[bond_type].dist
-            tpl.setBondLength([x.GetIdx() for x in bonded], dist)
+        for _, type_id, atom1, atom2 in self.bonds.itertuples():
+            tpl.setBondLength([atom1, atom2], self.ff.bonds[type_id].dist)
         # Update all conformers
         xyz = tpl.GetPositions()
         for conf in self.GetConformers():

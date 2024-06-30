@@ -237,8 +237,7 @@ class Mol(structure.Mol):
         self.impropers = Improper()
         self.symbol_impropers = {}
         self.nbr_charge = collections.defaultdict(float)
-        self.rvrs_bonds = {}
-        self.rvrs_angles = {}
+        self.rvrs_angles = None
         if self.ff is None and self.struct and hasattr(self.struct, 'ff'):
             self.ff = self.struct.ff
         if self.ff is None:
@@ -310,8 +309,6 @@ class Mol(structure.Mol):
             bond = Bond([[bond.id, *aids]])
             self.bonds = self.bonds.append(bond)
 
-        self.rvrs_bonds = {tuple(y): x for _, x, *y in self.bonds.itertuples()}
-
     def setAngles(self):
         """
         Set angle force field matches.
@@ -324,7 +321,11 @@ class Mol(structure.Mol):
             self.angles = self.angles.append(angle)
 
         angles = self.angles.drop(columns=[TYPE_ID])
-        self.rvrs_angles = {tuple(y): x for x, *y in angles.itertuples()}
+        shape = 0 if angles.empty else angles.max().max() + 1
+        self.rvrs_angles = np.zeros([shape] * 3, dtype=int)
+        col1, col2, col3 = tuple(np.transpose(angles.values))
+        self.rvrs_angles[col1, col2, col3] = angles.index
+        self.rvrs_angles[col3, col2, col1] = angles.index
 
     def setDihedrals(self):
         """
@@ -487,18 +488,13 @@ class Mol(structure.Mol):
         ref: Atomic Forces for Geometry-Dependent Point Multipole and Gaussian
         Multipole Models
         """
-        to_remove = []
-        for _, _, id1, id2, id3, id4 in self.impropers.itertuples():
-            for eids in itertools.combinations([id2, id1, id4], 2):
-                angle_atom_ids = tuple([eids[0], id3, eids[1]])
-                if angle_atom_ids not in self.rvrs_angles:
-                    angle_atom_ids = angle_atom_ids[::-1]
-                index = self.rvrs_angles[angle_atom_ids]
-                type_id = self.angles.loc[index][TYPE_ID]
-                if np.isnan(self.ff.angles[type_id].ene):
-                    break
-            to_remove.append(index)
-        self.angles = self.angles.drop(index=to_remove)
+        end_cols = itertools.combinations([ATOM2, ATOM1, ATOM4], 2)
+        cols = [[x, ATOM3, y] for x, y in end_cols]
+        impropers = [self.impropers[x].values for x in cols]
+        indexes = [self.rvrs_angles[tuple(np.transpose(x))] for x in impropers]
+        func = lambda x: self.ff.angles[self.angles.loc[x][TYPE_ID]].ene
+        index = [sorted(x, key=func)[0] for x in np.transpose(indexes)]
+        self.angles = self.angles.drop(index=index)
 
     def getFixed(self):
         """
@@ -507,7 +503,7 @@ class Mol(structure.Mol):
         """
         bnd_types = self.bonds.getFixed(lambda x: self.ff.bonds[x].has_h)
         ang_types = self.angles.getFixed(lambda x: self.ff.angles[x].has_h)
-        return pd.concat([bnd_types, ang_types], axis=1)
+        return bnd_types, ang_types
 
     @property
     def atoms(self):
@@ -908,9 +904,7 @@ class Struct(structure.Struct, Base):
         Write command to further equilibrate the system with molecules
         information considered.
         """
-        fixed = self.getFixed()
-        btypes = ' '.join(map(str, fixed[Bond.NAME].dropna().unique()))
-        atypes = ' '.join(map(str, fixed[Angle.NAME].dropna().unique()))
+        btypes, atypes = self.getFixed()
         testing = self.conformer_total == 1 and self.atom_total < 100
         struct_info = types.SimpleNamespace(btypes=btypes,
                                             atypes=atypes,
@@ -918,7 +912,12 @@ class Struct(structure.Struct, Base):
         super().writeRun(*arg, struct_info=struct_info, **kwarg)
 
     def getFixed(self):
-        return pd.concat([x.getFixed() for x in self.molecules])
+        data = [x.getFixed() for x in self.molecules]
+        bonds = np.concatenate([x[0] for x in data if not x[0].empty])
+        angles = np.concatenate([x[1] for x in data if not x[1].empty])
+        bond_types = self.bnd_types[bonds].flatten()
+        angle_types = self.ang_types[angles].flatten()
+        return [' '.join(map(str, x)) for x in [bond_types, angle_types]]
 
     def hasCharge(self):
         """
