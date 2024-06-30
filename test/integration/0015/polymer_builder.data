@@ -18,8 +18,8 @@ LAMMPS Description # full
 
 Masses
 
-1 15.035 # CH3 Neopentane C 85
-2 12.011 # C Neopentane C 90
+1 15.0350 # CH3 Neopentane C 85 #
+2 12.0110 # C Neopentane C 90 #
 
 Pair Coeffs
 

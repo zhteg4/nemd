@@ -18,10 +18,10 @@ LAMMPS Description # full
 
 Masses
 
-1 15.035 # CH3 (beta) Ala C 7
-2 12.011 # C Ketone Carbonyl C 127
-3 15.999 # O Ketone Carbonyl O 128
-4 14.027 # CH2 Diethyl Ketone C 130
+1 15.0350 # CH3 (beta) Ala C 7 #
+2 12.0110 # C Ketone Carbonyl C 127 #
+3 15.9990 # O Ketone Carbonyl O 128 #
+4 14.0270 # CH2 Diethyl Ketone C 130 #
 
 Pair Coeffs
 

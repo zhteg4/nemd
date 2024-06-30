@@ -18,13 +18,13 @@ LAMMPS Description # full
 
 Masses
 
-1 15.035 # CH3 n-Butane C 83
-2 15.035 # CH3 Isobutane C 84
-3 14.027 # CH2 n-Butane C 86
-4 15.999 # OH Alcohol Hydroxyl O 104
-5 1.008 # H Alcohol Hydroxyl H 105
-6 13.019 # CH Isopropanol C 108
-7 39.948 # Argon Atom Ar 211
+1 15.0350 # CH3 n-Butane C 83 #
+2 15.0350 # CH3 Isobutane C 84 #
+3 14.0270 # CH2 n-Butane C 86 #
+4 15.9990 # OH Alcohol Hydroxyl O 104 #
+5 1.0080 # H Alcohol Hydroxyl H 105 #
+6 13.0190 # CH Isopropanol C 108 #
+7 39.9480 # Argon Atom Ar 211 #
 
 Pair Coeffs
 

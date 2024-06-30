@@ -18,11 +18,11 @@ LAMMPS Description # full
 
 Masses
 
-1 4.003 # Helium Atom He 209
-2 20.179 # Neon Atom Ne 210
-3 39.948 # Argon Atom Ar 211
-4 83.8 # Krypton Atom Kr 212
-5 131.3 # Xenon Atom Xe 213
+1 4.0030 # Helium Atom He 209 #
+2 20.1790 # Neon Atom Ne 210 #
+3 39.9480 # Argon Atom Ar 211 #
+4 83.8000 # Krypton Atom Kr 212 #
+5 131.3000 # Xenon Atom Xe 213 #
 
 Pair Coeffs
 

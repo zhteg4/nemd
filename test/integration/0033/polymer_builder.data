@@ -18,8 +18,8 @@ LAMMPS Description # full
 
 Masses
 
-1 15.035 # CH3 n-Butane C 83
-2 14.027 # CH2 n-Butane C 86
+1 15.0350 # CH3 n-Butane C 83 #
+2 14.0270 # CH2 n-Butane C 86 #
 
 Pair Coeffs
 

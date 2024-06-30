@@ -18,13 +18,13 @@ LAMMPS Description # full
 
 Masses
 
-1 15.035 # CH3 (beta) Ala C 7
-2 15.035 # CH3 Isobutane C 84
-3 13.019 # CH Isobutane C 88
-4 12.011 # C Neopentane C 90
-5 12.011 # C Ketone Carbonyl C 127
-6 15.999 # O Ketone Carbonyl O 128
-7 14.027 # CH2 Diethyl Ketone C 130
+1 15.0350 # CH3 (beta) Ala C 7 #
+2 15.0350 # CH3 Isobutane C 84 #
+3 13.0190 # CH Isobutane C 88 #
+4 12.0110 # C Neopentane C 90 #
+5 12.0110 # C Ketone Carbonyl C 127 #
+6 15.9990 # O Ketone Carbonyl O 128 #
+7 14.0270 # CH2 Diethyl Ketone C 130 #
 
 Pair Coeffs
 

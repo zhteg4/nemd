@@ -18,8 +18,8 @@ LAMMPS Description # full
 
 Masses
 
-1 24.305 # Mg+2 Magnesium Ion Mg 202
-2 79.904 # Br- Bromide Ion Br 208
+1 24.3050 # Mg+2 Magnesium Ion Mg 202 #
+2 79.9040 # Br- Bromide Ion Br 208 #
 
 Pair Coeffs
 

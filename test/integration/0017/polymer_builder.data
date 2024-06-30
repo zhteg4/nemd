@@ -18,8 +18,8 @@ LAMMPS Description # full
 
 Masses
 
-1 6.941 # Li+ Lithium Ion Li 197
-2 18.998 # F- Fluoride Ion F 206
+1 6.9410 # Li+ Lithium Ion Li 197 #
+2 18.9980 # F- Fluoride Ion F 206 #
 
 Pair Coeffs
 

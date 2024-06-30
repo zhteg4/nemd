@@ -18,8 +18,8 @@ LAMMPS Description # full
 
 Masses
 
-1 15.999 # O Water (SPCE) O 214
-2 1.008 # H Water (SPCE) H 215
+1 15.9990 # O Water (SPCE) O 214 #
+2 1.0080 # H Water (SPCE) H 215 #
 
 Pair Coeffs
 

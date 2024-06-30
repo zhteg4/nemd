@@ -18,8 +18,8 @@ LAMMPS Description # full
 
 Masses
 
-1 22.99 # Na+ Sodium Ion Na 198
-2 35.453 # Cl- Chloride Ion Cl 207
+1 22.9900 # Na+ Sodium Ion Na 198 #
+2 35.4530 # Cl- Chloride Ion Cl 207 #
 
 Pair Coeffs
 

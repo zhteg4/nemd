@@ -18,10 +18,10 @@ LAMMPS Description # full
 
 Masses
 
-1 40.078 # Ca+2 Calcium Ion Ca 203
-2 87.62 # Sr+2 Strontium Ion Sr 204
-3 137.327 # Ba+2 Barium Ion Ba 205
-4 35.453 # Cl- Chloride Ion Cl 207
+1 40.0780 # Ca+2 Calcium Ion Ca 203 #
+2 87.6200 # Sr+2 Strontium Ion Sr 204 #
+3 137.3270 # Ba+2 Barium Ion Ba 205 #
+4 35.4530 # Cl- Chloride Ion Cl 207 #
 
 Pair Coeffs
 

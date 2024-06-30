@@ -1,5 +1,6 @@
 import io
 import re
+import csv
 import math
 import scipy
 import types
@@ -40,7 +41,11 @@ DIST = 'dist'
 class Mass(pd.DataFrame):
 
     COLUMNS = 'columns'
-    TO_CSV_KWARGS = dict(sep=' ', header=False, float_format='%.4f', mode='a')
+    TO_CSV_KWARGS = dict(sep=' ',
+                         header=False,
+                         float_format='%.4f',
+                         mode='a',
+                         quotechar='#')
     NAME = 'Masses'
     COLUMN_LABELS = ['mass', 'comment']
 
@@ -305,8 +310,7 @@ class Mol(structure.Mol):
             bond = Bond([[bond.id, *aids]])
             self.bonds = self.bonds.append(bond)
 
-        bonds = self.bonds.drop(columns=[TYPE_ID])
-        self.rvrs_bonds = {tuple(y): x for x, *y in bonds.itertuples()}
+        self.rvrs_bonds = {tuple(y): x for _, x, *y in self.bonds.itertuples()}
 
     def setAngles(self):
         """
@@ -610,7 +614,11 @@ class Base(lammpsin.In):
 class Struct(structure.Struct, Base):
 
     MolClass = Mol
-    TO_CSV_KWARGS = dict(sep=' ', header=False, float_format='%.4f', mode='a')
+    TO_CSV_KWARGS = dict(sep=' ',
+                         header=False,
+                         float_format='%.4f',
+                         mode='a',
+                         quoting=csv.QUOTE_NONE)
 
     def __init__(self, struct=None, ff=None, options=None, **kwargs):
         """
@@ -966,7 +974,7 @@ class Struct(structure.Struct, Base):
     @property
     def masses(self):
         masses = [self.ff.atoms[x] for x in self.atm_types.indexes]
-        masses = Mass([[x.mass, f"# {x.description} {x.symbol} {x.id}"]
+        masses = Mass([[x.mass, f" {x.description} {x.symbol} {x.id} "]
                        for x in masses])
         return masses
 

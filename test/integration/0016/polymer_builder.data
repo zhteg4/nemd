@@ -18,8 +18,8 @@ LAMMPS Description # full
 
 Masses
 
-1 39.098 # K+ Potassium Ion K 199
-2 79.904 # Br- Bromide Ion Br 208
+1 39.0980 # K+ Potassium Ion K 199 #
+2 79.9040 # Br- Bromide Ion Br 208 #
 
 Pair Coeffs
 

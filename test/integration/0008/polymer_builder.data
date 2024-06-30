@@ -18,8 +18,8 @@ LAMMPS Description # full
 
 Masses
 
-1 15.999 # O Water (TIP3P) O 77
-2 1.008 # H Water (TIP3P) H 78
+1 15.9990 # O Water (TIP3P) O 77 #
+2 1.0080 # H Water (TIP3P) H 78 #
 
 Pair Coeffs
 
