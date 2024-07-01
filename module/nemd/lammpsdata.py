@@ -913,8 +913,9 @@ class Struct(structure.Struct, Base):
 
     def getFixed(self):
         data = [x.getFixed() for x in self.molecules]
-        bonds = np.concatenate([x[0] for x in data if not x[0].empty])
-        angles = np.concatenate([x[1] for x in data if not x[1].empty])
+        bonds, angles = list(map(list, zip(*data)))
+        bonds = Bond.concat([x for x in bonds if not x.empty])
+        angles = Angle.concat([x for x in angles if not x.empty])
         bond_types = self.bnd_types[bonds].flatten()
         angle_types = self.ang_types[angles].flatten()
         return [' '.join(map(str, x)) for x in [bond_types, angle_types]]

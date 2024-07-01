@@ -8,7 +8,7 @@ LAMMPS Description # full
 
 4 atom types
 3 bond types
-3 angle types
+2 angle types
 1 dihedral types
 1 improper types
 
@@ -38,9 +38,8 @@ Bond Coeffs
 
 Angle Coeffs
 
-1 63.0 112.4
-2 55.0 108.5
-3 80.0 109.5
+1 55.0 108.5
+2 80.0 109.5
 
 Dihedral Coeffs
 
@@ -67,9 +66,9 @@ Bonds
 
 Angles
 
-1 1 1 2 3
-2 3 3 2 4
-3 2 5 4 2
+1 2 1 2 4
+2 2 3 2 4
+3 1 5 4 2
 
 Dihedrals
 
