@@ -23,20 +23,34 @@ class Array(np.ndarray):
         super(Array, self).__setitem__(nindex, value)
 
 
-class TypeMap(np.ndarray):
+class BitSet(np.ndarray):
     """
-    A subclass of numpy.ndarray that represents a set of integers as a bit array.
+    A subclass of numpy.ndarray that represents integer list as a bit array.
     """
 
-    def __new__(cls, size, dtype=int):
-        array = np.zeros(size, dtype=dtype)
+    def __new__(cls, max_val=0, dtype=int):
+        """
+        Create a new BitSet object.
+
+        :param max_val: The maximum value of the bit array.
+        :param dtype: The data type of the bit array.
+        """
+        array = np.zeros(max_val + 1, dtype=dtype)
         obj = np.asarray(array).view(cls)
         return obj
 
-    def union(self, indexes):
-        self[indexes] = 1
-        self[self.indexes] = np.arange(1, len(self.indexes) + 1)
+    def add(self, indexes):
+        """
+        Add bits at the given indexes.
+
+        :param indexes: An iterable of indexes to add.
+        """
+        self[indexes] = True
+        self[self.on] = np.arange(1, len(self.on) + 1)
 
     @property
-    def indexes(self):
+    def on(self):
+        """
+        Return the indexes of the on bits.
+        """
         return self.nonzero()[0]

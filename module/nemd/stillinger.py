@@ -20,6 +20,9 @@ class Struct(xtal.Struct):
         if self.tasks is None:
             self.tasks = [self.XYZ]
 
+    def initTypeMap(self):
+        pass
+
     def writeLammpsIn(self):
         """
         Write out LAMMPS in script.

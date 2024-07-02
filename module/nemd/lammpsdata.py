@@ -625,29 +625,22 @@ class Struct(structure.Struct, Base):
         Base.__init__(self, options=options, **kwargs)
         self.ff = ff
         self.total_charge = 0.
-        self.atm_types = None
-        self.bnd_types = None
-        self.ang_types = None
-        self.dihe_types = None
-        self.impr_types = None
+        self.atm_types = numpyutils.BitSet()
+        self.bnd_types = numpyutils.BitSet()
+        self.ang_types = numpyutils.BitSet()
+        self.dihe_types = numpyutils.BitSet()
+        self.impr_types = numpyutils.BitSet()
         self.hdl = None
         self.warnings = []
         self.excluded = collections.defaultdict(set)
         self.initTypeMap()
 
     def initTypeMap(self):
-        if isinstance(self.ff, oplsua.Parser):
-            self.atm_types = numpyutils.TypeMap(max(self.ff.atoms) + 1)
-            self.bnd_types = numpyutils.TypeMap(max(self.ff.bonds) + 1)
-            self.ang_types = numpyutils.TypeMap(max(self.ff.angles) + 1)
-            self.dihe_types = numpyutils.TypeMap(max(self.ff.dihedrals) + 1)
-            self.impr_types = numpyutils.TypeMap(max(self.ff.impropers) + 1)
-            return
-        self.atm_types = np.array([0])
-        self.bnd_types = np.array([0])
-        self.ang_types = np.array([0])
-        self.dihe_types = np.array([0])
-        self.impr_types = np.array([0])
+        self.atm_types = numpyutils.BitSet(max(self.ff.atoms))
+        self.bnd_types = numpyutils.BitSet(max(self.ff.bonds))
+        self.ang_types = numpyutils.BitSet(max(self.ff.angles))
+        self.dihe_types = numpyutils.BitSet(max(self.ff.dihedrals))
+        self.impr_types = numpyutils.BitSet(max(self.ff.impropers))
 
     def addMol(self, mol):
         mol = super().addMol(mol)
@@ -660,11 +653,11 @@ class Struct(structure.Struct, Base):
         """
 
         atypes = [x.GetIntProp(TYPE_ID) for x in mol.GetAtoms()]
-        self.atm_types.union(atypes)
-        self.bnd_types.union(mol.bonds[TYPE_ID].values)
-        self.ang_types.union(mol.angles[TYPE_ID].values)
-        self.dihe_types.union(mol.dihedrals[TYPE_ID].values)
-        self.impr_types.union(mol.impropers[TYPE_ID].values)
+        self.atm_types.add(atypes)
+        self.bnd_types.add(mol.bonds[TYPE_ID])
+        self.ang_types.add(mol.angles[TYPE_ID])
+        self.dihe_types.add(mol.dihedrals[TYPE_ID])
+        self.impr_types.add(mol.impropers[TYPE_ID])
 
     def writeData(self, nofile=False):
         """
@@ -795,9 +788,10 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.BOND_COEFFS}\n\n")
-        for idx in self.bnd_types.indexes:
+        for idx in self.bnd_types.on:
             bond = self.ff.bonds[idx]
-            self.hdl.write(f"{self.bnd_types[idx]} {bond.ene} {bond.dist}\n")
+            self.hdl.write(
+                f"{self.bnd_types[idx]} {bond.ene} {bond.dist}\n")
         self.hdl.write("\n")
 
     def writeAngleCoeffs(self):
@@ -808,9 +802,10 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.ANGLE_COEFFS}\n\n")
-        for idx in self.ang_types.indexes:
+        for idx in self.ang_types.on:
             ang = self.ff.angles[idx]
-            self.hdl.write(f"{self.ang_types[idx]} {ang.ene} {ang.angle}\n")
+            self.hdl.write(
+                f"{self.ang_types[idx]} {ang.ene} {ang.angle}\n")
         self.hdl.write("\n")
 
     def writeDiheCoeffs(self):
@@ -821,7 +816,7 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.DIHEDRAL_COEFFS}\n\n")
-        for idx in self.dihe_types.indexes:
+        for idx in self.dihe_types.on:
             params = [0., 0., 0., 0.]
             # LAMMPS: K1, K2, K3, K4 in 0.5*K1[1+cos(x)] + 0.5*K2[1-cos(2x)]...
             # OPLS: [1 + cos(nx-gama)]
@@ -833,7 +828,8 @@ class Struct(structure.Struct, Base):
                 if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
                     params[ene_ang_n.n_parm] *= -1
             self.hdl.write(
-                f"{self.dihe_types[idx]}  {' '.join(map(str, params))}\n")
+                f"{self.dihe_types[idx]}  {' '.join(map(str, params))}\n"
+            )
         self.hdl.write("\n")
 
     def writeImpropCoeffs(self):
@@ -844,13 +840,14 @@ class Struct(structure.Struct, Base):
             return
 
         self.hdl.write(f"{self.IMPROPER_COEFFS}\n\n")
-        for idx in self.impr_types.indexes:
+        for idx in self.impr_types.on:
             impr = self.ff.impropers[idx]
             # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
             sign = 1 if impr.angle == 0. else -1
             self.hdl.write(
-                f"{self.impr_types[idx]} {impr.ene} {sign} {impr.n_parm}\n")
+                f"{self.impr_types[idx]} {impr.ene} {sign} {impr.n_parm}\n"
+            )
         self.hdl.write("\n")
 
     def writeAtoms(self):
@@ -973,14 +970,14 @@ class Struct(structure.Struct, Base):
 
     @property
     def masses(self):
-        masses = [self.ff.atoms[x] for x in self.atm_types.indexes]
+        masses = [self.ff.atoms[x] for x in self.atm_types.on]
         masses = Mass([[x.mass, f" {x.description} {x.symbol} {x.id} "]
                        for x in masses])
         return masses
 
     @property
     def vdws(self):
-        vdws = [self.ff.vdws[x] for x in self.atm_types.indexes]
+        vdws = [self.ff.vdws[x] for x in self.atm_types.on]
         vdws = Vdw([[x.ene, x.dist] for x in vdws])
         return vdws
 
