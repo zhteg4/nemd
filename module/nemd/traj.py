@@ -89,12 +89,13 @@ def get_frames(filename=None, contents=None, start=0):
 
 class XYZ(numpyutils.Array):
     """
-    Class to get vdw radius from atom id pair.
+    XYZ class to allow fast access to xyz coordinate by global atom ids.
     """
 
     def __new__(cls, frame, *args, **kwargs):
         """
-        :param frame pandas.core.frame.DataFrame: the original dataframe
+        :param frame pandas.core.frame.DataFrame: the trajectory dataframe with
+            the index being atom global ids and values being xyz coordinates.
         """
         obj = np.asarray(frame.values).view(cls)
         idx = {label: i for i, label in enumerate(frame.index)} | {-1: -1}

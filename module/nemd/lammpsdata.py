@@ -141,20 +141,22 @@ class Angle(Bond):
     _internal_names = pd.DataFrame._internal_names + ['id_map']
     _internal_names_set = set(_internal_names)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.id_map = None
+
     def getPairs(self, step=2):
         return super(Angle, self).getPairs(step=step)
 
-    def setMap(self):
-        atoms = self.drop(columns=[TYPE_ID])
-        shape = 0 if self.empty else atoms.max().max() + 1
-        if not shape:
-            return
-        self.id_map = np.zeros([shape] * 3, dtype=int)
-        col1, col2, col3 = tuple(np.transpose(atoms.values))
-        self.id_map[col1, col2, col3] = self.index
-        self.id_map[col3, col2, col1] = self.index
+    def min(self, x, key):
+        if self.id_map is None:
+            atom_ids = self.drop(columns=[TYPE_ID])
+            shape = 0 if self.empty else atom_ids.max().max() + 1
+            self.id_map = np.zeros([shape] * atom_ids.shape[1], dtype=int)
+            col1, col2, col3 = tuple(np.transpose(atom_ids.values))
+            self.id_map[col1, col2, col3] = self.index
+            self.id_map[col3, col2, col1] = self.index
 
-    def min(self, x, key=None):
         indexes = self.id_map[tuple(np.transpose(x))]
         return min(indexes, key=lambda x: key(self.loc[x][TYPE_ID]))
 
@@ -240,7 +242,6 @@ class Mol(structure.Mol):
 
     ConfClass = Conformer
     RES_NUM = oplsua.RES_NUM
-    IMPROPER_CENTER_SYMBOLS = symbols.CARBON + symbols.HYDROGEN
     INDEXES = [TYPE_ID, ATOM1, ATOM2]
     BONDS_KWARGS = dict(index=[TYPE_ID, ATOM1, ATOM2], dtype=int)
 
@@ -254,7 +255,6 @@ class Mol(structure.Mol):
         self.angles = Angle()
         self.dihedrals = Dihedral()
         self.impropers = Improper()
-        self.symbol_impropers = {}
         self.nbr_charge = collections.defaultdict(float)
         if self.ff is None and self.struct and hasattr(self.struct, 'ff'):
             self.ff = self.struct.ff
@@ -345,8 +345,6 @@ class Mol(structure.Mol):
         data.update({x: y for x, y in zip(Angle.ID_COLS, idxs)})
         self.angles = Angle(data)
 
-        self.angles.setMap()
-
     def setDihedrals(self):
         """
         Set the dihedral angles of the molecules.
@@ -358,7 +356,10 @@ class Mol(structure.Mol):
         self.dihedrals = Dihedral(data)
 
     def setImpropers(self):
-        data = self.getImpropers()
+        imprps = [x for x in self.getImproperAtoms()]
+        data = {TYPE_ID: [self.ff.getMatchedImpropers(x)[0] for x in imprps]}
+        idxs = [[y.GetIdx() for y in x] for x in zip(*imprps)]
+        data.update({x: y for x, y in zip(Improper.ID_COLS, idxs)})
         self.impropers = Improper(data)
 
     def getDihAtoms(self):
@@ -405,7 +406,7 @@ class Mol(structure.Mol):
 
         return dihe_atoms
 
-    def getImpropers(self, csymbols=IMPROPER_CENTER_SYMBOLS):
+    def getImproperAtoms(self):
         """
         Set improper angles based on center atoms and neighbor symbols.
 
@@ -443,60 +444,36 @@ class Mol(structure.Mol):
         ref: Atomic Forces for Geometry-Dependent Point Multipole and Gaussian
         Multipole Models
         """
-        impropers = []
+        # FIXME: LAMMPS recommends the first to be the center, while the prm
+        # and literature order the third as the center.
+        # My Implementation:
+        # Use the center as the third according to "A New Force Field for
+        # Molecular Mechanical Simulation of Nucleic Acids and Proteins"
+        # No special treatment to the order of other atoms.
+
+        # My Reasoning: first or third functions the same for planar
+        # scenario as both 0 deg and 180 deg implies in plane. However,
+        # center as first or third defines different planes, leading to
+        # eiter ~45 deg or 120 deg as the equilibrium improper angle.
+        # 120 deg sounds more plausible and thus the third is chosen to be
+        # the center.
+
+        atoms = []
         for atom in self.GetAtoms():
-            atom_symbol, neighbors = atom.GetSymbol(), atom.GetNeighbors()
-            if atom_symbol not in csymbols or len(neighbors) != 3:
+            if atom.GetTotalDegree() != 3:
                 continue
-            if atom.GetSymbol() == symbols.NITROGEN and atom.GetHybridization(
-            ) == Chem.rdchem.HybridizationType.SP3:
-                continue
-            # Sp2 carbon for planar, Sp3 with one H (CHR1R2R3) for chirality,
-            # Sp2 N in Amino Acid
-            neighbor_symbols = [x.GetSymbol() for x in neighbors]
-            counted = self.ff.countSymbols(
-                [str(oplsua.Parser.getAtomConnt(atom)), atom_symbol] +
-                neighbor_symbols)
-            improper_type_id = self.ff.improper_symbols[counted][0]
-            # FIXME: see docstring for current investigation. (NO ACTIONS TAKEN)
-            #  1) LAMMPS recommends the first to be the center, while the prm
-            #  and literature order the third as the center.
-            #  2) In addition, since improper has one non-connected edge,
-            #  are the two non-edge atom selections important?
-            #  3) Moreover, do we have to delete over constrained angle? If so,
-            #  how about the one facing the non-connected edge?
-            # My recommendation (not current implementation):
-            # first plane: center + the two most heavy atom
-            # second plane: the three non-center atoms
-            # benefit: 1) O-C-O / O.O.R imposes symmetricity (RCOO)
-            # 2) R-N-C / O.O.H exposes hydrogen out of plane vibration (RCNH)
-
-            # My Implementation:
-            # Use the center as the third according to "A New Force Field for
-            # Molecular Mechanical Simulation of Nucleic Acids and Proteins"
-            # No special treatment to the order of other atoms.
-
-            # My Reasoning: first or third functions the same for planar
-            # scenario as both 0 deg and 180 deg implies in plane. However,
-            # center as first or third defines different planes, leading to
-            # eiter ~45 deg or 120 deg as the equilibrium improper angle.
-            # 120 deg sounds more plausible and thus the third is chosen to be
-            # the center.
-            atoms = [neighbors[0], neighbors[1], atom, neighbors[2]]
-            improper = (improper_type_id, ) + tuple(x.GetIdx() for x in atoms)
-            impropers.append(improper)
-        return impropers
-
-    def printImpropers(self):
-        """
-        Print all the possible improper angles in the force field file.
-        """
-        for symb, improper_ids in self.symbol_impropers.items():
-            print(f"{symb} {self.ff.impropers[improper_ids[0]]}")
-            impropers = [self.ff.impropers[x] for x in improper_ids]
-            for improper in impropers:
-                ids = [improper.id1, improper.id2, improper.id3, improper.id4]
-                print(f"{[self.ff.atoms[x].description for x in ids]}")
+            match atom.GetSymbol():
+                case symbols.CARBON:
+                    # Planar Sp2 carbonyl carbon (R-COOH)
+                    # tetrahedral Sp3 carbon with one implicit H (CHR1R2R3)
+                    atoms.append(atom)
+                case symbols.NITROGEN:
+                    if atom.GetHybridization(
+                    ) == Chem.rdchem.HybridizationType.SP2:
+                        # Sp2 N in Amino Acid or Dimethylformamide
+                        atoms.append(atom)
+        neighbors = [x.GetNeighbors() for x in atoms]
+        return [[y[0], y[1], x, y[2]] for x, y in zip(atoms, neighbors)]
 
     def removeAngles(self):
         """
@@ -515,12 +492,10 @@ class Mol(structure.Mol):
         """
         columns = [ATOM2, ATOM1, ATOM4]
         cols = [[x, ATOM3, y] for x, y in itertools.combinations(columns, 2)]
-        angles = zip(*[self.impropers[x].values for x in cols])
-        index = [
-            self.angles.min(x, key=lambda x: self.ff.angles[x].ene)
-            for x in angles
-        ]
-        self.angles = self.angles.drop(index=index)
+        atom_ids = zip(*[self.impropers[x].values for x in cols])
+        get_energy_from_type_id = lambda x: self.ff.angles[x].ene
+        ids = [self.angles.min(x, get_energy_from_type_id) for x in atom_ids]
+        self.angles = self.angles.drop(index=ids)
 
     def getFixed(self):
         """

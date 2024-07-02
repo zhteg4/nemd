@@ -836,3 +836,12 @@ class Parser:
         counted = [y + str(symbols[2:].count(y)) for y in csmbls]
         # e.g., '3CC1H0N1O1'
         return ''.join(symbols[:2] + counted)
+
+    def getMatchedImpropers(self, atoms):
+        """
+        """
+        symbols = [str(self.getAtomConnt(atoms[2])), atoms[2].GetSymbol()]
+        symbols += [x.GetSymbol() for x in atoms[:2]]
+        symbols += [atoms[3].GetSymbol()]
+        counted = self.countSymbols(symbols)
+        return self.improper_symbols[counted]
