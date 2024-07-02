@@ -536,7 +536,7 @@ class Parser:
                                           constants=ene_ang_ns)
             self.dihe_map[ids[0], ids[1], ids[2], ids[3]] = id
 
-    def getMatchedBonds(self, bonded_atoms):
+    def getMatchedBonds(self, bond):
         """
         Get force field matched bonds. The searching and approximation follows:
 
@@ -550,6 +550,7 @@ class Parser:
         :param bonded_atoms: list of two bonded atoms sorted by BOND_AID
         :return list of 'oplsua.BOND': bond information
         """
+        bonded_atoms = [bond.GetBeginAtom(), bond.GetEndAtom()]
         # BOND_AID defines bonding parameters marked during atom typing
         bonded_atoms = sorted(bonded_atoms,
                               key=lambda x: x.GetIntProp(BOND_AID))

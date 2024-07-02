@@ -23,9 +23,10 @@ class Array(np.ndarray):
         super(Array, self).__setitem__(nindex, value)
 
 
-class BitSet(np.ndarray):
+class IntArray(np.ndarray):
     """
-    A subclass of numpy.ndarray that represents integer list as a bit array.
+    A subclass of numpy.ndarray that represents integer list as an array for
+    nonzero indexing.
     """
 
     def __new__(cls, max_val=0, dtype=int):

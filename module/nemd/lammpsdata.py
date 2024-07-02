@@ -49,12 +49,12 @@ class Mass(pd.DataFrame):
     NAME = 'Masses'
     COLUMN_LABELS = ['mass', 'comment']
 
-    def __init__(self, data=None, **kwargs):
-        if not isinstance(data, pd.DataFrame) and kwargs.get(
-                self.COLUMNS) is None:
-            kwargs[self.COLUMNS] = self.COLUMN_LABELS
-        super().__init__(data=data, **kwargs)
-        self.index = pd.RangeIndex(start=1, stop=self.shape[0] + 1)
+    def __init__(self, data=None, index=None, columns=None, **kwargs):
+        if not isinstance(data, pd.DataFrame) and columns is None:
+            columns = self.COLUMN_LABELS
+        super().__init__(data=data, index=index, columns=columns, **kwargs)
+        if not isinstance(data, pd.DataFrame) and index is None:
+            self.index = pd.RangeIndex(start=1, stop=self.shape[0] + 1)
 
     def to_csv(self, path_or_buf=None, as_block=True, **kwargs):
         if self.empty:
@@ -122,7 +122,9 @@ class Bond(Mass):
     def concat(cls, objs, **kwargs):
         if not len(objs):
             return cls(None)
-        return pd.concat(objs, **kwargs)
+        data = pd.concat(objs, **kwargs)
+        data.index = pd.RangeIndex(start=1, stop=data.shape[0] + 1)
+        return data
 
     @classmethod
     def read_csv(cls, *args, **kwargs):
@@ -135,9 +137,26 @@ class Angle(Bond):
     NAME = 'Angles'
     ID_COLS = [ATOM1, ATOM2, ATOM3]
     COLUMN_LABELS = [TYPE_ID] + ID_COLS
+    # https://pandas.pydata.org/docs/development/extending.html
+    _internal_names = pd.DataFrame._internal_names + ['id_map']
+    _internal_names_set = set(_internal_names)
 
     def getPairs(self, step=2):
         return super(Angle, self).getPairs(step=step)
+
+    def setMap(self):
+        atoms = self.drop(columns=[TYPE_ID])
+        shape = 0 if self.empty else atoms.max().max() + 1
+        if not shape:
+            return
+        self.id_map = np.zeros([shape] * 3, dtype=int)
+        col1, col2, col3 = tuple(np.transpose(atoms.values))
+        self.id_map[col1, col2, col3] = self.index
+        self.id_map[col3, col2, col1] = self.index
+
+    def min(self, x, key=None):
+        indexes = self.id_map[tuple(np.transpose(x))]
+        return min(indexes, key=lambda x: key(self.loc[x][TYPE_ID]))
 
 
 class Dihedral(Bond):
@@ -237,7 +256,6 @@ class Mol(structure.Mol):
         self.impropers = Improper()
         self.symbol_impropers = {}
         self.nbr_charge = collections.defaultdict(float)
-        self.rvrs_angles = None
         if self.ff is None and self.struct and hasattr(self.struct, 'ff'):
             self.ff = self.struct.ff
         if self.ff is None:
@@ -298,44 +316,50 @@ class Mol(structure.Mol):
         for res, idx in res_atom.items():
             self.nbr_charge[idx] -= res_charge[res]
 
+    @property
+    def atoms(self):
+        type_ids = [x.GetIntProp(TYPE_ID) for x in self.GetAtoms()]
+        fchrg = [self.ff.charges[x] for x in type_ids]
+        index = pd.Index([x.GetIdx() for x in self.GetAtoms()], name=ID)
+        nchrg = [self.nbr_charge[x] for x in index]
+        chrg = np.array([sum(x) for x in zip(fchrg, nchrg)])
+        return pd.DataFrame({TYPE_ID: type_ids, CHARGE: chrg}, index=index)
+
     def setBonds(self):
         """
         Set bonding information.
         """
-        for bond in self.GetBonds():
-            bonded = [bond.GetBeginAtom(), bond.GetEndAtom()]
-            bond = self.ff.getMatchedBonds(bonded)[0]
-            aids = sorted([bonded[0].GetIdx(), bonded[1].GetIdx()])
-            bond = Bond([[bond.id, *aids]])
-            self.bonds = self.bonds.append(bond)
+        bonds = [x for x in self.GetBonds()]
+        data = {TYPE_ID: [self.ff.getMatchedBonds(x)[0].id for x in bonds]}
+        data.update({ATOM1: [x.GetBeginAtom().GetIdx() for x in bonds]})
+        data.update({ATOM2: [x.GetEndAtom().GetIdx() for x in bonds]})
+        self.bonds = Bond(data)
 
     def setAngles(self):
         """
         Set angle force field matches.
         """
         angles = [y for x in self.GetAtoms() for y in self.ff.getAngleAtoms(x)]
-        for atoms in angles:
-            angle = self.ff.getMatchedAngles(atoms)[0]
-            aids = tuple(x.GetIdx() for x in atoms)
-            angle = Angle([[angle.id, *aids]])
-            self.angles = self.angles.append(angle)
+        data = {TYPE_ID: [self.ff.getMatchedAngles(x)[0].id for x in angles]}
+        idxs = [[y.GetIdx() for y in x] for x in zip(*angles)]
+        data.update({x: y for x, y in zip(Angle.ID_COLS, idxs)})
+        self.angles = Angle(data)
 
-        angles = self.angles.drop(columns=[TYPE_ID])
-        shape = 0 if angles.empty else angles.max().max() + 1
-        self.rvrs_angles = np.zeros([shape] * 3, dtype=int)
-        col1, col2, col3 = tuple(np.transpose(angles.values))
-        self.rvrs_angles[col1, col2, col3] = angles.index
-        self.rvrs_angles[col3, col2, col1] = angles.index
+        self.angles.setMap()
 
     def setDihedrals(self):
         """
         Set the dihedral angles of the molecules.
         """
-        for atoms in self.getDihAtoms():
-            dihedral = self.ff.getMatchedDihedrals(atoms)[0]
-            aids = tuple([x.GetIdx() for x in atoms])
-            dihedral = Dihedral([[dihedral.id, *aids]])
-            self.dihedrals = self.dihedrals.append(dihedral)
+        dihes = [x for x in self.getDihAtoms()]
+        data = {TYPE_ID: [self.ff.getMatchedDihedrals(x)[0].id for x in dihes]}
+        idxs = [[y.GetIdx() for y in x] for x in zip(*dihes)]
+        data.update({x: y for x, y in zip(Dihedral.ID_COLS, idxs)})
+        self.dihedrals = Dihedral(data)
+
+    def setImpropers(self):
+        data = self.getImpropers()
+        self.impropers = Improper(data)
 
     def getDihAtoms(self):
         """
@@ -381,7 +405,7 @@ class Mol(structure.Mol):
 
         return dihe_atoms
 
-    def setImpropers(self, csymbols=IMPROPER_CENTER_SYMBOLS):
+    def getImpropers(self, csymbols=IMPROPER_CENTER_SYMBOLS):
         """
         Set improper angles based on center atoms and neighbor symbols.
 
@@ -419,6 +443,7 @@ class Mol(structure.Mol):
         ref: Atomic Forces for Geometry-Dependent Point Multipole and Gaussian
         Multipole Models
         """
+        impropers = []
         for atom in self.GetAtoms():
             atom_symbol, neighbors = atom.GetSymbol(), atom.GetNeighbors()
             if atom_symbol not in csymbols or len(neighbors) != 3:
@@ -459,8 +484,8 @@ class Mol(structure.Mol):
             # the center.
             atoms = [neighbors[0], neighbors[1], atom, neighbors[2]]
             improper = (improper_type_id, ) + tuple(x.GetIdx() for x in atoms)
-            improper = Improper([improper])
-            self.impropers = self.impropers.append(improper)
+            impropers.append(improper)
+        return impropers
 
     def printImpropers(self):
         """
@@ -485,15 +510,16 @@ class Mol(structure.Mol):
             2) each variable can be perturbed independently of the other variables
         For the case of ammonia, 3 bond lengths N-H1, N-H2, N-H3, the two bond
         angles θ1 = H1-N-H2 and θ2 = H1-N-H3, and the ω = H2-H1-N-H3
-        ref: Atomic Forces for Geometry-Dependent Point Multipole and Gaussian
-        Multipole Models
+        ref: Atomic Forces for Geometry-Dependent Point Multi-pole and Gaussian
+        Multi-xpole Models
         """
-        end_cols = itertools.combinations([ATOM2, ATOM1, ATOM4], 2)
-        cols = [[x, ATOM3, y] for x, y in end_cols]
-        impropers = [self.impropers[x].values for x in cols]
-        indexes = [self.rvrs_angles[tuple(np.transpose(x))] for x in impropers]
-        func = lambda x: self.ff.angles[self.angles.loc[x][TYPE_ID]].ene
-        index = [sorted(x, key=func)[0] for x in np.transpose(indexes)]
+        columns = [ATOM2, ATOM1, ATOM4]
+        cols = [[x, ATOM3, y] for x, y in itertools.combinations(columns, 2)]
+        angles = zip(*[self.impropers[x].values for x in cols])
+        index = [
+            self.angles.min(x, key=lambda x: self.ff.angles[x].ene)
+            for x in angles
+        ]
         self.angles = self.angles.drop(index=index)
 
     def getFixed(self):
@@ -504,15 +530,6 @@ class Mol(structure.Mol):
         bnd_types = self.bonds.getFixed(lambda x: self.ff.bonds[x].has_h)
         ang_types = self.angles.getFixed(lambda x: self.ff.angles[x].has_h)
         return bnd_types, ang_types
-
-    @property
-    def atoms(self):
-        type_ids = [x.GetIntProp(TYPE_ID) for x in self.GetAtoms()]
-        fchrg = [self.ff.charges[x] for x in type_ids]
-        index = pd.Index([x.GetIdx() for x in self.GetAtoms()], name=ID)
-        nchrg = [self.nbr_charge[x] for x in index]
-        chrg = np.array([sum(x) for x in zip(fchrg, nchrg)])
-        return pd.DataFrame({TYPE_ID: type_ids, CHARGE: chrg}, index=index)
 
     @property
     def molecular_weight(self):
@@ -625,22 +642,22 @@ class Struct(structure.Struct, Base):
         Base.__init__(self, options=options, **kwargs)
         self.ff = ff
         self.total_charge = 0.
-        self.atm_types = numpyutils.BitSet()
-        self.bnd_types = numpyutils.BitSet()
-        self.ang_types = numpyutils.BitSet()
-        self.dihe_types = numpyutils.BitSet()
-        self.impr_types = numpyutils.BitSet()
+        self.atm_types = numpyutils.IntArray()
+        self.bnd_types = numpyutils.IntArray()
+        self.ang_types = numpyutils.IntArray()
+        self.dihe_types = numpyutils.IntArray()
+        self.impr_types = numpyutils.IntArray()
         self.hdl = None
         self.warnings = []
         self.excluded = collections.defaultdict(set)
         self.initTypeMap()
 
     def initTypeMap(self):
-        self.atm_types = numpyutils.BitSet(max(self.ff.atoms))
-        self.bnd_types = numpyutils.BitSet(max(self.ff.bonds))
-        self.ang_types = numpyutils.BitSet(max(self.ff.angles))
-        self.dihe_types = numpyutils.BitSet(max(self.ff.dihedrals))
-        self.impr_types = numpyutils.BitSet(max(self.ff.impropers))
+        self.atm_types = numpyutils.IntArray(max(self.ff.atoms))
+        self.bnd_types = numpyutils.IntArray(max(self.ff.bonds))
+        self.ang_types = numpyutils.IntArray(max(self.ff.angles))
+        self.dihe_types = numpyutils.IntArray(max(self.ff.dihedrals))
+        self.impr_types = numpyutils.IntArray(max(self.ff.impropers))
 
     def addMol(self, mol):
         mol = super().addMol(mol)
@@ -790,8 +807,7 @@ class Struct(structure.Struct, Base):
         self.hdl.write(f"{self.BOND_COEFFS}\n\n")
         for idx in self.bnd_types.on:
             bond = self.ff.bonds[idx]
-            self.hdl.write(
-                f"{self.bnd_types[idx]} {bond.ene} {bond.dist}\n")
+            self.hdl.write(f"{self.bnd_types[idx]} {bond.ene} {bond.dist}\n")
         self.hdl.write("\n")
 
     def writeAngleCoeffs(self):
@@ -804,8 +820,7 @@ class Struct(structure.Struct, Base):
         self.hdl.write(f"{self.ANGLE_COEFFS}\n\n")
         for idx in self.ang_types.on:
             ang = self.ff.angles[idx]
-            self.hdl.write(
-                f"{self.ang_types[idx]} {ang.ene} {ang.angle}\n")
+            self.hdl.write(f"{self.ang_types[idx]} {ang.ene} {ang.angle}\n")
         self.hdl.write("\n")
 
     def writeDiheCoeffs(self):
@@ -828,8 +843,7 @@ class Struct(structure.Struct, Base):
                 if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
                     params[ene_ang_n.n_parm] *= -1
             self.hdl.write(
-                f"{self.dihe_types[idx]}  {' '.join(map(str, params))}\n"
-            )
+                f"{self.dihe_types[idx]}  {' '.join(map(str, params))}\n")
         self.hdl.write("\n")
 
     def writeImpropCoeffs(self):
@@ -846,8 +860,7 @@ class Struct(structure.Struct, Base):
             # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
             sign = 1 if impr.angle == 0. else -1
             self.hdl.write(
-                f"{self.impr_types[idx]} {impr.ene} {sign} {impr.n_parm}\n"
-            )
+                f"{self.impr_types[idx]} {impr.ene} {sign} {impr.n_parm}\n")
         self.hdl.write("\n")
 
     def writeAtoms(self):
