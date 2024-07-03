@@ -1,6 +1,5 @@
 import io
 import re
-import csv
 import math
 import scipy
 import types
@@ -20,34 +19,23 @@ from nemd import numpyutils
 from nemd import constants as nconstant
 
 ID = 'id'
-MOL_ID = 'mol_id'
 TYPE_ID = 'type_id'
-CHARGE = 'charge'
-XU = symbols.XU
-YU = symbols.YU
-ZU = symbols.ZU
-XYZU = symbols.XYZU
-ATOM_COL = [ID, MOL_ID, TYPE_ID, CHARGE, XU, YU, ZU]
 
 ATOM1 = 'atom1'
 ATOM2 = 'atom2'
 ATOM3 = 'atom3'
 ATOM4 = 'atom4'
 
-ENE = 'ene'
-DIST = 'dist'
-
 
 class Mass(pd.DataFrame):
 
-    COLUMNS = 'columns'
+    NAME = 'Masses'
+    COLUMN_LABELS = ['mass', 'comment']
     TO_CSV_KWARGS = dict(sep=' ',
                          header=False,
                          float_format='%.4f',
                          mode='a',
                          quotechar='#')
-    NAME = 'Masses'
-    COLUMN_LABELS = ['mass', 'comment']
 
     def __init__(self, data=None, index=None, columns=None, **kwargs):
         if not isinstance(data, pd.DataFrame) and columns is None:
@@ -85,16 +73,41 @@ class Mass(pd.DataFrame):
 class Vdw(Mass):
 
     NAME = 'Pair Coeffs'
+    ENE = 'ene'
+    DIST = 'dist'
     COLUMN_LABELS = [ENE, DIST]
 
 
-class Bond(Mass):
+class Atom(Mass):
+
+    NAME = 'Atoms'
+    MOL_ID = 'mol_id'
+    TYPE_ID = TYPE_ID
+    CHARGE = 'charge'
+    XU = symbols.XU
+    YU = symbols.YU
+    ZU = symbols.ZU
+    XYZU = symbols.XYZU
+    COLUMN_LABELS = [MOL_ID, TYPE_ID, CHARGE, XU, YU, ZU]
+
+    def mapIds(self, id_map):
+        acopy = self.copy()
+        acopy.index = id_map[acopy.index]
+        return acopy
+
+    @classmethod
+    def read_csv(cls, *args, **kwargs):
+        kwargs.update(dict(names=cls.COLUMN_LABELS, sep=r'\s+'))
+        return cls(pd.read_csv(*args, **kwargs))
+
+
+class Bond(Atom):
 
     NAME = 'Bonds'
-    DTYPE = 'dtype'
-    DEFAULT_DTYPE = int
     ID_COLS = [ATOM1, ATOM2]
     COLUMN_LABELS = [TYPE_ID] + ID_COLS
+    DTYPE = 'dtype'
+    DEFAULT_DTYPE = int
 
     def __init__(self, data=None, **kwargs):
         if data is None:
@@ -114,7 +127,7 @@ class Bond(Mass):
         slices = slice(None, None, step)
         return [tuple(sorted(x[slices])) for x in self[self.ID_COLS].values]
 
-    def getFixed(self, func):
+    def getRigid(self, func):
         vals = [x for x in self[TYPE_ID].unique() if func(x)]
         return pd.DataFrame({self.NAME: vals})
 
@@ -125,11 +138,6 @@ class Bond(Mass):
         data = pd.concat(objs, **kwargs)
         data.index = pd.RangeIndex(start=1, stop=data.shape[0] + 1)
         return data
-
-    @classmethod
-    def read_csv(cls, *args, **kwargs):
-        kwargs.update(dict(names=cls.COLUMN_LABELS, sep=r'\s+'))
-        return cls(pd.read_csv(*args, **kwargs))
 
 
 class Angle(Bond):
@@ -148,17 +156,28 @@ class Angle(Bond):
     def getPairs(self, step=2):
         return super(Angle, self).getPairs(step=step)
 
-    def min(self, x, key):
+    def select(self, atom_ids):
+        """
+        Get the angles indexes whose energy is the lowest.
+
+        :param atom_ids `numpy.ndarray`: list of an angle atom id tuples
+        """
         if self.id_map is None:
-            atom_ids = self.drop(columns=[TYPE_ID])
-            shape = 0 if self.empty else atom_ids.max().max() + 1
-            self.id_map = np.zeros([shape] * atom_ids.shape[1], dtype=int)
-            col1, col2, col3 = tuple(np.transpose(atom_ids.values))
+            shape = 0 if self.empty else self[self.ID_COLS].max().max() + 1
+            self.id_map = np.zeros([shape] * len(self.ID_COLS), dtype=int)
+            col1, col2, col3 = tuple(np.transpose(self[self.ID_COLS].values))
             self.id_map[col1, col2, col3] = self.index
             self.id_map[col3, col2, col1] = self.index
 
-        indexes = self.id_map[tuple(np.transpose(x))]
-        return min(indexes, key=lambda x: key(self.loc[x][TYPE_ID]))
+        return self.loc[self.id_map[tuple(np.transpose(atom_ids))]]
+
+    def getIndex(self, func):
+        """
+        Get the index of the angle with the lowest energy.
+
+        :param key func: a function to get the angle energy from the type.
+        """
+        return min(self.index, key=lambda x: func(self.loc[x].type_id))
 
 
 class Dihedral(Bond):
@@ -179,6 +198,11 @@ class Improper(Dihedral):
         ids = [itertools.combinations(x, 2) for x in self[self.ID_COLS].values]
         return [tuple(sorted(y)) for x in ids for y in x]
 
+    def getAngles(self):
+        columns = [ATOM2, ATOM1, ATOM4]
+        cols = [[x, ATOM3, y] for x, y in itertools.combinations(columns, 2)]
+        return np.array([x for x in zip(*[self[x].values for x in cols])])
+
 
 class Conformer(structure.Conformer):
 
@@ -190,11 +214,9 @@ class Conformer(structure.Conformer):
         :return `pandas.core.frame.DataFrame`: information such as atom global
             ids, molecule ids, atom type ids, charges, coordinates.
         """
-        atoms = self.GetOwningMol().atoms
-        atoms.insert(0, MOL_ID, self.gid)
-        for dim, vals in zip(symbols.XYZU, self.GetPositions().transpose()):
-            atoms[dim] = vals
-        atoms.index = self.id_map[atoms.index]
+        atoms = self.GetOwningMol().atoms.mapIds(self.id_map)
+        atoms.mol_id = self.gid
+        atoms[Atom.XYZU] = self.GetPositions()
         return atoms
 
     @property
@@ -242,8 +264,6 @@ class Mol(structure.Mol):
 
     ConfClass = Conformer
     RES_NUM = oplsua.RES_NUM
-    INDEXES = [TYPE_ID, ATOM1, ATOM2]
-    BONDS_KWARGS = dict(index=[TYPE_ID, ATOM1, ATOM2], dtype=int)
 
     def __init__(self, *args, ff=None, **kwargs):
         """
@@ -251,6 +271,7 @@ class Mol(structure.Mol):
         """
         super().__init__(*args, **kwargs)
         self.ff = ff
+        self.atoms = Atom()
         self.bonds = Bond()
         self.angles = Angle()
         self.dihedrals = Dihedral()
@@ -270,6 +291,7 @@ class Mol(structure.Mol):
         """
         self.typeAtoms()
         self.balanceCharge()
+        self.setAtoms()
         self.setBonds()
         self.setAngles()
         self.setDihedrals()
@@ -316,14 +338,13 @@ class Mol(structure.Mol):
         for res, idx in res_atom.items():
             self.nbr_charge[idx] -= res_charge[res]
 
-    @property
-    def atoms(self):
+    def setAtoms(self):
         type_ids = [x.GetIntProp(TYPE_ID) for x in self.GetAtoms()]
         fchrg = [self.ff.charges[x] for x in type_ids]
-        index = pd.Index([x.GetIdx() for x in self.GetAtoms()], name=ID)
-        nchrg = [self.nbr_charge[x] for x in index]
-        chrg = np.array([sum(x) for x in zip(fchrg, nchrg)])
-        return pd.DataFrame({TYPE_ID: type_ids, CHARGE: chrg}, index=index)
+        aids = [x.GetIdx() for x in self.GetAtoms()]
+        nchrg = [self.nbr_charge[x] for x in aids]
+        chrg = [sum(x) for x in zip(fchrg, nchrg)]
+        self.atoms = Atom({TYPE_ID: type_ids, Atom.CHARGE: chrg}, index=aids)
 
     def setBonds(self):
         """
@@ -490,20 +511,18 @@ class Mol(structure.Mol):
         ref: Atomic Forces for Geometry-Dependent Point Multi-pole and Gaussian
         Multi-xpole Models
         """
-        columns = [ATOM2, ATOM1, ATOM4]
-        cols = [[x, ATOM3, y] for x, y in itertools.combinations(columns, 2)]
-        atom_ids = zip(*[self.impropers[x].values for x in cols])
-        get_energy_from_type_id = lambda x: self.ff.angles[x].ene
-        ids = [self.angles.min(x, get_energy_from_type_id) for x in atom_ids]
-        self.angles = self.angles.drop(index=ids)
+        angles = [self.angles.select(x) for x in self.impropers.getAngles()]
+        index = [x.getIndex(lambda x: self.ff.angles[x].ene) for x in angles]
+        self.angles = self.angles.drop(index=index)
 
-    def getFixed(self):
+    def getRigid(self):
         """
-        The lengths or angle values of these geometries remain unchanged during
-        simulation.
+        The bond and angle are rigid during simulation.
+
+        :return
         """
-        bnd_types = self.bonds.getFixed(lambda x: self.ff.bonds[x].has_h)
-        ang_types = self.angles.getFixed(lambda x: self.ff.angles[x].has_h)
+        bnd_types = self.bonds.getRigid(lambda x: self.ff.bonds[x].has_h)
+        ang_types = self.angles.getRigid(lambda x: self.ff.angles[x].has_h)
         return bnd_types, ang_types
 
     @property
@@ -579,7 +598,7 @@ class Base(lammpsin.In):
         """
         Set the vdw radius.
         """
-        self.radii = Radius(self.vdws[DIST], self.atoms[TYPE_ID])
+        self.radii = Radius(self.vdws.dist, self.atoms.type_id)
 
     def setClashExclusion(self, include14=True):
         """
@@ -602,11 +621,6 @@ class Base(lammpsin.In):
 class Struct(structure.Struct, Base):
 
     MolClass = Mol
-    TO_CSV_KWARGS = dict(sep=' ',
-                         header=False,
-                         float_format='%.4f',
-                         mode='a',
-                         quoting=csv.QUOTE_NONE)
 
     def __init__(self, struct=None, ff=None, options=None, **kwargs):
         """
@@ -842,12 +856,10 @@ class Struct(structure.Struct, Base):
         """
         Write atom coefficients.
         """
-        self.hdl.write(f"{self.ATOMS.capitalize()}\n\n")
-        self.atoms.to_csv(self.hdl, **self.TO_CSV_KWARGS)
-        self.hdl.write(f"\n")
-        if not round(self.atoms[CHARGE].sum(), 4):
+        self.atoms.to_csv(self.hdl)
+        if not self.hasCharge(total=True):
             return
-        msg = f'The system has a net charge of {self.atoms[CHARGE].sum():.4f}'
+        msg = f'The system has a net charge of {self.atoms.charge.sum():.4f}'
         self.warnings.append(msg)
 
     def writeBonds(self):
@@ -889,15 +901,15 @@ class Struct(structure.Struct, Base):
         Write command to further equilibrate the system with molecules
         information considered.
         """
-        btypes, atypes = self.getFixed()
+        btypes, atypes = self.getRigid()
         testing = self.conformer_total == 1 and self.atom_total < 100
         struct_info = types.SimpleNamespace(btypes=btypes,
                                             atypes=atypes,
                                             testing=testing)
         super().writeRun(*arg, struct_info=struct_info, **kwarg)
 
-    def getFixed(self):
-        data = [x.getFixed() for x in self.molecules]
+    def getRigid(self):
+        data = [x.getRigid() for x in self.molecules]
         bonds, angles = list(map(list, zip(*data)))
         bonds = Bond.concat([x for x in bonds if not x.empty])
         angles = Angle.concat([x for x in angles if not x.empty])
@@ -905,11 +917,12 @@ class Struct(structure.Struct, Base):
         angle_types = self.ang_types[angles].flatten()
         return [' '.join(map(str, x)) for x in [bond_types, angle_types]]
 
-    def hasCharge(self):
+    def hasCharge(self, total=False):
         """
         Whether any atom has charge.
         """
-        return np.isclose(self.atoms[CHARGE], 0, 0.001).any()
+        return round(self.atoms.charge.sum(), 4) if total else np.isclose(
+            self.atoms.charge, 0, 0.001).any()
 
     @property
     def molecular_weight(self):
@@ -1100,10 +1113,7 @@ class DataFileReader(Base):
         """
         sidx = self.blk_idx[self.ATOMS_CAP] + 2
         lines = self.lines[sidx:sidx + self.count[self.ATOMS]]
-        data = pd.read_csv(io.StringIO(''.join(lines)),
-                           names=ATOM_COL,
-                           sep=r'\s+')
-        self.atoms = data.set_index(ID)
+        self.atoms = Atom.read_csv(io.StringIO(''.join(lines)))
 
     def gidFromEle(self, ele):
         if ele is None:

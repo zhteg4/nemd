@@ -146,11 +146,7 @@ class PackedConf(GriddedConf):
         gids = self.id_map[aids]
         values = self.mol.struct.dcell.xyz[gids, :]
         for name, xyz in zip(gids, values):
-            try:
-                clashes = self.mol.struct.dcell.getClashes(xyz, name=name)
-            except IndexError:
-                import pdb
-                pdb.set_trace()
+            clashes = self.mol.struct.dcell.getClashes(xyz, name=name)
             if clashes:
                 return True
         return False
