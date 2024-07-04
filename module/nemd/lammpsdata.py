@@ -1,7 +1,5 @@
 import io
 import re
-import math
-import scipy
 import types
 import base64
 import itertools
@@ -9,14 +7,12 @@ import collections
 import numpy as np
 import pandas as pd
 from rdkit import Chem
-from scipy import constants
 
 from nemd import oplsua
 from nemd import symbols
 from nemd import lammpsin
 from nemd import structure
 from nemd import numpyutils
-from nemd import constants as nconstant
 
 ID = 'id'
 TYPE_ID = 'type_id'
@@ -26,34 +22,83 @@ ATOM2 = 'atom2'
 ATOM3 = 'atom3'
 ATOM4 = 'atom4'
 
-
 class Mass(pd.DataFrame):
+    """
+    The masses of the atoms in the system.
+    """
 
     NAME = 'Masses'
     COLUMN_LABELS = ['mass', 'comment']
-    TO_CSV_KWARGS = dict(sep=' ',
-                         header=False,
-                         float_format='%.4f',
-                         mode='a',
-                         quotechar='#')
+    LABEL = 'atom types'
 
     def __init__(self, data=None, index=None, columns=None, **kwargs):
+        """
+        Initialize the Mass object.
+
+        :param data: `pandas.DataFrame`: the data to initialize the object.
+        :param index: `pandas.Index`: the index to initialize the object.
+        :param columns: `list`: the column labels to initialize the object.
+        """
         if not isinstance(data, pd.DataFrame) and columns is None:
             columns = self.COLUMN_LABELS
         super().__init__(data=data, index=index, columns=columns, **kwargs)
         if not isinstance(data, pd.DataFrame) and index is None:
             self.index = pd.RangeIndex(start=1, stop=self.shape[0] + 1)
 
-    def to_csv(self, path_or_buf=None, as_block=True, **kwargs):
+    def to_csv(self,
+               path_or_buf=None,
+               as_block=True,
+               sep=' ',
+               header=False,
+               float_format='%.4f',
+               mode='a',
+               quotechar='#',
+               **kwargs):
+        """
+        Write the data to a file buffer.
+
+        :param path_or_buf '_io.TextIOWrapper': the buffer to write to.
+        :param as_block `bool`: whether to write the data as a block.
+        :param sep `str`: the separator to use.
+        :param header `bool`: whether to write the column names as the header.
+        :param float_format `str`: the format to use for floating point numbers.
+        :param mode `str`: the mode to use for writing.
+        :param quotechar `str`: the quote character to use.
+        """
+
         if self.empty:
             return
-        kwargs.update(self.TO_CSV_KWARGS)
-        if not as_block:
-            super().to_csv(path_or_buf=path_or_buf, **kwargs)
-            return
-        path_or_buf.write(self.NAME + '\n\n')
-        super().to_csv(path_or_buf=path_or_buf, **kwargs)
-        path_or_buf.write('\n')
+
+        content = self.NAME + '\n\n' if as_block and self.NAME else ''
+        content += super().to_csv(sep=sep,
+                                  header=header,
+                                  float_format=float_format,
+                                  mode=mode,
+                                  quotechar=quotechar,
+                                  **kwargs)
+        if as_block:
+            content += '\n'
+        path_or_buf.write(content)
+
+    @classmethod
+    def read_csv(cls,
+                 *args,
+                 names=None,
+                 index_col=None,
+                 sep=r'\s+',
+                 comment='#',
+                 **kwargs):
+        if names is None:
+            names = [ID] + cls.COLUMN_LABELS
+            if index_col is None:
+                index_col = ID
+        return cls(
+            pd.read_csv(*args,
+                        names=names,
+                        index_col=index_col,
+                        sep=sep,
+                        comment=comment,
+                        **kwargs))
 
     @classmethod
     @property
@@ -61,44 +106,119 @@ class Mass(pd.DataFrame):
         """
         Return the constructor of the class.
 
-        :return 'Bond' class or subclass of 'Bond': the constructor of the class
+        :return (sub)-class of 'Bond': the constructor of the class
         """
         return cls
 
     @classmethod
     def new(cls, *args, **kwargs):
+        """
+        Create a new instance of the class.
+        """
         return cls(*args, **kwargs)
 
+    def writeCount(self, fh):
+        fh.write(f'{self.shape[0]} {self.LABEL}\n')
 
-class Vdw(Mass):
+
+class Box(Mass):
+
+    NAME = ''
+    LO, HI = 'lo', 'hi'
+    COLUMN_LABELS = [LO, HI]
+    INDEX = ['x', 'y', 'z']
+    ORIGIN = [0, 0, 0]
+    LIMIT_CMT = '{limit}_cmt'
+    LO_LABEL, HI_LABEL = LIMIT_CMT.format(limit=LO), LIMIT_CMT.format(limit=HI)
+    LO_CMT = [x + y for x, y in itertools.product(INDEX, [LO])]
+    HI_CMT =[x + y for x, y in itertools.product(INDEX, [HI])]
+
+    def __init__(self, data=None, index=INDEX, **kwargs):
+        super().__init__(data=data, index=index, **kwargs)
+
+    @classmethod
+    def fromEdges(cls, edges):
+        return cls(data={cls.LO: cls.ORIGIN, cls.HI: edges})
+
+    @property
+    def span(self):
+        return self.hi - self.lo
+
+    def to_csv(self, fh, index=False, **kwargs):
+        self[self.LO_LABEL] = self.LO_CMT
+        self[self.HI_LABEL] = self.HI_CMT
+        super().to_csv(fh, index=index, **kwargs)
+        self.drop(columns=[self.LO_LABEL, self.HI_LABEL], inplace=True)
+
+    def getPoint(self):
+        point = np.random.rand(3) * self.span
+        return point + self.lo
+
+
+class PairCoeff(Mass):
+    """
+    The pair coefficients between non-bonded atoms in the system.
+    """
 
     NAME = 'Pair Coeffs'
     ENE = 'ene'
     DIST = 'dist'
     COLUMN_LABELS = [ENE, DIST]
+    LABEL = 'atom types'
+
+
+class BondCoeff(PairCoeff):
+    """
+    The bond coefficients between bonded atoms in the system.
+    """
+    NAME = 'Bond Coeffs'
+    LABEL = 'bond types'
+
+
+class AngleCoeff(PairCoeff):
+    """
+    The bond coefficients between bonded atoms in the system.
+    """
+    NAME = 'Angle Coeffs'
+    DEG = 'deg'
+    COLUMN_LABELS = [PairCoeff.ENE, DEG]
+    LABEL = 'angle types'
+
+
+class DihedralCoeff(AngleCoeff):
+    """
+    The bond coefficients between bonded atoms in the system.
+    """
+    NAME = 'Dihedral Coeffs'
+    COLUMN_LABELS = ['k1', 'k2', 'k3', 'k4']
+    LABEL = 'dihedral types'
+
+
+class ImproperCoeff(AngleCoeff):
+    """
+    The bond coefficients between bonded atoms in the system.
+    """
+    NAME = 'Improper Coeffs'
+    COLUMN_LABELS = ['k', 'd', 'n']
+    LABEL = 'improper types'
 
 
 class Atom(Mass):
 
     NAME = 'Atoms'
     MOL_ID = 'mol_id'
-    TYPE_ID = TYPE_ID
     CHARGE = 'charge'
     XU = symbols.XU
     YU = symbols.YU
     ZU = symbols.ZU
     XYZU = symbols.XYZU
     COLUMN_LABELS = [MOL_ID, TYPE_ID, CHARGE, XU, YU, ZU]
+    LABEL = 'atoms'
 
     def mapIds(self, id_map):
         acopy = self.copy()
         acopy.index = id_map[acopy.index]
         return acopy
-
-    @classmethod
-    def read_csv(cls, *args, **kwargs):
-        kwargs.update(dict(names=cls.COLUMN_LABELS, sep=r'\s+'))
-        return cls(pd.read_csv(*args, **kwargs))
 
 
 class Bond(Atom):
@@ -108,6 +228,7 @@ class Bond(Atom):
     COLUMN_LABELS = [TYPE_ID] + ID_COLS
     DTYPE = 'dtype'
     DEFAULT_DTYPE = int
+    LABEL = 'bonds'
 
     def __init__(self, data=None, **kwargs):
         if data is None:
@@ -145,6 +266,7 @@ class Angle(Bond):
     NAME = 'Angles'
     ID_COLS = [ATOM1, ATOM2, ATOM3]
     COLUMN_LABELS = [TYPE_ID] + ID_COLS
+    LABEL = 'angles'
     # https://pandas.pydata.org/docs/development/extending.html
     _internal_names = pd.DataFrame._internal_names + ['id_map']
     _internal_names_set = set(_internal_names)
@@ -185,6 +307,7 @@ class Dihedral(Bond):
     NAME = 'Dihedrals'
     ID_COLS = [ATOM1, ATOM2, ATOM3, ATOM4]
     COLUMN_LABELS = [TYPE_ID] + ID_COLS
+    LABEL = 'dihedrals'
 
     def getPairs(self, step=3):
         return super(Dihedral, self).getPairs(step=step)
@@ -193,6 +316,7 @@ class Dihedral(Bond):
 class Improper(Dihedral):
 
     NAME = 'Impropers'
+    LABEL = 'impropers'
 
     def getPairs(self):
         ids = [itertools.combinations(x, 2) for x in self[self.ID_COLS].values]
@@ -539,22 +663,7 @@ class Mol(structure.Mol):
 
 class Base(lammpsin.In):
 
-    LAMMPS_DESCRIPTION = 'LAMMPS Description # %s'
-
-    ATOMS = 'atoms'
-    BONDS = 'bonds'
-    ANGLES = 'angles'
-    DIHEDRALS = 'dihedrals'
-    IMPROPERS = 'impropers'
-    TOPO_CT = [ATOMS, BONDS, ANGLES, DIHEDRALS, IMPROPERS]
-
-    ATOM_TYPES = 'atom types'
-    BOND_TYPES = 'bond types'
-    ANGLE_TYPES = 'angle types'
-    DIHE_TYPES = 'dihedral types'
-    IMPROP_TYPES = 'improper types'
-    TYPE_CT = [ATOM_TYPES, BOND_TYPES, ANGLE_TYPES, DIHE_TYPES, IMPROP_TYPES]
-    ALL_CT = TOPO_CT + TYPE_CT
+    DESCR = 'LAMMPS Description # {style}'
 
     XLO_XHI = 'xlo xhi'
     YLO_YHI = 'ylo yhi'
@@ -562,33 +671,12 @@ class Base(lammpsin.In):
     LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
     BUFFER = [4., 4., 4.]
 
-    MASSES = 'Masses'
-    PAIR_COEFFS = 'Pair Coeffs'
-    BOND_COEFFS = 'Bond Coeffs'
-    ANGLE_COEFFS = 'Angle Coeffs'
-    DIHEDRAL_COEFFS = 'Dihedral Coeffs'
-    IMPROPER_COEFFS = 'Improper Coeffs'
-    TYPE_BLK = [
-        MASSES, PAIR_COEFFS, BOND_COEFFS, ANGLE_COEFFS, DIHEDRAL_COEFFS,
-        IMPROPER_COEFFS
-    ]
-    BLK_COUNT = {x: y for x, y in zip(TYPE_BLK, TYPE_CT)}
+    TYPE_CLASSES = [Mass, BondCoeff, AngleCoeff, DihedralCoeff, ImproperCoeff]
+    TOPO_CLASSES = [Atom, Bond, Angle, Dihedral, Improper]
 
-    ATOMS_CAP = ATOMS.capitalize()
-    BONDS_CAP = BONDS.capitalize()
-    ANGLES_CAP = ANGLES.capitalize()
-    DIHEDRALS_CAP = DIHEDRALS.capitalize()
-    IMPROPERS_CAP = IMPROPERS.capitalize()
-    TOPO_BLK = [ATOMS_CAP, BONDS_CAP, ANGLES_CAP, DIHEDRALS_CAP, IMPROPERS_CAP]
-    BLK_COUNT.update({x: y for x, y in zip(TOPO_BLK, TOPO_CT)})
-    BLK_MARKERS = TYPE_BLK + TOPO_BLK
-
-    TOPO_TYPE = {
-        BONDS_CAP: Bond,
-        ANGLES_CAP: Angle,
-        DIHEDRALS_CAP: Dihedral,
-        IMPROPERS_CAP: Improper
-    }
+    BLOCK_CLASSES = TYPE_CLASSES + TOPO_CLASSES
+    BLOCK_NAMES = [x.NAME for x in BLOCK_CLASSES]
+    BLOCK_LABELS = [x.LABEL for x in BLOCK_CLASSES]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -598,7 +686,7 @@ class Base(lammpsin.In):
         """
         Set the vdw radius.
         """
-        self.radii = Radius(self.vdws.dist, self.atoms.type_id)
+        self.radii = Radius(self.pair_coeffs.dist, self.atoms.type_id)
 
     def setClashExclusion(self, include14=True):
         """
@@ -636,7 +724,6 @@ class Struct(structure.Struct, Base):
         self.ang_types = numpyutils.IntArray()
         self.dihe_types = numpyutils.IntArray()
         self.impr_types = numpyutils.IntArray()
-        self.hdl = None
         self.warnings = []
         self.excluded = collections.defaultdict(set)
         self.initTypeMap()
@@ -673,218 +760,38 @@ class Struct(structure.Struct, Base):
         """
 
         with io.StringIO() if nofile else open(self.datafile, 'w') as self.hdl:
-            self.writeDescription()
-            self.writeTopoType()
-            self.writeBox()
-            self.writeMasses()
-            self.writePairCoeffs()
-            self.writeBondCoeffs()
-            self.writeAngleCoeffs()
-            self.writeDiheCoeffs()
-            self.writeImpropCoeffs()
-            self.writeAtoms()
-            self.writeBonds()
-            self.writeAngles()
-            self.writeDihedrals()
-            self.writeImpropers()
+            self.hdl.write(f"{self.DESCR.format(style=self.atom_style)}\n\n")
+            # Topology counting
+            self.atoms.writeCount(self.hdl)
+            self.bonds.writeCount(self.hdl)
+            self.angles.writeCount(self.hdl)
+            self.dihedrals.writeCount(self.hdl)
+            self.impropers.writeCount(self.hdl)
+            self.hdl.write("\n")
+            # Type counting
+            self.masses.writeCount(self.hdl)
+            self.bond_coeffs.writeCount(self.hdl)
+            self.angle_coeffs.writeCount(self.hdl)
+            self.dihedral_coeffs.writeCount(self.hdl)
+            self.improper_coeffs.writeCount(self.hdl)
+            self.hdl.write("\n")
+            # Box boundary
+            self.box.to_csv(self.hdl)
+            # Interaction coefficients
+            self.masses.to_csv(self.hdl)
+            self.pair_coeffs.to_csv(self.hdl)
+            self.bond_coeffs.to_csv(self.hdl)
+            self.angle_coeffs.to_csv(self.hdl)
+            self.dihedral_coeffs.to_csv(self.hdl)
+            self.improper_coeffs.to_csv(self.hdl)
+            # Topology details
+            self.atoms.to_csv(self.hdl)
+            self.bonds.to_csv(self.hdl)
+            self.angles.to_csv(self.hdl)
+            self.dihedrals.to_csv(self.hdl)
+            self.impropers.to_csv(self.hdl)
+
             return self.getContents() if nofile else None
-
-    def writeDescription(self):
-        """
-        Write the lammps description section, including the number of atom,
-        bond, angle etc.
-        """
-        lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
-        self.hdl.write(f"{lmp_dsp}\n\n")
-        self.hdl.write(f"{self.atoms.shape[0]} {self.ATOMS}\n")
-        self.hdl.write(f"{self.bonds.shape[0]} {self.BONDS}\n")
-        self.hdl.write(f"{self.angles.shape[0]} {self.ANGLES}\n")
-        self.hdl.write(f"{self.dihedrals.shape[0]} {self.DIHEDRALS}\n")
-        self.hdl.write(f"{self.impropers.shape[0]} {self.IMPROPERS}\n\n")
-
-    def writeTopoType(self):
-        """
-        Write topologic data. e.g. number of atoms, angles...
-        """
-        self.hdl.write(f"{self.atm_types.max()} {self.ATOM_TYPES}\n")
-        self.hdl.write(f"{self.bnd_types.max()} {self.BOND_TYPES}\n")
-        self.hdl.write(f"{self.ang_types.max()} {self.ANGLE_TYPES}\n")
-        self.hdl.write(f"{self.dihe_types.max()} {self.DIHE_TYPES}\n")
-        self.hdl.write(f"{self.impr_types.max()} {self.IMPROP_TYPES}\n")
-        self.hdl.write("\n")
-
-    def writeBox(self, min_box=None, buffer=None):
-        """
-        Write box information.
-
-        :param min_box list: minimum box size
-        :param buffer list: buffer in three dimensions
-        """
-        xyzs = self.getPositions()
-        ctr = xyzs.mean(axis=0)
-        box_hf = self.getHalfBox(xyzs, min_box=min_box, buffer=buffer)
-        box = [[x - y, x + y, z] for x, y, z in zip(ctr, box_hf, self.LO_HI)]
-        if self.box is not None:
-            boxes = zip(box, np.array(self.box).reshape(-1, 2))
-            box = [[*x, symbols.POUND, *y] for x, y in boxes]
-        for line in box:
-            line = [f'{x:.2f}' if isinstance(x, float) else x for x in line]
-            self.hdl.write(f"{' '.join(line)}\n")
-        self.hdl.write("\n")
-        if self.density is None:
-            return
-        # Calculate density as the revised box may alter the box size.
-        vol = math.prod([x * 2 * nconstant.ANG_TO_CM for x in box_hf])
-        density = self.molecular_weight / vol / scipy.constants.Avogadro
-        if np.isclose(self.density, density):
-            return
-        msg = f'The density of the final data file is {density:.4g} kg/cm^3'
-        self.warnings.append(msg)
-
-    def getHalfBox(self, xyzs, min_box=None, buffer=None):
-        """
-        Get the half box size based on interaction minimum, buffer, and structure
-        span.
-
-        :param xyzs 'numpy.ndarray': the xyz of the structure
-        :param min_box list: minimum box size
-        :param buffer list: the buffer in xyz dimensions (good for non-pbc)
-        :return list of three floats: the xyz box limits.
-        """
-        if min_box is None:
-            min_box = [1, 1, 1]
-        if buffer is None:
-            buffer = self.BUFFER  # yapf: disable
-        box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
-        if self.box is not None:
-            box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
-        box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        cut_off = min([self.options.lj_cut, self.options.coul_cut])
-        if min(box_hf) < cut_off:
-            # One particle interacts with another particle within cutoff twice:
-            # within the box and across the PBC
-            msg = f"The half box size ({min(box_hf):.2f} {symbols.ANGSTROM}) " \
-                  f"is smaller than the {cut_off} {symbols.ANGSTROM} cutoff."
-            self.warnings.append(msg)
-
-        if self.conformer_total != 1:
-            return box_hf
-        # All-trans single molecule with internal tension runs into clashes
-        # across PBCs and thus larger box is used.
-        return [x * 1.2 for x in box_hf]
-
-    def writeMasses(self):
-        """
-        Write out mass information.
-        """
-        self.masses.to_csv(self.hdl)
-
-    def writePairCoeffs(self):
-        """
-        Write pair coefficients.
-        """
-        self.vdws.to_csv(self.hdl)
-
-    def writeBondCoeffs(self):
-        """
-        Write bond coefficients.
-        """
-
-        if not self.bnd_types.any():
-            return
-
-        self.hdl.write(f"{self.BOND_COEFFS}\n\n")
-        for idx in self.bnd_types.on:
-            bond = self.ff.bonds[idx]
-            self.hdl.write(f"{self.bnd_types[idx]} {bond.ene} {bond.dist}\n")
-        self.hdl.write("\n")
-
-    def writeAngleCoeffs(self):
-        """
-        Write angle coefficients.
-        """
-        if not self.ang_types.any():
-            return
-
-        self.hdl.write(f"{self.ANGLE_COEFFS}\n\n")
-        for idx in self.ang_types.on:
-            ang = self.ff.angles[idx]
-            self.hdl.write(f"{self.ang_types[idx]} {ang.ene} {ang.angle}\n")
-        self.hdl.write("\n")
-
-    def writeDiheCoeffs(self):
-        """
-        Write dihedral coefficients.
-        """
-        if not self.dihe_types.any():
-            return
-
-        self.hdl.write(f"{self.DIHEDRAL_COEFFS}\n\n")
-        for idx in self.dihe_types.on:
-            params = [0., 0., 0., 0.]
-            # LAMMPS: K1, K2, K3, K4 in 0.5*K1[1+cos(x)] + 0.5*K2[1-cos(2x)]...
-            # OPLS: [1 + cos(nx-gama)]
-            # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
-            for ene_ang_n in self.ff.dihedrals[idx].constants:
-                params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
-                if not params[ene_ang_n.n_parm]:
-                    continue
-                if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
-                    params[ene_ang_n.n_parm] *= -1
-            self.hdl.write(
-                f"{self.dihe_types[idx]}  {' '.join(map(str, params))}\n")
-        self.hdl.write("\n")
-
-    def writeImpropCoeffs(self):
-        """
-        Write improper coefficients.
-        """
-        if not self.impr_types.any():
-            return
-
-        self.hdl.write(f"{self.IMPROPER_COEFFS}\n\n")
-        for idx in self.impr_types.on:
-            impr = self.ff.impropers[idx]
-            # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
-            # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
-            sign = 1 if impr.angle == 0. else -1
-            self.hdl.write(
-                f"{self.impr_types[idx]} {impr.ene} {sign} {impr.n_parm}\n")
-        self.hdl.write("\n")
-
-    def writeAtoms(self):
-        """
-        Write atom coefficients.
-        """
-        self.atoms.to_csv(self.hdl)
-        if not self.hasCharge(total=True):
-            return
-        msg = f'The system has a net charge of {self.atoms.charge.sum():.4f}'
-        self.warnings.append(msg)
-
-    def writeBonds(self):
-        """
-        Write bond coefficients.
-        """
-        self.bonds.to_csv(self.hdl)
-
-    def writeAngles(self):
-        """
-        Write angle coefficients.
-        """
-        self.angles.to_csv(self.hdl)
-
-    def writeDihedrals(self):
-        """
-        Write dihedral coefficients.
-        """
-        self.dihedrals.to_csv(self.hdl)
-
-    def writeImpropers(self):
-        """
-        Write improper coefficients.
-        """
-        self.impropers.to_csv(self.hdl)
 
     def getContents(self):
         """
@@ -895,45 +802,6 @@ class Struct(structure.Struct, Base):
         self.hdl.seek(0)
         contents = base64.b64encode(self.hdl.read().encode("utf-8"))
         return b','.join([b'lammps_datafile', contents])
-
-    def writeRun(self, *arg, **kwarg):
-        """
-        Write command to further equilibrate the system with molecules
-        information considered.
-        """
-        btypes, atypes = self.getRigid()
-        testing = self.conformer_total == 1 and self.atom_total < 100
-        struct_info = types.SimpleNamespace(btypes=btypes,
-                                            atypes=atypes,
-                                            testing=testing)
-        super().writeRun(*arg, struct_info=struct_info, **kwarg)
-
-    def getRigid(self):
-        data = [x.getRigid() for x in self.molecules]
-        bonds, angles = list(map(list, zip(*data)))
-        bonds = Bond.concat([x for x in bonds if not x.empty])
-        angles = Angle.concat([x for x in angles if not x.empty])
-        bond_types = self.bnd_types[bonds].flatten()
-        angle_types = self.ang_types[angles].flatten()
-        return [' '.join(map(str, x)) for x in [bond_types, angle_types]]
-
-    def hasCharge(self, total=False):
-        """
-        Whether any atom has charge.
-        """
-        return round(self.atoms.charge.sum(), 4) if total else np.isclose(
-            self.atoms.charge, 0, 0.001).any()
-
-    @property
-    def molecular_weight(self):
-        """
-        The molecular weight of the polymer.
-
-        :return float: the total weight.
-        """
-        return sum([x.mw * x.GetNumConformers() for x in self.molecules])
-
-    mw = molecular_weight
 
     @property
     def atoms(self):
@@ -977,10 +845,118 @@ class Struct(structure.Struct, Base):
         return masses
 
     @property
-    def vdws(self):
+    def pair_coeffs(self):
         vdws = [self.ff.vdws[x] for x in self.atm_types.on]
-        vdws = Vdw([[x.ene, x.dist] for x in vdws])
-        return vdws
+        return PairCoeff([[x.ene, x.dist] for x in vdws])
+
+    @property
+    def bond_coeffs(self):
+        bonds = [self.ff.bonds[x] for x in self.bnd_types.on]
+        return BondCoeff([[x.ene, x.dist] for x in bonds])
+
+    @property
+    def angle_coeffs(self):
+        angles = [self.ff.angles[x] for x in self.ang_types.on]
+        return AngleCoeff([[x.ene, x.deg] for x in angles])
+
+    @property
+    def dihedral_coeffs(self):
+
+        def getParams(ene_ang_ns):
+            params = [0., 0., 0., 0.]
+            # LAMMPS: K1, K2, K3, K4 in 0.5*K1[1+cos(x)] + 0.5*K2[1-cos(2x)]...
+            # OPLS: [1 + cos(nx-gama)]
+            # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
+            for ene_ang_n in ene_ang_ns:
+                params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
+                if not params[ene_ang_n.n_parm]:
+                    continue
+                if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
+                    params[ene_ang_n.n_parm] *= -1
+            return params
+
+        dihes = [self.ff.dihedrals[x] for x in self.dihe_types.on]
+        return DihedralCoeff([getParams(x.constants) for x in dihes])
+
+    @property
+    def improper_coeffs(self):
+        imprps = [self.ff.impropers[x] for x in self.impr_types.on]
+        # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
+        # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
+        imprps = [[x.ene, 1 if x.deg == 0. else -1, x.n_parm] for x in imprps]
+        return ImproperCoeff(imprps)
+
+    @property
+    def molecular_weight(self):
+        """
+        The molecular weight of the polymer.
+
+        :return float: the total weight.
+        """
+        return sum([x.mw * x.GetNumConformers() for x in self.molecules])
+
+    mw = molecular_weight
+
+    def getHalfBox(self, min_box=None, buffer=None):
+        """
+        Get the half box size based on interaction minimum, buffer, and structure
+        span.
+
+        :param min_box list: minimum box size
+        :param buffer list: the buffer in xyz dimensions (good for non-pbc)
+        :return list of three floats: the xyz box limits.
+        """
+        if min_box is None:
+            min_box = [1, 1, 1]
+        if buffer is None:
+            buffer = self.BUFFER
+        xyzs = self.getPositions()
+        box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
+        if self.box is not None:
+            box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
+        box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
+        cut_off = min([self.options.lj_cut, self.options.coul_cut])
+        if min(box_hf) < cut_off:
+            # One particle interacts with another particle within cutoff twice:
+            # within the box and across the PBC
+            msg = f"The half box size ({min(box_hf):.2f} {symbols.ANGSTROM}) " \
+                  f"is smaller than the {cut_off} {symbols.ANGSTROM} cutoff."
+            self.warnings.append(msg)
+
+        if self.conformer_total != 1:
+            return box_hf
+        # All-trans single molecule with internal tension runs into clashes
+        # across PBCs and thus larger box is used.
+        return [x * 1.2 for x in box_hf]
+
+    def writeRun(self, *arg, **kwarg):
+        """
+        Write command to further equilibrate the system with molecules
+        information considered.
+        """
+        btypes, atypes = self.getRigid()
+        testing = self.conformer_total == 1 and self.atom_total < 100
+        struct_info = types.SimpleNamespace(btypes=btypes,
+                                            atypes=atypes,
+                                            testing=testing)
+        super().writeRun(*arg, struct_info=struct_info, **kwarg)
+
+    def getRigid(self):
+        data = [x.getRigid() for x in self.molecules]
+        bonds, angles = list(map(list, zip(*data)))
+        bonds = Bond.concat([x for x in bonds if not x.empty])
+        angles = Angle.concat([x for x in angles if not x.empty])
+        bond_types = self.bnd_types[bonds].flatten()
+        angle_types = self.ang_types[angles].flatten()
+        return [' '.join(map(str, x)) for x in [bond_types, angle_types]]
+
+    def hasCharge(self):
+        """
+        Whether any atom has charge.
+        """
+        return  np.isclose(self.atoms.charge, 0, 0.001).any()
+
+
 
 
 class DataFileReader(Base):
@@ -988,11 +964,8 @@ class DataFileReader(Base):
     LAMMPS Data file reader
     """
 
-    MASS = 'mass'
-    ELE = 'ele'
-    MASS_COL = [ID, MASS, ELE]
-    BLK_RE = re.compile(f"^{'|'.join(Base.BLK_MARKERS)}$")
-    CT_RE = re.compile(f"^[0-9]+\s+({'|'.join(Base.ALL_CT)})$")
+    NAME_RE = re.compile(f"^{'|'.join(Base.BLOCK_NAMES)}$")
+    COUNT_RE = re.compile(f"^[0-9]+\s+({'|'.join(Base.BLOCK_LABELS)})$")
     FLT_RE = "[+-]?[\d\.\d]+"
     BOX_RE = re.compile(f"^{FLT_RE}\s+{FLT_RE}\s+({'|'.join(Base.LO_HI)}).*$")
 
@@ -1004,13 +977,10 @@ class DataFileReader(Base):
         self.data_file = data_file
         self.contents = contents
         self.lines = None
-        self.masses = {}
-        self.atoms = {}
-        self.vdws = {}
-        self.excluded = collections.defaultdict(set)
         self.blk_idx = {}
-        self.count = {x: 0 for x in self.ALL_CT}
+        self.count = {x: 0 for x in self.BLOCK_LABELS}
         self.box = {}
+        self.excluded = collections.defaultdict(set)
 
     def run(self):
         """
@@ -1019,9 +989,6 @@ class DataFileReader(Base):
         self.setLines()
         self.indexLines()
         self.setDescription()
-        self.setMasses()
-        self.setPairCoeffs()
-        self.setAtoms()
 
     def setLines(self):
         """
@@ -1041,7 +1008,7 @@ class DataFileReader(Base):
         Index the lines by block markers.
         """
         for idx, line in enumerate(self.lines):
-            match = self.BLK_RE.match(line)
+            match = self.NAME_RE.match(line)
             if not match:
                 continue
             self.blk_idx[match.group()] = idx
@@ -1051,7 +1018,7 @@ class DataFileReader(Base):
         Parse the description section for topo counts, type counts, and box size
         """
         for line in self.lines[:min(self.blk_idx.values())]:
-            match = self.CT_RE.match(line)
+            match = self.COUNT_RE.match(line)
             if match:
                 # 'atoms': 1620, 'bonds': 1593, 'angles': 1566 ...
                 # 'atom types': 7, 'bond types': 6, 'angle types': 5 ...
@@ -1064,40 +1031,12 @@ class DataFileReader(Base):
                 self.box[match.group(1)] = val
                 continue
 
-    def setMasses(self):
-        """
-        Parse the mass section for masses and elements.
-        """
-        sidx = self.blk_idx[self.MASSES] + 2
-        data = []
-        for idx in range(sidx, sidx + self.count[self.ATOM_TYPES]):
-            splitted = self.lines[idx].split()
-            data.append([splitted[0], splitted[1], splitted[-2]])
-        self.masses = pd.DataFrame(data, columns=self.MASS_COL)
-        self.masses[ID] = self.masses[ID].astype(int)
-        self.masses[self.MASS] = self.masses[self.MASS].astype(float)
-
-    def setPairCoeffs(self):
-        """
-        Paser the pair coefficient section.
-        """
-
-        if self.PAIR_COEFFS not in self.blk_idx:
-            return
-        sidx = self.blk_idx[self.PAIR_COEFFS] + 2
-        lines = self.lines[sidx:sidx + self.count[self.ATOM_TYPES]]
-        data = pd.read_csv(io.StringIO(''.join(lines)),
-                           names=[ID] + Vdw.COLUMN_LABELS,
-                           sep=r'\s+')
-        self.vdws = data.set_index(ID)
-
-    def read(self, name):
-        if name not in self.blk_idx:
-            return self.TOPO_TYPE[name].read_csv(io.StringIO(''))
-        sidx = self.blk_idx[name] + 2
-        lines = self.lines[sidx:sidx + self.count[self.BLK_COUNT[name]]]
-        io_str = io.StringIO(''.join(lines))
-        return self.TOPO_TYPE[name].read_csv(io_str)
+    def read(self, BlockClass):
+        if BlockClass.NAME not in self.blk_idx:
+            return BlockClass.read_csv(io.StringIO(''))
+        sidx = self.blk_idx[BlockClass.NAME] + 2
+        lines = self.lines[sidx:sidx + self.count[BlockClass.LABEL]]
+        return BlockClass.read_csv(io.StringIO(''.join(lines)))
 
     def getBox(self):
         """
@@ -1107,14 +1046,6 @@ class DataFileReader(Base):
         """
         return [y for x in self.box_dsp.values() for y in x]
 
-    def setAtoms(self):
-        """
-        Parse the atom section for atom id and molecule id.
-        """
-        sidx = self.blk_idx[self.ATOMS_CAP] + 2
-        lines = self.lines[sidx:sidx + self.count[self.ATOMS]]
-        self.atoms = Atom.read_csv(io.StringIO(''.join(lines)))
-
     def gidFromEle(self, ele):
         if ele is None:
             return self.atoms.index.tolist()
@@ -1123,32 +1054,54 @@ class DataFileReader(Base):
                                 type_id.iloc[0]].tolist()
 
     @property
+    def masses(self):
+        """
+        Parse the mass section for masses and elements.
+        """
+        self.read(Mass)
+
+    @property
+    def pair_coeffs(self):
+        """
+        Paser the pair coefficient section.
+        """
+
+        return self.read(PairCoeff)
+
+    @property
+    def atoms(self):
+        """
+        Parse the atom section for atom id and molecule id.
+        """
+        return self.read(Atom)
+
+    @property
     def bonds(self):
         """
         Parse the atom section for atom id and molecule id.
         """
-        return self.read(name=self.BONDS_CAP)
+        return self.read(Bond)
 
     @property
     def angles(self):
         """
         Parse the angle section for angle id and constructing atoms.
         """
-        return self.read(name=self.ANGLES_CAP)
+        return self.read(Angle)
 
     @property
     def dihedrals(self):
         """
         Parse the dihedral section for dihedral id and constructing atoms.
         """
-        return self.read(name=self.DIHEDRALS_CAP)
+        return self.read(Dihedral)
 
     @property
     def impropers(self):
         """
         Parse the improper section for dihedral id and constructing atoms.
         """
-        return self.read(name=self.IMPROPERS_CAP)
+        return self.read(Improper)
 
     def setClashParams(self, include14=False):
         """

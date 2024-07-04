@@ -245,6 +245,9 @@ class AmorphousCell(object):
         self.struct.writeData()
         for warning in self.struct.warnings:
             log_warning(f'{warning}')
+        # if not self.struct.hasCharge(total=True):
+        #     log_warning(f'The system has a net charge of {self.atoms.charge.sum():.4f}')
+        #     return
         self.struct.writeIn()
         log(f'Data file written into {self.struct.datafile}')
         log(f'In script written into {self.struct.lammps_in}')

@@ -115,9 +115,7 @@ class Frame(pd.DataFrame):
     XYZU_ELE_SZ_CLR = XYZU + [ELEMENT, SIZE, COLOR]
 
     # https://pandas.pydata.org/docs/development/extending.html
-    _internal_names = pd.DataFrame._internal_names + [
-        'box', 'span', 'step', 'xyz'
-    ]
+    _internal_names = pd.DataFrame._internal_names + ['box', 'step', 'xyz']
     _internal_names_set = set(_internal_names)
 
     def __init__(self,
@@ -152,7 +150,6 @@ class Frame(pd.DataFrame):
                          **kwargs)
         self.box = box
         self.step = step
-        self.span = None
         self.xyz = XYZ(self)
         self.setBox(self.box)
 
@@ -163,9 +160,6 @@ class Frame(pd.DataFrame):
         :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
         """
         self.box = box
-        if self.box is None:
-            return
-        self.span = np.array([box[i * 2 + 1] - box[i * 2] for i in range(3)])
 
     @property
     def _constructor(self):
@@ -219,7 +213,7 @@ class Frame(pd.DataFrame):
                     # 'xu', 'yu', 'zu'
                     columns = lines[-1].rstrip().split()[-3:]
                     frame = cls(data=data[:, 1:],
-                                box=box,
+                                box=lammpsdata.Box(box.reshape(3,2)),
                                 index=data[:, 0].astype(int),
                                 columns=columns,
                                 step=step)
@@ -284,18 +278,6 @@ class Frame(pd.DataFrame):
         finally:
             fh.close()
 
-    def getPoint(self):
-        """
-        Get the XYZ of in the span.
-
-        :param atom_id int: atom id
-        :return row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
-        """
-        point = np.random.rand(3) * self.span
-        point = [x + y for x, y in zip(point, self.box[::2])]
-
-        return np.array(point)
-
     def getXYZ(self, atom_id):
         """
         Get the XYZ of the atom id.
@@ -317,7 +299,7 @@ class Frame(pd.DataFrame):
 
         :param float: the volume of the frame
         """
-        return np.prod(self.span)
+        return np.prod(self.box.span)
 
     def getDensity(self):
         """
@@ -352,11 +334,11 @@ class Frame(pd.DataFrame):
 
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
             for id in range(3):
-                func = lambda x: math.remainder(x, self.span[id])
+                func = lambda x: math.remainder(x, self.box.span[id])
                 dists[:, id] = np.frompyfunc(func, 1, 1)(dists[:, id])
             return np.linalg.norm(dists, axis=1)
 
-        return np.array(self.remainderIEEE(dists, self.span))
+        return np.array(self.remainderIEEE(dists, self.box.span.values))
 
     @staticmethod
     @numbautils.jit
@@ -409,7 +391,7 @@ class Frame(pd.DataFrame):
             return
 
         if broken_bonds:
-            self.loc[:] = self.loc[:] % self.span
+            self.loc[:] = self.loc[:] % self.box.span
             # The wrapped xyz shouldn't support molecule center operation
             return
 
@@ -419,7 +401,7 @@ class Frame(pd.DataFrame):
         # The unwrapped xyz can directly perform molecule center operation
         for gids in dreader.mols.values():
             center = self.xyz[gids, :].mean(axis=0)
-            delta = (center % self.span) - center
+            delta = (center % self.box.span) - center
             self.xyz[gids, :] += delta
 
     def ivals(self):
@@ -561,9 +543,9 @@ class DistanceCell(Frame):
         Grids: the length of the cell in each dimension
         """
         res = self.cut if self.res == self.AUTO else self.res
-        self.indexes = [math.ceil(x / res) for x in self.span]
+        self.indexes = [math.ceil(x / res) for x in self.box.span]
         self.indexes_numba = numba.int32(self.indexes)
-        self.grids = np.array([x / i for x, i in zip(self.span, self.indexes)])
+        self.grids = np.array([x / i for x, i in zip(self.box.span, self.indexes)])
 
     def setNeighborIds(self):
         """
@@ -821,9 +803,9 @@ class DistanceCell(Frame):
         """
         self.graph = nx.Graph()
         # getVoids() doesn't generate enough voids with scaling down the grid
-        mgrid = pow(np.prod(self.span) / max([mol_num, min_num]), 1 / 3) * 0.8
-        self.gindexes = (self.span / mgrid).round().astype(int)
-        self.ggrids = self.span / self.gindexes
+        mgrid = pow(np.prod(self.box.span.values) / max([mol_num, min_num]), 1 / 3) * 0.8
+        self.gindexes = (self.box.span.values / mgrid).round().astype(int)
+        self.ggrids = self.box.span.values / self.gindexes
         indexes = [range(x) for x in self.gindexes]
         nodes = list(itertools.product(*indexes))
         self.graph.add_nodes_from(nodes)

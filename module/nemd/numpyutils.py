@@ -55,3 +55,6 @@ class IntArray(np.ndarray):
         Return the indexes of the on bits.
         """
         return self.nonzero()[0]
+
+    def items(self):
+        return zip(self.on, self[self.on])

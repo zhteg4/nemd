@@ -23,12 +23,11 @@ ATOM_TYPE = namedtuple('ATOM_TYPE', [
 ])
 VDW = namedtuple('VDW', ['id', 'dist', 'ene'])
 BOND = namedtuple('BOND', ['id', 'id1', 'id2', 'dist', 'ene', 'has_h'])
-ANGLE = namedtuple('ANGLE',
-                   ['id', 'id1', 'id2', 'id3', 'ene', 'angle', 'has_h'])
+ANGLE = namedtuple('ANGLE', ['id', 'id1', 'id2', 'id3', 'ene', 'deg', 'has_h'])
 UREY_BRADLEY = namedtuple('UREY_BRADLEY', ['id1', 'id2', 'id3', 'ene', 'dist'])
 IMPROPER = namedtuple(
-    'IMPROPER', ['id', 'id1', 'id2', 'id3', 'id4', 'ene', 'angle', 'n_parm'])
-ENE_ANG_N = namedtuple('ENE_ANG_N', ['ene', 'angle', 'n_parm'])
+    'IMPROPER', ['id', 'id1', 'id2', 'id3', 'id4', 'ene', 'deg', 'n_parm'])
+ENE_ANG_N = namedtuple('ENE_ANG_N', ['ene', 'deg', 'n_parm'])
 DIHEDRAL = namedtuple('DIHEDRAL',
                       ['id', 'id1', 'id2', 'id3', 'id4', 'constants'])
 
@@ -478,7 +477,7 @@ class Parser:
                                     id2=int(id2),
                                     id3=int(id3),
                                     ene=float(ene),
-                                    angle=float(angle),
+                                    deg=float(angle),
                                     has_h=has_h)
             self.ang_map[int(id1), int(id2), int(id3)] = id
 
@@ -511,7 +510,7 @@ class Parser:
                                           id3=int(id3),
                                           id4=int(id4),
                                           ene=float(ene),
-                                          angle=float(angle),
+                                          deg=float(angle),
                                           n_parm=int(n_parm))
 
     def setDihedral(self):
@@ -526,7 +525,7 @@ class Parser:
             ids, enes = line_splitted[1:5], line_splitted[5:]
             ids = list(map(int, ids))
             ene_ang_ns = tuple(
-                ENE_ANG_N(ene=float(x), angle=float(y), n_parm=int(z))
+                ENE_ANG_N(ene=float(x), deg=float(y), n_parm=int(z))
                 for x, y, z in zip(enes[::3], enes[1::3], enes[2::3]))
             self.dihedrals[id] = DIHEDRAL(id=id,
                                           id1=ids[0],
@@ -794,12 +793,12 @@ class Parser:
             if symbols not in symbol_impropers:
                 symbol_impropers[symbols] = (
                     improper.ene,
-                    improper.angle,
+                    improper.deg,
                     improper.n_parm,
                 )
             assert symbol_impropers[symbols][:3] == (
                 improper.ene,
-                improper.angle,
+                improper.deg,
                 improper.n_parm,
             )
             symbol_impropers[symbols] += (improper.id, )

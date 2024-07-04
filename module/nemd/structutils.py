@@ -17,6 +17,7 @@ from scipy.spatial.transform import Rotation
 
 from nemd import traj
 from nemd import pnames
+from nemd import symbols
 from nemd import logutils
 from nemd import lammpsdata
 
@@ -100,7 +101,7 @@ class PackedConf(GriddedConf):
         for _ in range(max_trial):
             self.translate(-np.array(self.centroid()))
             self.rotateRandomly()
-            pnt = self.mol.struct.dcell.getPoint()
+            pnt = self.mol.struct.dcell.box.getPoint()
             self.translate(pnt)
             self.mol.struct.dcell.update(self.gids, self.GetPositions())
             if self.hasClashes():
@@ -639,14 +640,15 @@ class GriddedStruct(Struct):
         # vectors shifts molecules by the largest box size
         total_box_num = sum(x.box_num for x in self.molecules)
         edges = self.size * math.ceil(math.pow(total_box_num, 1. / 3))
-        self.box = [0, edges[0], 0, edges[1], 0, edges[2]]
-        log_debug(f'Cubic box of size {self.box[0]:.2f} angstrom is created.')
+        self.box = lammpsdata.Box.fromEdges(edges)
+        log_debug(f'Cubic box of {self.box.span.max():.2f} {symbols.ANGSTROM} '
+                  f'is created.')
 
     def setConformers(self):
         """
         Set coordinates.
         """
-        idxes = [list(range(x)) for x in map(int, self.box[1::2] / self.size)]
+        idxes = [list(range(x)) for x in map(int, self.box.span / self.size)]
         # vectors shifts molecules by the largest box size
         vectors = [x * self.size for x in itertools.product(*idxes)]
         np.random.shuffle(vectors)
@@ -660,7 +662,7 @@ class GriddedStruct(Struct):
         """
         Set the density of the structure.
         """
-        vol = np.prod(self.box[1::2])
+        vol = self.box.span.prod()
         vol *= math.pow(scipy.constants.centi / scipy.constants.angstrom, 3)
         self.density = self.mw * scipy.constants.Avogadro / vol
 
@@ -732,7 +734,7 @@ class PackedStruct(Struct):
         vol = self.mw / self.density / scipy.constants.Avogadro
         edge = math.pow(vol, 1 / 3)  # centimeter
         edge *= scipy.constants.centi / scipy.constants.angstrom
-        self.box = [0, edge, 0, edge, 0, edge]
+        self.box = lammpsdata.Box.fromEdges([edge] * 3)
         log_debug(f'Cubic box of size {edge:.2f} angstrom is created.')
 
     def setUpDcell(self):
