@@ -857,10 +857,12 @@ class Struct(structure.Struct, Base):
         self.ang_types = numpyutils.IntArray()
         self.dihe_types = numpyutils.IntArray()
         self.impr_types = numpyutils.IntArray()
-        self.warnings = []
         self.initTypeMap()
 
     def initTypeMap(self):
+        """
+        Initiate type map.
+        """
         self.atm_types = numpyutils.IntArray(max(self.ff.atoms))
         self.bnd_types = numpyutils.IntArray(max(self.ff.bonds))
         self.ang_types = numpyutils.IntArray(max(self.ff.angles))
@@ -868,6 +870,14 @@ class Struct(structure.Struct, Base):
         self.impr_types = numpyutils.IntArray(max(self.ff.impropers))
 
     def addMol(self, mol):
+        """
+        Add a molecule to the structure.
+
+        :param mol: add this molecule to the structure
+        :type mol: Mol
+        :return: the added molecule
+        :rtype: Mol
+        """
         mol = super().addMol(mol)
         self.setTypeMap(mol)
         return mol
@@ -875,6 +885,9 @@ class Struct(structure.Struct, Base):
     def setTypeMap(self, mol):
         """
         Set the type map for atoms, bonds, angles, dihedrals, and impropers.
+
+        :param mol: add this molecule to the structure
+        :type mol: Mol
         """
 
         atypes = [x.GetIntProp(TYPE_ID) for x in mol.GetAtoms()]
@@ -1028,38 +1041,6 @@ class Struct(structure.Struct, Base):
 
     mw = molecular_weight
 
-    def getHalfBox(self, min_box=None, buffer=None):
-        """
-        Get the half box size based on interaction minimum, buffer, and structure
-        span.
-
-        :param min_box list: minimum box size
-        :param buffer list: the buffer in xyz dimensions (good for non-pbc)
-        :return list of three floats: the xyz box limits.
-        """
-        if min_box is None:
-            min_box = [1, 1, 1]
-        if buffer is None:
-            buffer = self.BUFFER
-        xyzs = self.getPositions()
-        box = xyzs.max(axis=0) - xyzs.min(axis=0) + buffer
-        if self.box is not None:
-            box = [(x - y) for x, y in zip(self.box[1::2], self.box[::2])]
-        box_hf = [max([x, y]) / 2. for x, y in zip(box, min_box)]
-        cut_off = min([self.options.lj_cut, self.options.coul_cut])
-        if min(box_hf) < cut_off:
-            # One particle interacts with another particle within cutoff twice:
-            # within the box and across the PBC
-            msg = f"The half box size ({min(box_hf):.2f} {symbols.ANGSTROM}) " \
-                  f"is smaller than the {cut_off} {symbols.ANGSTROM} cutoff."
-            self.warnings.append(msg)
-
-        if self.conformer_total != 1:
-            return box_hf
-        # All-trans single molecule with internal tension runs into clashes
-        # across PBCs and thus larger box is used.
-        return [x * 1.2 for x in box_hf]
-
     def writeRun(self, *arg, **kwarg):
         """
         Write command to further equilibrate the system with molecules
@@ -1086,6 +1067,22 @@ class Struct(structure.Struct, Base):
         Whether any atom has charge.
         """
         return np.isclose(self.atoms.charge, 0, 0.001).any()
+
+    def getWarnings(self):
+        """
+        Get warnings for the structure.
+
+        :return generator of str: the warnings on structure checking.
+        """
+        net_charge = round(self.atoms.charge.sum(), 4)
+        net_charge = 1
+        if net_charge:
+            yield f'The system has a net charge of {net_charge:.4f}'
+        min_span = self.box.span.min()
+        if min_span < self.options.lj_cut * 2:
+            yield f'The minimum box span ({min_span:.2f} {symbols.ANGSTROM})' \
+                  f' is smaller than {self.options.lj_cut * 2:.2f} ' \
+                  f'{symbols.ANGSTROM} (Lennard-Jones Cutoff x 2) '
 
 
 class DataFileReader(Base):
