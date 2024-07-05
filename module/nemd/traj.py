@@ -206,14 +206,11 @@ class Frame(pd.DataFrame):
                         return
                     data = data[data[:, 0].argsort()]
                     # array([  8.8 ,  68.75,   2.86,  67.43, -28.76,  19.24])
-                    box = np.array([
-                        float(y) for x in range(5, 8)
-                        for y in lines[x].rstrip().split()
-                    ])
+                    box = lammpsdata.Box.fromLines(lines[5:8])
                     # 'xu', 'yu', 'zu'
                     columns = lines[-1].rstrip().split()[-3:]
                     frame = cls(data=data[:, 1:],
-                                box=lammpsdata.Box(box.reshape(3, 2)),
+                                box=box,
                                 index=data[:, 0].astype(int),
                                 columns=columns,
                                 step=step)

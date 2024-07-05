@@ -593,15 +593,6 @@ class Struct(lammpsdata.Struct):
         self.density = None
         self.box = None
 
-    def finalize(self, include14=False):
-        """
-        Finalize the structure by setting the clash parameters.
-
-        :param include14 bool: whether to include atom separated by 2 bonds for
-            clash check.
-        """
-        self.setClashParams(include14=include14)
-
 
 class GriddedStruct(Struct):
     """
@@ -703,10 +694,11 @@ class PackedStruct(Struct):
         """
         Set the distance cell with the trajectory frame.
         """
+
         self.dcell = traj.DistanceCell(data=self.getPositions(),
                                        box=self.box,
-                                       radii=self.radii,
-                                       excluded=self.excluded,
+                                       radii=self.getRadius(),
+                                       excluded=self.getExcluded(),
                                        **kwargs)
 
     def runWithDensity(self, density):

@@ -3,6 +3,7 @@ import re
 import types
 import base64
 import itertools
+import functools
 import collections
 import numpy as np
 import pandas as pd
@@ -60,20 +61,14 @@ class Block(pd.DataFrame):
         return cls(*args, **kwargs)
 
     @classmethod
-    def read_csv(cls,
-                 *args,
-                 names=None,
-                 index_col=None,
-                 sep=r'\s+',
-                 quotechar=QUOTECHAR,
-                 **kwargs):
-        if names is None:
-            names = [ID] + cls.COLUMN_LABELS
-            if index_col is None:
-                index_col = ID
-        df = pd.read_csv(*args,
-                         names=names,
-                         index_col=index_col,
+    def fromLines(cls,
+                  lines,
+                  *args,
+                  sep=r'\s+',
+                  quotechar=QUOTECHAR,
+                  **kwargs):
+        df = pd.read_csv(io.StringIO(''.join(lines)),
+                         *args,
                          sep=sep,
                          quotechar=quotechar,
                          **kwargs)
@@ -127,9 +122,6 @@ class Box(Block):
     LO_CMT = [x + y for x, y in itertools.product(INDEX, [LO])]
     HI_CMT = [x + y for x, y in itertools.product(INDEX, [HI])]
 
-    def __init__(self, data=None, index=INDEX, **kwargs):
-        super().__init__(data=data, index=index, **kwargs)
-
     @classmethod
     def fromEdges(cls, edges):
         return cls(data={cls.LO: cls.ORIGIN, cls.HI: edges})
@@ -147,6 +139,12 @@ class Box(Block):
     def getPoint(self):
         point = np.random.rand(3) * self.span
         return point + self.lo
+
+    @classmethod
+    def fromLines(cls, *args, names=None, **kwargs):
+        if names is None:
+            names = cls.COLUMN_LABELS + [cls.LO_LABEL, cls.HI_LABEL]
+        return super().fromLines(*args, names=names, **kwargs)
 
 
 class Mass(Block):
@@ -172,6 +170,17 @@ class Mass(Block):
 
     def writeCount(self, fh):
         fh.write(f'{self.shape[0]} {self.LABEL}\n')
+
+    @classmethod
+    def fromLines(cls, *args, names=None, index_col=None, **kwargs):
+        if names is None:
+            names = [ID] + cls.COLUMN_LABELS
+            if index_col is None:
+                index_col = ID
+        return super().fromLines(*args,
+                                 names=names,
+                                 index_col=index_col,
+                                 **kwargs)
 
 
 class PairCoeff(Mass):
@@ -696,28 +705,13 @@ class Base(lammpsin.In):
     BLOCK_NAMES = [x.NAME for x in BLOCK_CLASSES]
     BLOCK_LABELS = [x.LABEL for x in BLOCK_CLASSES]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.radii = None
-        self.excluded = collections.defaultdict(set)
-
-    def setClashParams(self, include14=False):
-        """
-        Set clash check related parameters including pair radii and exclusion.
-
-        :param include14 bool: whether to include atom separated by 2 bonds for
-            clash check.
-        """
-        self.setVdwRadius()
-        self.setClashExclusion(include14=not include14)
-
-    def setVdwRadius(self):
+    def getRadius(self):
         """
         Set the vdw radius.
         """
-        self.radii = Radius(self.pair_coeffs.dist, self.atoms.type_id)
+        return Radius(self.pair_coeffs.dist, self.atoms.type_id)
 
-    def setClashExclusion(self, include14=True):
+    def getExcluded(self, include14=True):
         """
         Bonded atoms and atoms in angles are in the exclusion. If include14=True,
         the dihedral angles are in the exclusion as well.
@@ -730,9 +724,12 @@ class Base(lammpsin.In):
         pairs = pairs.union(self.impropers.getPairs())
         if include14:
             pairs = pairs.union(self.dihedrals.getPairs())
+
+        excluded = collections.defaultdict(set)
         for id1, id2 in pairs:
-            self.excluded[id1].add(id2)
-            self.excluded[id2].add(id1)
+            excluded[id1].add(id2)
+            excluded[id2].add(id1)
+        return excluded
 
 
 class Struct(structure.Struct, Base):
@@ -995,7 +992,7 @@ class DataFileReader(Base):
     FLT_RE = "[+-]?[\d\.\d]+"
     BOX_RE = re.compile(f"^{FLT_RE}\s+{FLT_RE}\s+({'|'.join(Base.LO_HI)}).*$")
 
-    def __init__(self, data_file=None, contents=None):
+    def __init__(self, data_file=None, contents=None, delay=False):
         """
         :param data_file str: data file with path
         :param contents `bytes`: parse the contents if data_file not provided.
@@ -1005,17 +1002,13 @@ class DataFileReader(Base):
         self.lines = None
         self.blk_idx = {}
         self.count = {x: 0 for x in self.BLOCK_LABELS}
-        self.box = {}
+        if delay:
+            return
+        self.read()
+        self.index()
+        self.cout()
 
-    def run(self):
-        """
-        Main method to read and parse the data file.
-        """
-        self.setLines()
-        self.indexLines()
-        self.setDescription()
-
-    def setLines(self):
+    def read(self):
         """
         Read the data file or content into lines.
         """
@@ -1028,7 +1021,7 @@ class DataFileReader(Base):
         decoded = base64.b64decode(content_string)
         self.lines = decoded.decode("utf-8").splitlines()
 
-    def indexLines(self):
+    def index(self):
         """
         Index the lines by block markers.
         """
@@ -1038,38 +1031,81 @@ class DataFileReader(Base):
                 continue
             self.blk_idx[match.group()] = idx
 
-    def setDescription(self):
+    def cout(self):
         """
-        Parse the description section for topo counts, type counts, and box size
+        Parse the description section for topo counts and type counts.
         """
         for line in self.lines[:min(self.blk_idx.values())]:
             match = self.COUNT_RE.match(line)
-            if match:
-                # 'atoms': 1620, 'bonds': 1593, 'angles': 1566 ...
-                # 'atom types': 7, 'bond types': 6, 'angle types': 5 ...
-                self.count[match.group(1)] = int(line.split(match.group(1))[0])
+            if not match:
                 continue
-            match = self.BOX_RE.match(line)
-            if match:
-                # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
-                val = [float(x) for x in line.split(match.group(1))[0].split()]
-                self.box[match.group(1)] = val
-                continue
+            # 'atoms': 1620, 'bonds': 1593, 'angles': 1566 ...
+            # 'atom types': 7, 'bond types': 6, 'angle types': 5 ...
+            self.count[match.group(1)] = int(line.split(match.group(1))[0])
 
-    def getBox(self):
+    @property
+    @functools.cache
+    def box(self):
+        lines = self.lines[:min(self.blk_idx.values())]
+        # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
+        box_lines = [x for x in lines if self.BOX_RE.match(x)]
+        return Box.fromLines(box_lines)
+
+    @property
+    def masses(self):
         """
-        Get the box.
-
-        :return list of float: xlo, xhi, ylo, yhi, zlo, zhi
+        Parse the mass section for masses and elements.
         """
-        return [y for x in self.box_dsp.values() for y in x]
+        return self.fromLines(Mass)
 
-    def read(self, BlockClass):
+    @property
+    def pair_coeffs(self):
+        """
+        Paser the pair coefficient section.
+        """
+        return self.fromLines(PairCoeff)
+
+    @property
+    def atoms(self):
+        """
+        Parse the atom section for atom id and molecule id.
+        """
+        return self.fromLines(Atom)
+
+    @property
+    def bonds(self):
+        """
+        Parse the atom section for atom id and molecule id.
+        """
+        return self.fromLines(Bond)
+
+    @property
+    def angles(self):
+        """
+        Parse the angle section for angle id and constructing atoms.
+        """
+        return self.fromLines(Angle)
+
+    @property
+    def dihedrals(self):
+        """
+        Parse the dihedral section for dihedral id and constructing atoms.
+        """
+        return self.fromLines(Dihedral)
+
+    @property
+    def impropers(self):
+        """
+        Parse the improper section for dihedral id and constructing atoms.
+        """
+        return self.fromLines(Improper)
+
+    def fromLines(self, BlockClass):
         if BlockClass.NAME not in self.blk_idx:
-            return BlockClass.read_csv(io.StringIO(''))
+            return BlockClass.fromLines([])
         sidx = self.blk_idx[BlockClass.NAME] + 2
         lines = self.lines[sidx:sidx + self.count[BlockClass.LABEL]]
-        return BlockClass.read_csv(io.StringIO(''.join(lines)))
+        return BlockClass.fromLines(lines)
 
     def gidFromEle(self, ele):
         if ele is None:
@@ -1079,55 +1115,6 @@ class DataFileReader(Base):
             i for i, x in self.masses.comment.items() if x.split()[-2] == ele
         ][0]
         return self.atoms.index[self.atoms[TYPE_ID] == type_id].tolist()
-
-    @property
-    def masses(self):
-        """
-        Parse the mass section for masses and elements.
-        """
-        return self.read(Mass)
-
-    @property
-    def pair_coeffs(self):
-        """
-        Paser the pair coefficient section.
-        """
-        return self.read(PairCoeff)
-
-    @property
-    def atoms(self):
-        """
-        Parse the atom section for atom id and molecule id.
-        """
-        return self.read(Atom)
-
-    @property
-    def bonds(self):
-        """
-        Parse the atom section for atom id and molecule id.
-        """
-        return self.read(Bond)
-
-    @property
-    def angles(self):
-        """
-        Parse the angle section for angle id and constructing atoms.
-        """
-        return self.read(Angle)
-
-    @property
-    def dihedrals(self):
-        """
-        Parse the dihedral section for dihedral id and constructing atoms.
-        """
-        return self.read(Dihedral)
-
-    @property
-    def impropers(self):
-        """
-        Parse the improper section for dihedral id and constructing atoms.
-        """
-        return self.read(Improper)
 
 
 class Radius(numpyutils.Array):

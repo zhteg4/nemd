@@ -390,22 +390,17 @@ class Clash(Base):
     UNIT = 'count'
     LABEL = f'{PNAME} ({UNIT})'
 
-    def run(self):
-        """
-        Main method to run clash analysis.
-        """
-        self.df_reader.setClashParams()
-        super().run()
-
     def setData(self):
         """
         Set the time vs clash number.
         """
-        data = [len(self.getClashes(x)) for x in self.frms]
+        radii = self.df_reader.getRadius()
+        excluded = self.df_reader.getExcluded()
+        data = [len(self.getClashes(x, radii, excluded)) for x in self.frms]
         self.data = pd.DataFrame(data={self.LABEL: data}, index=self.time)
         self.data.index.name = f"{self.ILABEL} ({self.sidx})"
 
-    def getClashes(self, frm):
+    def getClashes(self, frm, radii, excluded):
         """
         Get the clashes between atom pair for this frame.
 
@@ -415,8 +410,8 @@ class Clash(Base):
         """
         dcell = traj.DistanceCell(frm,
                                   gids=self.gids,
-                                  radii=self.df_reader.radii,
-                                  excluded=self.df_reader.excluded)
+                                  radii=radii,
+                                  excluded=excluded)
         dcell.setUp()
         return [y for i, v in frm.ivals() for y in dcell.getClashes(v, name=i)]
 

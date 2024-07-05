@@ -124,7 +124,6 @@ class CustomDump(object):
         if not self.options.data_file:
             return
         self.df_reader = lammpsdata.DataFileReader(self.options.data_file)
-        self.df_reader.run()
 
     def setAtoms(self):
         """
