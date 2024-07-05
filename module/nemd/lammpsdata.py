@@ -61,6 +61,8 @@ class Block(pd.DataFrame):
     def new(cls, *args, **kwargs):
         """
         Create a new instance of the (sub-)class.
+
+        :return instance of Block (sub-)class: the new instance.
         """
         return cls(*args, **kwargs)
 
@@ -284,6 +286,7 @@ class Atom(Mass):
         Create a copy of the instance with atom ids mapped to global atom ids.
 
         :param id_map 'numpy.ndarray': map atom indexes to global atom indexes.
+        :return (sub-)class instance: the new instance with global atom ids.
         """
         acopy = self.copy()
         acopy.index = id_map[acopy.index]
@@ -304,6 +307,16 @@ class Bond(Atom):
                  aids=None,
                  dtype=DEFAULT_DTYPE,
                  **kwargs):
+        """
+        :param data: ndarray, Iterable, dict, or DataFrame
+        :type data: the content to create dataframe
+        :param type_ids: type ids of the aids
+        :type type_ids: list of int
+        :param aids: each sublist contains atom ids matching with one type id
+        :type aids: list of list
+        :param dtype: 'the data type of the Series
+        :type dtype: 'type'
+        """
         if data is None and type_ids is not None and aids is not None:
             data = [[x] + y for x, y in zip(type_ids, aids)]
         if data is None:
@@ -311,22 +324,52 @@ class Bond(Atom):
         super().__init__(data=data, **kwargs)
 
     def mapIds(self, id_map):
+        """
+        Create a copy of the instance with atom ids mapped to global atom ids.
+
+        :param id_map 'numpy.ndarray': map atom id columns with global indexes.
+        :return (sub-)class instance: the new instance with global atom ids.
+        """
         acopy = self.copy()
         acopy[self.ID_COLS] = id_map[acopy[self.ID_COLS]]
         return acopy
 
     def getPairs(self, step=1):
+        """
+        Get the atom pairs from each topology connectivity.
+
+        :param step: the step when slicing the atom ids
+        :type step: int
+        :return: the atom pairs
+        :rtype: list of tuple
+        """
         slices = slice(None, None, step)
         return [tuple(sorted(x[slices])) for x in self[self.ID_COLS].values]
 
     def getRigid(self, func):
+        """
+        Get the rigid topology types.
+
+        :param func: whether this type of topology is rigid
+        :type func: callable
+        :return: the rigid topology types.
+        :rtype: `DataFrame`
+        """
         vals = [x for x in self[TYPE_ID].unique() if func(x)]
         return pd.DataFrame({self.NAME: vals})
 
     @classmethod
     def concat(cls, objs, **kwargs):
+        """
+        Concatenate the instances and re-index the row from 1.
+
+        :param objs: the instances to concatenate.
+        :type objs: list of (sub-)class instances.
+        :return: the concatenated data
+        :rtype: (sub-)class instances
+        """
         if not len(objs):
-            return cls(None)
+            return cls()
         data = pd.concat(objs, **kwargs)
         data.index = pd.RangeIndex(start=1, stop=data.shape[0] + 1)
         return data
@@ -351,9 +394,10 @@ class Angle(Bond):
 
     def select(self, atom_ids):
         """
-        Get the angles indexes whose energy is the lowest.
+        Get the angles indexes from atom ids.
 
-        :param atom_ids `numpy.ndarray`: list of an angle atom id tuples
+        :param atom_ids `numpy.ndarray`: each row is atom ids from one angle
+        :return Angle: the selected angles matching the input atom ids.
         """
         if self.id_map is None:
             shape = 0 if self.empty else self[self.ID_COLS].max().max() + 1
@@ -369,6 +413,7 @@ class Angle(Bond):
         Get the index of the angle with the lowest energy.
 
         :param key func: a function to get the angle energy from the type.
+        :return int: the index of the angle with the lowest energy.
         """
         return min(self.index, key=lambda x: func(self.loc[x].type_id))
 
@@ -381,6 +426,14 @@ class Dihedral(Bond):
     LABEL = 'dihedrals'
 
     def getPairs(self, step=3):
+        """
+        Get the atom pairs from each topology connectivity.
+
+        :param step: the step when slicing the atom ids
+        :type step: int
+        :return: the atom pairs
+        :rtype: list of tuple
+        """
         return super(Dihedral, self).getPairs(step=step)
 
 
@@ -390,10 +443,24 @@ class Improper(Dihedral):
     LABEL = 'impropers'
 
     def getPairs(self):
+        """
+        Get the atom pairs from each topology connectivity.
+
+        :param step: the step when slicing the atom ids
+        :type step: int
+        :return: the atom pairs
+        :rtype: list of tuple
+        """
         ids = [itertools.combinations(x, 2) for x in self[self.ID_COLS].values]
         return [tuple(sorted(y)) for x in ids for y in x]
 
     def getAngles(self):
+        """
+        Get the atom pairs from each topology connectivity.
+
+        :return: each row contains three angles by one improper angle atoms.
+        :rtype: ndarray
+        """
         columns = [ATOM2, ATOM1, ATOM4]
         cols = [[x, ATOM3, y] for x, y in itertools.combinations(columns, 2)]
         return np.array([x for x in zip(*[self[x].values for x in cols])])
@@ -525,6 +592,12 @@ class Mol(structure.Mol):
     @property
     @functools.cache
     def atoms(self):
+        """
+        The atoms of the molecules.
+
+        :return: Atoms with type ids and charges
+        :rtype: Atom
+        """
         type_ids = [x.GetIntProp(TYPE_ID) for x in self.GetAtoms()]
         fchrg = [self.ff.charges[x] for x in type_ids]
         aids = [x.GetIdx() for x in self.GetAtoms()]
@@ -536,7 +609,9 @@ class Mol(structure.Mol):
     @functools.cache
     def bonds(self):
         """
-        Set bonding information.
+        The bonds of the molecule.
+
+        :return Bond: the bond types and bonded atom ids.
         """
         bonds = [x for x in self.GetBonds()]
         type_ids = [self.ff.getMatchedBonds(x)[0].id for x in bonds]
@@ -560,6 +635,8 @@ class Mol(structure.Mol):
         angles θ1 = H1-N-H2 and θ2 = H1-N-H3, and the ω = H2-H1-N-H3
         ref: Atomic Forces for Geometry-Dependent Point Multi-pole and Gaussian
         Multi-xpole Models
+
+        :return Angle: the angle types and atoms forming each angle.
         """
         angles = [y for x in self.GetAtoms() for y in self.ff.getAngleAtoms(x)]
         type_ids = [self.ff.getMatchedAngles(x)[0].id for x in angles]
@@ -574,6 +651,8 @@ class Mol(structure.Mol):
     def dihedrals(self):
         """
         Dihedral angles of the molecules.
+
+        :return Dihedral: the dihedral types and atoms forming each dihedral.
         """
         dihes = [x for x in self.getDihAtoms()]
         type_ids = [self.ff.getMatchedDihedrals(x)[0].id for x in dihes]
@@ -585,6 +664,8 @@ class Mol(structure.Mol):
     def impropers(self):
         """
         Improper angles of the molecules.
+
+        :return Improper: the improper types and atoms forming each improper.
         """
         imprps = [x for x in self.getImproperAtoms()]
         type_ids = [self.ff.getMatchedImpropers(x)[0] for x in imprps]
@@ -708,7 +789,7 @@ class Mol(structure.Mol):
         """
         The bond and angle are rigid during simulation.
 
-        :return
+        :return DataFrame, DataFrame: the type ids of the rigid bonds and angles
         """
         bnd_types = self.bonds.getRigid(lambda x: self.ff.bonds[x].has_h)
         ang_types = self.angles.getRigid(lambda x: self.ff.angles[x].has_h)
@@ -730,15 +811,6 @@ class Base(lammpsin.In):
 
     DESCR = 'LAMMPS Description # {style}'
     BUFFER = [4., 4., 4.]
-
-    TYPE_CLASSES = [
-        Mass, PairCoeff, BondCoeff, AngleCoeff, DihedralCoeff, ImproperCoeff
-    ]
-    TOPO_CLASSES = [Atom, Bond, Angle, Dihedral, Improper]
-
-    BLOCK_CLASSES = TYPE_CLASSES + TOPO_CLASSES
-    BLOCK_NAMES = [x.NAME for x in BLOCK_CLASSES]
-    BLOCK_LABELS = [x.LABEL for x in BLOCK_CLASSES]
 
     def getRadius(self):
         """
@@ -1020,9 +1092,14 @@ class DataFileReader(Base):
     """
     LAMMPS Data file reader.
     """
-
-    NAME_RE = re.compile(f"^{'|'.join(Base.BLOCK_NAMES)}$")
-    COUNT_RE = re.compile(f"^[0-9]+\s+({'|'.join(Base.BLOCK_LABELS)})$")
+    BLOCK_CLASSES = [
+        Mass, PairCoeff, BondCoeff, AngleCoeff, DihedralCoeff, ImproperCoeff,
+        Atom, Bond, Angle, Dihedral, Improper
+    ]
+    BLOCK_NAMES = [x.NAME for x in BLOCK_CLASSES]
+    BLOCK_LABELS = [x.LABEL for x in BLOCK_CLASSES]
+    NAME_RE = re.compile(f"^{'|'.join(BLOCK_NAMES)}$")
+    COUNT_RE = re.compile(f"^[0-9]+\s+({'|'.join(BLOCK_LABELS)})$")
 
     def __init__(self, data_file=None, contents=None, delay=False):
         """
