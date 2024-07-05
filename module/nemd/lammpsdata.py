@@ -22,14 +22,13 @@ ATOM2 = 'atom2'
 ATOM3 = 'atom3'
 ATOM4 = 'atom4'
 
-class Mass(pd.DataFrame):
-    """
-    The masses of the atoms in the system.
-    """
 
-    NAME = 'Masses'
-    COLUMN_LABELS = ['mass', 'comment']
-    LABEL = 'atom types'
+class Block(pd.DataFrame):
+
+    NAME = 'Block'
+    COLUMN_LABELS = ['column_labels']
+    LABEL = 'label'
+    QUOTECHAR = symbols.POUND
 
     def __init__(self, data=None, index=None, columns=None, **kwargs):
         """
@@ -42,8 +41,43 @@ class Mass(pd.DataFrame):
         if not isinstance(data, pd.DataFrame) and columns is None:
             columns = self.COLUMN_LABELS
         super().__init__(data=data, index=index, columns=columns, **kwargs)
-        if not isinstance(data, pd.DataFrame) and index is None:
-            self.index = pd.RangeIndex(start=1, stop=self.shape[0] + 1)
+
+    @classmethod
+    @property
+    def _constructor(cls):
+        """
+        Return the constructor of the class.
+
+        :return (sub)-class of 'Bond': the constructor of the class
+        """
+        return cls
+
+    @classmethod
+    def new(cls, *args, **kwargs):
+        """
+        Create a new instance of the class.
+        """
+        return cls(*args, **kwargs)
+
+    @classmethod
+    def read_csv(cls,
+                 *args,
+                 names=None,
+                 index_col=None,
+                 sep=r'\s+',
+                 quotechar=QUOTECHAR,
+                 **kwargs):
+        if names is None:
+            names = [ID] + cls.COLUMN_LABELS
+            if index_col is None:
+                index_col = ID
+        df = pd.read_csv(*args,
+                         names=names,
+                         index_col=index_col,
+                         sep=sep,
+                         quotechar=quotechar,
+                         **kwargs)
+        return cls(df)
 
     def to_csv(self,
                path_or_buf=None,
@@ -52,7 +86,7 @@ class Mass(pd.DataFrame):
                header=False,
                float_format='%.4f',
                mode='a',
-               quotechar='#',
+               quotechar=QUOTECHAR,
                **kwargs):
         """
         Write the data to a file buffer.
@@ -80,48 +114,8 @@ class Mass(pd.DataFrame):
             content += '\n'
         path_or_buf.write(content)
 
-    @classmethod
-    def read_csv(cls,
-                 *args,
-                 names=None,
-                 index_col=None,
-                 sep=r'\s+',
-                 comment='#',
-                 **kwargs):
-        if names is None:
-            names = [ID] + cls.COLUMN_LABELS
-            if index_col is None:
-                index_col = ID
-        return cls(
-            pd.read_csv(*args,
-                        names=names,
-                        index_col=index_col,
-                        sep=sep,
-                        comment=comment,
-                        **kwargs))
 
-    @classmethod
-    @property
-    def _constructor(cls):
-        """
-        Return the constructor of the class.
-
-        :return (sub)-class of 'Bond': the constructor of the class
-        """
-        return cls
-
-    @classmethod
-    def new(cls, *args, **kwargs):
-        """
-        Create a new instance of the class.
-        """
-        return cls(*args, **kwargs)
-
-    def writeCount(self, fh):
-        fh.write(f'{self.shape[0]} {self.LABEL}\n')
-
-
-class Box(Mass):
+class Box(Block):
 
     NAME = ''
     LO, HI = 'lo', 'hi'
@@ -131,7 +125,7 @@ class Box(Mass):
     LIMIT_CMT = '{limit}_cmt'
     LO_LABEL, HI_LABEL = LIMIT_CMT.format(limit=LO), LIMIT_CMT.format(limit=HI)
     LO_CMT = [x + y for x, y in itertools.product(INDEX, [LO])]
-    HI_CMT =[x + y for x, y in itertools.product(INDEX, [HI])]
+    HI_CMT = [x + y for x, y in itertools.product(INDEX, [HI])]
 
     def __init__(self, data=None, index=INDEX, **kwargs):
         super().__init__(data=data, index=index, **kwargs)
@@ -153,6 +147,31 @@ class Box(Mass):
     def getPoint(self):
         point = np.random.rand(3) * self.span
         return point + self.lo
+
+
+class Mass(Block):
+    """
+    The masses of the atoms in the system.
+    """
+
+    NAME = 'Masses'
+    COLUMN_LABELS = ['mass', 'comment']
+    LABEL = 'atom types'
+
+    def __init__(self, data=None, index=None, columns=None, **kwargs):
+        """
+        Initialize the Mass object.
+
+        :param data: `pandas.DataFrame`: the data to initialize the object.
+        :param index: `pandas.Index`: the index to initialize the object.
+        :param columns: `list`: the column labels to initialize the object.
+        """
+        super().__init__(data=data, index=index, columns=columns, **kwargs)
+        if not isinstance(data, pd.DataFrame) and index is None:
+            self.index = pd.RangeIndex(start=1, stop=self.shape[0] + 1)
+
+    def writeCount(self, fh):
+        fh.write(f'{self.shape[0]} {self.LABEL}\n')
 
 
 class PairCoeff(Mass):
@@ -235,9 +254,6 @@ class Bond(Atom):
             dtype = kwargs.get(self.DTYPE, self.DEFAULT_DTYPE)
             data = {x: pd.Series(dtype=dtype) for x in self.COLUMN_LABELS}
         super().__init__(data=data, **kwargs)
-
-    def append(self, *args, **kwargs):
-        return self._append(*args, **kwargs)
 
     def mapIds(self, id_map):
         acopy = self.copy()
@@ -671,7 +687,9 @@ class Base(lammpsin.In):
     LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
     BUFFER = [4., 4., 4.]
 
-    TYPE_CLASSES = [Mass, BondCoeff, AngleCoeff, DihedralCoeff, ImproperCoeff]
+    TYPE_CLASSES = [
+        Mass, PairCoeff, BondCoeff, AngleCoeff, DihedralCoeff, ImproperCoeff
+    ]
     TOPO_CLASSES = [Atom, Bond, Angle, Dihedral, Improper]
 
     BLOCK_CLASSES = TYPE_CLASSES + TOPO_CLASSES
@@ -681,6 +699,17 @@ class Base(lammpsin.In):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.radii = None
+        self.excluded = collections.defaultdict(set)
+
+    def setClashParams(self, include14=False):
+        """
+        Set clash check related parameters including pair radii and exclusion.
+
+        :param include14 bool: whether to include atom separated by 2 bonds for
+            clash check.
+        """
+        self.setVdwRadius()
+        self.setClashExclusion(include14=not include14)
 
     def setVdwRadius(self):
         """
@@ -725,7 +754,6 @@ class Struct(structure.Struct, Base):
         self.dihe_types = numpyutils.IntArray()
         self.impr_types = numpyutils.IntArray()
         self.warnings = []
-        self.excluded = collections.defaultdict(set)
         self.initTypeMap()
 
     def initTypeMap(self):
@@ -954,9 +982,7 @@ class Struct(structure.Struct, Base):
         """
         Whether any atom has charge.
         """
-        return  np.isclose(self.atoms.charge, 0, 0.001).any()
-
-
+        return np.isclose(self.atoms.charge, 0, 0.001).any()
 
 
 class DataFileReader(Base):
@@ -980,7 +1006,6 @@ class DataFileReader(Base):
         self.blk_idx = {}
         self.count = {x: 0 for x in self.BLOCK_LABELS}
         self.box = {}
-        self.excluded = collections.defaultdict(set)
 
     def run(self):
         """
@@ -1031,13 +1056,6 @@ class DataFileReader(Base):
                 self.box[match.group(1)] = val
                 continue
 
-    def read(self, BlockClass):
-        if BlockClass.NAME not in self.blk_idx:
-            return BlockClass.read_csv(io.StringIO(''))
-        sidx = self.blk_idx[BlockClass.NAME] + 2
-        lines = self.lines[sidx:sidx + self.count[BlockClass.LABEL]]
-        return BlockClass.read_csv(io.StringIO(''.join(lines)))
-
     def getBox(self):
         """
         Get the box.
@@ -1046,26 +1064,34 @@ class DataFileReader(Base):
         """
         return [y for x in self.box_dsp.values() for y in x]
 
+    def read(self, BlockClass):
+        if BlockClass.NAME not in self.blk_idx:
+            return BlockClass.read_csv(io.StringIO(''))
+        sidx = self.blk_idx[BlockClass.NAME] + 2
+        lines = self.lines[sidx:sidx + self.count[BlockClass.LABEL]]
+        return BlockClass.read_csv(io.StringIO(''.join(lines)))
+
     def gidFromEle(self, ele):
         if ele is None:
             return self.atoms.index.tolist()
-        type_id = self.masses[ID][self.masses[self.ELE] == ele]
-        return self.atoms.index[self.atoms[TYPE_ID] ==
-                                type_id.iloc[0]].tolist()
+
+        type_id = [
+            i for i, x in self.masses.comment.items() if x.split()[-2] == ele
+        ][0]
+        return self.atoms.index[self.atoms[TYPE_ID] == type_id].tolist()
 
     @property
     def masses(self):
         """
         Parse the mass section for masses and elements.
         """
-        self.read(Mass)
+        return self.read(Mass)
 
     @property
     def pair_coeffs(self):
         """
         Paser the pair coefficient section.
         """
-
         return self.read(PairCoeff)
 
     @property
@@ -1102,17 +1128,6 @@ class DataFileReader(Base):
         Parse the improper section for dihedral id and constructing atoms.
         """
         return self.read(Improper)
-
-    def setClashParams(self, include14=False):
-        """
-        Set clash check related parameters including pair radii and exclusion.
-
-        :param include14 bool: whether to include atom separated by 2 bonds for
-            clash check.
-        """
-        self.setClashExclusion(include14=not include14)
-        self.setPairCoeffs()
-        self.setVdwRadius()
 
 
 class Radius(numpyutils.Array):

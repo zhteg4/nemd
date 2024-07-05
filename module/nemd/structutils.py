@@ -594,8 +594,13 @@ class Struct(lammpsdata.Struct):
         self.box = None
 
     def finalize(self, include14=False):
-        self.setClashExclusion(include14=not include14)
-        self.setVdwRadius()
+        """
+        Finalize the structure by setting the clash parameters.
+
+        :param include14 bool: whether to include atom separated by 2 bonds for
+            clash check.
+        """
+        self.setClashParams(include14=include14)
 
 
 class GriddedStruct(Struct):

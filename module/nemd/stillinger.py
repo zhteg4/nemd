@@ -17,6 +17,7 @@ class Struct(xtal.Struct):
         self.tasks = tasks
         self.units = self.METAL
         self.atom_style = self.ATOMIC
+        self.elements = None
         if self.tasks is None:
             self.tasks = [self.XYZ]
 
@@ -29,13 +30,13 @@ class Struct(xtal.Struct):
         """
         with open(self.lammps_in, 'w') as self.fh:
             self.setElements()
-            self.writeDescriptions()
+            self.writeSetup()
             self.readData()
             self.writePairStyle()
             self.writeDump()
             self.writeEnergy()
 
-    def writeDescriptions(self):
+    def writeSetup(self):
         """
         Write in script description section.
         """
@@ -62,8 +63,7 @@ class Struct(xtal.Struct):
     def writeData(self, *args, **kwargs):
         with open(self.datafile, 'w') as self.data_fh:
             self.setElements()
-            self.writeDescription()
-            self.writeTopoType()
+            self.writeCounting()
             self.writeBox()
             self.writeMasses()
             self.writeAtoms()
@@ -72,20 +72,14 @@ class Struct(xtal.Struct):
         elements = [x.GetAtomicNum() for x in self.atom]
         self.elements = list(set(elements))
 
-    def writeDescription(self):
+    def writeCounting(self):
         """
-        Write the lammps description section, including the number of atom, bond,
-        angle etc.
+        Write the topology and type counting information.
         """
-        lmp_dsp = self.LAMMPS_DESCRIPTION % self.atom_style
-        self.data_fh.write(f"{lmp_dsp}\n\n")
-        self.data_fh.write(f"{self.atom_total} {self.ATOMS}\n\n")
-
-    def writeTopoType(self):
-        """
-        Write topologic data. e.g. number of atoms, angles...
-        """
-        self.data_fh.write(f"{len(self.elements)} {self.ATOM_TYPES}\n\n")
+        self.data_fh.write(f"{self.DESCR.format(style=self.atom_style)}\n\n")
+        atom_total = sum([x.GetNumAtoms() for x in self.molecules])
+        self.data_fh.write(f"{atom_total} atoms\n\n")
+        self.data_fh.write(f"{len(self.elements)} atom types\n\n")
 
     def writeBox(self):
         """
@@ -107,7 +101,8 @@ class Struct(xtal.Struct):
         """
         Write out mass information.
         """
-        self.data_fh.write(f"{self.MASSES}\n\n")
+
+        self.data_fh.write(f"{lammpsdata.Mass.NAME}\n\n")
         masses = list(set([x.GetMass() for x in self.atom]))
         for id, mass in enumerate(masses, 1):
             self.data_fh.write(f"{id} {mass}\n")
@@ -118,7 +113,7 @@ class Struct(xtal.Struct):
         Write atom coefficients.
         """
 
-        self.data_fh.write(f"{self.ATOMS.capitalize()}\n\n")
+        self.data_fh.write(f"{lammpsdata.Atom.NAME}\n\n")
         for mol in self.molecules:
             data = np.zeros((mol.GetNumAtoms(), 5))
             conformer = mol.GetConformer()

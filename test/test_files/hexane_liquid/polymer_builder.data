@@ -18,8 +18,8 @@ LAMMPS Description # full
 
 Masses
 
-1 15.999 # O Water (SPC) O 79
-2 1.008 # H Water (SPC) H 80
+1 15.999 # O Water (SPC) O 79 #
+2 1.008 # H Water (SPC) H 80 #
 
 Pair Coeffs
 

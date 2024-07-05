@@ -213,7 +213,7 @@ class Frame(pd.DataFrame):
                     # 'xu', 'yu', 'zu'
                     columns = lines[-1].rstrip().split()[-3:]
                     frame = cls(data=data[:, 1:],
-                                box=lammpsdata.Box(box.reshape(3,2)),
+                                box=lammpsdata.Box(box.reshape(3, 2)),
                                 index=data[:, 0].astype(int),
                                 columns=columns,
                                 step=step)
@@ -334,7 +334,7 @@ class Frame(pd.DataFrame):
 
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
             for id in range(3):
-                func = lambda x: math.remainder(x, self.box.span[id])
+                func = lambda x: math.remainder(x, self.box.span.iloc[id])
                 dists[:, id] = np.frompyfunc(func, 1, 1)(dists[:, id])
             return np.linalg.norm(dists, axis=1)
 
@@ -545,7 +545,8 @@ class DistanceCell(Frame):
         res = self.cut if self.res == self.AUTO else self.res
         self.indexes = [math.ceil(x / res) for x in self.box.span]
         self.indexes_numba = numba.int32(self.indexes)
-        self.grids = np.array([x / i for x, i in zip(self.box.span, self.indexes)])
+        self.grids = np.array(
+            [x / i for x, i in zip(self.box.span, self.indexes)])
 
     def setNeighborIds(self):
         """
@@ -803,7 +804,9 @@ class DistanceCell(Frame):
         """
         self.graph = nx.Graph()
         # getVoids() doesn't generate enough voids with scaling down the grid
-        mgrid = pow(np.prod(self.box.span.values) / max([mol_num, min_num]), 1 / 3) * 0.8
+        mgrid = pow(
+            np.prod(self.box.span.values) / max([mol_num, min_num]),
+            1 / 3) * 0.8
         self.gindexes = (self.box.span.values / mgrid).round().astype(int)
         self.ggrids = self.box.span.values / self.gindexes
         indexes = [range(x) for x in self.gindexes]
