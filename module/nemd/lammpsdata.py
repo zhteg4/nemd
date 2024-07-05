@@ -16,8 +16,7 @@ from nemd import structure
 from nemd import numpyutils
 
 ID = 'id'
-TYPE_ID = 'type_id'
-
+TYPE_ID = oplsua.TYPE_ID
 ATOM1 = 'atom1'
 ATOM2 = 'atom2'
 ATOM3 = 'atom3'
@@ -25,11 +24,16 @@ ATOM4 = 'atom4'
 
 
 class Block(pd.DataFrame):
+    """
+    Base class to handle a datafile block.
+    """
 
     NAME = 'Block'
     COLUMN_LABELS = ['column_labels']
     LABEL = 'label'
-    QUOTECHAR = symbols.POUND
+    POUND = symbols.POUND
+    SPACE = symbols.SPACE
+    SPACE_PATTERN = symbols.SPACE_PATTERN
 
     def __init__(self, data=None, index=None, columns=None, **kwargs):
         """
@@ -49,14 +53,14 @@ class Block(pd.DataFrame):
         """
         Return the constructor of the class.
 
-        :return (sub)-class of 'Bond': the constructor of the class
+        :return (sub-)class of 'Block': the constructor of the class
         """
         return cls
 
     @classmethod
     def new(cls, *args, **kwargs):
         """
-        Create a new instance of the class.
+        Create a new instance of the (sub-)class.
         """
         return cls(*args, **kwargs)
 
@@ -64,9 +68,12 @@ class Block(pd.DataFrame):
     def fromLines(cls,
                   lines,
                   *args,
-                  sep=r'\s+',
-                  quotechar=QUOTECHAR,
+                  sep=SPACE_PATTERN,
+                  quotechar=POUND,
                   **kwargs):
+        """
+        Construct a new instance from a list of lines.
+        """
         df = pd.read_csv(io.StringIO(''.join(lines)),
                          *args,
                          sep=sep,
@@ -74,19 +81,19 @@ class Block(pd.DataFrame):
                          **kwargs)
         return cls(df)
 
-    def to_csv(self,
-               path_or_buf=None,
-               as_block=True,
-               sep=' ',
-               header=False,
-               float_format='%.4f',
-               mode='a',
-               quotechar=QUOTECHAR,
-               **kwargs):
+    def write(self,
+              hdl=None,
+              as_block=True,
+              sep=SPACE,
+              header=False,
+              float_format='%.4f',
+              mode='a',
+              quotechar=POUND,
+              **kwargs):
         """
         Write the data to a file buffer.
 
-        :param path_or_buf '_io.TextIOWrapper': the buffer to write to.
+        :param hdl `_io.TextIOWrapper` or `_io.StringIO`: write to this the handle
         :param as_block `bool`: whether to write the data as a block.
         :param sep `str`: the separator to use.
         :param header `bool`: whether to write the column names as the header.
@@ -94,20 +101,18 @@ class Block(pd.DataFrame):
         :param mode `str`: the mode to use for writing.
         :param quotechar `str`: the quote character to use.
         """
-
         if self.empty:
             return
-
         content = self.NAME + '\n\n' if as_block and self.NAME else ''
-        content += super().to_csv(sep=sep,
-                                  header=header,
-                                  float_format=float_format,
-                                  mode=mode,
-                                  quotechar=quotechar,
-                                  **kwargs)
+        content += self.to_csv(sep=sep,
+                               header=header,
+                               float_format=float_format,
+                               mode=mode,
+                               quotechar=quotechar,
+                               **kwargs)
         if as_block:
             content += '\n'
-        path_or_buf.write(content)
+        hdl.write(content)
 
 
 class Box(Block):
@@ -121,6 +126,9 @@ class Box(Block):
     LO_LABEL, HI_LABEL = LIMIT_CMT.format(limit=LO), LIMIT_CMT.format(limit=HI)
     LO_CMT = [x + y for x, y in itertools.product(INDEX, [LO])]
     HI_CMT = [x + y for x, y in itertools.product(INDEX, [HI])]
+    FLT_RE = "[+-]?[\d\.\d]+"
+    LO_HI = [f'{x}{Block.SPACE}{y}' for x, y in zip(LO_CMT, HI_CMT)]
+    RE = re.compile(f"^{FLT_RE}\s+{FLT_RE}\s+({'|'.join(LO_HI)}).*$")
 
     @classmethod
     def fromEdges(cls, edges):
@@ -130,10 +138,10 @@ class Box(Block):
     def span(self):
         return self.hi - self.lo
 
-    def to_csv(self, fh, index=False, **kwargs):
+    def write(self, fh, index=False, **kwargs):
         self[self.LO_LABEL] = self.LO_CMT
         self[self.HI_LABEL] = self.HI_CMT
-        super().to_csv(fh, index=index, **kwargs)
+        super().write(fh, index=index, **kwargs)
         self.drop(columns=[self.LO_LABEL, self.HI_LABEL], inplace=True)
 
     def getPoint(self):
@@ -689,11 +697,6 @@ class Mol(structure.Mol):
 class Base(lammpsin.In):
 
     DESCR = 'LAMMPS Description # {style}'
-
-    XLO_XHI = 'xlo xhi'
-    YLO_YHI = 'ylo yhi'
-    ZLO_ZHI = 'zlo zhi'
-    LO_HI = [XLO_XHI, YLO_YHI, ZLO_ZHI]
     BUFFER = [4., 4., 4.]
 
     TYPE_CLASSES = [
@@ -779,9 +782,9 @@ class Struct(structure.Struct, Base):
 
     def writeData(self, nofile=False):
         """
-        Write out LAMMPS data file.
+        Write out a LAMMPS datafile or return the content.
 
-        :param nofile bool: return the string instead of writing to a file if True
+        :param nofile bool: return the content as a string if True.
         """
 
         with io.StringIO() if nofile else open(self.datafile, 'w') as self.hdl:
@@ -801,21 +804,20 @@ class Struct(structure.Struct, Base):
             self.improper_coeffs.writeCount(self.hdl)
             self.hdl.write("\n")
             # Box boundary
-            self.box.to_csv(self.hdl)
+            self.box.write(self.hdl)
             # Interaction coefficients
-            self.masses.to_csv(self.hdl)
-            self.pair_coeffs.to_csv(self.hdl)
-            self.bond_coeffs.to_csv(self.hdl)
-            self.angle_coeffs.to_csv(self.hdl)
-            self.dihedral_coeffs.to_csv(self.hdl)
-            self.improper_coeffs.to_csv(self.hdl)
+            self.masses.write(self.hdl)
+            self.pair_coeffs.write(self.hdl)
+            self.bond_coeffs.write(self.hdl)
+            self.angle_coeffs.write(self.hdl)
+            self.dihedral_coeffs.write(self.hdl)
+            self.improper_coeffs.write(self.hdl)
             # Topology details
-            self.atoms.to_csv(self.hdl)
-            self.bonds.to_csv(self.hdl)
-            self.angles.to_csv(self.hdl)
-            self.dihedrals.to_csv(self.hdl)
-            self.impropers.to_csv(self.hdl)
-
+            self.atoms.write(self.hdl)
+            self.bonds.write(self.hdl)
+            self.angles.write(self.hdl)
+            self.dihedrals.write(self.hdl)
+            self.impropers.write(self.hdl)
             return self.getContents() if nofile else None
 
     def getContents(self):
@@ -984,13 +986,11 @@ class Struct(structure.Struct, Base):
 
 class DataFileReader(Base):
     """
-    LAMMPS Data file reader
+    LAMMPS Data file reader.
     """
 
     NAME_RE = re.compile(f"^{'|'.join(Base.BLOCK_NAMES)}$")
     COUNT_RE = re.compile(f"^[0-9]+\s+({'|'.join(Base.BLOCK_LABELS)})$")
-    FLT_RE = "[+-]?[\d\.\d]+"
-    BOX_RE = re.compile(f"^{FLT_RE}\s+{FLT_RE}\s+({'|'.join(Base.LO_HI)}).*$")
 
     def __init__(self, data_file=None, contents=None, delay=False):
         """
@@ -1000,13 +1000,11 @@ class DataFileReader(Base):
         self.data_file = data_file
         self.contents = contents
         self.lines = None
-        self.blk_idx = {}
-        self.count = {x: 0 for x in self.BLOCK_LABELS}
+        self.name = {}
         if delay:
             return
         self.read()
         self.index()
-        self.cout()
 
     def read(self):
         """
@@ -1023,97 +1021,144 @@ class DataFileReader(Base):
 
     def index(self):
         """
-        Index the lines by block markers.
+        Index the lines by block markers, and Parse the description section for
+        topo counts and type counts.
         """
+        names = {}
         for idx, line in enumerate(self.lines):
             match = self.NAME_RE.match(line)
             if not match:
                 continue
-            self.blk_idx[match.group()] = idx
+            # The block name occupies one lien and there is one empty line below
+            names[match.group()] = idx + 2
 
-    def cout(self):
-        """
-        Parse the description section for topo counts and type counts.
-        """
-        for line in self.lines[:min(self.blk_idx.values())]:
+        counts = {}
+        for line in self.lines[:min(names.values())]:
             match = self.COUNT_RE.match(line)
             if not match:
                 continue
             # 'atoms': 1620, 'bonds': 1593, 'angles': 1566 ...
             # 'atom types': 7, 'bond types': 6, 'angle types': 5 ...
-            self.count[match.group(1)] = int(line.split(match.group(1))[0])
+            counts[match.group(1)] = int(line.split(match.group(1))[0])
+
+        for block_class in self.BLOCK_CLASSES:
+            if block_class.NAME not in names:
+                continue
+            idx = names[block_class.NAME]
+            count = counts[block_class.LABEL]
+            self.name[block_class.NAME] = slice(idx, idx + count)
 
     @property
     @functools.cache
     def box(self):
+        """
+        Parse the box section.
+
+        :return `Box`: the box
+        """
         lines = self.lines[:min(self.blk_idx.values())]
         # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
-        box_lines = [x for x in lines if self.BOX_RE.match(x)]
+        box_lines = [x for x in lines if Box.RE.match(x)]
         return Box.fromLines(box_lines)
 
     @property
+    @functools.cache
     def masses(self):
         """
         Parse the mass section for masses and elements.
+
+        :return `Mass`: the masses of atoms.
         """
         return self.fromLines(Mass)
 
     @property
+    @functools.cache
     def pair_coeffs(self):
         """
         Paser the pair coefficient section.
+
+        :return `PairCoeff`: the pair coefficients between non-bonded atoms.
         """
         return self.fromLines(PairCoeff)
 
     @property
+    @functools.cache
     def atoms(self):
         """
-        Parse the atom section for atom id and molecule id.
+        Parse the atom section.
+
+        :return `Atom`: the atom information such as atom id, molecule id,
+            type id, charge, position, etc.
         """
         return self.fromLines(Atom)
 
     @property
+    @functools.cache
     def bonds(self):
         """
         Parse the atom section for atom id and molecule id.
+
+        :return `Bond`: the bond information such as id, type id, and bonded
+            atom ids.
         """
         return self.fromLines(Bond)
 
     @property
+    @functools.cache
     def angles(self):
         """
         Parse the angle section for angle id and constructing atoms.
+
+        :return `Angle`: the angle information such as id, type id, and atom ids
+            in the angle.
         """
         return self.fromLines(Angle)
 
     @property
+    @functools.cache
     def dihedrals(self):
         """
         Parse the dihedral section for dihedral id and constructing atoms.
+
+        :return `Dihedral`: the dihedral angle information such as id, type id,
+            and atom ids in the dihedral angle.
         """
         return self.fromLines(Dihedral)
 
     @property
+    @functools.cache
     def impropers(self):
         """
         Parse the improper section for dihedral id and constructing atoms.
+
+        :return `Improper`: the improper angle information such as id, type id,
+            and atom ids in the improper angle.
         """
         return self.fromLines(Improper)
 
     def fromLines(self, BlockClass):
-        if BlockClass.NAME not in self.blk_idx:
+        """
+        Parse a block of lines from the datafile.
+
+        :param BlockClass: the class to handle a block.
+        :return BlockClass: the parsed block.
+        """
+        if BlockClass.NAME not in self.name:
             return BlockClass.fromLines([])
-        sidx = self.blk_idx[BlockClass.NAME] + 2
-        lines = self.lines[sidx:sidx + self.count[BlockClass.LABEL]]
+        lines = self.lines[self.name[BlockClass.NAME]]
         return BlockClass.fromLines(lines)
 
     def gidFromEle(self, ele):
+        """
+        Get global atom ids matching the element.
+
+        :param list: global atom ids.
+        """
         if ele is None:
             return self.atoms.index.tolist()
 
-        type_id = [
-            i for i, x in self.masses.comment.items() if x.split()[-2] == ele
-        ][0]
+        comment = self.masses.comment
+        type_id = [i for i, x in comment.items() if x.split()[-2] == ele][0]
         return self.atoms.index[self.atoms[TYPE_ID] == type_id].tolist()
 
 

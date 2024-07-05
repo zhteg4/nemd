@@ -87,12 +87,14 @@ class Struct(xtal.Struct):
         """
 
         boxes = [x.getBox() for x in self.molecules]
+
         box = boxes[0]
         repeated = np.repeat(box.reshape(1, -1), len(boxes), axis=0)
         if not (repeated == boxes).all():
             raise ValueError("Unit cells have different PBCs.")
         for dim in range(3):
-            self.data_fh.write(f"{0:.4f} {box[dim]:.4f} {self.LO_HI[dim]}\n")
+            self.data_fh.write(
+                f"{0:.4f} {box[dim]:.4f} {lammpsdata.Box.LO_HI[dim]}\n")
         # FIXME https://docs.lammps.org/Howto_triclinic.html
         self.data_fh.write("0.0000 0.0000 0.0000 xy xz yz\n")
         self.data_fh.write("\n")
