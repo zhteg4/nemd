@@ -30,10 +30,10 @@ class Block(pd.DataFrame):
 
     NAME = 'Block'
     COLUMN_LABELS = ['column_labels']
-    LABEL = 'label'
     POUND = symbols.POUND
     SPACE = symbols.SPACE
     SPACE_PATTERN = symbols.SPACE_PATTERN
+    LABEL = 'label'
 
     def __init__(self, data=None, index=None, columns=None, **kwargs):
         """
@@ -68,21 +68,36 @@ class Block(pd.DataFrame):
     def fromLines(cls,
                   lines,
                   *args,
+                  names=None,
+                  header=None,
                   sep=SPACE_PATTERN,
                   quotechar=POUND,
                   **kwargs):
         """
         Construct a new instance from a list of lines.
+
+        :param names list: Sequence of column labels to apply.
+        :param header int, ‘infer’ or None: the row number defining the header
+        :param lines list: list of lines to parse.
+        :param sep str: Character or regex pattern to treat as the delimiter.
+        :param quotechar str: Character used to denote the start and end of a
+            quoted item
+
+        :return instance of Block (sub-)class: the parsed object.
         """
+        if names is None:
+            names = cls.COLUMN_LABELS
         df = pd.read_csv(io.StringIO(''.join(lines)),
                          *args,
+                         names=names,
+                         header=header,
                          sep=sep,
                          quotechar=quotechar,
                          **kwargs)
         return cls(df)
 
     def write(self,
-              hdl=None,
+              hdl,
               as_block=True,
               sep=SPACE,
               header=False,
@@ -93,7 +108,7 @@ class Block(pd.DataFrame):
         """
         Write the data to a file buffer.
 
-        :param hdl `_io.TextIOWrapper` or `_io.StringIO`: write to this the handle
+        :param hdl `_io.TextIOWrapper` or `_io.StringIO`: write to this handler
         :param as_block `bool`: whether to write the data as a block.
         :param sep `str`: the separator to use.
         :param header `bool`: whether to write the column names as the header.
@@ -119,11 +134,11 @@ class Box(Block):
 
     NAME = ''
     LO, HI = 'lo', 'hi'
-    COLUMN_LABELS = [LO, HI]
     INDEX = ['x', 'y', 'z']
     ORIGIN = [0, 0, 0]
     LIMIT_CMT = '{limit}_cmt'
     LO_LABEL, HI_LABEL = LIMIT_CMT.format(limit=LO), LIMIT_CMT.format(limit=HI)
+    COLUMN_LABELS = [LO, HI, LO_LABEL, HI_LABEL]
     LO_CMT = [x + y for x, y in itertools.product(INDEX, [LO])]
     HI_CMT = [x + y for x, y in itertools.product(INDEX, [HI])]
     FLT_RE = "[+-]?[\d\.\d]+"
@@ -132,27 +147,41 @@ class Box(Block):
 
     @classmethod
     def fromEdges(cls, edges):
+        """
+        Box built from these edges and origin.
+
+        :param list: the box edges.
+        """
         return cls(data={cls.LO: cls.ORIGIN, cls.HI: edges})
 
     @property
     def span(self):
+        """
+        The span of the box.
+
+        :param 'pandas.core.series.Series': the span of the box.
+        """
         return self.hi - self.lo
 
     def write(self, fh, index=False, **kwargs):
+        """
+        Write the box into the handler.
+
+        :param hdl `_io.TextIOWrapper` or `_io.StringIO`: write to this handler
+        """
         self[self.LO_LABEL] = self.LO_CMT
         self[self.HI_LABEL] = self.HI_CMT
         super().write(fh, index=index, **kwargs)
         self.drop(columns=[self.LO_LABEL, self.HI_LABEL], inplace=True)
 
     def getPoint(self):
+        """
+        Get a random point within the box.
+
+        :return 'pandas.core.series.Series': the random point within the box.
+        """
         point = np.random.rand(3) * self.span
         return point + self.lo
-
-    @classmethod
-    def fromLines(cls, *args, names=None, **kwargs):
-        if names is None:
-            names = cls.COLUMN_LABELS + [cls.LO_LABEL, cls.HI_LABEL]
-        return super().fromLines(*args, names=names, **kwargs)
 
 
 class Mass(Block):
@@ -177,18 +206,22 @@ class Mass(Block):
             self.index = pd.RangeIndex(start=1, stop=self.shape[0] + 1)
 
     def writeCount(self, fh):
+        """
+        Write the count with the label appended.
+
+        :param hdl `_io.TextIOWrapper` or `_io.StringIO`: write to this handler
+        """
         fh.write(f'{self.shape[0]} {self.LABEL}\n')
 
     @classmethod
-    def fromLines(cls, *args, names=None, index_col=None, **kwargs):
-        if names is None:
-            names = [ID] + cls.COLUMN_LABELS
-            if index_col is None:
-                index_col = ID
-        return super().fromLines(*args,
-                                 names=names,
-                                 index_col=index_col,
-                                 **kwargs)
+    def fromLines(cls, *args, index_col=0, **kwargs):
+        """
+        Construct a mass instance from a list of lines.
+
+        :param index_col int: Column(s) to use as row label(s)
+        :return 'Mass' or subclass instance: the mass.
+        """
+        return super().fromLines(*args, index_col=index_col, **kwargs)
 
 
 class PairCoeff(Mass):
@@ -198,8 +231,7 @@ class PairCoeff(Mass):
 
     NAME = 'Pair Coeffs'
     ENE = 'ene'
-    DIST = 'dist'
-    COLUMN_LABELS = [ENE, DIST]
+    COLUMN_LABELS = [ENE, 'dist']
     LABEL = 'atom types'
 
 
@@ -216,8 +248,7 @@ class AngleCoeff(PairCoeff):
     The bond coefficients between bonded atoms in the system.
     """
     NAME = 'Angle Coeffs'
-    DEG = 'deg'
-    COLUMN_LABELS = [PairCoeff.ENE, DEG]
+    COLUMN_LABELS = [PairCoeff.ENE, 'deg']
     LABEL = 'angle types'
 
 
@@ -244,14 +275,16 @@ class Atom(Mass):
     NAME = 'Atoms'
     MOL_ID = 'mol_id'
     CHARGE = 'charge'
-    XU = symbols.XU
-    YU = symbols.YU
-    ZU = symbols.ZU
     XYZU = symbols.XYZU
-    COLUMN_LABELS = [MOL_ID, TYPE_ID, CHARGE, XU, YU, ZU]
+    COLUMN_LABELS = [MOL_ID, TYPE_ID, CHARGE] + XYZU
     LABEL = 'atoms'
 
     def mapIds(self, id_map):
+        """
+        Create a copy of the instance with atom ids mapped to global atom ids.
+
+        :param id_map 'numpy.ndarray': map atom indexes to global atom indexes.
+        """
         acopy = self.copy()
         acopy.index = id_map[acopy.index]
         return acopy
@@ -262,13 +295,18 @@ class Bond(Atom):
     NAME = 'Bonds'
     ID_COLS = [ATOM1, ATOM2]
     COLUMN_LABELS = [TYPE_ID] + ID_COLS
-    DTYPE = 'dtype'
     DEFAULT_DTYPE = int
     LABEL = 'bonds'
 
-    def __init__(self, data=None, **kwargs):
+    def __init__(self,
+                 data=None,
+                 type_ids=None,
+                 aids=None,
+                 dtype=DEFAULT_DTYPE,
+                 **kwargs):
+        if data is None and type_ids is not None and aids is not None:
+            data = [[x] + y for x, y in zip(type_ids, aids)]
         if data is None:
-            dtype = kwargs.get(self.DTYPE, self.DEFAULT_DTYPE)
             data = {x: pd.Series(dtype=dtype) for x in self.COLUMN_LABELS}
         super().__init__(data=data, **kwargs)
 
@@ -428,11 +466,6 @@ class Mol(structure.Mol):
         """
         super().__init__(*args, **kwargs)
         self.ff = ff
-        self.atoms = Atom()
-        self.bonds = Bond()
-        self.angles = Angle()
-        self.dihedrals = Dihedral()
-        self.impropers = Improper()
         self.nbr_charge = collections.defaultdict(float)
         if self.ff is None and self.struct and hasattr(self.struct, 'ff'):
             self.ff = self.struct.ff
@@ -440,20 +473,14 @@ class Mol(structure.Mol):
             self.ff = oplsua.get_parser()
         if self.delay:
             return
-        self.setTopo()
+        self.type()
 
-    def setTopo(self):
+    def type(self):
         """
-        Set charge, bond, angle, dihedral, improper, and other topology params.
+        Type atoms and set charges.
         """
         self.typeAtoms()
         self.balanceCharge()
-        self.setAtoms()
-        self.setBonds()
-        self.setAngles()
-        self.setDihedrals()
-        self.setImpropers()
-        self.removeAngles()
 
     def typeAtoms(self):
         """
@@ -495,50 +522,74 @@ class Mol(structure.Mol):
         for res, idx in res_atom.items():
             self.nbr_charge[idx] -= res_charge[res]
 
-    def setAtoms(self):
+    @property
+    @functools.cache
+    def atoms(self):
         type_ids = [x.GetIntProp(TYPE_ID) for x in self.GetAtoms()]
         fchrg = [self.ff.charges[x] for x in type_ids]
         aids = [x.GetIdx() for x in self.GetAtoms()]
         nchrg = [self.nbr_charge[x] for x in aids]
         chrg = [sum(x) for x in zip(fchrg, nchrg)]
-        self.atoms = Atom({TYPE_ID: type_ids, Atom.CHARGE: chrg}, index=aids)
+        return Atom({TYPE_ID: type_ids, Atom.CHARGE: chrg}, index=aids)
 
-    def setBonds(self):
+    @property
+    @functools.cache
+    def bonds(self):
         """
         Set bonding information.
         """
         bonds = [x for x in self.GetBonds()]
-        data = {TYPE_ID: [self.ff.getMatchedBonds(x)[0].id for x in bonds]}
-        data.update({ATOM1: [x.GetBeginAtom().GetIdx() for x in bonds]})
-        data.update({ATOM2: [x.GetEndAtom().GetIdx() for x in bonds]})
-        self.bonds = Bond(data)
+        type_ids = [self.ff.getMatchedBonds(x)[0].id for x in bonds]
+        aids = [[x.GetBeginAtom().GetIdx(),
+                 x.GetEndAtom().GetIdx()] for x in bonds]
+        return Bond(type_ids=type_ids, aids=aids)
 
-    def setAngles(self):
+    @property
+    @functools.cache
+    def angles(self):
         """
-        Set angle force field matches.
+        Angle force of the molecules after removal due to improper angles.
+
+        e.g. NH3 if all three H-N-H angles are defined, you cannot control out
+        of plane mode.
+
+        Two conditions are satisfied:
+            1) the number of internal geometry variables is Nv= 3N_atom – 6
+            2) each variable can be perturbed independently of the other variables
+        For the case of ammonia, 3 bond lengths N-H1, N-H2, N-H3, the two bond
+        angles θ1 = H1-N-H2 and θ2 = H1-N-H3, and the ω = H2-H1-N-H3
+        ref: Atomic Forces for Geometry-Dependent Point Multi-pole and Gaussian
+        Multi-xpole Models
         """
         angles = [y for x in self.GetAtoms() for y in self.ff.getAngleAtoms(x)]
-        data = {TYPE_ID: [self.ff.getMatchedAngles(x)[0].id for x in angles]}
-        idxs = [[y.GetIdx() for y in x] for x in zip(*angles)]
-        data.update({x: y for x, y in zip(Angle.ID_COLS, idxs)})
-        self.angles = Angle(data)
+        type_ids = [self.ff.getMatchedAngles(x)[0].id for x in angles]
+        aids = [[y.GetIdx() for y in x] for x in angles]
+        angles = Angle(type_ids=type_ids, aids=aids)
+        matches = [angles.select(x) for x in self.impropers.getAngles()]
+        index = [x.getIndex(lambda x: self.ff.angles[x].ene) for x in matches]
+        return angles.drop(index=index)
 
-    def setDihedrals(self):
+    @property
+    @functools.cache
+    def dihedrals(self):
         """
-        Set the dihedral angles of the molecules.
+        Dihedral angles of the molecules.
         """
         dihes = [x for x in self.getDihAtoms()]
-        data = {TYPE_ID: [self.ff.getMatchedDihedrals(x)[0].id for x in dihes]}
-        idxs = [[y.GetIdx() for y in x] for x in zip(*dihes)]
-        data.update({x: y for x, y in zip(Dihedral.ID_COLS, idxs)})
-        self.dihedrals = Dihedral(data)
+        type_ids = [self.ff.getMatchedDihedrals(x)[0].id for x in dihes]
+        aids = [[y.GetIdx() for y in x] for x in dihes]
+        return Dihedral(type_ids=type_ids, aids=aids)
 
-    def setImpropers(self):
+    @property
+    @functools.cache
+    def impropers(self):
+        """
+        Improper angles of the molecules.
+        """
         imprps = [x for x in self.getImproperAtoms()]
-        data = {TYPE_ID: [self.ff.getMatchedImpropers(x)[0] for x in imprps]}
-        idxs = [[y.GetIdx() for y in x] for x in zip(*imprps)]
-        data.update({x: y for x, y in zip(Improper.ID_COLS, idxs)})
-        self.impropers = Improper(data)
+        type_ids = [self.ff.getMatchedImpropers(x)[0] for x in imprps]
+        aids = [[y.GetIdx() for y in x] for x in imprps]
+        return Improper(type_ids=type_ids, aids=aids)
 
     def getDihAtoms(self):
         """
@@ -652,25 +703,6 @@ class Mol(structure.Mol):
                         atoms.append(atom)
         neighbors = [x.GetNeighbors() for x in atoms]
         return [[y[0], y[1], x, y[2]] for x, y in zip(atoms, neighbors)]
-
-    def removeAngles(self):
-        """
-        One improper adds one restraint and thus one angle is removed.
-
-        e.g. NH3 if all three H-N-H angles are defined, you cannot control out
-        of plane mode.
-
-        Two conditions are satisfied:
-            1) the number of internal geometry variables is Nv= 3N_atom – 6
-            2) each variable can be perturbed independently of the other variables
-        For the case of ammonia, 3 bond lengths N-H1, N-H2, N-H3, the two bond
-        angles θ1 = H1-N-H2 and θ2 = H1-N-H3, and the ω = H2-H1-N-H3
-        ref: Atomic Forces for Geometry-Dependent Point Multi-pole and Gaussian
-        Multi-xpole Models
-        """
-        angles = [self.angles.select(x) for x in self.impropers.getAngles()]
-        index = [x.getIndex(lambda x: self.ff.angles[x].ene) for x in angles]
-        self.angles = self.angles.drop(index=index)
 
     def getRigid(self):
         """
