@@ -471,10 +471,10 @@ class Conformer(structure.Conformer):
     @property
     def atoms(self):
         """
-        Return atom information in the format of numpy array.
+        Atoms in the conformer.
 
-        :return `pandas.core.frame.DataFrame`: information such as atom global
-            ids, molecule ids, atom type ids, charges, coordinates.
+        :return `Atom`: information such as atom global ids, molecule ids, atom
+            type ids, charges, coordinates.
         """
         atoms = self.GetOwningMol().atoms.mapIds(self.id_map)
         atoms.mol_id = self.gid
@@ -484,40 +484,36 @@ class Conformer(structure.Conformer):
     @property
     def bonds(self):
         """
-        Return bond information in the format of numpy array.
+        Bonds in the conformer.
 
-        :return `pandas.core.frame.DataFrame`: information such as bond ids and
-            bonded atom ids.
+        :return `Bond`: information such as bond ids and bonded atom ids.
         """
         return self.GetOwningMol().bonds.mapIds(self.id_map)
 
     @property
     def angles(self):
         """
-        Return angle information in the format of numpy array.
+        Angles in the conformer.
 
-        :return `pandas.core.frame.DataFrame`: information such as angle ids and
-            connected atom ids.
+        :return `Angle`: information such as angle ids and connected atom ids.
         """
         return self.GetOwningMol().angles.mapIds(self.id_map)
 
     @property
     def dihedrals(self):
         """
-        Return dihedral angle information in the format of numpy array.
+        Dihedral angles in the conformer.
 
-        :return `pandas.core.frame.DataFrame`: information such as dihedral ids
-            and connected atom ids.
+        :return `Dihedral`: information such as dihedral ids and connected atom ids.
         """
         return self.GetOwningMol().dihedrals.mapIds(self.id_map)
 
     @property
     def impropers(self):
         """
-        Return improper angle information in the format of numpy array.
+        Improper angles in the conformer.
 
-        :return `pandas.core.frame.DataFrame`: information such as improper ids
-            and connected atom ids.
+        :return `Improper`: information such as improper ids and connected atom ids.
         """
         return self.GetOwningMol().impropers.mapIds(self.id_map)
 
@@ -949,12 +945,23 @@ class Struct(structure.Struct, Base):
 
     @property
     def atoms(self):
+        """
+        Atoms in the structure.
+
+        :return `Atom`: information such as atom global ids, molecule ids, atom
+            type ids, charges, coordinates.
+        """
         data = pd.concat(x.atoms for x in self.conformer)
         data[TYPE_ID] = self.atm_types[data[TYPE_ID]]
         return data
 
     @property
     def bonds(self):
+        """
+        Bonds in the structure.
+
+        :return `Bond`: information such as bond ids and bonded atom ids.
+        """
         bonds = [x.bonds for x in self.conformer if not x.bonds.empty]
         bonds = Bond.concat(bonds, axis=0)
         bonds[TYPE_ID] = self.bnd_types[bonds[TYPE_ID]]
@@ -962,6 +969,11 @@ class Struct(structure.Struct, Base):
 
     @property
     def angles(self):
+        """
+        Angle in the structure.
+
+        :return `Angle`: information such as angle ids and connected atom ids.
+        """
         angles = [x.angles for x in self.conformer if not x.angles.empty]
         angles = Angle.concat(angles, axis=0)
         angles[TYPE_ID] = self.ang_types[angles[TYPE_ID]]
@@ -969,6 +981,11 @@ class Struct(structure.Struct, Base):
 
     @property
     def dihedrals(self):
+        """
+        Dihedral angles in the structure.
+
+        :return `Dihedral`: information such as dihedral ids and connected atom ids.
+        """
         dihes = [x.dihedrals for x in self.conformer if not x.dihedrals.empty]
         dihes = Dihedral.concat(dihes, axis=0)
         dihes[TYPE_ID] = self.dihe_types[dihes[TYPE_ID]]
@@ -976,6 +993,11 @@ class Struct(structure.Struct, Base):
 
     @property
     def impropers(self):
+        """
+        Improper angles in the structure.
+
+        :return `Improper`: information such as improper ids and connected atom ids.
+        """
         imprps = [x.impropers for x in self.conformer if not x.impropers.empty]
         imprps = Improper.concat(imprps, axis=0)
         imprps[TYPE_ID] = self.impr_types[imprps[TYPE_ID]]
@@ -983,6 +1005,11 @@ class Struct(structure.Struct, Base):
 
     @property
     def masses(self):
+        """
+        Atom masses.
+
+        :return `Mass`: mass of each type of atom.
+        """
         masses = [self.ff.atoms[x] for x in self.atm_types.on]
         masses = Mass([[x.mass, f" {x.description} {x.symbol} {x.id} "]
                        for x in masses])
@@ -990,40 +1017,51 @@ class Struct(structure.Struct, Base):
 
     @property
     def pair_coeffs(self):
+        """
+        Non-bonded atom pair coefficients.
+
+        :return `PairCoeff`: the interaction between non-bond atoms.
+        """
         vdws = [self.ff.vdws[x] for x in self.atm_types.on]
         return PairCoeff([[x.ene, x.dist] for x in vdws])
 
     @property
     def bond_coeffs(self):
+        """
+        Bond coefficients.
+
+        :return `BondCoeff`: the interaction between bonded atoms.
+        """
         bonds = [self.ff.bonds[x] for x in self.bnd_types.on]
         return BondCoeff([[x.ene, x.dist] for x in bonds])
 
     @property
     def angle_coeffs(self):
+        """
+        Angle coefficients.
+
+        :return `AngleCoeff`: the three-atom angle interaction coefficients
+        """
         angles = [self.ff.angles[x] for x in self.ang_types.on]
         return AngleCoeff([[x.ene, x.deg] for x in angles])
 
     @property
     def dihedral_coeffs(self):
+        """
+        Dihedral coefficients.
 
-        def getParams(ene_ang_ns):
-            params = [0., 0., 0., 0.]
-            # LAMMPS: K1, K2, K3, K4 in 0.5*K1[1+cos(x)] + 0.5*K2[1-cos(2x)]...
-            # OPLS: [1 + cos(nx-gama)]
-            # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
-            for ene_ang_n in ene_ang_ns:
-                params[ene_ang_n.n_parm - 1] = ene_ang_n.ene * 2
-                if not params[ene_ang_n.n_parm]:
-                    continue
-                if (ene_ang_n.angle == 180.) ^ (not ene_ang_n.n_parm % 2):
-                    params[ene_ang_n.n_parm] *= -1
-            return params
-
+        :return `DihedralCoeff`: the four-atom torsion interaction coefficients
+        """
         dihes = [self.ff.dihedrals[x] for x in self.dihe_types.on]
-        return DihedralCoeff([getParams(x.constants) for x in dihes])
+        return DihedralCoeff([x.params for x in dihes])
 
     @property
     def improper_coeffs(self):
+        """
+        Improper coefficients.
+
+        :return `ImproperCoeff`: the four-atom improper interaction coefficients
+        """
         imprps = [self.ff.impropers[x] for x in self.impr_types.on]
         # LAMMPS: K in K[1+d*cos(nx)] vs OPLS: [1 + cos(nx-gama)]
         # due to cos (θ - 180°) = cos (180° - θ) = - cos θ
@@ -1054,6 +1092,12 @@ class Struct(structure.Struct, Base):
         super().writeRun(*arg, struct_info=struct_info, **kwarg)
 
     def getRigid(self):
+        """
+        Get the rigid bond and angle types.
+
+        :return: the rigid bond and angle types
+        :rtype: str, str
+        """
         data = [x.getRigid() for x in self.molecules]
         bonds, angles = list(map(list, zip(*data)))
         bonds = Bond.concat([x for x in bonds if not x.empty])
@@ -1075,7 +1119,6 @@ class Struct(structure.Struct, Base):
         :return generator of str: the warnings on structure checking.
         """
         net_charge = round(self.atoms.charge.sum(), 4)
-        net_charge = 1
         if net_charge:
             yield f'The system has a net charge of {net_charge:.4f}'
         min_span = self.box.span.min()

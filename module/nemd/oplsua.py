@@ -8,7 +8,9 @@ datafile, and in-script.
 """
 import chemparse
 import itertools
+import functools
 import collections
+import typing
 import numpy as np
 from rdkit import Chem
 from collections import namedtuple
@@ -27,9 +29,41 @@ ANGLE = namedtuple('ANGLE', ['id', 'id1', 'id2', 'id3', 'ene', 'deg', 'has_h'])
 UREY_BRADLEY = namedtuple('UREY_BRADLEY', ['id1', 'id2', 'id3', 'ene', 'dist'])
 IMPROPER = namedtuple(
     'IMPROPER', ['id', 'id1', 'id2', 'id3', 'id4', 'ene', 'deg', 'n_parm'])
-ENE_ANG_N = namedtuple('ENE_ANG_N', ['ene', 'deg', 'n_parm'])
-DIHEDRAL = namedtuple('DIHEDRAL',
-                      ['id', 'id1', 'id2', 'id3', 'id4', 'constants'])
+
+
+class DIHEDRAL(typing.NamedTuple):
+
+    id: int
+    id1: int
+    id2: int
+    id3: int
+    id4: int
+    constants: str
+
+    @property
+    @functools.cache
+    def params(self):
+        """
+        Lammps opls coefficients K1, K2, K3, K4 in 0.5*K1[1+cos(x)] +
+        0.5*K2[1-cos(2x)]...
+        # In oplsua.py, dihedral adopts [1 + cos(n*x-gama)] formula.
+        # When gama = 180, cos(x-gama) = cos(x - 180°) = cos(180° - x) = -cos(x)
+
+        :return: opls coefficients K1, K2, K3, K4
+        :rtype: list of float
+        """
+        params = [0., 0., 0., 0.]
+        splitted = self.constants.split()
+        constants = zip(splitted[::3], splitted[1::3], splitted[2::3])
+        for ene, deg, n_parm in constants:
+            ene, deg, n_parm = float(ene), float(deg), int(n_parm)
+            params[n_parm - 1] = ene * 2
+            if not params[n_parm]:
+                continue
+            if (deg == 180.) ^ (not n_parm % 2):
+                params[n_parm] *= -1
+        return params
+
 
 UA = namedtuple('UA', ['sml', 'mp', 'hs', 'dsc'])
 
@@ -364,6 +398,7 @@ class Parser:
         self.symbol_impropers = None
         self.bnd_map = None
         self.ang_map = None
+        self.dihe_map = None
 
     def type(self, mol):
         """
@@ -428,10 +463,10 @@ class Parser:
         """
         for line in self.raw_content[self.VAN_MK]:
             # 'vdw         213               2.5560     0.4330'
-            _, id, dist, ene = line.split()
-            self.vdws[int(id)] = VDW(id=int(id),
-                                     dist=float(dist),
-                                     ene=float(ene))
+            _, idx, dist, ene = line.split()
+            self.vdws[int(idx)] = VDW(id=int(idx),
+                                      dist=float(dist),
+                                      ene=float(ene))
 
     def setCharge(self):
         """
@@ -448,18 +483,18 @@ class Parser:
         """
         shape = len(self.atoms) + 1
         self.bnd_map = np.zeros((shape, shape), dtype=np.int16)
-        for id, line in enumerate(self.raw_content[self.BOND_MK], 1):
+        for idx, line in enumerate(self.raw_content[self.BOND_MK], 1):
             # 'bond        104  107          386.00     1.4250'
             _, id1, id2, ene, dist = line.split()
             atoms = [self.atoms[int(x)] for x in [id1, id2]]
             has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
-            self.bonds[id] = BOND(id=id,
-                                  id1=int(id1),
-                                  id2=int(id2),
-                                  ene=float(ene),
-                                  dist=float(dist),
-                                  has_h=has_h)
-            self.bnd_map[int(id1), int(id2)] = id
+            self.bonds[idx] = BOND(id=idx,
+                                   id1=int(id1),
+                                   id2=int(id2),
+                                   ene=float(ene),
+                                   dist=float(dist),
+                                   has_h=has_h)
+            self.bnd_map[int(id1), int(id2)] = idx
 
     def setAngle(self):
         """
@@ -467,19 +502,19 @@ class Parser:
         """
         shape = len(self.atoms) + 1
         self.ang_map = np.zeros((shape, shape, shape), dtype=np.int16)
-        for id, line in enumerate(self.raw_content[self.ANGLE_MK], 1):
+        for idx, line in enumerate(self.raw_content[self.ANGLE_MK], 1):
             # 'angle        83  107  104      80.00     109.50'
             _, id1, id2, id3, ene, angle = line.split()
             atoms = [self.atoms[int(x)] for x in [id1, id2, id3]]
             has_h = any(x.symbol == symbols.HYDROGEN for x in atoms)
-            self.angles[id] = ANGLE(id=id,
-                                    id1=int(id1),
-                                    id2=int(id2),
-                                    id3=int(id3),
-                                    ene=float(ene),
-                                    deg=float(angle),
-                                    has_h=has_h)
-            self.ang_map[int(id1), int(id2), int(id3)] = id
+            self.angles[idx] = ANGLE(id=idx,
+                                     id1=int(id1),
+                                     id2=int(id2),
+                                     id3=int(id3),
+                                     ene=float(ene),
+                                     deg=float(angle),
+                                     has_h=has_h)
+            self.ang_map[int(id1), int(id2), int(id3)] = idx
 
     def setUreyBradley(self):
         """
@@ -487,53 +522,52 @@ class Parser:
 
         NOTE: current this is not supported.
         """
-        for id, line in enumerate(self.raw_content[self.UREY_MK], 1):
+        for idx, line in enumerate(self.raw_content[self.UREY_MK], 1):
             # ureybrad     78   77   78      38.25     1.5139
             # ureybrad     80   79   80      39.90     1.6330
             _, id1, id2, id3, ene, dist = line.split()
-            self.urey_bradleys[id] = UREY_BRADLEY(id1=int(id1),
-                                                  id2=int(id2),
-                                                  id3=int(id3),
-                                                  ene=float(ene),
-                                                  dist=float(dist))
+            self.urey_bradleys[idx] = UREY_BRADLEY(id1=int(id1),
+                                                   id2=int(id2),
+                                                   id3=int(id3),
+                                                   ene=float(ene),
+                                                   dist=float(dist))
 
     def setImproper(self):
         """
         Set improper parameters based on 'Improper Torsional Parameters' block.
         """
-        for id, line in enumerate(self.raw_content[self.IMPROPER_MK], 1):
+        for idx, line in enumerate(self.raw_content[self.IMPROPER_MK], 1):
             # imptors       5    3    1    2           10.500  180.0  2
             _, id1, id2, id3, id4, ene, angle, n_parm = line.split()
-            self.impropers[id] = IMPROPER(id=id,
-                                          id1=int(id1),
-                                          id2=int(id2),
-                                          id3=int(id3),
-                                          id4=int(id4),
-                                          ene=float(ene),
-                                          deg=float(angle),
-                                          n_parm=int(n_parm))
+            self.impropers[idx] = IMPROPER(id=idx,
+                                           id1=int(id1),
+                                           id2=int(id2),
+                                           id3=int(id3),
+                                           id4=int(id4),
+                                           ene=float(ene),
+                                           deg=float(angle),
+                                           n_parm=int(n_parm))
 
     def setDihedral(self):
         """
         Set dihedral parameters based on 'Torsional Parameters' block.
         """
-        shape = len(self.atoms) + 1
-        self.dihe_map = np.zeros((shape, shape, shape, shape), dtype=np.int16)
-        for id, line in enumerate(self.raw_content[self.TORSIONAL_MK], 1):
+        for idx, line in enumerate(self.raw_content[self.TORSIONAL_MK], 1):
             # torsion       2    1    3    4            0.650    0.0  1      2.500  180.0  2
             line_splitted = line.split()
-            ids, enes = line_splitted[1:5], line_splitted[5:]
-            ids = list(map(int, ids))
-            ene_ang_ns = tuple(
-                ENE_ANG_N(ene=float(x), deg=float(y), n_parm=int(z))
-                for x, y, z in zip(enes[::3], enes[1::3], enes[2::3]))
-            self.dihedrals[id] = DIHEDRAL(id=id,
-                                          id1=ids[0],
-                                          id2=ids[1],
-                                          id3=ids[2],
-                                          id4=ids[3],
-                                          constants=ene_ang_ns)
-            self.dihe_map[ids[0], ids[1], ids[2], ids[3]] = id
+            ids = list(map(int, line_splitted[1:5]))
+            constants = ' '.join(line_splitted[5:])
+            self.dihedrals[idx] = DIHEDRAL(id=idx,
+                                           id1=ids[0],
+                                           id2=ids[1],
+                                           id3=ids[2],
+                                           id4=ids[3],
+                                           constants=constants)
+
+        shape = len(self.atoms) + 1
+        self.dihe_map = np.zeros([shape] * 4, dtype=np.int16)
+        for idx, dihe in self.dihedrals.items():
+            self.dihe_map[dihe.id1, dihe.id2, dihe.id3, dihe.id4] = idx
 
     def getMatchedBonds(self, bond):
         """
