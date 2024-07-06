@@ -1,12 +1,8 @@
-import re
-import os
+import types
 import pytest
 import numpy as np
-from rdkit import Chem
 
-from nemd import oplsua
 from nemd import lammpsdata
-from nemd import parserutils
 
 
 class TestConformer:
@@ -18,7 +14,7 @@ class TestConformer:
         return mol.GetConformer()
 
     def testAtoms(self, conf):
-        assert conf.atoms.shape == (6, 7)
+        assert conf.atoms.shape == (6, 6)
 
     def testBonds(self, conf):
         assert conf.bonds.shape == (5, 3)
@@ -36,57 +32,47 @@ class TestConformer:
 class TestMol:
 
     @pytest.fixture
-    def mol(self):
+    def raw_mol(self):
         mol = lammpsdata.Mol.MolFromSmiles('[H]OC(=O)CC', delay=True)
         mol.EmbedMolecule()
         return mol
 
-    def testTypeAtoms(self, mol):
-        mol.typeAtoms()
-        assert len([x.GetIntProp('type_id') for x in mol.GetAtoms()]) == 6
+    def testTypeAtoms(self, raw_mol):
+        raw_mol.typeAtoms()
+        assert len([x.GetIntProp('type_id') for x in raw_mol.GetAtoms()]) == 6
 
-    def testBalanceCharge(self, mol):
-        mol.typeAtoms()
-        mol.balanceCharge()
-        np.testing.assert_almost_equal(mol.nbr_charge[3], 0.08, 5)
+    def testBalanceCharge(self, raw_mol):
+        raw_mol.typeAtoms()
+        raw_mol.balanceCharge()
+        np.testing.assert_almost_equal(raw_mol.nbr_charge[1], 0.08, 5)
 
-    def testSetBonds(self, mol):
-        mol.typeAtoms()
-        mol.setBonds()
-        assert mol.bond_total == 5
+    @pytest.fixture
+    def mol(self):
+        mol = lammpsdata.Mol.MolFromSmiles('[H]OC(=O)CC')
+        mol.EmbedMolecule()
+        return mol
 
-    def testSetAngles(self, mol):
-        mol.typeAtoms()
-        mol.setAngles()
-        assert mol.angle_total == 5
+    def testAtoms(self, mol):
+        assert mol.atoms.shape == (6, 6)
 
-    def testSetDihedrals(self, mol):
-        mol.typeAtoms()
-        mol.setDihedrals()
-        assert mol.dihedral_total == 4
+    def testBonds(self, mol):
+        assert mol.bonds.shape == (5, 3)
 
-    def testSetImpropers(self, mol):
-        mol.typeAtoms()
-        mol.setImpropers()
-        assert mol.improper_total == 1
+    def testAngles(self, mol):
+        assert mol.angles.shape == (4, 4)
 
-    def testRemoveAngles(self, mol):
-        mol.typeAtoms()
-        mol.setAngles()
-        mol.setImpropers()
-        mol.removeAngles()
-        assert len(mol.angles) == 4
+    def testDihedrals(self, mol):
+        assert mol.dihedrals.shape == (4, 5)
+
+    def testImpropers(self, mol):
+        assert mol.impropers.shape == (1, 5)
 
     def testSetFixGeom(self, mol):
-        mol.typeAtoms()
-        mol.setBonds()
-        mol.setAngles()
-        mol.setFixGeom()
-        assert len(mol.fbonds) == 1
-        assert len(mol.fangles) == 1
+        bonds, angles = mol.getRigid()
+        assert all(bonds == 86)
+        assert all(angles == 296)
 
     def testMolecularWeight(self, mol):
-        mol.typeAtoms()
         assert mol.mw == 74.079
 
 
@@ -94,7 +80,7 @@ class TestBase:
 
     @pytest.fixture
     def base(self):
-        return lammpsdata.Base()
+        return lammpsdata.Base(options=types.SimpleNamespace(jobname='test'))
 
     def testHeader(self, base):
         assert base.header == ''

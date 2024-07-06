@@ -323,7 +323,7 @@ class Frame(pd.DataFrame):
         Get the distance between the xyz and the of the xyzs associated with the
         input atom ids.
 
-        :param atom_id int: atom ids
+        :param ids list of int: atom ids
         :param xyz (3,) 'pandas.core.series.Series': xyz coordinates and atom id
         :return list of floats: distances
         """
@@ -401,13 +401,15 @@ class Frame(pd.DataFrame):
             delta = (center % self.box.span) - center
             self.xyz[gids, :] += delta
 
-    def ivals(self):
+    def ivals(self, gids=None):
         """
         Fast access to the row indexes and values of the frame.
 
         :return iterator of (int, numpy.ndarray): the index and xyz values
         """
-        return zip(self.index, self.values)
+        if gids is None:
+            return zip(self.index, self.values)
+        return zip(gids, self.xyz[gids, :])
 
     def glue(self, dreader=None):
         """
@@ -481,7 +483,7 @@ class DistanceCell(Frame):
     ALL = 'all'
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
                      (0, 0, -1)]
-
+    THRESHOLD = 1.
     # https://pandas.pydata.org/docs/development/extending.html
     _internal_names = Frame._internal_names + [
         'cut', 'res', 'neigh_ids', 'atom_cell', 'graph', 'vals', 'cell_vals',
@@ -493,7 +495,6 @@ class DistanceCell(Frame):
     def __init__(self,
                  data=None,
                  box=None,
-                 index=None,
                  gids=None,
                  cut=6.,
                  res=AUTO,
@@ -505,7 +506,7 @@ class DistanceCell(Frame):
         :param cut float: the cutoff distance to search neighbors
         :param res float: the res of the grid step
         """
-        super().__init__(data=data, box=box, index=index)
+        super().__init__(data=data, box=box)
         self.cut = cut
         self.gids = gids
         self.res = res
@@ -728,13 +729,28 @@ class DistanceCell(Frame):
         ]
         return neighbors
 
-    def getClashes(self,
-                   row,
-                   name=None,
-                   included=None,
-                   excluded=None,
-                   radii=None,
-                   threshold=1.):
+    def hasClashes(self, gids=None):
+        if gids is None:
+            gids = self.gids
+        try:
+            next(self.getClashes(gids=gids))
+        except StopIteration:
+            return False
+        return True
+
+    def getClashes(self, gids=None):
+        if gids is None:
+            gids = self.gids
+        clashes = [self.getRowClashes(x, name=i) for i, x in self.ivals(gids)]
+        return itertools.chain.from_iterable(clashes)
+
+    def getRowClashes(self,
+                      row,
+                      name=None,
+                      included=None,
+                      excluded=None,
+                      radii=None,
+                      distance_only=True):
         """
         Get the clashes between xyz and atoms in the frame.
 
@@ -745,7 +761,7 @@ class DistanceCell(Frame):
         :param excluded list of int: the atom ids excluded for the clash check
         :param radii oplsua.Radius: the values are the radii smaller than which
             are clashes
-        :param threshold clash radii: clash criteria when radii not defined
+        :param distance_only bool: return clashed distance only if True
         :return list of tuple: clashed atom ids, distance, and threshold
         """
         if included is None:
@@ -773,12 +789,13 @@ class DistanceCell(Frame):
         neighbors = list(neighbors)
         dists = self.getDists(neighbors, xyz).round(4)
         if radii is None:
-            thresholds = [threshold] * len(neighbors)
+            thresholds = [self.THRESHOLD] * len(neighbors)
         else:
-            thresholds = [radii[name, x] for x in neighbors]
-        clashes = [(name, x, y, z)
-                   for x, y, z in zip(neighbors, dists, thresholds) if y < z]
-        return clashes
+            thresholds = radii[name, neighbors]
+        if distance_only:
+            return dists[dists < thresholds]
+        return [(name, x, y, z)
+                for x, y, z in zip(neighbors, dists, thresholds) if y < z]
 
     def removeGids(self, gids):
         """

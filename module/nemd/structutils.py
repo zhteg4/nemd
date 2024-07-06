@@ -144,13 +144,7 @@ class PackedConf(GriddedConf):
         :return bool: True if clashes are found.
         """
         aids = self.aids if aids is None else aids
-        gids = self.id_map[aids]
-        values = self.mol.struct.dcell.xyz[gids, :]
-        for name, xyz in zip(gids, values):
-            clashes = self.mol.struct.dcell.getClashes(xyz, name=name)
-            if clashes:
-                return True
-        return False
+        return self.mol.struct.dcell.hasClashes(gids=self.id_map[aids])
 
     def reset(self):
         self.setPositions(self.oxyz)
@@ -285,7 +279,7 @@ class GrownConf(PackedConf):
             raise ConfError
         self.failed_num += 1
         self.ifrag.reset()
-        # The method backmove() deletes some extg_gids
+        # The method backmove() deletes some existing gids
         self.mol.struct.dcell.resetGraph()
         self.placeInitFrag()
         self.reportRelocation()

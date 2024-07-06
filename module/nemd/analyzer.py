@@ -413,7 +413,7 @@ class Clash(Base):
                                   radii=radii,
                                   excluded=excluded)
         dcell.setUp()
-        return [y for i, v in frm.ivals() for y in dcell.getClashes(v, name=i)]
+        return [x for x in dcell.getClashes()]
 
 
 class XYZ(Base):

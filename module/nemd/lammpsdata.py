@@ -668,6 +668,27 @@ class Mol(structure.Mol):
         aids = [[y.GetIdx() for y in x] for x in imprps]
         return Improper(type_ids=type_ids, aids=aids)
 
+    @property
+    def molecular_weight(self):
+        """
+        The molecular weight of the polymer.
+
+        :return float: the total weight.
+        """
+        return self.ff.molecular_weight(self)
+
+    mw = molecular_weight
+
+    def getRigid(self):
+        """
+        The bond and angle are rigid during simulation.
+
+        :return DataFrame, DataFrame: the type ids of the rigid bonds and angles
+        """
+        bnd_types = self.bonds.getRigid(lambda x: self.ff.bonds[x].has_h)
+        ang_types = self.angles.getRigid(lambda x: self.ff.angles[x].has_h)
+        return bnd_types, ang_types
+
     def getDihAtoms(self):
         """
         Get the dihedral atoms of this molecule.
@@ -780,27 +801,6 @@ class Mol(structure.Mol):
                         atoms.append(atom)
         neighbors = [x.GetNeighbors() for x in atoms]
         return [[y[0], y[1], x, y[2]] for x, y in zip(atoms, neighbors)]
-
-    def getRigid(self):
-        """
-        The bond and angle are rigid during simulation.
-
-        :return DataFrame, DataFrame: the type ids of the rigid bonds and angles
-        """
-        bnd_types = self.bonds.getRigid(lambda x: self.ff.bonds[x].has_h)
-        ang_types = self.angles.getRigid(lambda x: self.ff.angles[x].has_h)
-        return bnd_types, ang_types
-
-    @property
-    def molecular_weight(self):
-        """
-        The molecular weight of the polymer.
-
-        :return float: the total weight.
-        """
-        return self.ff.molecular_weight(self)
-
-    mw = molecular_weight
 
 
 class Base(lammpsin.In):
