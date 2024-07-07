@@ -338,6 +338,7 @@ setup(name='nemd',
           'spglib',
           'numba',
           'tbb',
+          'multipledispatch'
       ],
       extras_require={
           'dev': [

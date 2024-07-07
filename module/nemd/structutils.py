@@ -690,7 +690,6 @@ class PackedStruct(Struct):
         """
 
         self.dcell = traj.DistanceCell(data=self.getPositions(),
-                                       box=self.box,
                                        radii=self.getRadius(),
                                        excluded=self.getExcluded(),
                                        **kwargs)
@@ -720,7 +719,7 @@ class PackedStruct(Struct):
 
     def setBox(self):
         """
-        Set periodic boundary box size.
+        Set periodic boundary box.
         """
         vol = self.mw / self.density / scipy.constants.Avogadro
         edge = math.pow(vol, 1 / 3)  # centimeter
@@ -729,8 +728,7 @@ class PackedStruct(Struct):
         log_debug(f'Cubic box of size {edge:.2f} angstrom is created.')
 
     def setUpDcell(self):
-        self.dcell.setBox(box=self.box)
-        self.dcell.setUp()
+        self.dcell.setUp(self.box)
 
     def setConformers(self, max_trial=MAX_TRIAL_PER_DENSITY):
         """
@@ -886,7 +884,6 @@ class GrownStruct(PackedStruct):
         """
         Reset the state so that a new growing attempt can happen.
         """
-        ...
         super().reset()
         self.placeInitFrags()
 

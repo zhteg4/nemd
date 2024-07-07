@@ -22,6 +22,7 @@ import collections
 import numpy as np
 import pandas as pd
 import networkx as nx
+from multipledispatch import dispatch
 from contextlib import contextmanager
 
 from nemd import symbols
@@ -134,15 +135,12 @@ class Frame(pd.DataFrame):
         :param step int: the number of simulation step that this frame is at
         :param dtype str: the data type of the frame
         """
-        if box is None and isinstance(data, Frame):
-            box = data.box
-        if index is None and not isinstance(data, pd.DataFrame):
+        if index is None and isinstance(data, np.ndarray):
+            # Numpy array as coordinates without index input
             index = range(1, data.shape[0] + 1)
-        if isinstance(data, pd.DataFrame) and (data.columns != columns).any():
-            columns = {x: y for x, y in zip(data.columns, columns)}
-            data = data.rename(columns=columns)
-        if dtype is None and isinstance(data, np.ndarray):
-            dtype = float if data is None else data.dtype
+        if dtype is None:
+            # Use input data type is not provided
+            dtype = data.dtype if isinstance(data, np.ndarray) else float
         super().__init__(data=data,
                          index=index,
                          columns=columns,
@@ -151,7 +149,8 @@ class Frame(pd.DataFrame):
         self.box = box
         self.step = step
         self.xyz = XYZ(self)
-        self.setBox(self.box)
+        if self.box is None and isinstance(data, Frame):
+            self.box = data.box
 
     def setBox(self, box):
         """
@@ -494,7 +493,6 @@ class DistanceCell(Frame):
 
     def __init__(self,
                  data=None,
-                 box=None,
                  gids=None,
                  cut=6.,
                  res=AUTO,
@@ -506,7 +504,7 @@ class DistanceCell(Frame):
         :param cut float: the cutoff distance to search neighbors
         :param res float: the res of the grid step
         """
-        super().__init__(data=data, box=box)
+        super().__init__(data=data)
         self.cut = cut
         self.gids = gids
         self.res = res
@@ -526,14 +524,25 @@ class DistanceCell(Frame):
             case None:
                 self.gids = set()
 
+    @dispatch(Frame)
+    def setUp(self, frm):
+        self[self.XYZU] = frm
+        self.setUp(frm.box)
+
+    @dispatch(lammpsdata.Box)
+    def setUp(self, box):
+        self.box = box
+        self.setUp()
+
+    @dispatch()
     def setUp(self):
-        self.setgrids()
+        self.setGrids()
         self.setNeighborIds()
         self.setNeighborMap()
         self.setAtomCell()
         self.saveState()
 
-    def setgrids(self):
+    def setGrids(self):
         """
         Set grids and indexes.
 

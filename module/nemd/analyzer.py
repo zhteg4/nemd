@@ -396,6 +396,9 @@ class Clash(Base):
         """
         radii = self.df_reader.getRadius()
         excluded = self.df_reader.getExcluded()
+        dcell = traj.DistanceCell(gids=self.gids, radii=radii, excluded=excluded)
+        dcell.setUp(self.frms[0])
+        import pdb; pdb.set_trace()
         data = [len(self.getClashes(x, radii, excluded)) for x in self.frms]
         self.data = pd.DataFrame(data={self.LABEL: data}, index=self.time)
         self.data.index.name = f"{self.ILABEL} ({self.sidx})"
