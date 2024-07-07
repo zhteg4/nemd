@@ -138,9 +138,6 @@ class Frame(pd.DataFrame):
         if index is None and isinstance(data, np.ndarray):
             # Numpy array as coordinates without index input
             index = range(1, data.shape[0] + 1)
-        if dtype is None:
-            # Use input data type is not provided
-            dtype = data.dtype if isinstance(data, np.ndarray) else float
         super().__init__(data=data,
                          index=index,
                          columns=columns,
@@ -527,6 +524,8 @@ class DistanceCell(Frame):
     @dispatch(Frame)
     def setUp(self, frm):
         self[self.XYZU] = frm
+        self.xyz = XYZ(self)
+        self.step = frm.step
         self.setUp(frm.box)
 
     @dispatch(lammpsdata.Box)

@@ -396,27 +396,15 @@ class Clash(Base):
         """
         radii = self.df_reader.getRadius()
         excluded = self.df_reader.getExcluded()
-        dcell = traj.DistanceCell(gids=self.gids, radii=radii, excluded=excluded)
-        dcell.setUp(self.frms[0])
-        import pdb; pdb.set_trace()
-        data = [len(self.getClashes(x, radii, excluded)) for x in self.frms]
-        self.data = pd.DataFrame(data={self.LABEL: data}, index=self.time)
-        self.data.index.name = f"{self.ILABEL} ({self.sidx})"
-
-    def getClashes(self, frm, radii, excluded):
-        """
-        Get the clashes between atom pair for this frame.
-
-        :param frm 'traj.Frame': traj frame to analyze clashes
-        :return list of tuples: each tuple has two atom ids, the distance, and
-            clash threshold
-        """
-        dcell = traj.DistanceCell(frm,
-                                  gids=self.gids,
+        dcell = traj.DistanceCell(gids=self.gids,
                                   radii=radii,
                                   excluded=excluded)
-        dcell.setUp()
-        return [x for x in dcell.getClashes()]
+        data = []
+        for frm in self.frms:
+            dcell.setUp(frm)
+            data.append(len([x for x in dcell.getClashes()]))
+        self.data = pd.DataFrame(data={self.LABEL: data}, index=self.time)
+        self.data.index.name = f"{self.ILABEL} ({self.sidx})"
 
 
 class XYZ(Base):
