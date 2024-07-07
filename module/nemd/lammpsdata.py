@@ -45,6 +45,8 @@ class Block(pd.DataFrame):
         """
         if not isinstance(data, pd.DataFrame) and columns is None:
             columns = self.COLUMN_LABELS
+        if isinstance(data, int):
+            data = np.ones((data, len(columns)), dtype=int)
         super().__init__(data=data, index=index, columns=columns, **kwargs)
 
     @classmethod
@@ -233,7 +235,8 @@ class PairCoeff(Mass):
 
     NAME = 'Pair Coeffs'
     ENE = 'ene'
-    COLUMN_LABELS = [ENE, 'dist']
+    DIST = 'dist'
+    COLUMN_LABELS = [ENE, DIST]
     LABEL = 'atom types'
 
 
@@ -803,41 +806,10 @@ class Mol(structure.Mol):
         return [[y[0], y[1], x, y[2]] for x, y in zip(atoms, neighbors)]
 
 
-class Base(lammpsin.In):
-
-    DESCR = 'LAMMPS Description # {style}'
-    BUFFER = [4., 4., 4.]
-
-    def getRadius(self):
-        """
-        Set the vdw radius.
-        """
-        return Radius(self.pair_coeffs.dist, self.atoms.type_id)
-
-    def getExcluded(self, include14=True):
-        """
-        Bonded atoms and atoms in angles are in the exclusion. If include14=True,
-        the dihedral angles are in the exclusion as well.
-
-        :param include14 bool: If True, 1-4 interaction in a dihedral angle count
-            as exclusion.
-        """
-        pairs = set(self.bonds.getPairs())
-        pairs = pairs.union(self.angles.getPairs())
-        pairs = pairs.union(self.impropers.getPairs())
-        if include14:
-            pairs = pairs.union(self.dihedrals.getPairs())
-
-        excluded = collections.defaultdict(set)
-        for id1, id2 in pairs:
-            excluded[id1].add(id2)
-            excluded[id2].add(id1)
-        return excluded
-
-
-class Struct(structure.Struct, Base):
+class Struct(structure.Struct, lammpsin.In):
 
     MolClass = Mol
+    DESCR = 'LAMMPS Description # {style}'
 
     def __init__(self, struct=None, ff=None, options=None, **kwargs):
         """
@@ -845,7 +817,7 @@ class Struct(structure.Struct, Base):
         :param ff 'OplsParser': the force field class.
         """
         super().__init__(struct=struct, **kwargs)
-        Base.__init__(self, options=options, **kwargs)
+        lammpsin.In.__init__(self, options=options, **kwargs)
         self.ff = ff
         self.total_charge = 0.
         self.atm_types = numpyutils.IntArray()
@@ -1128,7 +1100,7 @@ class Struct(structure.Struct, Base):
                   f'{symbols.ANGSTROM} (Lennard-Jones Cutoff x 2) '
 
 
-class DataFileReader(Base):
+class DataFileReader(lammpsin.In):
     """
     LAMMPS Data file reader.
     """

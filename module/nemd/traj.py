@@ -149,14 +149,6 @@ class Frame(pd.DataFrame):
         if self.box is None and isinstance(data, Frame):
             self.box = data.box
 
-    def setBox(self, box):
-        """
-        Set the box span from box limits.
-
-        :param box str: xlo, xhi, ylo, yhi, zlo, zhi boundaries
-        """
-        self.box = box
-
     @property
     def _constructor(self):
         """
@@ -348,27 +340,29 @@ class Frame(pd.DataFrame):
         dists -= np.round(np.divide(dists, span)) * span
         return [np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) for x in dists]
 
-    def pairDists(self, ids=None, cut=None, res=2.):
+    def getDistsWithIds(self, ids):
+        """
+        Get the distances between existing atoms with the given ids.
+        """
+
+        oids = list(self.gids.difference(ids))
+        dists = [self.getDists(oids, self.loc[x]) for x in ids]
+        return np.concatenate(dists)
+
+    def pairDists(self, grp1=None, grp2=None):
         """
         Get the distance between atom pair.
 
-        :param ids list: list of gids as the atom selection
-        :param cut float: the cutoff distance to search neighbors
-        :param res float: the res of the grid step
-        :return `numpy.ndarray`: distances array
+        :param grp1 list: list of gids as the atom selection
+        :param grp2 list of list: each sublist contains atom ids to compute
+            distances with one atom in grp1.
 
         NOTE: sel.values is used instead of iterrows due to performace
         https://stackoverflow.com/questions/24870953/does-pandas-iterrows-have-performance-issues
         """
-        ids = sorted(ids) if ids else list(range(1, self.shape[0] + 1))
-        if cut:
-            dcell = DistanceCell(self, gids=ids, cut=cut, res=res)
-            dcell.setUp()
-        dists = []
-        for idx, (id, row) in enumerate(self.loc[ids].ivals()):
-            oids = [x for x in dcell.getNeighbors(row)
-                    if x > id] if cut else ids[idx + 1:]
-            dists.append(self.getDists(oids, row))
+        grp1 = self.index if grp1 is None else sorted(grp1)
+        grp2 = (grp1[:i] for i in range(len(grp1))) if grp2 is None else grp2
+        dists = [self.getDists(x, self.xyz[y, :]) for x, y in zip(grp2, grp1)]
         return np.concatenate(dists)
 
     def wrapCoords(self, broken_bonds=False, dreader=None):
@@ -479,7 +473,6 @@ class DistanceCell(Frame):
     ALL = 'all'
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
                      (0, 0, -1)]
-    THRESHOLD = 1.
     # https://pandas.pydata.org/docs/development/extending.html
     _internal_names = Frame._internal_names + [
         'cut', 'res', 'neigh_ids', 'atom_cell', 'graph', 'vals', 'cell_vals',
@@ -488,25 +481,21 @@ class DistanceCell(Frame):
     ]
     _internal_names_set = set(_internal_names)
 
-    def __init__(self,
-                 data=None,
-                 gids=None,
-                 cut=6.,
-                 res=AUTO,
-                 radii=None,
-                 excluded=None):
+    def __init__(self, data=None, gids=ALL, cut=6., res=AUTO, struct=None):
         """
         :param data 'Frame': trajectory frame
         :param gids list: global atom ids to analyze
         :param cut float: the cutoff distance to search neighbors
         :param res float: the res of the grid step
+        :param struct 'Struct' or 'DataFileReader': radii and excluded pairs
+            are set from this object.
         """
         super().__init__(data=data)
         self.cut = cut
         self.gids = gids
         self.res = res
-        self.radii = radii
-        self.excluded = excluded
+        self.struct = struct
+        self.radii = None
         self.neigh_ids = None
         self.atom_cell = None
         self.graph = None
@@ -515,11 +504,50 @@ class DistanceCell(Frame):
         self.indexes = None
         self.indexes_numba = None
         self.grids = None
-        match self.gids:
-            case self.ALL:
-                self.gids = set(range(1, self.shape[0] + 1))
-            case None:
-                self.gids = set()
+        self.excluded = collections.defaultdict(set)
+        if self.gids == self.ALL:
+            self.gids = set(range(1, self.shape[0] + 1))
+        self.setRadius()
+        self.setExcluded()
+
+    def setRadius(self):
+        """
+        Set the vdw radius.
+        """
+        if self.struct:
+            atoms = self.struct.atoms
+            pair_coeffs = self.struct.pair_coeffs
+        else:
+            atoms = lammpsdata.Atom(self.shape[0])
+            pair_coeffs = lammpsdata.PairCoeff(self.shape[0])
+            pair_coeffs.dist = lammpsdata.Radius.MIN_DIST
+        self.radii = lammpsdata.Radius(pair_coeffs.dist, atoms.type_id)
+
+    def setExcluded(self, include14=True):
+        """
+        Set the pair exclusion during clash check. Bonded atoms and atoms in
+        angles are in the exclusion. The dihedral angles are in the exclusion
+        if include14=True.
+
+        :param include14 bool: If True, 1-4 interaction in a dihedral angle count
+            as exclusion.
+        """
+        if self.struct is None:
+            return
+        pairs = set(self.struct.bonds.getPairs())
+        pairs = pairs.union(self.struct.angles.getPairs())
+        pairs = pairs.union(self.struct.impropers.getPairs())
+        if include14:
+            pairs = pairs.union(self.struct.dihedrals.getPairs())
+
+        for id1, id2 in pairs:
+            self.excluded[id1].add(id2)
+            self.excluded[id2].add(id1)
+        return self.excluded
+
+    @dispatch(types.NoneType)
+    def setUp(self, obj):
+        return
 
     @dispatch(Frame)
     def setUp(self, frm):
@@ -664,6 +692,12 @@ class DistanceCell(Frame):
         self.atomCellUpdate(gids)
         self.addGids(gids)
 
+    def addGids(self, gids):
+        """
+        Add one global id to the existing global ids.
+        """
+        self.gids.update(gids)
+
     def atomCellUpdate(self, gids):
         """
         Add atoms cell to the atom cell.
@@ -675,6 +709,12 @@ class DistanceCell(Frame):
             self.atom_cell[ix, iy, iz][id] = True
 
     def remove(self, gids):
+        """
+        Remove gids from atom cell and existing gids.
+
+        :param gids: the global atom ids to be removed.
+        :type gids: list
+        """
         self.atomCellRemove(gids)
         self.removeGids(gids)
 
@@ -811,12 +851,6 @@ class DistanceCell(Frame):
         """
         self.gids = self.gids.difference(gids)
 
-    def addGids(self, gids):
-        """
-        Add one global id to the existing global ids.
-        """
-        self.gids.update(gids)
-
     def setGraph(self, mol_num, min_num=1000):
         """
         Set graph using grid intersection as nodes and connect neighbor nodes.
@@ -891,14 +925,29 @@ class DistanceCell(Frame):
             for x in sel_nodes
         ]
 
-    def getDistsWithIds(self, ids):
-        """
-        Get the distances between existing atoms with the given ids.
-        """
-        oids = list(self.gids.difference(ids))
-        dists = [self.getDists(oids, self.loc[x]) for x in ids]
-        return np.concatenate(dists)
-
     @property
     def ratio(self):
+        """
+        The ratio of the existing atoms.
+
+        :return: the ratio of the existing gids with respect to the total atoms.
+        :rtype: str
+        """
         return f'{len(self.gids)} / {self.shape[0]}'
+
+    def pairDists(self, frm=None):
+        """
+        Get the pair distances between existing atoms.
+
+        :param frm: the trajectory frame to set up the distance and get pair
+            distances.
+        :type frm: 'Frame'
+
+        :return: the pair distances
+        :rtype: 'numpy.ndarray'
+        """
+        self.setUp(frm)
+        gids = sorted(self.gids)
+        nbrs = [self.getNeighbors(x) for x in self.xyz[gids, :]]
+        grp2 = [[z for z in y if z < x] for x, y in zip(gids, nbrs)]
+        return super().pairDists(grp1=gids, grp2=grp2)

@@ -690,8 +690,8 @@ class PackedStruct(Struct):
         """
 
         self.dcell = traj.DistanceCell(data=self.getPositions(),
-                                       radii=self.getRadius(),
-                                       excluded=self.getExcluded(),
+                                       gids=set(),
+                                       struct=self,
                                        **kwargs)
 
     def runWithDensity(self, density):

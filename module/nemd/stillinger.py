@@ -10,7 +10,7 @@ class Struct(xtal.Struct):
 
     XYZ = 'XYZ'
     FORCE = 'force'
-    CUSTOM_EXT = f'.{lammpsdata.Base.DUMP}'
+    CUSTOM_EXT = f'.{lammpsdata.Struct.DUMP}'
 
     def __init__(self, *args, tasks=None, **kwargs):
         super().__init__(*args, **kwargs)

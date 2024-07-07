@@ -285,9 +285,14 @@ class RDF(Base):
         hist_range = [res / 2, res * bins + res / 2]
         rdf, num = np.zeros((bins)), len(self.gids)
         tenth, threshold, = len(frms) / 10., 0
+        dcell = traj.DistanceCell(gids=self.gids,
+                                  cut=dcut,
+                                  res=dres,
+                                  struct=self.df_reader)
         for idx, frm in enumerate(frms, start=1):
             self.log_debug(f"Analyzing frame {idx} for RDF..")
-            dists = frm.pairDists(ids=self.gids, cut=dcut, res=dres)
+            dists = dcell.pairDists(frm) if dcut else frm.pairDists(
+                grp1=self.gids)
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
@@ -394,11 +399,7 @@ class Clash(Base):
         """
         Set the time vs clash number.
         """
-        radii = self.df_reader.getRadius()
-        excluded = self.df_reader.getExcluded()
-        dcell = traj.DistanceCell(gids=self.gids,
-                                  radii=radii,
-                                  excluded=excluded)
+        dcell = traj.DistanceCell(gids=self.gids, struct=self.df_reader)
         data = []
         for frm in self.frms:
             dcell.setUp(frm)

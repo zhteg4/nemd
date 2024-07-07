@@ -289,7 +289,6 @@ class Mol(structure.Mol):
         self.box = None
         self.cru_mol = None
         self.smiles = None
-        self.buffer = lammpsdata.Base.BUFFER
         if delay:
             return
         self.build()
