@@ -332,11 +332,11 @@ class GrownConf(PackedConf):
         """
 
         idists = self.mol.struct.init_tf.pairDists()
-        dists = self.mol.struct.dcell.getDistsWithIds(
-            self.id_map[self.init_aids])
+        nbrs = self.id_map[self.init_aids]
+        min_dist = self.mol.struct.dcell.pairDists(nbrs=nbrs).min()
         log_debug(f"Relocate the initiator of {self.gid} conformer "
                   f"(initiator: {idists.min():.2f}-{idists.max():.2f}; "
-                  f"close contact: {dists.min():.2f}) ")
+                  f"close contact: {min_dist:.2f}) ")
         log_debug(f'{self.mol.struct.dcell.ratio} atoms placed.')
 
 
@@ -792,13 +792,6 @@ class GrownStruct(PackedStruct):
     def finalize(self):
         super().finalize()
         self.fragmentize()
-
-    def setDcell(self):
-        # memory saving flaot16 to regular float32
-        # Using [0][1][2] as the cell, atoms in [0] and [2], are at least
-        # Separated by 1 max_clash_dist, meaning no clashes.
-        cut = float(self.radii.max())
-        super().setDcell(cut=cut)
 
     def setUpDcell(self):
         """

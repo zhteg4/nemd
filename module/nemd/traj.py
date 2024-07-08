@@ -340,15 +340,6 @@ class Frame(pd.DataFrame):
         dists -= np.round(np.divide(dists, span)) * span
         return [np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) for x in dists]
 
-    def getDistsWithIds(self, ids):
-        """
-        Get the distances between existing atoms with the given ids.
-        """
-
-        oids = list(self.gids.difference(ids))
-        dists = [self.getDists(oids, self.loc[x]) for x in ids]
-        return np.concatenate(dists)
-
     def pairDists(self, grp1=None, grp2=None):
         """
         Get the distance between atom pair.
@@ -356,9 +347,6 @@ class Frame(pd.DataFrame):
         :param grp1 list: list of gids as the atom selection
         :param grp2 list of list: each sublist contains atom ids to compute
             distances with one atom in grp1.
-
-        NOTE: sel.values is used instead of iterrows due to performace
-        https://stackoverflow.com/questions/24870953/does-pandas-iterrows-have-performance-issues
         """
         grp1 = self.index if grp1 is None else sorted(grp1)
         grp2 = (grp1[:i] for i in range(len(grp1))) if grp2 is None else grp2
@@ -469,8 +457,7 @@ class DistanceCell(Frame):
     checking.
     """
 
-    AUTO = 'auto'
-    ALL = 'all'
+    GRID_MAX = 20
     INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
                      (0, 0, -1)]
     # https://pandas.pydata.org/docs/development/extending.html
@@ -481,19 +468,17 @@ class DistanceCell(Frame):
     ]
     _internal_names_set = set(_internal_names)
 
-    def __init__(self, data=None, gids=ALL, cut=6., res=AUTO, struct=None):
+    def __init__(self, data=None, gids=None, cut=None, struct=None):
         """
         :param data 'Frame': trajectory frame
         :param gids list: global atom ids to analyze
         :param cut float: the cutoff distance to search neighbors
-        :param res float: the res of the grid step
         :param struct 'Struct' or 'DataFileReader': radii and excluded pairs
             are set from this object.
         """
         super().__init__(data=data)
         self.cut = cut
         self.gids = gids
-        self.res = res
         self.struct = struct
         self.radii = None
         self.neigh_ids = None
@@ -504,46 +489,9 @@ class DistanceCell(Frame):
         self.indexes = None
         self.indexes_numba = None
         self.grids = None
-        self.excluded = collections.defaultdict(set)
-        if self.gids == self.ALL:
+        self.excluded = None
+        if self.gids is None:
             self.gids = set(range(1, self.shape[0] + 1))
-        self.setRadius()
-        self.setExcluded()
-
-    def setRadius(self):
-        """
-        Set the vdw radius.
-        """
-        if self.struct:
-            atoms = self.struct.atoms
-            pair_coeffs = self.struct.pair_coeffs
-        else:
-            atoms = lammpsdata.Atom(self.shape[0])
-            pair_coeffs = lammpsdata.PairCoeff(self.shape[0])
-            pair_coeffs.dist = lammpsdata.Radius.MIN_DIST
-        self.radii = lammpsdata.Radius(pair_coeffs.dist, atoms.type_id)
-
-    def setExcluded(self, include14=True):
-        """
-        Set the pair exclusion during clash check. Bonded atoms and atoms in
-        angles are in the exclusion. The dihedral angles are in the exclusion
-        if include14=True.
-
-        :param include14 bool: If True, 1-4 interaction in a dihedral angle count
-            as exclusion.
-        """
-        if self.struct is None:
-            return
-        pairs = set(self.struct.bonds.getPairs())
-        pairs = pairs.union(self.struct.angles.getPairs())
-        pairs = pairs.union(self.struct.impropers.getPairs())
-        if include14:
-            pairs = pairs.union(self.struct.dihedrals.getPairs())
-
-        for id1, id2 in pairs:
-            self.excluded[id1].add(id2)
-            self.excluded[id2].add(id1)
-        return self.excluded
 
     @dispatch(types.NoneType)
     def setUp(self, obj):
@@ -563,21 +511,75 @@ class DistanceCell(Frame):
 
     @dispatch()
     def setUp(self):
+        self.setRadius()
+        self.setCut()
+        self.setExcluded()
         self.setGrids()
         self.setNeighborIds()
         self.setNeighborMap()
         self.setAtomCell()
         self.saveState()
 
-    def setGrids(self):
+    def setRadius(self):
+        """
+        Set the vdw radius and cut off.
+        """
+        if self.radii is not None:
+            return
+
+        if self.struct:
+            atoms = self.struct.atoms
+            pair_coeffs = self.struct.pair_coeffs
+            self.radii = lammpsdata.Radius(pair_coeffs.dist, atoms.type_id)
+            return
+
+        atoms = lammpsdata.Atom(self.shape[0])
+        pair_coeffs = lammpsdata.PairCoeff(self.shape[0])
+        pair_coeffs.dist = lammpsdata.Radius.MIN_DIST
+        self.radii = lammpsdata.Radius(pair_coeffs.dist, atoms.type_id)
+
+    def setCut(self):
+        """
+        Set the cut-off distance.
+        """
+        if self.cut is not None:
+            return
+        self.cut = self.radii.max()
+
+    def setExcluded(self, include14=True):
+        """
+        Set the pair exclusion during clash check. Bonded atoms and atoms in
+        angles are in the exclusion. The dihedral angles are in the exclusion
+        if include14=True.
+
+        :param include14 bool: If True, 1-4 interaction in a dihedral angle count
+            as exclusion.
+        """
+        if self.excluded is not None or self.struct is None:
+            return
+
+        pairs = set(self.struct.bonds.getPairs())
+        pairs = pairs.union(self.struct.angles.getPairs())
+        pairs = pairs.union(self.struct.impropers.getPairs())
+        if include14:
+            pairs = pairs.union(self.struct.dihedrals.getPairs())
+
+        self.excluded = collections.defaultdict(set)
+        for id1, id2 in pairs:
+            self.excluded[id1].add(id2)
+            self.excluded[id2].add(id1)
+        return self.excluded
+
+    def setGrids(self, max_num=GRID_MAX):
         """
         Set grids and indexes.
 
+        :param max_num int: maximum number of cells in each dimension.
         Indexes: the number of cells in three dimensions
         Grids: the length of the cell in each dimension
         """
-        res = self.cut if self.res == self.AUTO else self.res
-        self.indexes = [math.ceil(x / res) for x in self.box.span]
+        self.indexes = [math.ceil(x / self.cut) for x in self.box.span]
+        self.indexes = [min(x, max_num) for x in self.indexes]
         self.indexes_numba = numba.int32(self.indexes)
         self.grids = np.array(
             [x / i for x, i in zip(self.box.span, self.indexes)])
@@ -935,7 +937,7 @@ class DistanceCell(Frame):
         """
         return f'{len(self.gids)} / {self.shape[0]}'
 
-    def pairDists(self, frm=None):
+    def pairDists(self, frm=None, gids=None, nbrs=None):
         """
         Get the pair distances between existing atoms.
 
@@ -943,11 +945,20 @@ class DistanceCell(Frame):
             distances.
         :type frm: 'Frame'
 
+        :param gids: the center atom global atom ids.
+        :type gids: list
+
+        :param nbrs: the neighbor global atom ids.
+        :type nbrs: list
+
         :return: the pair distances
         :rtype: 'numpy.ndarray'
         """
         self.setUp(frm)
-        gids = sorted(self.gids)
-        nbrs = [self.getNeighbors(x) for x in self.xyz[gids, :]]
-        grp2 = [[z for z in y if z < x] for x, y in zip(gids, nbrs)]
-        return super().pairDists(grp1=gids, grp2=grp2)
+        grp1 = sorted(self.gids) if gids is None else sorted(gids)
+        if nbrs is None:
+            nbrs = [self.getNeighbors(x) for x in self.xyz[grp1, :]]
+        else:
+            nbrs = [nbrs for _ in range(len(grp1))]
+        grp2 = [[z for z in y if z < x] for x, y in zip(grp1, nbrs)]
+        return super().pairDists(grp1=grp1, grp2=grp2)

@@ -254,7 +254,7 @@ class RDF(Base):
     ILABEL = f'r ({symbols.ANGSTROM})'
     DEFAULT_CUT = lammpsin.In.DEFAULT_CUT
 
-    def setData(self, res=0.02, dcut=None, dres=None):
+    def setData(self, res=0.02, dcut=None):
         """
         Set the radial distribution function.
 
@@ -262,37 +262,31 @@ class RDF(Base):
         :param dcut float: the cutoff distance to look for neighbors. If None,
             all the neighbors are counted when the cell is not significantly
              larger than the LJ cutoff.
-        :param dres float: the distance cell resolution
         """
         frms = self.frms[self.sidx:]
-        span = np.array([[x for x in x.box.span] for x in frms])
-        vol = np.prod(span, axis=1)
+        span = pd.concat([x.box.span for x in frms], axis=1)
+        vol = span.prod()
         self.log(f'The volume fluctuates: [{vol.min():.2f} {vol.max():.2f}] '
                  f'{symbols.ANGSTROM}^3')
+
+        mdist, dcell = span.min().min() * 0.5, None
         # The auto resolution based on cut grabs left, middle, and right boxes
-        if dcut is None and span.min() > self.DEFAULT_CUT * 5:
+        if dcut is None and mdist > self.DEFAULT_CUT * 2.5:
             # Cell is significant larger than LJ cut off, and thus use LJ cut
-            dcut = self.DEFAULT_CUT
-        if dcut:
-            dres = dcut / 2
-            # Grid the space up to 8000 boxes
-            dres = span.min() / min([math.floor(span.min() / dres), 20])
-            self.log(
-                f"Only neighbors within {dcut} are accurate. (res={dres:.2f})")
-        mdist = max(dcut, dres) if dcut else span.min() * 0.5
+            dcell = traj.DistanceCell(gids=self.gids, cut=self.DEFAULT_CUT)
+            self.log(f"Only neighbors within {dcut} are accurate.")
+            mini_res = span.min().min() / traj.DistanceCell.GRID_MAX
+            mdist = max(self.DEFAULT_CUT, mini_res)
+
         res = min(res, mdist / 100)
         bins = round(mdist / res)
         hist_range = [res / 2, res * bins + res / 2]
         rdf, num = np.zeros((bins)), len(self.gids)
         tenth, threshold, = len(frms) / 10., 0
-        dcell = traj.DistanceCell(gids=self.gids,
-                                  cut=dcut,
-                                  res=dres,
-                                  struct=self.df_reader)
         for idx, frm in enumerate(frms, start=1):
             self.log_debug(f"Analyzing frame {idx} for RDF..")
-            dists = dcell.pairDists(frm) if dcut else frm.pairDists(
-                grp1=self.gids)
+            dists = frm.pairDists(
+                grp1=self.gids) if dcell is None else dcell.pairDists(frm)
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
