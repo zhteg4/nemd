@@ -285,8 +285,11 @@ class RDF(Base):
         tenth, threshold, = len(frms) / 10., 0
         for idx, frm in enumerate(frms, start=1):
             self.log_debug(f"Analyzing frame {idx} for RDF..")
-            dists = frm.pairDists(
-                grp1=self.gids) if dcell is None else dcell.pairDists(frm)
+            if dcell is None:
+                dists = frm.pairDists(grp1=self.gids)
+            else:
+                dcell.setup(frm)
+                dists = dcell.pairDists()
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
@@ -396,7 +399,7 @@ class Clash(Base):
         dcell = traj.DistanceCell(gids=self.gids, struct=self.df_reader)
         data = []
         for frm in self.frms:
-            dcell.setUp(frm)
+            dcell.setup(frm)
             data.append(len([x for x in dcell.getClashes()]))
         self.data = pd.DataFrame(data={self.LABEL: data}, index=self.time)
         self.data.index.name = f"{self.ILABEL} ({self.sidx})"

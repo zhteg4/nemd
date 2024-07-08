@@ -728,7 +728,7 @@ class PackedStruct(Struct):
         log_debug(f'Cubic box of size {edge:.2f} angstrom is created.')
 
     def setUpDcell(self):
-        self.dcell.setUp(self.box)
+        self.dcell.setup(self.box)
 
     def setConformers(self, max_trial=MAX_TRIAL_PER_DENSITY):
         """

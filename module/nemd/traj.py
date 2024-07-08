@@ -17,12 +17,12 @@ import random
 import base64
 import warnings
 import itertools
+import functools
 import subprocess
 import collections
 import numpy as np
 import pandas as pd
 import networkx as nx
-from multipledispatch import dispatch
 from contextlib import contextmanager
 
 from nemd import symbols
@@ -462,9 +462,10 @@ class DistanceCell(Frame):
                      (0, 0, -1)]
     # https://pandas.pydata.org/docs/development/extending.html
     _internal_names = Frame._internal_names + [
-        'cut', 'res', 'neigh_ids', 'atom_cell', 'graph', 'vals', 'cell_vals',
-        'span', 'grids', 'indexes', 'indexes_numba', 'neigh_map', 'gindexes',
-        'ggrids', 'orig_graph', 'grids', 'radii', 'excluded', 'gids'
+        'cut', 'neigh_ids', 'atom_cell', 'graph', 'orig_values',
+        'orig_atom_cell', 'span', 'grids', 'indexes', 'indexes_numba',
+        'neigh_map', 'gindexes', 'ggrids', 'orig_graph', 'grids', 'radii',
+        'excluded', 'gids', 'orig_gids'
     ]
     _internal_names_set = set(_internal_names)
 
@@ -492,25 +493,13 @@ class DistanceCell(Frame):
         self.excluded = None
         if self.gids is None:
             self.gids = set(range(1, self.shape[0] + 1))
+        self.orig_gids = self.gids.copy()
+        self.orig_values = self.values.copy()
 
-    @dispatch(types.NoneType)
-    def setUp(self, obj):
-        return
-
-    @dispatch(Frame)
-    def setUp(self, frm):
-        self[self.XYZU] = frm
-        self.xyz = XYZ(self)
-        self.step = frm.step
-        self.setUp(frm.box)
-
-    @dispatch(lammpsdata.Box)
-    def setUp(self, box):
-        self.box = box
-        self.setUp()
-
-    @dispatch()
     def setUp(self):
+        """
+        Set up the distance cell.
+        """
         self.setRadius()
         self.setCut()
         self.setExcluded()
@@ -518,11 +507,42 @@ class DistanceCell(Frame):
         self.setNeighborIds()
         self.setNeighborMap()
         self.setAtomCell()
-        self.saveState()
+
+    @functools.singledispatchmethod
+    def setup(self, arg):
+        """
+        Set up the distance cell with additional arguments.
+        """
+        raise NotImplementedError("Cannot set up the distance cell.")
+
+    @setup.register
+    def _(self, arg: Frame):
+        """
+        Set up the distance cell from input trajectory frame.
+
+        :param arg: the input trajectory frame.
+        :type arg: `Frame`
+        """
+        self[self.XYZU] = arg
+        self.orig_values = self.values.copy()
+        self.xyz = XYZ(self)
+        self.step = arg.step
+        self.setup(arg.box)
+
+    @setup.register
+    def _(self, arg: lammpsdata.Box):
+        """
+        Set up the distance cell from input periodic boundary conditions.
+
+        :param arg: the input box.
+        :type arg: `Box`
+        """
+        self.box = arg
+        self.setUp()
 
     def setRadius(self):
         """
-        Set the vdw radius and cut off.
+        Set the vdw radius.
         """
         if self.radii is not None:
             return
@@ -655,17 +675,7 @@ class DistanceCell(Frame):
         atom_ids = numba.int32(self.index)
         self.atom_cell = self.setAtomCellNumba(atom_ids, self.values,
                                                self.grids, self.indexes_numba)
-
-    def saveState(self):
-        self.vals = self.values.copy()
-        self.cell_vals = self.atom_cell.copy()
-
-    def reset(self):
-        self.gids.clear()
-        self.iloc[:] = self.vals.copy()
-        self.atom_cell[:] = self.cell_vals.copy()
-        if self.graph is not None:
-            self.graph = self.orig_graph.copy()
+        self.orig_atom_cell = self.atom_cell.copy()
 
     @staticmethod
     @numbautils.jit
@@ -690,25 +700,27 @@ class DistanceCell(Frame):
             atom_cell[cid[0], cid[1], cid[2]][aid] = True
         return atom_cell
 
-    def add(self, gids):
-        self.atomCellUpdate(gids)
-        self.addGids(gids)
-
-    def addGids(self, gids):
+    def reset(self):
         """
-        Add one global id to the existing global ids.
+        Reset the distance cell.
+        """
+        self.gids = self.orig_gids.copy()
+        self.iloc[:] = self.orig_values.copy()
+        self.atom_cell[:] = self.orig_atom_cell.copy()
+        if self.graph is not None:
+            self.graph = self.orig_graph.copy()
+
+    def add(self, gids):
+        """
+        Add gids to atom cell and existing gids.
+
+        :param gids: the global atom ids to be added.
+        :type gids: list
         """
         self.gids.update(gids)
-
-    def atomCellUpdate(self, gids):
-        """
-        Add atoms cell to the atom cell.
-
-        :param gids list: global atom ids to be added to the atom cell
-        """
         ids = (self.xyz[gids, :] / self.grids).round().astype(int)
-        for id, (ix, iy, iz) in zip(gids, ids % self.indexes):
-            self.atom_cell[ix, iy, iz][id] = True
+        for idx, (ix, iy, iz) in zip(gids, ids % self.indexes):
+            self.atom_cell[ix, iy, iz][idx] = True
 
     def remove(self, gids):
         """
@@ -717,18 +729,10 @@ class DistanceCell(Frame):
         :param gids: the global atom ids to be removed.
         :type gids: list
         """
-        self.atomCellRemove(gids)
-        self.removeGids(gids)
-
-    def atomCellRemove(self, gids):
-        """
-        Remove atoms cell to the atom cell.
-
-        :param gids list: global atom ids to be removed from the atom cell
-        """
+        self.gids = self.gids.difference(gids)
         ids = (self.xyz[gids, :] / self.grids).round().astype(int)
-        for id, (ix, iy, iz) in zip(gids, ids % self.indexes):
-            self.atom_cell[ix, iy, iz][id] = False
+        for idx, (ix, iy, iz) in zip(gids, ids % self.indexes):
+            self.atom_cell[ix, iy, iz][idx] = False
 
     def getNeighbors(self, xyz):
         """
@@ -847,12 +851,6 @@ class DistanceCell(Frame):
         return [(name, x, y, z)
                 for x, y, z in zip(neighbors, dists, thresholds) if y < z]
 
-    def removeGids(self, gids):
-        """
-        Remove one global id from the existing global ids.
-        """
-        self.gids = self.gids.difference(gids)
-
     def setGraph(self, mol_num, min_num=1000):
         """
         Set graph using grid intersection as nodes and connect neighbor nodes.
@@ -937,24 +935,18 @@ class DistanceCell(Frame):
         """
         return f'{len(self.gids)} / {self.shape[0]}'
 
-    def pairDists(self, frm=None, gids=None, nbrs=None):
+    def pairDists(self, gids=None, nbrs=None):
         """
         Get the pair distances between existing atoms.
 
-        :param frm: the trajectory frame to set up the distance and get pair
-            distances.
-        :type frm: 'Frame'
-
         :param gids: the center atom global atom ids.
         :type gids: list
-
         :param nbrs: the neighbor global atom ids.
         :type nbrs: list
 
         :return: the pair distances
         :rtype: 'numpy.ndarray'
         """
-        self.setUp(frm)
         grp1 = sorted(self.gids) if gids is None else sorted(gids)
         if nbrs is None:
             nbrs = [self.getNeighbors(x) for x in self.xyz[grp1, :]]
