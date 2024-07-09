@@ -774,16 +774,18 @@ class DistanceCell(Frame):
     def hasClashes(self, gids=None):
         if gids is None:
             gids = self.gids
-        try:
-            next(self.getClashes(gids=gids))
-        except StopIteration:
-            return False
-        return True
-
-    def getClashes(self, gids=None):
         if gids is None:
             gids = self.gids
-        return (y for i in gids for y in self.getRowClashes(i))
+        dists, thresholds = [], []
+        for gid in gids:
+            neighbors, threshold = self.getRowClashes(gid)
+            dists.append(self.xyz[neighbors, :] - self.xyz[gid, :])
+            thresholds.append(threshold)
+        thresholds = np.concatenate(thresholds)
+        if len(thresholds) == 0:
+            return []
+        dists = np.array(self.remainderIEEE(np.concatenate(dists), self.box.span.values))
+        return dists[(dists < thresholds).nonzero()].tolist()
 
     def getRowClashes(self, gid):
         """
@@ -792,7 +794,7 @@ class DistanceCell(Frame):
         :param gid int: the global atom id
         :return list of tuple: clashed atom ids, distance, and threshold
         """
-        xyz = self.xyz[gid, :]
+        xyz = self.getXyx(gid)
         neighbors = self.getNeighbors(xyz)
         # For small box, the same neighbor across PBCs appears multiple times
         neighbors = set(neighbors)
@@ -806,12 +808,16 @@ class DistanceCell(Frame):
         if self.excluded is not None:
             neighbors = neighbors.difference(self.excluded[gid])
         if not neighbors:
-            return []
+            return [], []
         neighbors = list(neighbors)
-        dists = self.getDists(neighbors, xyz).round(4)
         thresholds = self.radii[gid, neighbors]
-        return [(gid, x, y, z) for x, y, z in zip(neighbors, dists, thresholds)
-                if y < z]
+        return neighbors, thresholds
+        # dists = self.getDists(neighbors, xyz).round(4)
+        # return [(gid, x, y, z) for x, y, z in zip(neighbors, dists, thresholds)
+        #         if y < z]
+
+    def getXyx(self, gid):
+        return self.xyz[gid, :]
 
     def setGraph(self, mol_num):
         """
@@ -884,6 +890,7 @@ class DistanceCell(Frame):
         if infinite:
             # The void tunnels the PBC and thus points are uniformly distributed
             yield self.ggrids * (np.random.normal(0, 0.5, void.shape) + void)
+            return
         # The void is surrounded by atoms and thus the center is biased
         imap = np.zeros(void_max + 1, dtype=bool)
         imap[tuple(np.transpose(void))] = True

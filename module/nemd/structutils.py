@@ -260,7 +260,6 @@ class GrownConf(PackedConf):
             reached.
         """
         frag = self.frags.pop(0)
-
         if not frag.dihe:
             # ifrag without dihe means rigid body
             return
