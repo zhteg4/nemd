@@ -13,7 +13,6 @@ import math
 import gzip
 import numba
 import types
-import random
 import base64
 import warnings
 import itertools
@@ -757,9 +756,9 @@ class DistanceCell(Frame):
         """
         # The cell id for xyz
         int32 = numba.int32 if nopython else np.int32
-        id = np.round(xyz / grids).astype(int32) % indexes
+        idx = np.round(xyz / grids).astype(int32) % indexes
         # Unique neighbor cell ids
-        ids = neigh_map[id[0], id[1], id[2], :]
+        ids = neigh_map[idx[0], idx[1], idx[2], :]
         mx = [np.max(ids[:, i]) + 1 for i in range(3)]
         boolean = numba.boolean if nopython else np.bool_
         uids = np.zeros((mx[0], mx[1], mx[2]), dtype=boolean)
@@ -790,7 +789,7 @@ class DistanceCell(Frame):
         """
         Get the clashes between xyz and atoms in the frame.
 
-        :param name int: the global atom id
+        :param gid int: the global atom id
         :return list of tuple: clashed atom ids, distance, and threshold
         """
         xyz = self.xyz[gid, :]

@@ -924,6 +924,7 @@ class Fragment:
         """
         self.val, self.fval = None, True
         self.vals = list(np.linspace(0, 360, 36, endpoint=False))
+        np.random.shuffle(self.vals)
 
     def reset(self):
         """
@@ -1051,8 +1052,7 @@ class Fragment:
         :param val float: the dihedral angle value to be set.
         """
         if val is None:
-            val = np.random.choice(self.vals)
-            self.vals.remove(val)
+            val = self.vals.pop()
             self.fval = False
         self.val = val
         self.conf.setDihedralDeg(self.dihe, self.val)

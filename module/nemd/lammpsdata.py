@@ -159,6 +159,9 @@ class Box(Block):
     def span(self):
         """
         Set and cache the span of the box.
+
+        :return: the span of the box.
+        :rtype: 'pandas.core.series.Series'
         """
         try:
             return self[self.SPAN]
