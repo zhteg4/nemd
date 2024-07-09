@@ -830,12 +830,10 @@ class DistanceCell(Frame):
     def setGraph(self, mol_num):
         """
         Set graph using grid intersection as nodes and connect neighbor nodes.
-
-        :param mol_num int: molecule number.
         """
         self.graph = nx.Graph()
-        # getVoids() doesn't generate enough voids with scaling down the grid
-        mgrid = self.box.span.min().min() / math.ceil(pow(mol_num, 1/3))
+        grid_num = math.ceil(pow(mol_num, 1 / 3)) + 1
+        mgrid = self.box.span.min().min() / grid_num
         self.gindexes = (self.box.span.values / mgrid).round().astype(int)
         self.ggrids = self.box.span.values / self.gindexes
         indexes = [range(x) for x in self.gindexes]
@@ -852,12 +850,12 @@ class DistanceCell(Frame):
     @classmethod
     @functools.cache
     def getNbrIncr(cls, nth=1):
-        first = math.ceil(nth/3)
-        second = math.ceil((nth-first)/2)
-        third = nth-first-second
+        first = math.ceil(nth / 3)
+        second = math.ceil((nth - first) / 2)
+        third = nth - first - second
         row = np.array([first, second, third])
         data = []
-        for signs in itertools.product([-1, 1], [-1, 1],  [-1, 1]):
+        for signs in itertools.product([-1, 1], [-1, 1], [-1, 1]):
             rows = signs * np.array([x for x in itertools.permutations(row)])
             data.append(np.unique(rows, axis=0))
         return np.unique(np.concatenate(data), axis=0)
@@ -878,33 +876,39 @@ class DistanceCell(Frame):
         nodes = [tuple(x) for x in nodes.astype(int)]
         self.graph.remove_nodes_from(nodes)
 
-    def getVoids(self, num=100):
+    def getVoids(self):
         """
         Get the points from the voids.
 
-        :param num int: number of voids returned
-        :return list: list of points whether the void centers are
+        :return `numpy.ndarray`: each value is one random point from the voids.
+        """
+        return (y for x in self.getVoid() for y in x)
+
+    def getVoid(self):
+        """
+        Get the points from the largest void.
+
+        :return `numpy.ndarray`: each row is one random point from the void.
         """
         largest_component = max(nx.connected_components(self.graph), key=len)
         void = np.array(list(largest_component))
-        center = void.mean(axis=0).astype(int)
-        max_nth = np.abs(void - center).max(axis=0).sum()
         void_max = void.max(axis=0)
+        void_span = void_max - void.min(axis=0)
+        infinite = (void_span + 1 == self.gindexes).any()
+        if infinite:
+            # The void tunnels the PBC and thus points are uniformly distributed
+            yield self.ggrids * (np.random.normal(0, 0.5, void.shape) + void)
+        # The void is surrounded by atoms and thus the center is biased
         imap = np.zeros(void_max + 1, dtype=bool)
         imap[tuple(np.transpose(void))] = True
-        nodes = []
+        center = void.mean(axis=0).astype(int)
+        max_nth = np.abs(void - center).max(axis=0).sum()
         for nth in range(max_nth):
             nbrs = center + self.getNbrIncr(nth=nth)
             nbrs = nbrs[(nbrs <= void_max).all(axis=1).nonzero()]
             nbrs = nbrs[imap[tuple(np.transpose(nbrs))].nonzero()]
             np.random.shuffle(nbrs)
-            nodes.append(nbrs)
-            if len(nodes) > num:
-                break
-        nodes = np.concatenate(nodes)
-        delta = np.random.normal(0, 0.5, nodes.shape)
-        nodes = delta + nodes
-        return (self.ggrids * nodes).tolist()
+            yield self.ggrids * (np.random.normal(0, 0.5, nbrs.shape) + nbrs)
 
     @property
     def ratio(self):
