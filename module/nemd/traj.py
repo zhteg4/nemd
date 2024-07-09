@@ -458,8 +458,6 @@ class DistanceCell(Frame):
     """
 
     GRID_MAX = 20
-    INIT_NBR_INCR = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (-1, 0, 0), (0, -1, 0),
-                     (0, 0, -1)]
     # https://pandas.pydata.org/docs/development/extending.html
     _internal_names = Frame._internal_names + [
         'cut', 'neigh_ids', 'atom_cell', 'graph', 'orig_values',
@@ -670,6 +668,7 @@ class DistanceCell(Frame):
                                       dtype=bool)
             for row in ids.loc[list(self.gids)].itertuples():
                 self.atom_cell[row.xu, row.yu, row.zu][row.Index] = True
+            self.orig_atom_cell = self.atom_cell.copy()
             return
 
         atom_ids = numba.int32(self.index)
@@ -795,86 +794,73 @@ class DistanceCell(Frame):
     def getClashes(self, gids=None):
         if gids is None:
             gids = self.gids
-        clashes = [self.getRowClashes(x, name=i) for i, x in self.ivals(gids)]
+        clashes = [self.getRowClashes(x, i) for i, x in self.ivals(gids)]
         return itertools.chain.from_iterable(clashes)
 
-    def getRowClashes(self,
-                      row,
-                      name=None,
-                      included=None,
-                      excluded=None,
-                      radii=None,
-                      distance_only=True):
+    def getRowClashes(self, xyz, gid, distance_only=True):
         """
         Get the clashes between xyz and atoms in the frame.
 
-        :param row (3,) 'pandas.core.series.Series' or (3,) 'numpy.ndarray':
-            xyz coordinates. Name is the atom id if Series provided.
-        :param name str: the atom id and row is expected to be a 'numpy.ndarray'
-        :param included list of int: the atom ids included for the clash check
-        :param excluded list of int: the atom ids excluded for the clash check
-        :param radii oplsua.Radius: the values are the radii smaller than which
-            are clashes
+        :param xyz 'numpy.ndarray': xyz coordinates.
+        :param name int: the global atom id
         :param distance_only bool: return clashed distance only if True
         :return list of tuple: clashed atom ids, distance, and threshold
         """
-        if included is None:
-            included = self.gids
-        if excluded is None:
-            excluded = self.excluded
-        if radii is None:
-            radii = self.radii
-        xyz = row.values if name is None else row
-        if name is None:
-            name = row.name
         neighbors = self.getNeighbors(xyz)
         # For small box, the same neighbor across PBCs appears multiple times
         neighbors = set(neighbors)
         try:
-            neighbors.remove(name)
+            neighbors.remove(gid)
         except KeyError:
             pass
-        if included is not None:
-            neighbors = neighbors.intersection(included)
-        if excluded is not None:
-            neighbors = neighbors.difference(excluded[name])
+        if self.gids is not None:
+            neighbors = neighbors.intersection(self.gids)
+        if self.excluded is not None:
+            neighbors = neighbors.difference(self.excluded[gid])
         if not neighbors:
             return []
         neighbors = list(neighbors)
         dists = self.getDists(neighbors, xyz).round(4)
-        if radii is None:
-            thresholds = [self.THRESHOLD] * len(neighbors)
-        else:
-            thresholds = radii[name, neighbors]
+        thresholds = self.radii[gid, neighbors]
         if distance_only:
             return dists[dists < thresholds]
-        return [(name, x, y, z)
-                for x, y, z in zip(neighbors, dists, thresholds) if y < z]
+        return [(gid, x, y, z) for x, y, z in zip(neighbors, dists, thresholds)
+                if y < z]
 
-    def setGraph(self, mol_num, min_num=1000):
+    def setGraph(self, mol_num):
         """
         Set graph using grid intersection as nodes and connect neighbor nodes.
 
         :param mol_num int: molecule number.
-        :param min_num int: minimum number of sites.
         """
         self.graph = nx.Graph()
         # getVoids() doesn't generate enough voids with scaling down the grid
-        mgrid = pow(
-            np.prod(self.box.span.values) / max([mol_num, min_num]),
-            1 / 3) * 0.8
+        mgrid = self.box.span.min().min() / math.ceil(pow(mol_num, 1/3))
         self.gindexes = (self.box.span.values / mgrid).round().astype(int)
         self.ggrids = self.box.span.values / self.gindexes
         indexes = [range(x) for x in self.gindexes]
         nodes = list(itertools.product(*indexes))
         self.graph.add_nodes_from(nodes)
         for node in nodes:
-            for ids in self.INIT_NBR_INCR:
+            for ids in self.getNbrIncr():
                 neighbor = tuple([
                     (x + y) % z for x, y, z in zip(node, ids, self.gindexes)
                 ])
                 self.graph.add_edge(neighbor, node)
         self.orig_graph = self.graph.copy()
+
+    @classmethod
+    @functools.cache
+    def getNbrIncr(cls, nth=1):
+        first = math.ceil(nth/3)
+        second = math.ceil((nth-first)/2)
+        third = nth-first-second
+        row = np.array([first, second, third])
+        data = []
+        for signs in itertools.product([-1, 1], [-1, 1],  [-1, 1]):
+            rows = signs * np.array([x for x in itertools.permutations(row)])
+            data.append(np.unique(rows, axis=0))
+        return np.unique(np.concatenate(data), axis=0)
 
     def resetGraph(self):
         """
@@ -886,13 +872,10 @@ class DistanceCell(Frame):
         """
         Remove nodes occupied by existing atoms.
         """
-        xyzs = self.loc[list(self.gids)]
-        nodes = (xyzs / self.ggrids).round().astype(int)
-        nodes = set([tuple(x[1]) for x in nodes.iterrows()])
-        rnodes = []
-        for node in nodes:
-            rnode = tuple([x % y for x, y in zip(node, self.gindexes)])
-            rnodes.append(rnode)
+        if not self.gids:
+            return
+        nodes = (self.xyz[list(self.gids), :] / self.ggrids).round()
+        nodes = [tuple(x) for x in nodes.astype(int)]
         self.graph.remove_nodes_from(nodes)
 
     def getVoids(self, num=100):
@@ -902,28 +885,26 @@ class DistanceCell(Frame):
         :param num int: number of voids returned
         :return list: list of points whether the void centers are
         """
-        mcc = max(nx.connected_components(self.graph), key=len)
-        cut = min(max(self.gindexes) / 3, (len(mcc) * 3 / 4 / np.pi)**(1 / 3))
-        snum = num * 2 if len(mcc) > num * 2 else len(mcc)
-        sampled = [x for x in random.sample(list(mcc), snum)]
-        # yapf: disable
-        largest_cc = {x: len(nx.single_source_shortest_path_length(self.graph, x, cutoff=cut))
-                      for x in sampled}
-        # yapf: enable
-        largest_cc_rv = collections.defaultdict(list)
-        for node, size in largest_cc.items():
-            largest_cc_rv[size].append(node)
-        sizes = sorted(set(largest_cc.values()), reverse=True)
-        sel_nodes, sel_num = [], 0
-        while len(sel_nodes) < num and sizes:
-            size = sizes.pop(0)
-            sub_nodes = largest_cc_rv[size]
-            np.random.shuffle(sub_nodes)
-            sel_nodes += sub_nodes
-        return [
-            self.ggrids * (np.random.normal(-0.5, 0.5, 3) + x)
-            for x in sel_nodes
-        ]
+        largest_component = max(nx.connected_components(self.graph), key=len)
+        void = np.array(list(largest_component))
+        center = void.mean(axis=0).astype(int)
+        max_nth = np.abs(void - center).max(axis=0).sum()
+        void_max = void.max(axis=0)
+        imap = np.zeros(void_max + 1, dtype=bool)
+        imap[tuple(np.transpose(void))] = True
+        nodes = []
+        for nth in range(max_nth):
+            nbrs = center + self.getNbrIncr(nth=nth)
+            nbrs = nbrs[(nbrs <= void_max).all(axis=1).nonzero()]
+            nbrs = nbrs[imap[tuple(np.transpose(nbrs))].nonzero()]
+            np.random.shuffle(nbrs)
+            nodes.append(nbrs)
+            if len(nodes) > num:
+                break
+        nodes = np.concatenate(nodes)
+        delta = np.random.normal(0, 0.5, nodes.shape)
+        nodes = delta + nodes
+        return (self.ggrids * nodes).tolist()
 
     @property
     def ratio(self):

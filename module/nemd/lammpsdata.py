@@ -1082,7 +1082,7 @@ class Struct(structure.Struct, lammpsin.In):
         """
         Whether any atom has charge.
         """
-        return np.isclose(self.atoms.charge, 0, 0.001).any()
+        return not np.isclose(self.atoms.charge, 0, 0.001).any()
 
     def getWarnings(self):
         """
