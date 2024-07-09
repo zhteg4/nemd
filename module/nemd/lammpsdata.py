@@ -103,6 +103,7 @@ class Block(pd.DataFrame):
     def write(self,
               hdl,
               as_block=True,
+              columns=None,
               sep=SPACE,
               header=False,
               float_format='%.4f',
@@ -114,16 +115,20 @@ class Block(pd.DataFrame):
 
         :param hdl `_io.TextIOWrapper` or `_io.StringIO`: write to this handler
         :param as_block `bool`: whether to write the data as a block.
+        :param columns list: the labels of the columns to write out.
         :param sep `str`: the separator to use.
         :param header `bool`: whether to write the column names as the header.
         :param float_format `str`: the format to use for floating point numbers.
         :param mode `str`: the mode to use for writing.
         :param quotechar `str`: the quote character to use.
         """
+        if columns is None:
+            columns = self.COLUMN_LABELS
         if self.empty:
             return
         content = self.NAME + '\n\n' if as_block and self.NAME else ''
-        content += self.to_csv(sep=sep,
+        content += self.to_csv(columns=columns,
+                               sep=sep,
                                header=header,
                                float_format=float_format,
                                mode=mode,
@@ -142,12 +147,24 @@ class Box(Block):
     ORIGIN = [0, 0, 0]
     LIMIT_CMT = '{limit}_cmt'
     LO_LABEL, HI_LABEL = LIMIT_CMT.format(limit=LO), LIMIT_CMT.format(limit=HI)
+    SPAN = 'span'
     COLUMN_LABELS = [LO, HI, LO_LABEL, HI_LABEL]
     LO_CMT = [x + y for x, y in itertools.product(INDEX, [LO])]
     HI_CMT = [x + y for x, y in itertools.product(INDEX, [HI])]
     FLT_RE = "[+-]?[\d\.\d]+"
     LO_HI = [f'{x}{Block.SPACE}{y}' for x, y in zip(LO_CMT, HI_CMT)]
     RE = re.compile(f"^{FLT_RE}\s+{FLT_RE}\s+({'|'.join(LO_HI)}).*$")
+
+    @property
+    def span(self):
+        """
+        Set and cache the span of the box.
+        """
+        try:
+            return self[self.SPAN]
+        except KeyError:
+            self[self.SPAN] = self.hi - self.lo
+            return self[self.SPAN]
 
     @classmethod
     def fromEdges(cls, edges):
@@ -158,15 +175,6 @@ class Box(Block):
         """
         return cls(data={cls.LO: cls.ORIGIN, cls.HI: edges})
 
-    @property
-    def span(self):
-        """
-        The span of the box.
-
-        :param 'pandas.core.series.Series': the span of the box.
-        """
-        return self.hi - self.lo
-
     def write(self, fh, index=False, **kwargs):
         """
         Write the box into the handler.
@@ -176,7 +184,6 @@ class Box(Block):
         self[self.LO_LABEL] = self.LO_CMT
         self[self.HI_LABEL] = self.HI_CMT
         super().write(fh, index=index, **kwargs)
-        self.drop(columns=[self.LO_LABEL, self.HI_LABEL], inplace=True)
 
     def getPoint(self):
         """

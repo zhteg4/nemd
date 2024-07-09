@@ -379,16 +379,6 @@ class Frame(pd.DataFrame):
             delta = (center % self.box.span) - center
             self.xyz[gids, :] += delta
 
-    def ivals(self, gids=None):
-        """
-        Fast access to the row indexes and values of the frame.
-
-        :return iterator of (int, numpy.ndarray): the index and xyz values
-        """
-        if gids is None:
-            return zip(self.index, self.values)
-        return zip(gids, self.xyz[gids, :])
-
     def glue(self, dreader=None):
         """
         Circular mean to compact the molecules. Good for molecules droplets in
@@ -794,24 +784,23 @@ class DistanceCell(Frame):
     def getClashes(self, gids=None):
         if gids is None:
             gids = self.gids
-        clashes = [self.getRowClashes(x, i) for i, x in self.ivals(gids)]
-        return itertools.chain.from_iterable(clashes)
+        return (y for i in gids for y in self.getRowClashes(i))
 
-    def getRowClashes(self, xyz, gid, distance_only=True):
+    def getRowClashes(self, gid):
         """
         Get the clashes between xyz and atoms in the frame.
 
-        :param xyz 'numpy.ndarray': xyz coordinates.
         :param name int: the global atom id
-        :param distance_only bool: return clashed distance only if True
         :return list of tuple: clashed atom ids, distance, and threshold
         """
+        xyz = self.xyz[gid, :]
         neighbors = self.getNeighbors(xyz)
         # For small box, the same neighbor across PBCs appears multiple times
         neighbors = set(neighbors)
         try:
             neighbors.remove(gid)
         except KeyError:
+            # The gid atom have been moved into another atom cell.
             pass
         if self.gids is not None:
             neighbors = neighbors.intersection(self.gids)
@@ -822,8 +811,6 @@ class DistanceCell(Frame):
         neighbors = list(neighbors)
         dists = self.getDists(neighbors, xyz).round(4)
         thresholds = self.radii[gid, neighbors]
-        if distance_only:
-            return dists[dists < thresholds]
         return [(gid, x, y, z) for x, y, z in zip(neighbors, dists, thresholds)
                 if y < z]
 
