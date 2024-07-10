@@ -615,14 +615,23 @@ class DistanceCell(Frame):
         """
         neigh_ids = np.array(list(self.neigh_ids))
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
-            self.neigh_map = np.zeros((*self.indexes, len(self.neigh_ids), 3),
-                                      dtype=int)
+            neigh_map = np.zeros((*self.indexes, len(self.neigh_ids), 3),
+                                 dtype=int)
             indexes = [range(x) for x in self.indexes]
             nodes = list(itertools.product(*indexes))
             for node in nodes:
-                self.neigh_map[node] = (neigh_ids + node) % self.indexes
-            return
-        self.neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
+                neigh_map[node] = (neigh_ids + node) % self.indexes
+
+        else:
+            neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
+
+        cols = list(itertools.product(*[range(x) for x in self.indexes]))
+        unique_maps = [np.unique(neigh_map[tuple(x)], axis=0) for x in cols]
+        num = np.unique([x.shape for x in unique_maps], axis=0).max(axis=0)[0]
+        self.neigh_map = np.zeros((*self.indexes, num, 3), dtype=int)
+        for col, unique_map in zip(cols, unique_maps):
+            start, end = unique_map.shape
+            self.neigh_map[col[0], col[1], col[2], :start, :end] = unique_map
 
     @staticmethod
     @numbautils.jit(parallel=True)
@@ -660,8 +669,8 @@ class DistanceCell(Frame):
             self.orig_atom_cell = self.atom_cell.copy()
             return
 
-        atom_ids = numba.int32(self.index)
-        self.atom_cell = self.setAtomCellNumba(atom_ids, self.values,
+        gids = numba.int32(list(self.gids))
+        self.atom_cell = self.setAtomCellNumba(gids, self.values,
                                                self.grids, self.indexes_numba)
         self.orig_atom_cell = self.atom_cell.copy()
 
@@ -757,17 +766,10 @@ class DistanceCell(Frame):
         # The cell id for xyz
         int32 = numba.int32 if nopython else np.int32
         idx = np.round(xyz / grids).astype(int32) % indexes
-        # Unique neighbor cell ids
         ids = neigh_map[idx[0], idx[1], idx[2], :]
-        mx = [np.max(ids[:, i]) + 1 for i in range(3)]
-        boolean = numba.boolean if nopython else np.bool_
-        uids = np.zeros((mx[0], mx[1], mx[2]), dtype=boolean)
-        for x in ids:
-            uids[x[0], x[1], x[2]] = True
         # The atom ids from all neighbor cells
         neighbors = [
-            j for i, x in np.ndenumerate(uids) if x
-            for j in atom_cell[i[0], i[1], i[2], :].nonzero()[0]
+            y for x in ids for y in atom_cell[x[0], x[1], x[2], :].nonzero()[0]
         ]
         return neighbors
 
@@ -784,8 +786,9 @@ class DistanceCell(Frame):
         thresholds = np.concatenate(thresholds)
         if len(thresholds) == 0:
             return []
-        dists = np.array(self.remainderIEEE(np.concatenate(dists), self.box.span.values))
-        return dists[(dists < thresholds).nonzero()].tolist()
+        dists = np.array(
+            self.remainderIEEE(np.concatenate(dists), self.box.span.values))
+        return dists[(dists < thresholds).nonzero()[0]].tolist()
 
     def getRowClashes(self, gid):
         """
@@ -796,15 +799,8 @@ class DistanceCell(Frame):
         """
         xyz = self.getXyx(gid)
         neighbors = self.getNeighbors(xyz)
-        # For small box, the same neighbor across PBCs appears multiple times
         neighbors = set(neighbors)
-        try:
-            neighbors.remove(gid)
-        except KeyError:
-            # The gid atom have been moved into another atom cell.
-            pass
-        if self.gids is not None:
-            neighbors = neighbors.intersection(self.gids)
+        neighbors = self.gids.intersection(neighbors)
         if self.excluded is not None:
             neighbors = neighbors.difference(self.excluded[gid])
         if not neighbors:
@@ -812,9 +808,6 @@ class DistanceCell(Frame):
         neighbors = list(neighbors)
         thresholds = self.radii[gid, neighbors]
         return neighbors, thresholds
-        # dists = self.getDists(neighbors, xyz).round(4)
-        # return [(gid, x, y, z) for x, y, z in zip(neighbors, dists, thresholds)
-        #         if y < z]
 
     def getXyx(self, gid):
         return self.xyz[gid, :]

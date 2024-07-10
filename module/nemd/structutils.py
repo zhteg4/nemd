@@ -315,7 +315,7 @@ class GrownConf(PackedConf):
         # 2）Find the next fragments who have been placed into the cell.
         nxt_frags = frag.getNxtFrags()
         [x.resetVals() for x in nxt_frags]
-        ratom_aids = [y for x in nxt_frags for y in x.aids]
+        ratom_aids = [y for x in nxt_frags for y in x.aids] + frag.aids
         if not found:
             ratom_aids += frag.conf.init_aids
         self.mol.struct.dcell.remove(self.id_map[ratom_aids])
