@@ -147,7 +147,6 @@ class Box(Block):
     ORIGIN = [0, 0, 0]
     LIMIT_CMT = '{limit}_cmt'
     LO_LABEL, HI_LABEL = LIMIT_CMT.format(limit=LO), LIMIT_CMT.format(limit=HI)
-    SPAN = 'span'
     COLUMN_LABELS = [LO, HI, LO_LABEL, HI_LABEL]
     LO_CMT = [x + y for x, y in itertools.product(INDEX, [LO])]
     HI_CMT = [x + y for x, y in itertools.product(INDEX, [HI])]
@@ -155,19 +154,26 @@ class Box(Block):
     LO_HI = [f'{x}{Block.SPACE}{y}' for x, y in zip(LO_CMT, HI_CMT)]
     RE = re.compile(f"^{FLT_RE}\s+{FLT_RE}\s+({'|'.join(LO_HI)}).*$")
 
+    # https://pandas.pydata.org/docs/development/extending.html
+    _internal_names = pd.DataFrame._internal_names + ['_span']
+    _internal_names_set = set(_internal_names)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._span = None
+
     @property
     def span(self):
         """
         Set and cache the span of the box.
 
         :return: the span of the box.
-        :rtype: 'pandas.core.series.Series'
+        :rtype: 'numpy.ndarray'
         """
-        try:
-            return self[self.SPAN]
-        except KeyError:
-            self[self.SPAN] = self.hi - self.lo
-            return self[self.SPAN]
+        if self._span is not None:
+            return self._span
+        self._span = (self.hi - self.lo).values
+        return self._span
 
     @classmethod
     def fromEdges(cls, edges):

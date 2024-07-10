@@ -264,18 +264,18 @@ class RDF(Base):
              larger than the LJ cutoff.
         """
         frms = self.frms[self.sidx:]
-        span = pd.concat([x.box.span for x in frms], axis=1)
+        span = np.array([x.box.span for x in frms])
         vol = span.prod()
         self.log(f'The volume fluctuates: [{vol.min():.2f} {vol.max():.2f}] '
                  f'{symbols.ANGSTROM}^3')
 
-        mdist, dcell = span.min().min() * 0.5, None
+        mdist, dcell = span.min() * 0.5, None
         # The auto resolution based on cut grabs left, middle, and right boxes
         if dcut is None and mdist > self.DEFAULT_CUT * 2.5:
             # Cell is significant larger than LJ cut off, and thus use LJ cut
             dcell = traj.DistanceCell(gids=self.gids, cut=self.DEFAULT_CUT)
             self.log(f"Only neighbors within {dcut} are accurate.")
-            mini_res = span.min().min() / traj.DistanceCell.GRID_MAX
+            mini_res = span.min() / traj.DistanceCell.GRID_MAX
             mdist = max(self.DEFAULT_CUT, mini_res)
 
         res = min(res, mdist / 100)
@@ -396,11 +396,11 @@ class Clash(Base):
         """
         Set the time vs clash number.
         """
-        dcell = traj.DistanceCell(gids=self.gids, struct=self.df_reader)
+        dcell = traj.DistanceCell(gids=set(self.gids), struct=self.df_reader)
         data = []
         for frm in self.frms:
             dcell.setup(frm)
-            data.append(len([x for x in dcell.getClashes()]))
+            data.append(len(dcell.getClashes()))
         self.data = pd.DataFrame(data={self.LABEL: data}, index=self.time)
         self.data.index.name = f"{self.ILABEL} ({self.sidx})"
 

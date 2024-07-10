@@ -318,11 +318,11 @@ class Frame(pd.DataFrame):
 
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
             for id in range(3):
-                func = lambda x: math.remainder(x, self.box.span.iloc[id])
+                func = lambda x: math.remainder(x, self.box.span[id])
                 dists[:, id] = np.frompyfunc(func, 1, 1)(dists[:, id])
             return np.linalg.norm(dists, axis=1)
 
-        return np.array(self.remainderIEEE(dists, self.box.span.values))
+        return np.array(self.remainderIEEE(dists, self.box.span))
 
     @staticmethod
     @numbautils.jit
@@ -774,43 +774,61 @@ class DistanceCell(Frame):
         return neighbors
 
     def hasClashes(self, gids=None):
-        if gids is None:
-            gids = self.gids
-        if gids is None:
-            gids = self.gids
-        dists, thresholds = [], []
-        for gid in gids:
-            neighbors, threshold = self.getRowClashes(gid)
-            dists.append(self.xyz[neighbors, :] - self.xyz[gid, :])
-            thresholds.append(threshold)
-        thresholds = np.concatenate(thresholds)
-        if len(thresholds) == 0:
-            return []
-        dists = np.array(
-            self.remainderIEEE(np.concatenate(dists), self.box.span.values))
-        return dists[(dists < thresholds).nonzero()[0]].tolist()
+        """
+        Whether the selected atoms have clashes
 
-    def getRowClashes(self, gid):
+        :param gids: global atom ids for atom selection.
+        :type gids: set
+
+        :return: whether the selected atoms have clashes
+        :rtype: bool
+        """
+        if gids is None:
+            gids = self.gids
+        dists = (self.getClash(x) for x in gids)
+        try:
+            return next(itertools.chain.from_iterable(dists))
+        except StopIteration:
+            return False
+
+    def getClashes(self, gids=None):
+        """
+        Get the clashes distances.
+
+        :param gids: global atom ids for atom selection.
+        :type gids: set
+
+        :return: the clash distances
+        :rtype: list of float
+        """
+        if gids is None:
+            gids = self.gids
+        return [y for x in gids for y in self.getClash(x)]
+
+    def getClash(self, gid):
         """
         Get the clashes between xyz and atoms in the frame.
 
         :param gid int: the global atom id
-        :return list of tuple: clashed atom ids, distance, and threshold
+        :return list of float: clash distances between atom pairs
         """
-        xyz = self.getXyx(gid)
+        xyz = self.xyz[gid, :]
         neighbors = self.getNeighbors(xyz)
-        neighbors = set(neighbors)
+        try:
+            neighbors.remove(gid)
+        except ValueError:
+            # Trajectory clash check for all atoms finds itself in the atom cell
+            pass
         neighbors = self.gids.intersection(neighbors)
         if self.excluded is not None:
             neighbors = neighbors.difference(self.excluded[gid])
         if not neighbors:
-            return [], []
+            return []
         neighbors = list(neighbors)
+        delta = self.xyz[neighbors, :] - xyz
+        dists = np.array(self.remainderIEEE(delta, self.box.span))
         thresholds = self.radii[gid, neighbors]
-        return neighbors, thresholds
-
-    def getXyx(self, gid):
-        return self.xyz[gid, :]
+        return dists[np.nonzero(dists < thresholds)]
 
     def setGraph(self, mol_num):
         """
@@ -819,8 +837,8 @@ class DistanceCell(Frame):
         self.graph = nx.Graph()
         grid_num = math.ceil(pow(mol_num, 1 / 3)) + 1
         mgrid = self.box.span.min().min() / grid_num
-        self.gindexes = (self.box.span.values / mgrid).round().astype(int)
-        self.ggrids = self.box.span.values / self.gindexes
+        self.gindexes = (self.box.span / mgrid).round().astype(int)
+        self.ggrids = self.box.span / self.gindexes
         indexes = [range(x) for x in self.gindexes]
         nodes = list(itertools.product(*indexes))
         self.graph.add_nodes_from(nodes)
