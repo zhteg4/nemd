@@ -20,9 +20,9 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         super().__init__(*args, **kwargs)
         self.mol = None
         self.id_map = None
-        self.gid = 1
+        self.gid = 0
 
-    def setUp(self, mol, cid=1, gid=1):
+    def setUp(self, mol, cid=0, gid=0):
         """
         Set up the conformer global id, global atoms ids, and owning molecule.
 
@@ -36,8 +36,8 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
             return
         gids = [x for x in range(gid, gid + self.mol.GetNumAtoms())]
         id_map = {x.GetIdx(): y for x, y in zip(self.mol.GetAtoms(), gids)}
-        max_gid = max(id_map.keys()) + 1
-        self.id_map = np.array([id_map.get(x, -1) for x in range(max_gid)])
+        max_gid = max(id_map.keys())
+        self.id_map = np.array([id_map.get(x, -1) for x in range(max_gid + 1)])
 
     @property
     @functools.cache
@@ -84,6 +84,16 @@ class Conformer(rdkit.Chem.rdchem.Conformer):
         for id in range(xyz.shape[0]):
             self.SetAtomPosition(id, xyz[id, :])
 
+    def getPositions(self):
+        """
+        Get the positions of the conformer.
+
+        :return 'pandas.core.frame.DataFrame': the positions of all conformers.
+        """
+        return pd.DataFrame(self.GetPositions(),
+                            index=self.gids,
+                            columns=symbols.XYZU)
+
 
 class Mol(rdkit.Chem.rdchem.Mol):
     """
@@ -109,7 +119,7 @@ class Mol(rdkit.Chem.rdchem.Mol):
             return
         self.setUp(mol.GetConformers())
 
-    def setUp(self, confs, cid=1, gid=1):
+    def setUp(self, confs, cid=0, gid=0):
         """
         Set up the conformers including global ids and references.
 
@@ -272,8 +282,8 @@ class Struct:
 
         :retrun int, int: the conformer gid, the global atom id.
         """
-        cid = max([x.gid for x in self.conformer] or [0]) + 1
-        gid = max([x.id_map.max() for x in self.conformer] or [0]) + 1
+        cid = max([x.gid for x in self.conformer] or [-1]) + 1
+        gid = max([x.id_map.max() for x in self.conformer] or [-1]) + 1
         return cid, gid
 
     @property
@@ -312,10 +322,8 @@ class Struct:
 
         :return 'pandas.core.frame.DataFrame': the positions of all conformers.
         """
-        return pd.concat([
-            pd.DataFrame(x.GetPositions(), index=x.gids, columns=symbols.XYZU)
-            for x in self.conformer
-        ])
+
+        return pd.concat([x.getPositions() for x in self.conformer])
 
     @property
     def conformer_total(self):

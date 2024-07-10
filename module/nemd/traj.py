@@ -134,9 +134,6 @@ class Frame(pd.DataFrame):
         :param step int: the number of simulation step that this frame is at
         :param dtype str: the data type of the frame
         """
-        if index is None and isinstance(data, np.ndarray):
-            # Numpy array as coordinates without index input
-            index = range(1, data.shape[0] + 1)
         super().__init__(data=data,
                          index=index,
                          columns=columns,
@@ -479,7 +476,7 @@ class DistanceCell(Frame):
         self.grids = None
         self.excluded = None
         if self.gids is None:
-            self.gids = set(range(1, self.shape[0] + 1))
+            self.gids = set(range(self.shape[0]))
         self.orig_gids = self.gids.copy()
         self.orig_values = self.values.copy()
 
@@ -670,8 +667,8 @@ class DistanceCell(Frame):
             return
 
         gids = numba.int32(list(self.gids))
-        self.atom_cell = self.setAtomCellNumba(gids, self.values,
-                                               self.grids, self.indexes_numba)
+        self.atom_cell = self.setAtomCellNumba(gids, self.values, self.grids,
+                                               self.indexes_numba)
         self.orig_atom_cell = self.atom_cell.copy()
 
     @staticmethod

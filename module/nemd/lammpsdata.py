@@ -30,6 +30,8 @@ class Block(pd.DataFrame):
 
     NAME = 'Block'
     COLUMN_LABELS = ['column_labels']
+    ID_COLS = []
+    TYPE_COL = []
     POUND = symbols.POUND
     SPACE = symbols.SPACE
     SPACE_PATTERN = symbols.SPACE_PATTERN
@@ -127,6 +129,9 @@ class Block(pd.DataFrame):
         if self.empty:
             return
         content = self.NAME + '\n\n' if as_block and self.NAME else ''
+        self.index += 1
+        self[self.TYPE_COL] += 1
+        self[self.ID_COLS] += 1
         content += self.to_csv(columns=columns,
                                sep=sep,
                                header=header,
@@ -134,6 +139,9 @@ class Block(pd.DataFrame):
                                mode=mode,
                                quotechar=quotechar,
                                **kwargs)
+        self.index -= 1
+        self[self.TYPE_COL] -= 1
+        self[self.ID_COLS] -= 1
         if as_block:
             content += '\n'
         hdl.write(content)
@@ -213,18 +221,6 @@ class Mass(Block):
     COLUMN_LABELS = ['mass', 'comment']
     LABEL = 'atom types'
 
-    def __init__(self, data=None, index=None, columns=None, **kwargs):
-        """
-        Initialize the Mass object.
-
-        :param data: `pandas.DataFrame`: the data to initialize the object.
-        :param index: `pandas.Index`: the index to initialize the object.
-        :param columns: `list`: the column labels to initialize the object.
-        """
-        super().__init__(data=data, index=index, columns=columns, **kwargs)
-        if not isinstance(data, pd.DataFrame) and index is None:
-            self.index = pd.RangeIndex(start=1, stop=self.shape[0] + 1)
-
     def writeCount(self, fh):
         """
         Write the count with the label appended.
@@ -297,7 +293,9 @@ class Atom(Mass):
     MOL_ID = 'mol_id'
     CHARGE = 'charge'
     XYZU = symbols.XYZU
+    TYPE_COL = [TYPE_ID]
     COLUMN_LABELS = [MOL_ID, TYPE_ID, CHARGE] + XYZU
+    ID_COLS = [MOL_ID]
     LABEL = 'atoms'
 
     def mapIds(self, id_map):
@@ -310,6 +308,20 @@ class Atom(Mass):
         acopy = self.copy()
         acopy.index = id_map[acopy.index]
         return acopy
+
+    @classmethod
+    def concat(cls, objs, ignore_index=True, **kwargs):
+        """
+        Concatenate the instances and re-index the row from 1.
+
+        :param objs: the instances to concatenate.
+        :type objs: list of (sub-)class instances.
+        :return: the concatenated data
+        :rtype: (sub-)class instances
+        """
+        if not len(objs):
+            return cls()
+        return pd.concat(objs, ignore_index=ignore_index, **kwargs)
 
 
 class Bond(Atom):
@@ -376,22 +388,6 @@ class Bond(Atom):
         """
         vals = [x for x in self[TYPE_ID].unique() if func(x)]
         return pd.DataFrame({self.NAME: vals})
-
-    @classmethod
-    def concat(cls, objs, **kwargs):
-        """
-        Concatenate the instances and re-index the row from 1.
-
-        :param objs: the instances to concatenate.
-        :type objs: list of (sub-)class instances.
-        :return: the concatenated data
-        :rtype: (sub-)class instances
-        """
-        if not len(objs):
-            return cls()
-        data = pd.concat(objs, **kwargs)
-        data.index = pd.RangeIndex(start=1, stop=data.shape[0] + 1)
-        return data
 
 
 class Angle(Bond):
@@ -875,11 +871,11 @@ class Struct(structure.Struct, lammpsin.In):
         """
 
         atypes = [x.GetIntProp(TYPE_ID) for x in mol.GetAtoms()]
-        self.atm_types.add(atypes)
-        self.bnd_types.add(mol.bonds[TYPE_ID])
-        self.ang_types.add(mol.angles[TYPE_ID])
-        self.dihe_types.add(mol.dihedrals[TYPE_ID])
-        self.impr_types.add(mol.impropers[TYPE_ID])
+        self.atm_types[atypes] = True
+        self.bnd_types[mol.bonds[TYPE_ID]] = True
+        self.ang_types[mol.angles[TYPE_ID]] = True
+        self.dihe_types[mol.dihedrals[TYPE_ID]] = True
+        self.impr_types[mol.impropers[TYPE_ID]] = True
 
     def writeData(self, nofile=False):
         """
@@ -939,8 +935,8 @@ class Struct(structure.Struct, lammpsin.In):
         :return `Atom`: information such as atom global ids, molecule ids, atom
             type ids, charges, coordinates.
         """
-        data = pd.concat(x.atoms for x in self.conformer)
-        data[TYPE_ID] = self.atm_types[data[TYPE_ID]]
+        data = Atom.concat([x.atoms for x in self.conformer])
+        data[TYPE_ID] = self.atm_types.map(data[TYPE_ID])
         return data
 
     @property
@@ -952,7 +948,7 @@ class Struct(structure.Struct, lammpsin.In):
         """
         bonds = [x.bonds for x in self.conformer if not x.bonds.empty]
         bonds = Bond.concat(bonds, axis=0)
-        bonds[TYPE_ID] = self.bnd_types[bonds[TYPE_ID]]
+        bonds[TYPE_ID] = self.bnd_types.map(bonds[TYPE_ID])
         return bonds
 
     @property
@@ -964,7 +960,7 @@ class Struct(structure.Struct, lammpsin.In):
         """
         angles = [x.angles for x in self.conformer if not x.angles.empty]
         angles = Angle.concat(angles, axis=0)
-        angles[TYPE_ID] = self.ang_types[angles[TYPE_ID]]
+        angles[TYPE_ID] = self.ang_types.map(angles[TYPE_ID])
         return angles
 
     @property
@@ -976,7 +972,7 @@ class Struct(structure.Struct, lammpsin.In):
         """
         dihes = [x.dihedrals for x in self.conformer if not x.dihedrals.empty]
         dihes = Dihedral.concat(dihes, axis=0)
-        dihes[TYPE_ID] = self.dihe_types[dihes[TYPE_ID]]
+        dihes[TYPE_ID] = self.dihe_types.map(dihes[TYPE_ID])
         return dihes
 
     @property
@@ -988,7 +984,7 @@ class Struct(structure.Struct, lammpsin.In):
         """
         imprps = [x.impropers for x in self.conformer if not x.impropers.empty]
         imprps = Improper.concat(imprps, axis=0)
-        imprps[TYPE_ID] = self.impr_types[imprps[TYPE_ID]]
+        imprps[TYPE_ID] = self.impr_types.map(imprps[TYPE_ID])
         return imprps
 
     @property
@@ -1316,7 +1312,7 @@ class Radius(numpyutils.Array):
         :param atypes pandas.Series: global atom id (index), atom type (value)
         """
         # Data.GEOMETRIC is optimized for speed and is supported
-        kwargs = dict(index=range(dists.index.max() + 1), fill_value=0)
+        kwargs = dict(index=range(dists.index.max() + 1), fill_value=-1)
         radii = dists.reindex(**kwargs).values.tolist()
         radii = np.full((len(radii), len(radii)), radii, dtype='float16')
         radii *= radii.transpose()
@@ -1324,6 +1320,6 @@ class Radius(numpyutils.Array):
         radii *= pow(2, 1 / 6) * cls.SCALE
         radii[radii < cls.MIN_DIST] = cls.MIN_DIST
         obj = np.asarray(radii).view(cls)
-        kwargs = dict(index=range(atypes.index.max() + 1), fill_value=0)
+        kwargs = dict(index=range(atypes.index.max() + 1), fill_value=-1)
         obj.id_map = atypes.reindex(**kwargs).values
         return obj

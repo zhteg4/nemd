@@ -29,7 +29,7 @@ class IntArray(np.ndarray):
     nonzero indexing.
     """
 
-    def __new__(cls, max_val=0, dtype=int):
+    def __new__(cls, max_val=0, dtype=bool):
         """
         Create a new BitSet object.
 
@@ -40,18 +40,19 @@ class IntArray(np.ndarray):
         obj = np.asarray(array).view(cls)
         return obj
 
-    def add(self, indexes):
-        """
-        Add bits at the given indexes.
-
-        :param indexes: An iterable of indexes to add.
-        """
-        self[indexes] = True
-        self[self.on] = np.arange(1, len(self.on) + 1)
-
     @property
     def on(self):
         """
         Return the indexes of the on bits.
         """
         return self.nonzero()[0]
+
+    def map(self, ids):
+        """
+        Map the given indexes to the range of the on bits.
+
+        :param ids: An iterable of indexes to add.
+        :return list: the mapped indexes.
+        """
+        imap = {x: y for x, y in zip(self.on, range(self.sum()))}
+        return [imap[x] for x in ids]
