@@ -120,7 +120,7 @@ class Struct(xtal.Struct):
             data = np.zeros((mol.GetNumAtoms(), 5))
             conformer = mol.GetConformer()
             aids = [x.GetIdx() for x in mol.GetAtoms()]
-            data[:, 0] = conformer.id_map[aids]
+            data[:, 0] = conformer.id_map[aids] + 1
             atomic_num = [x.GetAtomicNum() for x in mol.GetAtoms()]
             data[:, 1] = self.atm_types[atomic_num]
             data[:, 2:] = conformer.GetPositions()

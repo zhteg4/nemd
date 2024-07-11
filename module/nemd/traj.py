@@ -87,7 +87,7 @@ def get_frames(filename=None, contents=None, start=0):
     return Frame.read(filename=filename, contents=contents, start=start)
 
 
-class XYZ(numpyutils.Array):
+class XYZ(np.ndarray):
     """
     XYZ class to allow fast access to xyz coordinate by global atom ids.
     """
@@ -98,8 +98,6 @@ class XYZ(numpyutils.Array):
             the index being atom global ids and values being xyz coordinates.
         """
         obj = np.asarray(frame.values).view(cls)
-        idx = {label: i for i, label in enumerate(frame.index)} | {-1: -1}
-        obj.id_map = np.array([idx.get(x, -1) for x in range(max(idx) + 1)])
         return obj
 
 
@@ -198,6 +196,7 @@ class Frame(pd.DataFrame):
                                 index=data[:, 0].astype(int),
                                 columns=columns,
                                 step=step)
+                    frame.index -= 1
                 yield frame
 
     @classmethod

@@ -75,6 +75,7 @@ class Block(pd.DataFrame):
                   lines,
                   *args,
                   names=None,
+                  index_col=None,
                   header=None,
                   sep=SPACE_PATTERN,
                   quotechar=POUND,
@@ -83,6 +84,7 @@ class Block(pd.DataFrame):
         Construct a new instance from a list of lines.
 
         :param names list: Sequence of column labels to apply.
+        :param index_col int: Column(s) to use as row label(s)
         :param header int, ‘infer’ or None: the row number defining the header
         :param lines list: list of lines to parse.
         :param sep str: Character or regex pattern to treat as the delimiter.
@@ -96,10 +98,18 @@ class Block(pd.DataFrame):
         df = pd.read_csv(io.StringIO(''.join(lines)),
                          *args,
                          names=names,
+                         index_col=index_col,
                          header=header,
                          sep=sep,
                          quotechar=quotechar,
                          **kwargs)
+        df[cls.ID_COLS] -= 1
+        try:
+            df[cls.TYPE_COL] -= 1
+        except KeyError:
+            pass
+        if index_col == 0:
+            df.index -=1
         return cls(df)
 
     def write(self,
