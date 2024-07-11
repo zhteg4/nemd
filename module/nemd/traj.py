@@ -11,6 +11,8 @@ import io
 import os
 import math
 import gzip
+import sys
+
 import numba
 import types
 import base64
@@ -465,6 +467,7 @@ class DistanceCell(Frame):
         self.gids = gids
         self.struct = struct
         self.radii = None
+        self.radii_numba = None
         self.neigh_ids = None
         self.atom_cell = None
         self.graph = None
@@ -474,6 +477,7 @@ class DistanceCell(Frame):
         self.indexes_numba = None
         self.grids = None
         self.excluded = None
+        self.excluded_numba = None
         if self.gids is None:
             self.gids = set(range(self.shape[0]))
         self.orig_gids = self.gids.copy()
@@ -486,6 +490,7 @@ class DistanceCell(Frame):
         self.setRadius()
         self.setCut()
         self.setExcluded()
+        self.setExcludedNumba()
         self.setGrids()
         self.setNeighborIds()
         self.setNeighborMap()
@@ -534,12 +539,14 @@ class DistanceCell(Frame):
             atoms = self.struct.atoms
             pair_coeffs = self.struct.pair_coeffs
             self.radii = lammpsdata.Radius(pair_coeffs.dist, atoms.type_id)
+            self.radii_numba = np.array(self.radii).astype(float)
             return
 
         atoms = lammpsdata.Atom(self.shape[0])
         pair_coeffs = lammpsdata.PairCoeff(self.shape[0])
         pair_coeffs.dist = lammpsdata.Radius.MIN_DIST
         self.radii = lammpsdata.Radius(pair_coeffs.dist, atoms.type_id)
+        self.radii_numba = np.array(self.radii).astype(float)
 
     def setCut(self):
         """
@@ -558,7 +565,14 @@ class DistanceCell(Frame):
         :param include14 bool: If True, 1-4 interaction in a dihedral angle count
             as exclusion.
         """
-        if self.excluded is not None or self.struct is None:
+        if self.excluded is not None:
+            return
+
+        self.excluded = collections.defaultdict(set)
+        for idx in self.index:
+            self.excluded[idx].add(idx)
+
+        if self.struct is None:
             return
 
         pairs = set(self.struct.bonds.getPairs())
@@ -566,12 +580,23 @@ class DistanceCell(Frame):
         pairs = pairs.union(self.struct.impropers.getPairs())
         if include14:
             pairs = pairs.union(self.struct.dihedrals.getPairs())
-
-        self.excluded = collections.defaultdict(set)
         for id1, id2 in pairs:
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
-        return self.excluded
+
+
+    def setExcludedNumba(self):
+        """
+        Set the pair exclusion during clash check.
+        """
+        self.excluded_numba = numba.typed.Dict.empty(
+            key_type=numba.types.int64,
+            value_type=numba.types.int64[:],
+        )
+
+        for key, val in self.excluded.items():
+            self.excluded_numba[key] = np.array(list(val)).astype(np.int64)
+
 
     def setGrids(self, max_num=GRID_MAX):
         """
@@ -769,6 +794,44 @@ class DistanceCell(Frame):
         ]
         return neighbors
 
+    @staticmethod
+    @numbautils.jit
+    def hasClashesNumba(gids, xyz, id_map, radii, excluded, grids, indexes,
+                        neigh_map, cell, span, nopython):
+        """
+        Get the neighbor atom ids from the neighbor cells (including the current
+        cell itself) via Numba.
+
+        :param xyz nx3 'numpy.ndarray': global atom ids for selection
+        :param id_map 1xn 'numpy.ndarray': map global atom ids to atom types
+        :param radii nxn 'numpy.ndarray': the radius of atom type pairs
+        :param excluded dict of int list: the atom ids to be excluded in clash check
+        :param grids 'numpy.ndarray': the length of the cell in each dimension
+        :param indexes list of 'numba.int32': the number of the cell in each dimension
+        :param neigh_map ixjxkxnx3 'numpy.ndarray': map between cell id to neighbor cell ids
+        :param cell ixjxkxn array of floats: map cell id into containing atom ids
+        :param span 1x3 'numpy.ndarray': the span of the box
+        :param nopython bool: whether numba nopython mode is on
+        :return list int: the atom ids of the neighbor atoms
+        """
+
+        int32 = numba.int32 if nopython else np.int32
+        idxs = np.round(xyz[gids, :] / grids).astype(int32) % indexes
+
+        for gid, idx in zip(gids, idxs):
+            ids = neigh_map[idx[0], idx[1], idx[2], :]
+            nbrs = np.array([
+                y for x in ids for y in cell[x[0], x[1], x[2], :].nonzero()[0]
+                if y not in excluded[gid]
+            ])
+            delta = xyz[nbrs, :] - xyz[gid, :]
+            delta -= np.round(np.divide(delta, span)) * span
+            dists = [np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) for x in delta]
+            thresholds = radii[id_map[gid], id_map[nbrs]]
+            if (np.array(dists) < thresholds).any():
+                return True
+        return False
+
     def hasClashes(self, gids=None):
         """
         Whether the selected atoms have clashes
@@ -781,11 +844,20 @@ class DistanceCell(Frame):
         """
         if gids is None:
             gids = self.gids
-        dists = (self.getClash(x) for x in gids)
-        try:
-            return next(itertools.chain.from_iterable(dists))
-        except StopIteration:
-            return False
+
+        if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
+            dists = (self.getClash(x) for x in gids)
+            try:
+                next(itertools.chain.from_iterable(dists))
+            except StopIteration:
+                return False
+            return True
+
+        return self.hasClashesNumba(gids, self.xyz, self.radii.id_map,
+                                  self.radii_numba, self.excluded_numba,
+                                  self.grids, self.indexes_numba,
+                                  self.neigh_map, self.atom_cell,
+                                  self.box.span)
 
     def getClashes(self, gids=None):
         """
@@ -809,11 +881,8 @@ class DistanceCell(Frame):
         :return list of float: clash distances between atom pairs
         """
         xyz = self.xyz[gid, :]
-        neighbors = set(self.getNeighbors(xyz))
-        # Trajectory clash check for all atoms finds itself in the atom cell
-        neighbors.discard(gid)
-        if self.excluded is not None:
-            neighbors = neighbors.difference(self.excluded[gid])
+        neighbors = self.getNeighbors(xyz)
+        neighbors = self.excluded[gid].difference(neighbors)
         if not neighbors:
             return []
         neighbors = list(neighbors)

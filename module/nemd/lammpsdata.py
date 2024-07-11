@@ -109,7 +109,7 @@ class Block(pd.DataFrame):
         except KeyError:
             pass
         if index_col == 0:
-            df.index -=1
+            df.index -= 1
         return cls(df)
 
     def write(self,
