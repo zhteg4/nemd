@@ -503,9 +503,8 @@ class GrownMol(PackedMol):
         if self.ifrag is not None:
             return
         # dihe is not known and will be handled in setFragments()
-        self.ifrag = Fragment([], self.GetConformer(), delay=True)
+        self.ifrag = Fragment(self.GetConformer(), delay=True)
         self.ifrag.setFragments()
-        self.ifrag.resetVals()
         frags = self.ifrag.fragments()
         frag_aids_set = set([y for x in frags for y in x.aids])
         all_aids = set([x.GetIdx() for x in self.GetAtoms()])
@@ -899,15 +898,15 @@ class Fragment:
         """
         return f"{self.dihe}: {self.aids}"
 
-    def __init__(self, dihe, conf, delay=False):
+    def __init__(self, conf, dihe=None, delay=False):
         """
+        :param conf 'GrownConf': the conformer that this fragment belongs to
         :param dihe list of dihedral atom ids: the dihedral that changes the
             atom position in this fragment.
-        :param mol 'GrownMol': the GrownMol that this fragment belongs to
         :param delay bool: whether to delay the initialization of the fragment.
         """
-        self.dihe = dihe  # dihedral angle four-atom ids
         self.conf = conf  # Conformer object this fragment belongs to
+        self.dihe = dihe  # dihedral angle four-atom ids
         self.aids = []  # Atom ids of the swing atoms
         self.pfrag = None  # Previous fragment
         self.nfrags = []  # Next fragments
@@ -975,7 +974,7 @@ class Fragment:
         :param randomize bool: randomize the dihedral values candidates if True.
         :return Fragment: the copied fragment.
         """
-        frag = Fragment(self.dihe, conf, delay=True)
+        frag = Fragment(conf, dihe=self.dihe, delay=True)
         frag.aids = self.aids
         frag.pfrag = self.pfrag
         frag.nfrags = self.nfrags
@@ -1022,7 +1021,7 @@ class Fragment:
             # This is an initial fragment with unknown dihedral angle
             self.dihe = dihes.pop(0)
             self.setUp()
-        frags = [self] + [Fragment(x, self.conf) for x in dihes]
+        frags = [self] + [Fragment(self.conf, dihe=x) for x in dihes]
         for frag, nfrag in zip(frags[:-1], frags[1:]):
             frag.aids = sorted(set(frag.aids).difference(nfrag.aids))
             frag.nfrags.append(nfrag)
