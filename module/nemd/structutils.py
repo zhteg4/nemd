@@ -147,6 +147,9 @@ class PackedConf(GriddedConf):
         return self.mol.struct.dcell.hasClashes(gids=self.id_map[aids])
 
     def reset(self):
+        """
+        Reset the cooridinates of the conformer.
+        """
         self.setPositions(self.oxyz)
 
 
@@ -319,9 +322,10 @@ class GrownConf(PackedConf):
         if not found:
             ratom_aids += frag.conf.init_aids
         self.mol.struct.dcell.remove(self.id_map[ratom_aids])
-        # 3）Fragment after the next fragments were added to the growing
-        # frags before this backmove step.
-        nnxt_frags = [y for x in nxt_frags for y in x.nfrags]
+        # 3）The next fragments of the frag may have been added to the growing
+        # self.frags before this backmove step. These added next fragments
+        # may have never been growed even once.
+        nnxt_frags = [y for x in nxt_frags for y in x.nfrags] + frag.nfrags
         self.frags = [frag] + [x for x in self.frags if x not in nnxt_frags]
         return found
 
@@ -438,6 +442,9 @@ class PackedMol(Mol):
     ConfClass = PackedConf
 
     def adjustBondLength(self):
+        """
+        Adjust bond length according to the force field and store.
+        """
         super().adjustBondLength()
         for conf in self.GetConformers():
             conf.oxyz = conf.GetPositions()
@@ -498,6 +505,7 @@ class GrownMol(PackedMol):
         # dihe is not known and will be handled in setFragments()
         self.ifrag = Fragment([], self.GetConformer(), delay=True)
         self.ifrag.setFragments()
+        self.ifrag.resetVals()
         frags = self.ifrag.fragments()
         frag_aids_set = set([y for x in frags for y in x.aids])
         all_aids = set([x.GetIdx() for x in self.GetAtoms()])
@@ -739,11 +747,11 @@ class PackedStruct(Struct):
         """
         trial_id, conf_num, finished, nth = 1, self.conformer_total, [], -1
         for trial_id in range(1, max_trial + 1):
-            self.reset()
             for conf_id, conf in enumerate(self.conformer):
                 try:
                     conf.setConformer()
                 except ConfError:
+                    self.reset()
                     break
                 # One conformer successfully placed
                 if nth != math.floor((conf_id + 1) / conf_num * 10):
@@ -768,6 +776,7 @@ class PackedStruct(Struct):
                     # With successful conformer number following norm
                     # distribution, max_trial won't succeed for one time
                     raise DensityError
+        self.reset()
         raise DensityError
 
     def reset(self):
@@ -847,7 +856,11 @@ class GrownStruct(PackedStruct):
         log_debug("*" * 10 + f" {self.density} " + "*" * 10)
 
         for _ in range(max_trial):
-            self.reset()
+            try:
+                self.placeInitFrags()
+            except ConfError:
+                self.reset()
+                continue
             conformers = list(self.conformer)
             while conformers:
                 conf = conformers.pop(0)
@@ -856,6 +869,7 @@ class GrownStruct(PackedStruct):
                 except ConfError:
                     # Reset and try again as this conformer cannot be placed.
                     # 1 ) ifrag cannot be place; 2 ) failed_num reached maximum
+                    self.reset()
                     break
                 # Successfully set one fragment of this conformer.
                 if conf.frags:
@@ -870,14 +884,8 @@ class GrownStruct(PackedStruct):
                     # Successfully placed all conformers.
                     return
         # Max trial reached at this density.
+        self.reset()
         raise DensityError
-
-    def reset(self):
-        """
-        Reset the state so that a new growing attempt can happen.
-        """
-        super().reset()
-        self.placeInitFrags()
 
 
 class Fragment:
@@ -973,7 +981,7 @@ class Fragment:
         # Another conformer may have different value and candidates
         frag.vals = self.vals[:]
         frag.val = self.val
-        frag.val = self.fval
+        frag.fval = self.fval
         return frag
 
     def setFragments(self):
