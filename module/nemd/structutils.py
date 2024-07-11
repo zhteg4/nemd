@@ -911,7 +911,8 @@ class Fragment:
         self.aids = []  # Atom ids of the swing atoms
         self.pfrag = None  # Previous fragment
         self.nfrags = []  # Next fragments
-        self.vals = []  # Available dihedral values candidates
+        self.ovals = np.linspace(0, 360, 36, endpoint=False)  # shuffle on copy
+        self.vals = list(self.ovals)  # Available dihedral values candidates
         self.val = None  # Chosen dihedral angle value
         self.fval = True  # All dihedral values are available (new frag)
         if delay:
@@ -930,8 +931,7 @@ class Fragment:
         Reset the dihedral angle values and state.
         """
         self.val, self.fval = None, True
-        self.vals = list(np.linspace(0, 360, 36, endpoint=False))
-        np.random.shuffle(self.vals)
+        self.vals = list(self.ovals)
 
     def reset(self):
         """
@@ -967,21 +967,26 @@ class Fragment:
             all_nfrags += nfrags
         return ifrag
 
-    def copy(self, conf):
+    def copy(self, conf, randomize=True):
         """
         Copy the current fragment to a new one.
 
         :param conf GrownConf: the conformer object this fragment belongs to.
+        :param randomize bool: randomize the dihedral values candidates if True.
         :return Fragment: the copied fragment.
         """
         frag = Fragment(self.dihe, conf, delay=True)
         frag.aids = self.aids
         frag.pfrag = self.pfrag
         frag.nfrags = self.nfrags
-        # Another conformer may have different value and candidates
-        frag.vals = self.vals[:]
         frag.val = self.val
         frag.fval = self.fval
+        # Another conformer may have different value and candidates
+        frag.ovals = self.ovals.copy()
+        frag.vals = self.vals[:]
+        if randomize:
+            np.random.shuffle(frag.ovals)
+            frag.vals = list(frag.ovals)
         return frag
 
     def setFragments(self):
