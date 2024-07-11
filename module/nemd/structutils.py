@@ -503,8 +503,7 @@ class GrownMol(PackedMol):
         if self.ifrag is not None:
             return
         # dihe is not known and will be handled in setFragments()
-        self.ifrag = Fragment(self.GetConformer(), delay=True)
-        self.ifrag.setFragments()
+        self.ifrag = Fragment(self.GetConformer())
         frags = self.ifrag.fragments()
         frag_aids_set = set([y for x in frags for y in x.aids])
         all_aids = set([x.GetIdx() for x in self.GetAtoms()])
@@ -922,8 +921,10 @@ class Fragment:
         """
         Set up the fragment.
         """
-        self.resetVals()
-        self.aids = self.conf.getSwingAtoms(*self.dihe)
+        if self.dihe is not None:
+            self.aids = self.conf.getSwingAtoms(*self.dihe)
+            return
+        self.setFragments()
 
     def resetVals(self):
         """

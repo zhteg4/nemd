@@ -809,13 +809,9 @@ class DistanceCell(Frame):
         :return list of float: clash distances between atom pairs
         """
         xyz = self.xyz[gid, :]
-        neighbors = self.getNeighbors(xyz)
-        try:
-            neighbors.remove(gid)
-        except ValueError:
-            # Trajectory clash check for all atoms finds itself in the atom cell
-            pass
-        neighbors = self.gids.intersection(neighbors)
+        neighbors = set(self.getNeighbors(xyz))
+        # Trajectory clash check for all atoms finds itself in the atom cell
+        neighbors.discard(gid)
         if self.excluded is not None:
             neighbors = neighbors.difference(self.excluded[gid])
         if not neighbors:
