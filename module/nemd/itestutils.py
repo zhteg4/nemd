@@ -9,7 +9,7 @@ from nemd import logutils
 DIR = 'dir'
 CMD = 'cmd'
 CHECK = 'check'
-AND = 'and'
+AND_RE = r'and\s+'
 SUCCESS = task.SUCCESS
 MSG = task.MSG
 
@@ -45,7 +45,7 @@ class Integration_Driver(task.BaseTask):
         return f"echo \"{os.path.basename(self.job.document[DIR])} {comment}\"; {cmd}"
 
     @classmethod
-    def post(cls, job, name=None):
+    def post(cls, job, **kwargs):
         """
         The function to determine whether the main command has been executed.
 
@@ -89,6 +89,20 @@ class EXIST:
             raise FileNotFoundError(f"{self.target} not found")
 
 
+class NOT_EXIST(EXIST):
+    """
+    The class to perform file non-existence check.
+    """
+
+    def run(self):
+        """
+        The main method to check the existence of a file.
+        """
+        self.target = self.job.fn(self.target)
+        if os.path.isfile(self.target):
+            raise FileNotFoundError(f"{self.target} found")
+
+
 class CMP:
     """
     The class to perform file comparison.
@@ -125,7 +139,7 @@ class Results(task.BaseTask):
 
     CMD_BRACKET_RE = '\s.*?\(.*?\)'
     PAIRED_BRACKET_RE = '\(.*?\)'
-    CMD = {'cmp': CMP, 'exist': EXIST}
+    CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
 
     def __init__(self, args, **kwargs):
         """
@@ -159,7 +173,7 @@ class Results(task.BaseTask):
         """
         for operator in re.finditer(self.CMD_BRACKET_RE, self.line):
             operator = operator.group().strip()
-            operator = operator.strip(AND + ' ').strip()
+            operator = re.sub(AND_RE, '', operator)
             self.operators.append(operator)
 
     def executeOperators(self):
@@ -180,9 +194,8 @@ class Results(task.BaseTask):
         try:
             runner_class = self.CMD[cmd]
         except KeyError:
-            raise KeyError(
-                f'{cmd} is one unknown command. Please select from {self.CMD.keys()}'
-            )
+            raise KeyError(f'{cmd} is one unknown command. Please select from '
+                           f'{self.CMD.keys()}')
         runner = runner_class(*bracketed[1:-1].split(','), job=self.job)
         runner.run()
 

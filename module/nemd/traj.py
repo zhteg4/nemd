@@ -28,7 +28,6 @@ from contextlib import contextmanager
 
 from nemd import symbols
 from nemd import lammpsdata
-from nemd import numpyutils
 from nemd import numbautils
 from nemd import environutils
 
@@ -302,7 +301,7 @@ class Frame(pd.DataFrame):
         grp1 = self.index if grp1 is None else sorted(grp1)
         grp2 = (grp1[:i] for i in range(len(grp1))) if grp2 is None else grp2
         dists = [self.getDists(x, self.xyz[y, :]) for x, y in zip(grp2, grp1)]
-        return np.concatenate(dists)
+        return np.concatenate(dists) if dists else []
 
     def getDists(self, ids, xyz):
         """

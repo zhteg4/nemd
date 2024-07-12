@@ -86,6 +86,8 @@ class Base:
 
         :param float_format str: the format to save float
         """
+        if self.data.empty:
+            return
         outfile = self.options.jobname + self.DATA_EXT % self.NAME
         self.data.to_csv(outfile, float_format=float_format)
         self.log(f'{self.DESCR.capitalize()} data written into {outfile}')
@@ -127,6 +129,8 @@ class Base:
             interactive mode is on
         :type inav: bool
         """
+        if data.empty:
+            return
         with plotutils.get_pyplot(inav=inav, name=cls.DESCR.upper()) as plt:
             fig = plt.figure(figsize=(10, 6))
             ax = fig.add_axes([0.13, 0.1, 0.8, 0.8])
@@ -218,6 +222,17 @@ class Base:
         else:
             print(msg)
 
+    def log_warning(self, msg):
+        """
+        Print this warning message into log file.
+
+        :param msg str: the msg to be printed
+        """
+        if self.logger:
+            self.logger.warning(msg)
+        else:
+            print(msg)
+
 
 class Density(Base):
     """
@@ -263,6 +278,11 @@ class RDF(Base):
             all the neighbors are counted when the cell is not significantly
              larger than the LJ cutoff.
         """
+        if len(self.gids) < 2:
+            self.log_warning("RDF requires least two atoms selected.")
+            self.data = pd.DataFrame(data={self.LABEL: []})
+            return
+        # self.data = pd.DataFrame(data={self.LABEL: rdf}, index=index)
         frms = self.frms[self.sidx:]
         span = np.array([x.box.span for x in frms])
         vol = span.prod()
@@ -316,6 +336,8 @@ class RDF(Base):
         :type log: 'function'
         :return int, int: the start and end index for the selected data
         """
+        if data.empty:
+            return None, None
         raveled = np.ravel(data[data.columns[0]])
         smoothed = savgol_filter(raveled, window_length=31, polyorder=2)
         row = data.iloc[smoothed.argmax()]

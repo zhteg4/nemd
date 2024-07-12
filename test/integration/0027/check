@@ -1,1 +1,1 @@
-cmp('custom_dump_rdf.csv', 'custom_dump_rdf.csv')
+not_exist('custom_dump_rdf.csv')

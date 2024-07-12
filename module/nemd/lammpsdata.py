@@ -224,7 +224,10 @@ class Box(Block):
         :return: the box data in str
         :rtype: st
         """
-        return self.to_csv(header=False, lineterminator=' ', index=False, sep=' ')
+        return self.to_csv(header=False,
+                           lineterminator=' ',
+                           index=False,
+                           sep=' ')
 
     def getPoint(self):
         """
@@ -1334,8 +1337,8 @@ class DataFileReader(lammpsin.In):
             return self.atoms.index.tolist()
 
         comment = self.masses.comment
-        type_id = [i for i, x in comment.items() if x.split()[-2] == ele][0]
-        return self.atoms.index[self.atoms[TYPE_ID] == type_id].tolist()
+        type_ids = [i for i, x in comment.items() if x.split()[-2] == ele]
+        return self.atoms.index[self.atoms[TYPE_ID].isin(type_ids)].tolist()
 
     @property
     @functools.cache

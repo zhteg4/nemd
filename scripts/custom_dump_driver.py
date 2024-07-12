@@ -146,6 +146,9 @@ class CustomDump(object):
             if len(steps) == 0:
                 return
             sidx = math.floor(len(steps) * (1 - self.options.last_pct))
+            if sidx == len(steps) - 1 and sidx:
+                # From the second to the last frame in case of a broken last one
+                sidx -= 1
             start = int(steps[sidx])
 
         frms = traj.slice_frames(self.options.custom_dump,
@@ -157,9 +160,6 @@ class CustomDump(object):
         self.time = np.array([x.step * self.timestep for x in self.frms
                               ]) * constants.femto / constants.pico
         self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
-        if isinstance(self.frms[self.sidx], types.SimpleNamespace):
-            # pre-read by frame_steps farsely count the last broken frame
-            self.sidx += 1
         log(f"{len(self.frms)} trajectory frames found.")
         if af_tasks:
             log(f"{', '.join(af_tasks)} analyze all frames and save per frame "
