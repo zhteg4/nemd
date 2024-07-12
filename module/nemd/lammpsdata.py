@@ -30,8 +30,8 @@ class Block(pd.DataFrame):
 
     NAME = 'Block'
     COLUMN_LABELS = ['column_labels']
-    ID_COLS = []
-    TYPE_COL = []
+    ID_COLS = None
+    TYPE_COL = None
     POUND = symbols.POUND
     SPACE = symbols.SPACE
     SPACE_PATTERN = symbols.SPACE_PATTERN
@@ -103,11 +103,12 @@ class Block(pd.DataFrame):
                          sep=sep,
                          quotechar=quotechar,
                          **kwargs)
-        df[cls.ID_COLS] -= 1
-        try:
+        if df.empty:
+            return cls(df)
+        if cls.ID_COLS is not None:
+            df[cls.ID_COLS] -= 1
+        if cls.TYPE_COL is not None:
             df[cls.TYPE_COL] -= 1
-        except KeyError:
-            pass
         if index_col == 0:
             df.index -= 1
         return cls(df)
@@ -140,8 +141,10 @@ class Block(pd.DataFrame):
             return
         content = self.NAME + '\n\n' if as_block and self.NAME else ''
         self.index += 1
-        self[self.TYPE_COL] += 1
-        self[self.ID_COLS] += 1
+        if self.TYPE_COL is not None:
+            self[self.TYPE_COL] += 1
+        if self.ID_COLS is not None:
+            self[self.ID_COLS] += 1
         content += self.to_csv(columns=columns,
                                sep=sep,
                                header=header,
@@ -150,8 +153,10 @@ class Block(pd.DataFrame):
                                quotechar=quotechar,
                                **kwargs)
         self.index -= 1
-        self[self.TYPE_COL] -= 1
-        self[self.ID_COLS] -= 1
+        if self.TYPE_COL is not None:
+            self[self.TYPE_COL] -= 1
+        if self.ID_COLS is not None:
+            self[self.ID_COLS] -= 1
         if as_block:
             content += '\n'
         hdl.write(content)
@@ -179,6 +184,8 @@ class Box(Block):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._span = None
+        self[self.LO_LABEL] = self.LO_CMT
+        self[self.HI_LABEL] = self.HI_CMT
 
     @property
     def span(self):
@@ -208,9 +215,16 @@ class Box(Block):
 
         :param hdl `_io.TextIOWrapper` or `_io.StringIO`: write to this handler
         """
-        self[self.LO_LABEL] = self.LO_CMT
-        self[self.HI_LABEL] = self.HI_CMT
         super().write(fh, index=index, **kwargs)
+
+    def to_str(self):
+        """
+        return the box as string.
+
+        :return: the box data in str
+        :rtype: st
+        """
+        return self.to_csv(header=False, lineterminator=' ', index=False, sep=' ')
 
     def getPoint(self):
         """
@@ -231,6 +245,10 @@ class Mass(Block):
     COLUMN_LABELS = ['mass', 'comment']
     LABEL = 'atom types'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._element = None
+
     def writeCount(self, fh):
         """
         Write the count with the label appended.
@@ -248,6 +266,21 @@ class Mass(Block):
         :return 'Mass' or subclass instance: the mass.
         """
         return super().fromLines(*args, index_col=index_col, **kwargs)
+
+    @property
+    def element(self, rex='.*\s(\w+)\s\w+'):
+        """
+        Set and cache the element of the atom types.
+
+        :param rex str: the regular expression to extract elements from the
+            comment column.
+        :return: the element of the atom types.
+        :rtype: 'numpy.ndarray'
+        """
+        if self._element is not None:
+            return self._element
+        self._element = self.comment.str.extract(rex).values.flatten()
+        return self._element
 
 
 class PairCoeff(Mass):
@@ -1303,6 +1336,20 @@ class DataFileReader(lammpsin.In):
         comment = self.masses.comment
         type_id = [i for i, x in comment.items() if x.split()[-2] == ele][0]
         return self.atoms.index[self.atoms[TYPE_ID] == type_id].tolist()
+
+    @property
+    @functools.cache
+    def molecules(self):
+        """
+        The atom ids grouped by molecules.
+
+        :return: keys are molecule ids and values are atom global ids.
+        :rtype: dict
+        """
+        mols = collections.defaultdict(list)
+        for gid, mid, in self.atoms.mol_id.items():
+            mols[mid].append(gid)
+        return dict(mols)
 
 
 class Radius(numpyutils.Array):

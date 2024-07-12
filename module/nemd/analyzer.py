@@ -236,7 +236,7 @@ class Density(Base):
         """
         mass = self.df_reader.molecular_weight / constants.Avogadro
         mass_scaled = mass / (constants.angstrom / constants.centi)**3
-        data = [mass_scaled / x.getVolume() for x in self.frms]
+        data = [mass_scaled / x.volume for x in self.frms]
         self.data = pd.DataFrame({self.LABEL: data}, index=self.time)
         self.data.index.name = f"{self.ILABEL} ({self.sidx})"
 
@@ -293,7 +293,7 @@ class RDF(Base):
             hist, edge = np.histogram(dists, range=hist_range, bins=bins)
             mid = np.array([x for x in zip(edge[:-1], edge[1:])]).mean(axis=1)
             # 4pi*r^2*dr*rho from Radial distribution function - Wikipedia
-            norm_factor = 4 * np.pi * mid**2 * res * num / frm.getVolume()
+            norm_factor = 4 * np.pi * mid**2 * res * num / frm.volume
             # Stands at every id but either (1->2) or (2->1) is computed
             rdf += (hist * 2 / num / norm_factor)
             if idx >= threshold:

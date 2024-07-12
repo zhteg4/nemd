@@ -142,8 +142,12 @@ class Frame(pd.DataFrame):
         self.box = box
         self.step = step
         self.xyz = XYZ(self)
-        if self.box is None and isinstance(data, Frame):
+        if not isinstance(data, Frame):
+            return
+        if self.box is None:
             self.box = data.box
+        if self.step is None:
+            self.step = data.step
 
     @property
     def _constructor(self):
@@ -260,36 +264,20 @@ class Frame(pd.DataFrame):
         finally:
             fh.close()
 
-    def getXYZ(self, atom_id):
-        """
-        Get the XYZ of the atom id.
-
-        :param atom_id int: atom id
-        :return row (3,) 'pandas.core.series.Series': xyz coordinates and atom id
-        """
-        return self.loc[atom_id]
-
     def update(self, gids, xyz):
         """
         Update the coordinate frame based on the give gids and xyz.
         """
         self.xyz[gids, :] = xyz
 
-    def getVolume(self):
+    @property
+    def volume(self):
         """
         Get the volume of the frame.
 
         :param float: the volume of the frame
         """
         return np.prod(self.box.span)
-
-    def getDensity(self):
-        """
-        Get the number density of the frame.
-
-        :param float: the number density of the frame
-        """
-        return self.shape[0] / self.getVolume()
 
     def getEdges(self):
         """
@@ -302,6 +290,19 @@ class Frame(pd.DataFrame):
         if box is None:
             return []
         return lammpsdata.DataFileReader.getEdgesFromList(box)
+
+    def pairDists(self, grp1=None, grp2=None):
+        """
+        Get the distance between atom pair.
+
+        :param grp1 list: list of gids as the atom selection
+        :param grp2 list of list: each sublist contains atom ids to compute
+            distances with one atom in grp1.
+        """
+        grp1 = self.index if grp1 is None else sorted(grp1)
+        grp2 = (grp1[:i] for i in range(len(grp1))) if grp2 is None else grp2
+        dists = [self.getDists(x, self.xyz[y, :]) for x, y in zip(grp2, grp1)]
+        return np.concatenate(dists)
 
     def getDists(self, ids, xyz):
         """
@@ -332,23 +333,10 @@ class Frame(pd.DataFrame):
 
         :param dists numpy.ndarray: distances
         :param span numpy.ndarray: box span
-        :return numpy.ndarray: distances within half box span
+        :return list of floats: distances within half box span
         """
         dists -= np.round(np.divide(dists, span)) * span
         return [np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) for x in dists]
-
-    def pairDists(self, grp1=None, grp2=None):
-        """
-        Get the distance between atom pair.
-
-        :param grp1 list: list of gids as the atom selection
-        :param grp2 list of list: each sublist contains atom ids to compute
-            distances with one atom in grp1.
-        """
-        grp1 = self.index if grp1 is None else sorted(grp1)
-        grp2 = (grp1[:i] for i in range(len(grp1))) if grp2 is None else grp2
-        dists = [self.getDists(x, self.xyz[y, :]) for x, y in zip(grp2, grp1)]
-        return np.concatenate(dists)
 
     def wrapCoords(self, broken_bonds=False, dreader=None):
         """
@@ -363,15 +351,12 @@ class Frame(pd.DataFrame):
             return
 
         if broken_bonds:
-            self.loc[:] = self.loc[:] % self.box.span
+            self.xyz = self.xyz % self.box.span
             # The wrapped xyz shouldn't support molecule center operation
             return
 
-        if dreader.mols is None:
-            return
-
         # The unwrapped xyz can directly perform molecule center operation
-        for gids in dreader.mols.values():
+        for gids in dreader.molecules.values():
             center = self.xyz[gids, :].mean(axis=0)
             delta = (center % self.box.span) - center
             self.xyz[gids, :] += delta
@@ -387,18 +372,18 @@ class Frame(pd.DataFrame):
         if dreader is None:
             return
 
-        span = np.array([x for x in self.attrs[self.SPAN].values()])
         centers = pd.concat(
-            [self.loc[x].mean(axis=0) for x in dreader.mols.values()],
+            [self.loc[x].mean(axis=0) for x in dreader.molecules.values()],
             axis=1).transpose()
-        centers.index = dreader.mols.keys()
-        theta = centers / span * 2 * np.pi
+        centers.index = dreader.molecules.keys()
+        theta = centers / self.box.span * 2 * np.pi
         cos_theta = np.cos(theta)
         sin_theta = np.sin(theta)
         theta = np.arctan2(sin_theta.mean(), cos_theta.mean())
-        mcenters = theta * span / 2 / np.pi
-        cshifts = ((mcenters - centers) / span).round() * span
-        for id, mol in dreader.mols.items():
+        mcenters = theta * self.box.span / 2 / np.pi
+        cshifts = (
+            (mcenters - centers) / self.box.span).round() * self.box.span
+        for id, mol in dreader.molecules.items():
             cshift = cshifts.loc[id]
             self.loc[mol] += cshift
 
@@ -416,12 +401,9 @@ class Frame(pd.DataFrame):
         if dreader is None:
             data.index = [symbols.UNKNOWN] * data.shape[0]
         else:
-            data.index = [dreader.atoms[x].ele for x in data.index]
-        box = self.getBox()
-        header = [
-            f'{j} {box[i*2]} {box[i*2+1]}'
-            for i, j in enumerate(self.columns.to_list())
-        ]
+            type_ids = dreader.atoms.type_id.loc[data.index]
+            data.index = dreader.masses.element[type_ids]
+        header = self.box.to_str()
         if points:
             points = np.array(points)
             points = pd.DataFrame(points,
@@ -435,7 +417,7 @@ class Frame(pd.DataFrame):
                     sep=' ',
                     header=header,
                     quotechar=' ',
-                    float_format='%.3f')
+                    float_format='%.4f')
 
 
 class DistanceCell(Frame):
@@ -584,7 +566,6 @@ class DistanceCell(Frame):
             self.excluded[id1].add(id2)
             self.excluded[id2].add(id1)
 
-
     def setExcludedNumba(self):
         """
         Set the pair exclusion during clash check.
@@ -596,7 +577,6 @@ class DistanceCell(Frame):
 
         for key, val in self.excluded.items():
             self.excluded_numba[key] = np.array(list(val)).astype(np.int64)
-
 
     def setGrids(self, max_num=GRID_MAX):
         """
@@ -782,7 +762,7 @@ class DistanceCell(Frame):
         :param neigh_map ixjxkxnx3 'numpy.ndarray': map between cell id to neighbor cell ids
         :param atom_cell ixjxkxn array of floats: map cell id into containing atom ids
         :param nopython bool: whether numba nopython mode is on
-        :return list int: the atom ids of the neighbor atoms
+        :return list of int: the atom ids of the neighbor atoms
         """
         # The cell id for xyz
         int32 = numba.int32 if nopython else np.int32
@@ -812,7 +792,7 @@ class DistanceCell(Frame):
         :param cell ixjxkxn array of floats: map cell id into containing atom ids
         :param span 1x3 'numpy.ndarray': the span of the box
         :param nopython bool: whether numba nopython mode is on
-        :return list int: the atom ids of the neighbor atoms
+        :return bool: whether the selected atoms have clashes
         """
 
         int32 = numba.int32 if nopython else np.int32
@@ -854,10 +834,10 @@ class DistanceCell(Frame):
             return True
 
         return self.hasClashesNumba(gids, self.xyz, self.radii.id_map,
-                                  self.radii_numba, self.excluded_numba,
-                                  self.grids, self.indexes_numba,
-                                  self.neigh_map, self.atom_cell,
-                                  self.box.span)
+                                    self.radii_numba, self.excluded_numba,
+                                    self.grids, self.indexes_numba,
+                                    self.neigh_map, self.atom_cell,
+                                    self.box.span)
 
     def getClashes(self, gids=None):
         """
