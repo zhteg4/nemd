@@ -4,10 +4,9 @@ bond_style harmonic
 angle_style harmonic
 dihedral_style opls
 improper_style cvff
-pair_style lj/cut/coul/long 11.0 11.0
+pair_style lj/cut 11.0
 pair_modify mix geometric
 special_bonds lj/coul 0 0 0.5
-kspace_style pppm 0.0001
 read_data polymer_builder.data
 
 timestep 1
@@ -18,61 +17,137 @@ dump_modify 1 sort id
 min_style fire
 minimize 1.0e-6 1.0e-8 1000000 10000000
 
-fix rigid all shake 0.0001 10 10000 b 1 a 1
-velocity all create 10 482748
+velocity all create 10 836689
 fix 1a all temp/berendsen 10 10 100
 fix 1b all nve
 run 1000
 unfix 1b
 unfix 1a
 
-fix 2a all temp/berendsen 10 298.15 100
+fix 2a all temp/berendsen 10 300 100
 fix 2b all nve
 run 10000
 unfix 2b
 unfix 2a
 
+dump_modify 1 every 10000
+
 variable vol equal vol
-fix 3a all ave/time 1 100 100 c_thermo_press v_vol file press_vol.data
-variable amp equal "0.05*vol^(1/3)"
-fix 3b all deform 1 x wiggle ${amp} 10000.0 y wiggle ${amp} 10000.0 z wiggle ${amp} 10000.0
-fix 3c all temp/berendsen 298.15 298.15 100
-fix 3d all nve
+variable amp equal 0.01*v_vol^(1/3)
+variable immed_press python getPress
+python getPress input 1 press_vol.data return v_immed_press format sf here "from nemd.pyfunc import getPress"
+
+variable immed_modulus python getModulus
+python getModulus input 2 press_vol.data 100 return v_immed_modulus format sif here "from nemd.pyfunc import getModulus"
+
+variable factor python getBdryFactor
+python getBdryFactor input 2 1 press_vol.data return v_factor format fsf here "from nemd.pyfunc import getBdryFactor"
+
+variable defm_id loop 0 99 pad
+label defm_start
+print "defm_id = ${defm_id}"
+shell mkdir defm_${defm_id}
+shell cd defm_${defm_id}
+
+fix 15a all ave/time 1 25 25 c_thermo_press v_vol file press_vol.data
+fix 15b all deform 100 x wiggle ${amp} 2500 y wiggle ${amp} 2500 z wiggle ${amp} 2500
+fix 15c all temp/berendsen 300 300 100
+fix 15d all nve
+run 7500
+unfix 15d
+unfix 15c
+unfix 15b
+unfix 15a
+
+print "immed_press = ${immed_press}"
+print "immed_modulus = ${immed_modulus}"
+print "factor = ${factor}"
+if "${defm_id} == 99 || ${factor} == 1" then "jump SELF defm_break"
+
+fix 21a all deform 100 x scale ${factor} y scale ${factor} z scale ${factor} remap v
+fix 21b all temp/berendsen 300 300 100
+fix 21c all nve
+run 1250
+unfix 21c
+unfix 21b
+unfix 21a
+
+fix 22a all temp/berendsen 300 300 100
+fix 22b all nve
+run 1250
+unfix 22b
+unfix 22a
+
+shell cd ..
+next defm_id
+jump SELF defm_start
+
+label defm_break
+variable modulus equal ${immed_modulus}
+variable press equal ${immed_press}
+shell cd ..
+variable vol delete
+variable amp delete
+variable immed_press delete
+variable immed_modulus delete
+variable factor delete
+variable defm_id delete
+
+dump_modify 1 every 1000
+
+fix 38a all press/berendsen iso ${press} 1 1000 modulus ${modulus}
+fix 38b all temp/berendsen 300 300 100
+fix 38c all nve
 run 100000
-unfix 3d
-unfix 3c
-unfix 3b
-unfix 3a
+unfix 38c
+unfix 38b
+unfix 38a
 
-variable modulus python getModulus
-python getModulus input 2 press_vol.data 100 return v_modulus format sif here "from nemd.pyfunc import getModulus"
-print "Modulus = ${modulus}"
 
-variable ave_press python getPress
-python getPress input 1 press_vol.data return v_ave_press format sf here "from nemd.pyfunc import getPress"
-print "Averaged Press = ${ave_press}"
-
-fix 6a all press/berendsen iso ${ave_press} 1 1000 modulus ${modulus}
-fix 6b all temp/berendsen 298.15 298.15 100
-fix 6c all nve
-run 100000
-unfix 6c
-unfix 6b
-unfix 6a
-
-fix 7a all press/berendsen iso 1.0 1 1000 modulus ${modulus}
-fix 7b all temp/berendsen 298.15 298.15 100
-fix 7c all nve
+variable xl equal "xhi - xlo"
+variable yl equal "yhi - ylo"
+variable zl equal "zhi - zlo"
+fix 39a all ave/time 1 1000 1000 v_xl v_yl v_zl file xyzl.data
+fix 39b all press/berendsen iso 1.0 1 1000 modulus ${modulus}
+fix 39c all temp/berendsen 300 300 100
+fix 39d all nve
 run 1000000
-unfix 7c
-unfix 7b
-unfix 7a
+unfix 39d
+unfix 39c
+unfix 39b
+unfix 39a
 
-fix 8a all press/berendsen iso 1.0 1 1000 modulus ${modulus}
-fix 8b all temp/berendsen 298.15 298.15 100
-fix 8c all nve
+
+print "Final Boundary: xl = ${xl}, yl = ${yl}, zl = ${zl}"
+variable ave_xl python getXL
+python getXL input 1 xyzl.data return v_ave_xl format sf here "from nemd.pyfunc import getXL"
+variable ave_yl python getYL
+python getYL input 1 xyzl.data return v_ave_yl format sf here "from nemd.pyfunc import getYL"
+variable ave_zl python getZL
+python getZL input 1 xyzl.data return v_ave_zl format sf here "from nemd.pyfunc import getZL"
+print "Averaged  xl = ${ave_xl} yl = ${ave_yl} zl = ${ave_zl}"
+
+variable ave_xr equal "v_ave_xl / v_xl"
+variable ave_yr equal "v_ave_yl / v_yl"
+variable ave_zr equal "v_ave_zl / v_zl"
+change_box all x scale ${ave_xr} y scale ${ave_yr} z scale ${ave_zr} remap
+variable ave_xr delete
+variable ave_yr delete
+variable ave_zr delete
+variable ave_xl delete
+variable ave_yl delete
+variable ave_zl delete
+variable xl delete
+variable yl delete
+variable zl delete
+
+fix 41a all temp/berendsen 300 300 100
+fix 41b all nve
+run 10000
+unfix 41b
+unfix 41a
+
+fix 42a all nve
 run 1000000
-unfix 8c
-unfix 8b
-unfix 8a
+unfix 42a
 

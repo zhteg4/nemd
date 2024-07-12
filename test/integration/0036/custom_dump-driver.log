@@ -4,19 +4,19 @@ data_file: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/polymer_builder.
 task: clash
 sel: None
 last_pct: 0.2
-slice: 0, 9, 3
+slices: 0, 2, 1
 interactive: False
 jobname: custom_dump
 debug: False
 python: 2
 cpu: 7
-JobStart: 18:26:37 06/17/24
+JobStart: 16:35:17 07/12/24
 ...................................
-2400 atoms selected.
-3 trajectory frames found.
-clash analyze all frames and save per frame results ∈ [0.000, 5.000] ps
+3000 atoms selected.
+2 trajectory frames found.
+clash analyze all frames and save per frame results ∈ [0.000, 1.000] ps
 Clash count data written into custom_dump_clash.csv
-0 ± nan count ∈ [5.0000, 5.0000] ps
+0 ± nan count ∈ [1.0000, 1.0000] ps
 Clash count figure saved as custom_dump_clash.png
 Finished.
-18:26:44 06/17/24
+16:35:20 07/12/24

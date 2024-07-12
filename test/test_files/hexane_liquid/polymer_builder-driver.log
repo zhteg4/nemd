@@ -1,13 +1,13 @@
 ..........Command Options..........
-cru: O
+cru: CCCCCC
 cru_num: 1
-mol_num: 800
-seed: 1
+mol_num: 500
+seed: None
 cell: grow
 density: 0.8
 timestep: 1
 stemp: 10
-temp: 298.15
+temp: 300
 tdamp: 100
 press: 1
 pdamp: 1000
@@ -15,20 +15,16 @@ lj_cut: 11.0
 coul_cut: 11.0
 relax_time: 1
 prod_time: 1
-prod_ens: NPT
-force_field: FF_MODEL(ff='OPLSUA', model='SPC')
+prod_ens: NVE
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
 interactive: False
 jobname: polymer_builder
 debug: False
-cpu: 4
-JobStart: 09:24:45 04/23/24
+python: 2
+cpu: 7
+JobStart: 16:07:41 07/12/24
 ...................................
-Cubic box of size 31.04 angstrom is created.
-Placing 800 initiators into the cell...
-0%, 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80%, 90%, 100%
-800 initiators have been placed into the cell.
-(1.49 as the minimum pair distance)
 Data file written into polymer_builder.data
 In script written into polymer_builder.in
 Finished.
-09:26:03 04/23/24
+16:07:54 07/12/24

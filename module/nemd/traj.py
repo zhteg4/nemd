@@ -861,8 +861,8 @@ class DistanceCell(Frame):
         :return list of float: clash distances between atom pairs
         """
         xyz = self.xyz[gid, :]
-        neighbors = self.getNeighbors(xyz)
-        neighbors = self.excluded[gid].difference(neighbors)
+        neighbors = set(self.getNeighbors(xyz))
+        neighbors = neighbors.difference(self.excluded[gid])
         if not neighbors:
             return []
         neighbors = list(neighbors)
