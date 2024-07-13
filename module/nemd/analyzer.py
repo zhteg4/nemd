@@ -287,7 +287,7 @@ class RDF(Base):
         # self.data = pd.DataFrame(data={self.LABEL: rdf}, index=index)
         frms = self.frms[self.sidx:]
         span = np.array([x.box.span for x in frms])
-        vol = span.prod()
+        vol = span.prod(axis=1)
         self.log(f'The volume fluctuates: [{vol.min():.2f} {vol.max():.2f}] '
                  f'{symbols.ANGSTROM}^3')
 
@@ -372,7 +372,10 @@ class MSD(Base):
         frms = self.frms[self.sidx:]
         msd, num = [0], len(frms)
         for idx in range(1, num):
-            disp = [x.xyz[gids, :] - y.xyz[gids, :] for x, y in zip(frms[idx:], frms[:-idx])]
+            disp = [
+                x.xyz[gids, :] - y.xyz[gids, :]
+                for x, y in zip(frms[idx:], frms[:-idx])
+            ]
             data = np.array([np.linalg.norm(x, axis=1) for x in disp])
             sdata = np.square(data)
             msd.append(np.average(sdata.mean(axis=0), weights=masses))
