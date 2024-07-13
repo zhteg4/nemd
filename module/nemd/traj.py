@@ -297,11 +297,12 @@ class Frame(pd.DataFrame):
         :param grp1 list: list of gids as the atom selection
         :param grp2 list of list: each sublist contains atom ids to compute
             distances with one atom in grp1.
+        return numpy.ndarray: list of distance between pairs.
         """
         grp1 = self.index if grp1 is None else sorted(grp1)
         grp2 = (grp1[:i] for i in range(len(grp1))) if grp2 is None else grp2
         dists = [self.getDists(x, self.xyz[y, :]) for x, y in zip(grp2, grp1)]
-        return np.concatenate(dists) if dists else []
+        return np.concatenate(dists) if dists else np.array(dists)
 
     def getDists(self, ids, xyz):
         """

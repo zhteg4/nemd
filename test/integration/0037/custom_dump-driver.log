@@ -1,0 +1,24 @@
+..........Command Options..........
+custom_dump: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/dump.custom.gz
+data_file: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/polymer_builder.data
+task: rdf
+sel: C
+last_pct: 0.05
+slices: None
+interactive: False
+jobname: custom_dump
+debug: False
+python: 2
+cpu: 7
+JobStart: 21:17:32 07/12/24
+...................................
+3000 atoms selected.
+3 trajectory frames found.
+rdf average results from last 5.0% frames ∈ [ 2.000,  2.000] ps
+The volume fluctuates: [89438.76 89438.76] Å^3
+100%
+Radial distribution function data written into custom_dump_rdf.csv
+Peak position: 1.54; peak value:  56.09
+Radial distribution function figure saved as custom_dump_rdf.png
+Finished.
+21:17:35 07/12/24
