@@ -1,1 +1,1 @@
-cmp('custom_dump_rdf.csv', 'custom_dump_rdf.csv')
+cmp('custom_dump_rdf.csv', 'custom_dump_rdf.csv') and cmp('custom_dump_clash.csv', 'custom_dump_clash.csv') and cmp('custom_dump_msd.csv', 'custom_dump_msd.csv') and cmp('custom_dump_density.csv', 'custom_dump_density.csv') and cmp('custom_dump.xyz','custom_dump.xyz')

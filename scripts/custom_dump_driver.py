@@ -282,7 +282,7 @@ def get_parser(parser=None):
         FLAG_LAST_PCT,
         metavar=FLAG_LAST_PCT.upper(),
         type=functools.partial(parserutils.type_ranged_float,
-                               include_top=False,
+                               include_top=True,
                                top=1),
         default=0.2,
         help=f"{', '.join(LAST_FRM_TASKS)} average results from "

@@ -1,24 +1,35 @@
 ..........Command Options..........
 custom_dump: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/dump.custom.gz
 data_file: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/polymer_builder.data
-task: rdf
-sel: C
-last_pct: 0.05
+task: rdf, density, clash, msd, xyz
+sel: None
+last_pct: 1.0
 slices: None
 interactive: False
 jobname: custom_dump
 debug: False
 python: 2
 cpu: 7
-JobStart: 21:17:32 07/12/24
+JobStart: 22:08:43 07/12/24
 ...................................
 3000 atoms selected.
 3 trajectory frames found.
-rdf average results from last 5.0% frames ∈ [ 2.000,  2.000] ps
-The volume fluctuates: [89438.76 89438.76] Å^3
-100%
+density, clash, xyz analyze all frames and save per frame results ∈ [0.000, 2.000] ps
+rdf, density, msd average results from last 100.0% frames ∈ [ 0.000,  2.000] ps
+The volume fluctuates: [715446783203117.25 715446783203117.25] Å^3
+33%, 66%, 100%
 Radial distribution function data written into custom_dump_rdf.csv
-Peak position: 1.54; peak value:  56.09
+Peak position: 1.52; peak value:  48.15
 Radial distribution function figure saved as custom_dump_rdf.png
+Density data written into custom_dump_density.csv
+0.8 ± 1.36e-16 g/cm^3 ∈ [0.0000, 2.0000] ps
+Density figure saved as custom_dump_density.png
+Clash count data written into custom_dump_clash.csv
+75.33 ± 130.5 count ∈ [0.0000, 2.0000] ps
+Clash count figure saved as custom_dump_clash.png
+Mean squared displacement data written into custom_dump_msd.csv
+4.496e-05 ± 2.884e-06 cm^2/s (R-squared: 0.9959) linear fit of [0.0000 2.0000] ps
+Mean squared displacement figure saved as custom_dump_msd.png
+XYZ coordinates are written into custom_dump.xyz
 Finished.
-21:17:35 07/12/24
+22:08:49 07/12/24

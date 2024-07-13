@@ -120,7 +120,7 @@ def type_ranged_float(arg,
         raise argparse.ArgumentTypeError(f'{value} is larger than {bottom}.')
     if not include_top and value >= top:
         raise argparse.ArgumentTypeError(
-            f'{value} should be smaller than {bottom}.')
+            f'{value} should be smaller than {top}.')
     return value
 
 

@@ -367,11 +367,12 @@ class MSD(Base):
             self.log_warning("No atoms selected for MSD.")
             self.data = pd.DataFrame({self.LABEL: []})
             return
+        gids = list(self.gids)
         masses = self.df_reader.masses.mass[self.df_reader.atoms.type_id]
         frms = self.frms[self.sidx:]
         msd, num = [0], len(frms)
         for idx in range(1, num):
-            disp = [x - y for x, y in zip(frms[idx:], frms[:-idx])]
+            disp = [x.xyz[gids, :] - y.xyz[gids, :] for x, y in zip(frms[idx:], frms[:-idx])]
             data = np.array([np.linalg.norm(x, axis=1) for x in disp])
             sdata = np.square(data)
             msd.append(np.average(sdata.mean(axis=0), weights=masses))
