@@ -1354,6 +1354,17 @@ class DataFileReader(lammpsin.In):
             mols[mid].append(gid)
         return dict(mols)
 
+    @property
+    def molecular_weight(self):
+        """
+        The molecular weight of the polymer.
+
+        :return float: the total weight.
+        """
+        return self.masses.mass[self.atoms.type_id].sum()
+
+    mw = molecular_weight
+
 
 class Radius(numpyutils.Array):
     """

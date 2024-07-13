@@ -71,22 +71,22 @@ class EXIST:
     The class to perform file existence check.
     """
 
-    def __init__(self, target, job=None):
+    def __init__(self, *args, job=None):
         """
         :param original str: the original filename
-        :param target str: the target filename
+        :param args str: the target filenames
         :param job 'signac.contrib.job.Job': the signac job instance
         """
-        self.target = target.strip().strip('\'"')
+        self.targets = [x.strip().strip('\'"') for x in args]
         self.job = job
 
     def run(self):
         """
-        The main method to check the existence of a file.
+        The main method to check the existence of files.
         """
-        self.target = self.job.fn(self.target)
-        if not os.path.isfile(self.target):
-            raise FileNotFoundError(f"{self.target} not found")
+        for target in self.targets:
+            if not os.path.isfile(self.job.fn(target)):
+                raise FileNotFoundError(f"{self.job.fn(target)} not found")
 
 
 class NOT_EXIST(EXIST):
@@ -98,9 +98,9 @@ class NOT_EXIST(EXIST):
         """
         The main method to check the existence of a file.
         """
-        self.target = self.job.fn(self.target)
-        if os.path.isfile(self.target):
-            raise FileNotFoundError(f"{self.target} found")
+        for target in self.targets:
+            if os.path.isfile(self.job.fn(target)):
+                raise FileNotFoundError(f"{self.job.fn(target)} found")
 
 
 class CMP:

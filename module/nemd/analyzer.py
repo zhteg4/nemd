@@ -101,6 +101,8 @@ class Base:
         :param log 'function': the function to print user-facing information
         :return int, int: the start and end index for the selected data
         """
+        if data.empty:
+            return 0, None
         sidx = int(re.findall(cls.TIME_RE, data.index.name)[0])
         sel = data.iloc[sidx:]
         ave = sel.mean().iloc[0]
@@ -361,10 +363,11 @@ class MSD(Base):
         """
         Set the mean squared displacement and diffusion coefficient.
         """
-
-        masses = [
-            self.df_reader.masses[x.type_id].mass for x in self.df_reader.atom
-        ]
+        if not self.gids:
+            self.log_warning("No atoms selected for MSD.")
+            self.data = pd.DataFrame({self.LABEL: []})
+            return
+        masses = self.df_reader.masses.mass[self.df_reader.atoms.type_id]
         frms = self.frms[self.sidx:]
         msd, num = [0], len(frms)
         for idx in range(1, num):
@@ -388,6 +391,8 @@ class MSD(Base):
         :param log 'function': the function to print user-facing information
         :return int, int: the start and end index for the selected data
         """
+        if data.empty:
+            return None, None
         num = data.shape[0]
         sidx = math.floor(num * spct)
         eidx = math.ceil(num * (1 - epct))
@@ -418,6 +423,10 @@ class Clash(Base):
         """
         Set the time vs clash number.
         """
+        if not self.gids:
+            self.log_warning("No atoms selected for clash counting.")
+            self.data = pd.DataFrame({self.LABEL: []})
+            return
         dcell = traj.DistanceCell(gids=set(self.gids), struct=self.df_reader)
         data = []
         for frm in self.frms:

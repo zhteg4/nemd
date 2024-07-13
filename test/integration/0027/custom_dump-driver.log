@@ -1,24 +1,27 @@
 ..........Command Options..........
 custom_dump: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/dump.custom.gz
 data_file: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/polymer_builder.data
-task: rdf
+task: rdf, clash, density, msd, xyz
 sel: O
 last_pct: 0.05
-slice: None
+slices: None
 interactive: False
 jobname: custom_dump
 debug: False
 python: 2
-cpu: 4
-JobStart: 17:21:39 05/02/24
+cpu: 7
+JobStart: 21:40:36 07/12/24
 ...................................
-800 atoms selected.
-904 trajectory frames found.
-rdf average results from last 5.0% frames ∈ [ 858.000,  902.000] ps
-The volume fluctuates: [24307.87 25192.77] Å^3
-2%, 11%, 20%, 31%, 40%, 51%, 60%, 71%, 80%, 91%, 100%
-Radial distribution function data written into custom_dump_rdf.csv
-Peak position: 2.82; peak value:  2.76
-Radial distribution function figure saved as custom_dump_rdf.png
+0 atoms selected.
+3 trajectory frames found.
+clash, density, xyz analyze all frames and save per frame results ∈ [0.000, 2.000] ps
+rdf, density, msd average results from last 5.0% frames ∈ [ 2.000,  2.000] ps
+RDF requires least two atoms selected.
+No atoms selected for clash counting.
+Density data written into custom_dump_density.csv
+0.8 ± nan g/cm^3 ∈ [2.0000, 2.0000] ps
+Density figure saved as custom_dump_density.png
+No atoms selected for MSD.
+XYZ coordinates are written into custom_dump.xyz
 Finished.
-17:21:44 05/02/24
+21:40:36 07/12/24
