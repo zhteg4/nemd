@@ -1179,6 +1179,7 @@ class DataFileReader(lammpsin.In):
         self.data_file = data_file
         self.contents = contents
         self.lines = None
+        self.box = None
         self.name = {}
         if delay:
             return
@@ -1211,6 +1212,11 @@ class DataFileReader(lammpsin.In):
             # The block name occupies one lien and there is one empty line below
             names[match.group()] = idx + 2
 
+        lines = self.lines[:min(names.values())]
+        # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
+        box_lines = [x for x in lines if Box.RE.match(x)]
+        self.box = Box.fromLines(box_lines)
+
         counts = {}
         for line in self.lines[:min(names.values())]:
             match = self.COUNT_RE.match(line)
@@ -1226,19 +1232,6 @@ class DataFileReader(lammpsin.In):
             idx = names[block_class.NAME]
             count = counts[block_class.LABEL]
             self.name[block_class.NAME] = slice(idx, idx + count)
-
-    @property
-    @functools.cache
-    def box(self):
-        """
-        Parse the box section.
-
-        :return `Box`: the box
-        """
-        lines = self.lines[:min(self.blk_idx.values())]
-        # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
-        box_lines = [x for x in lines if Box.RE.match(x)]
-        return Box.fromLines(box_lines)
 
     @property
     @functools.cache
@@ -1327,18 +1320,18 @@ class DataFileReader(lammpsin.In):
         lines = self.lines[self.name[BlockClass.NAME]]
         return BlockClass.fromLines(lines)
 
-    def gidFromEle(self, ele):
+    @property
+    def elements(self, name='element'):
         """
-        Get global atom ids matching the element.
+        The elements of all atoms.
 
-        :param list: global atom ids.
+        :param name: the name of the element column.
+        :type name: str
+        :return: the element dataframe with atom ids
+        :rtype: `pd.DataFrame`
         """
-        if ele is None:
-            return self.atoms.index.tolist()
-
-        comment = self.masses.comment
-        type_ids = [i for i, x in comment.items() if x.split()[-2] == ele]
-        return self.atoms.index[self.atoms[TYPE_ID].isin(type_ids)].tolist()
+        data = self.masses.element[self.atoms.type_id]
+        return pd.DataFrame(data, index=self.atoms.index, columns=[name])
 
     @property
     @functools.cache

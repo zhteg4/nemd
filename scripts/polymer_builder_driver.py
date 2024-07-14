@@ -24,7 +24,6 @@ from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
 from nemd import structure
-from nemd import lammpsdata
 from nemd import rdkitutils
 from nemd import structutils
 from nemd import parserutils

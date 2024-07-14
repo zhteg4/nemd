@@ -11,7 +11,6 @@ import io
 import os
 import math
 import gzip
-import sys
 
 import numba
 import types
@@ -121,7 +120,7 @@ class Frame(pd.DataFrame):
                  data=None,
                  box=None,
                  index=None,
-                 columns=XYZU,
+                 columns=None,
                  step=None,
                  dtype=None,
                  **kwargs):
@@ -133,13 +132,11 @@ class Frame(pd.DataFrame):
         :param step int: the number of simulation step that this frame is at
         :param dtype str: the data type of the frame
         """
-        super().__init__(data=data,
-                         index=index,
-                         columns=columns,
-                         dtype=dtype,
-                         **kwargs)
+        super().__init__(data=data, index=index, dtype=dtype, **kwargs)
         self.box = box
         self.step = step
+        cols = self.XYZU if columns is None else columns
+        self.rename(columns={i: x for i, x in enumerate(cols)}, inplace=True)
         self.xyz = XYZ(self)
         if not isinstance(data, Frame):
             return

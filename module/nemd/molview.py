@@ -19,7 +19,6 @@ class FrameView:
     ELEMENT = traj.Frame.ELEMENT
     SIZE = 'size'
     COLOR = 'color'
-    ELE_SZ_CLR = dict(element=None, size=None, color=None)
 
     def __init__(self, df_reader=None, scale=5.):
         """
@@ -41,29 +40,20 @@ class FrameView:
         """
         if not self.df_reader:
             return
-        # Index, XU, YU, ZU
-        index = list(self.df_reader.atoms.keys())
-        xyz = np.array([x.xyz for x in self.df_reader.atom])
-        data = pd.DataFrame(xyz, index, columns=self.XYZU)
-        # Element, Size, Color
-        ele_sz_clr = self.ELE_SZ_CLR.copy()
-        self.df_reader.setMinimumDist()
-        type_ids = [x.type_id for x in self.df_reader.atom]
-        element = {x: y.ele for x, y in self.df_reader.masses.items()}
-        ele_sz_clr[self.ELEMENT] = [element[x] for x in type_ids]
-        ele_sz_clr[self.SIZE] = [
-            self.df_reader.vdws[x].dist * self.scale for x in type_ids
-        ]
-        color = {
-            x: nmendeleev.element(y).cpk_color
-            for x, y in element.items()
+        elements = self.df_reader.elements
+        size_map = {i: x for i, x in self.df_reader.pair_coeffs.dist.items()}
+        sizes = self.df_reader.atoms.type_id.map(size_map).to_frame()
+        unique_elements = set(self.df_reader.masses.element)
+        color_map = {
+            x: nmendeleev.element(x).cpk_color
+            for x in unique_elements
         }
-        ele_sz_clr[self.COLOR] = [color[x] for x in type_ids]
-        sz_clr = pd.DataFrame(ele_sz_clr, index=index)
-        data = pd.concat((data, sz_clr), axis=1)
-        box = self.df_reader.getBox()
-        columns = traj.Frame.XYZU_ELE_SZ_CLR
-        self.data = traj.Frame(data, box=box, columns=columns, dtype=None)
+        colors = elements.element.map(color_map).to_frame()
+        data = [self.df_reader.atoms[self.XYZU], elements, sizes, colors]
+        self.data = traj.Frame(pd.concat(data, axis=1),
+                               box=self.df_reader.box,
+                               columns=traj.Frame.XYZU_ELE_SZ_CLR)
+        breakpoint()
 
     def updateDataWithFrm(self, frm):
         """

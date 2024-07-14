@@ -131,7 +131,12 @@ class CustomDump(object):
         """
         if not self.df_reader:
             return
-        self.gids = self.df_reader.gidFromEle(self.options.sel)
+        if self.options.sel is None:
+            self.gids = self.df_reader.elements.index.tolist()
+            log(f"{len(self.gids)} atoms selected.")
+            return
+        selected = self.df_reader.elements.element.isin([self.options.sel])
+        self.gids = self.df_reader.elements.index[selected].tolist()
         log(f"{len(self.gids)} atoms selected.")
 
     def setFrames(self, start=0):

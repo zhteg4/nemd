@@ -12,13 +12,13 @@ LAMMPS Description # full
 0 dihedral types
 0 improper types
 
--3.46 47.55 xlo xhi # 0.00 51.00
--3.68 47.32 ylo yhi # 0.00 51.00
--3.34 47.66 zlo zhi # 0.00 51.00
+-3.46 47.55 xlo xhi
+-3.68 47.32 ylo yhi
+-3.34 47.66 zlo zhi
 
 Masses
 
-1 39.948 # Argon Atom Ar 211
+1 39.948 # Argon Atom Ar 211 #
 
 Pair Coeffs
 
