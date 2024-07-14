@@ -210,10 +210,6 @@ class Box(Block):
         """
         return cls(data={cls.LO: cls.ORIGIN, cls.HI: edges})
 
-    @property
-    def edges(self):
-        breakpoint()
-
     def write(self, fh, index=False, **kwargs):
         """
         Write the box into the handler.
@@ -249,17 +245,19 @@ class Box(Block):
         """
         Get the edges from point list of low and high points.
 
-        :return list of list: each sublist contains two points describing one
-            edge.
+        :return 12x2x3 numpy.ndarray: 12 edges of the box, and each edge
+            contains two points.
         """
         # Three edges starting from the [xlo, ylo, zlo]
-        lo_edges = [[self.lo.values[:], self.lo.values[:]] for _ in range(3)]
-        for index, hi in enumerate(self.hi):
-            lo_edges[index][1][index] = hi
+        lo_xyzs = np.array([self.lo.values] * 3)
+        lo_points = lo_xyzs.copy()
+        np.fill_diagonal(lo_points, self.hi)
+        lo_edges = np.stack((lo_xyzs, lo_points), axis=1)
         # Three edges starting from the [xhi, yhi, zhi]
-        hi_edges = [[self.hi.values[:], self.hi.values[:]] for _ in range(3)]
-        for index, lo in enumerate(self.lo):
-            hi_edges[index][1][index] = lo
+        hi_xyzs = np.array([self.hi.values] * 3)
+        hi_points = hi_xyzs.copy()
+        np.fill_diagonal(hi_points, self.lo)
+        hi_edges = np.stack((hi_xyzs, hi_points), axis=1)
         # Six edges connecting the open ends of the known edges
         spnts = collections.deque([x[1] for x in lo_edges])
         epnts = collections.deque([x[1] for x in hi_edges])
@@ -267,7 +265,7 @@ class Box(Block):
         oedges = [[x, y] for x, y in zip(spnts, epnts)]
         epnts.rotate(1)
         oedges += [[x, y] for x, y in zip(spnts, epnts)]
-        return lo_edges + hi_edges + oedges
+        return np.concatenate((lo_edges, hi_edges, np.array(oedges)))
 
 
 class Mass(Block):

@@ -32,6 +32,7 @@ class FrameView:
         self.fig = graph_objects.Figure()
         self.scale = scale
         self.data = None
+        self.ele_sz = None
         self.markers = []
         self.lines = []
         self.edges = []
@@ -49,51 +50,7 @@ class FrameView:
         color_map = {x: nmendeleev.element(x).cpk_color for x in uq_elements}
         colors = elements.element.map(color_map).to_frame(name=self.COLOR)
         data = [self.df_reader.atoms[self.XYZU], elements, sizes, colors]
-        self.data = traj.Frame(pd.concat(data, axis=1),
-                               box=self.df_reader.box,
-                               columns=self.XYZU_ELE_SZ_CLR)
-
-    def updateDataWithFrm(self, frm):
-        """
-        Update the data according to the trajectory frame.
-
-        :param frm 'nemd.traj.Frame': coordinate frame to update with
-        """
-        self.data[self.XYZU] = frm[self.XYZU]
-        self.data.box = frm.box
-
-    def addTraces(self):
-        """
-        Add traces to the figure.
-        """
-        self.fig.add_traces(self.markers + self.lines + self.edges)
-
-    def setFrames(self, frms):
-        """
-        Set animation from trajectory frames.
-
-        :param frms generator of 'nemd.traj.Frame': the trajectory frames to
-            create the animation from.
-        """
-        if self.data is None:
-            frm = self.setDataFromTraj(frms)
-            frms = itertools.chain([frm], frms)
-            self.setEleSz()
-            self.setScatters()
-            self.setLines()
-            self.setEdges()
-            self.addTraces()
-
-        fig_frms = []
-        for idx, frm in enumerate(frms):
-            self.updateDataWithFrm(frm)
-            self.setScatters()
-            self.setLines()
-            self.setEdges()
-            data = self.markers + self.lines + self.edges
-            fig_frm = graph_objects.Frame(data=data, name=f'{idx}')
-            fig_frms.append(fig_frm)
-        self.fig.update(frames=fig_frms)
+        self.data = traj.Frame(pd.concat(data, axis=1), box=self.df_reader.box)
 
     def setDataFromTraj(self, frms):
         """
@@ -101,38 +58,27 @@ class FrameView:
 
         :param frms generator of 'nemd.traj.Frame': the trajectory frames to
             create the animation from.
-
-        :return 'nemd.traj.Frame': the first trajectory frame.
         """
-        # peekable doesn't work for yield generator
+        if self.df_reader:
+            return
+        # Peekable doesn't work for yield generator
         frm = more_itertools.peekable(frms).peek()
-        ele_sz_clr = self.ELE_SZ_CLR.copy()
-        try:
-            ele_sz_clr[self.ELEMENT] = frm.pop(self.ELEMENT)
-        except KeyError:
-            ele_sz_clr[self.ELEMENT] = [self.X_ELE] * frm.shape[0]
-            ele_sz_clr[self.COLOR] = [self.X_COLOR] * frm.shape[0]
-        else:
-            element = set(ele_sz_clr[self.ELEMENT])
-            color = {
-                x:
-                self.X_COLOR
-                if x == self.X_ELE else nmendeleev.element(x).cpk_color
-                for x in element
-            }
-            ele_sz_clr[self.COLOR] = [
-                color[x] for x in ele_sz_clr[self.ELEMENT]
-            ]
-        finally:
-            ele_sz_clr[self.SIZE] = [self.X_SIZE] * frm.shape[0]
-
-        sz_clr = pd.DataFrame(ele_sz_clr, index=range(1, frm.shape[0] + 1))
+        data = {self.ELEMENT: [self.X_ELE] * frm.shape[0]}
+        data[self.SIZE] = [self.X_SIZE] * frm.shape[0]
+        data[self.COLOR] = [self.X_COLOR] * frm.shape[0]
+        sz_clr = pd.DataFrame(data)
         data = pd.concat((frm, sz_clr), axis=1)
-        self.data = traj.Frame(data,
-                               box=frm.getBox(),
-                               columns=traj.Frame.XYZU_ELE_SZ_CLR,
-                               dtype=None)
-        return frm
+        self.data = traj.Frame(data, box=frm.box)
+
+    def setEleSz(self):
+        """
+        Set elements and sizes.
+        """
+        if self.data is None:
+            return
+        ele_sz = self.data[[self.ELEMENT, self.SIZE]]
+        ele_sz = set([tuple(y.values) for x, y in ele_sz.iterrows()])
+        self.ele_sz = sorted(set(ele_sz), key=lambda x: x[1], reverse=True)
 
     def setScatters(self):
         """
@@ -158,16 +104,6 @@ class FrameView:
                                              hovertemplate='%{customdata}',
                                              customdata=data.index.values)
             self.markers.append(marker)
-
-    def setEleSz(self):
-        """
-        Set elements and sizes.
-        """
-        if self.data is None:
-            return
-        ele_sz = self.data[[self.ELEMENT, self.SIZE]]
-        ele_sz = set([tuple(y.values) for x, y in ele_sz.iterrows()])
-        self.ele_sz = sorted(set(ele_sz), key=lambda x: x[1], reverse=True)
 
     def setLines(self):
         """
@@ -234,6 +170,48 @@ class FrameView:
                                        hoverinfo='skip',
                                        line=dict(width=8, color='#b300ff'))
         self.edges.append(edge)
+
+    def updateDataWithFrm(self, frm):
+        """
+        Update the data according to the trajectory frame.
+
+        :param frm 'nemd.traj.Frame': coordinate frame to update with
+        """
+        self.data[self.XYZU] = frm[self.XYZU]
+        self.data.box = frm.box
+
+    def addTraces(self):
+        """
+        Add traces to the figure.
+        """
+        self.fig.add_traces(self.markers + self.lines + self.edges)
+
+    def setFrames(self, frms):
+        """
+        Set animation from trajectory frames.
+
+        :param frms generator of 'nemd.traj.Frame': the trajectory frames to
+            create the animation from.
+        """
+        if self.data is None:
+            frm = self.setDataFromTraj(frms)
+            frms = itertools.chain([frm], frms)
+            self.setEleSz()
+            self.setScatters()
+            self.setLines()
+            self.setEdges()
+            self.addTraces()
+
+        fig_frms = []
+        for idx, frm in enumerate(frms):
+            self.updateDataWithFrm(frm)
+            self.setScatters()
+            self.setLines()
+            self.setEdges()
+            data = self.markers + self.lines + self.edges
+            fig_frm = graph_objects.Frame(data=data, name=f'{idx}')
+            fig_frms.append(fig_frm)
+        self.fig.update(frames=fig_frms)
 
     def clearData(self):
         """

@@ -271,18 +271,6 @@ class Frame(pd.DataFrame):
         """
         return np.prod(self.box.span)
 
-    def getEdges(self):
-        """
-        Get the edges of the box.
-
-        :return list of list: each sublist contains two points describing one
-            edge.
-        """
-        box = self.getBox()
-        if box is None:
-            return []
-        return lammpsdata.DataFileReader.getEdgesFromList(box)
-
     def pairDists(self, grp1=None, grp2=None):
         """
         Get the distance between atom pair.
