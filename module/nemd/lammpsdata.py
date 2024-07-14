@@ -165,6 +165,7 @@ class Block(pd.DataFrame):
 class Box(Block):
 
     NAME = ''
+    LABEL = 'box'
     LO, HI = 'lo', 'hi'
     INDEX = ['x', 'y', 'z']
     ORIGIN = [0, 0, 0]
@@ -209,11 +210,16 @@ class Box(Block):
         """
         return cls(data={cls.LO: cls.ORIGIN, cls.HI: edges})
 
+    @property
+    def edges(self):
+        breakpoint()
+
     def write(self, fh, index=False, **kwargs):
         """
         Write the box into the handler.
 
-        :param hdl `_io.TextIOWrapper` or `_io.StringIO`: write to this handler
+        :param hdl `_io.TextIOWrapper` or `_io.StringIO`: write to this handler.
+        :param index `bool`: whether to write the index.
         """
         super().write(fh, index=index, **kwargs)
 
@@ -237,6 +243,31 @@ class Box(Block):
         """
         point = np.random.rand(3) * self.span
         return point + self.lo
+
+    @property
+    def edges(self):
+        """
+        Get the edges from point list of low and high points.
+
+        :return list of list: each sublist contains two points describing one
+            edge.
+        """
+        # Three edges starting from the [xlo, ylo, zlo]
+        lo_edges = [[self.lo.values[:], self.lo.values[:]] for _ in range(3)]
+        for index, hi in enumerate(self.hi):
+            lo_edges[index][1][index] = hi
+        # Three edges starting from the [xhi, yhi, zhi]
+        hi_edges = [[self.hi.values[:], self.hi.values[:]] for _ in range(3)]
+        for index, lo in enumerate(self.lo):
+            hi_edges[index][1][index] = lo
+        # Six edges connecting the open ends of the known edges
+        spnts = collections.deque([x[1] for x in lo_edges])
+        epnts = collections.deque([x[1] for x in hi_edges])
+        epnts.rotate(1)
+        oedges = [[x, y] for x, y in zip(spnts, epnts)]
+        epnts.rotate(1)
+        oedges += [[x, y] for x, y in zip(spnts, epnts)]
+        return lo_edges + hi_edges + oedges
 
 
 class Mass(Block):
@@ -1179,7 +1210,6 @@ class DataFileReader(lammpsin.In):
         self.data_file = data_file
         self.contents = contents
         self.lines = None
-        self.box = None
         self.name = {}
         if delay:
             return
@@ -1212,11 +1242,6 @@ class DataFileReader(lammpsin.In):
             # The block name occupies one lien and there is one empty line below
             names[match.group()] = idx + 2
 
-        lines = self.lines[:min(names.values())]
-        # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
-        box_lines = [x for x in lines if Box.RE.match(x)]
-        self.box = Box.fromLines(box_lines)
-
         counts = {}
         for line in self.lines[:min(names.values())]:
             match = self.COUNT_RE.match(line)
@@ -1232,6 +1257,21 @@ class DataFileReader(lammpsin.In):
             idx = names[block_class.NAME]
             count = counts[block_class.LABEL]
             self.name[block_class.NAME] = slice(idx, idx + count)
+
+        lines = self.lines[:min(names.values())]
+        # 'xlo xhi': [-7.12, 35.44], 'ylo yhi': [-7.53, 34.26], ..
+        box_lines = [i for i, x in enumerate(lines) if Box.RE.match(x)]
+        self.name[Box.LABEL] = slice(min(box_lines), max(box_lines) + 1)
+
+    @property
+    @functools.cache
+    def box(self):
+        """
+        Parse the box section.
+
+        :return `Box`: the box
+        """
+        return self.fromLines(Box)
 
     @property
     @functools.cache
@@ -1315,9 +1355,10 @@ class DataFileReader(lammpsin.In):
         :param BlockClass: the class to handle a block.
         :return BlockClass: the parsed block.
         """
-        if BlockClass.NAME not in self.name:
+        name = BlockClass.NAME if BlockClass.NAME else BlockClass.LABEL
+        if name not in self.name:
             return BlockClass.fromLines([])
-        lines = self.lines[self.name[BlockClass.NAME]]
+        lines = self.lines[self.name[name]]
         return BlockClass.fromLines(lines)
 
     @property

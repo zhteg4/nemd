@@ -12,12 +12,14 @@ class FrameView:
     """Viewer datafile and trajectory frame"""
 
     XYZU = traj.Frame.XYZU
+    ELEMENT = 'element'
+    SIZE = 'size'
+    COLOR = 'color'
+    XYZU_ELE_SZ_CLR = XYZU + [ELEMENT, SIZE, COLOR]
     X_ELE = 'X'
     X_SIZE = 20
     # Color from https://webmail.life.nthu.edu.tw/~fmhsu/rasframe/CPKCLRS.HTM
     X_COLOR = '#FF1493'
-    ELEMENT = traj.Frame.ELEMENT
-    SIZE = 'size'
     COLOR = 'color'
 
     def __init__(self, df_reader=None, scale=5.):
@@ -41,19 +43,15 @@ class FrameView:
         if not self.df_reader:
             return
         elements = self.df_reader.elements
-        size_map = {i: x for i, x in self.df_reader.pair_coeffs.dist.items()}
-        sizes = self.df_reader.atoms.type_id.map(size_map).to_frame()
-        unique_elements = set(self.df_reader.masses.element)
-        color_map = {
-            x: nmendeleev.element(x).cpk_color
-            for x in unique_elements
-        }
-        colors = elements.element.map(color_map).to_frame()
+        smap = {i: x for i, x in self.df_reader.pair_coeffs.dist.items()}
+        sizes = self.df_reader.atoms.type_id.map(smap).to_frame(name=self.SIZE)
+        uq_elements = set(self.df_reader.masses.element)
+        color_map = {x: nmendeleev.element(x).cpk_color for x in uq_elements}
+        colors = elements.element.map(color_map).to_frame(name=self.COLOR)
         data = [self.df_reader.atoms[self.XYZU], elements, sizes, colors]
         self.data = traj.Frame(pd.concat(data, axis=1),
                                box=self.df_reader.box,
-                               columns=traj.Frame.XYZU_ELE_SZ_CLR)
-        breakpoint()
+                               columns=self.XYZU_ELE_SZ_CLR)
 
     def updateDataWithFrm(self, frm):
         """
@@ -62,7 +60,7 @@ class FrameView:
         :param frm 'nemd.traj.Frame': coordinate frame to update with
         """
         self.data[self.XYZU] = frm[self.XYZU]
-        self.data.setBox(frm.getBox())
+        self.data.box = frm.box
 
     def addTraces(self):
         """
@@ -181,6 +179,7 @@ class FrameView:
         if self.df_reader is None:
             return
         self.lines = []
+        return
         for bond in self.df_reader.bonds.values():
             atom1 = self.df_reader.atoms[bond.id1]
             atom2 = self.df_reader.atoms[bond.id2]
@@ -216,8 +215,7 @@ class FrameView:
         Set box edges.
         """
         self.edges = []
-        edges = self.data.getEdges()
-        for edge in edges:
+        for edge in self.data.box.edges:
             self.setEdge(edge)
 
     def setEdge(self, xyzs):

@@ -107,10 +107,6 @@ class Frame(pd.DataFrame):
     """
 
     XYZU = symbols.XYZU
-    ELEMENT = 'element'
-    SIZE = 'size'
-    COLOR = 'color'
-    XYZU_ELE_SZ_CLR = XYZU + [ELEMENT, SIZE, COLOR]
 
     # https://pandas.pydata.org/docs/development/extending.html
     _internal_names = pd.DataFrame._internal_names + ['box', 'step', 'xyz']
