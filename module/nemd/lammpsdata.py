@@ -249,12 +249,12 @@ class Box(Block):
             contains two points.
         """
         # Three edges starting from the [xlo, ylo, zlo]
-        lo_xyzs = np.array([self.lo.values] * 3)
+        lo_xyzs = np.array([self.lo.values] * 3, dtype=float)
         lo_points = lo_xyzs.copy()
-        np.fill_diagonal(lo_points, self.hi)
+        np.fill_diagonal(lo_points, self.hi.values)
         lo_edges = np.stack((lo_xyzs, lo_points), axis=1)
         # Three edges starting from the [xhi, yhi, zhi]
-        hi_xyzs = np.array([self.hi.values] * 3)
+        hi_xyzs = np.array([self.hi.values] * 3, dtype=float)
         hi_points = hi_xyzs.copy()
         np.fill_diagonal(hi_points, self.lo)
         hi_edges = np.stack((hi_xyzs, hi_points), axis=1)
@@ -1161,8 +1161,8 @@ class Struct(structure.Struct, lammpsin.In):
         bonds, angles = list(map(list, zip(*data)))
         bonds = Bond.concat([x for x in bonds if not x.empty])
         angles = Angle.concat([x for x in angles if not x.empty])
-        bond_types = self.bnd_types[bonds].flatten()
-        angle_types = self.ang_types[angles].flatten()
+        bond_types = self.bnd_types.map(bonds.values.flatten())
+        angle_types = self.ang_types.map(angles.values.flatten())
         return [' '.join(map(str, x)) for x in [bond_types, angle_types]]
 
     def hasCharge(self):

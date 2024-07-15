@@ -1,0 +1,2 @@
+# Water trajectory visualizer
+run_nemd custom_dump_driver.py $NEMD_SRC/test/test_files/water/dump.custom.gz -data_file $NEMD_SRC/test/test_files/water/polymer_builder.data -task view -last_pct 0.9

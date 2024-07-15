@@ -19,15 +19,13 @@ class FrameView:
     X_COLOR = '#FF1493'
     ELE_SZ_CLR = {ELEMENT: X_ELE, SIZE: X_SIZE, COLOR: X_COLOR}
 
-    def __init__(self, df_reader=None, scale=5.):
+    def __init__(self, df_reader=None):
         """
         :param df_reader `nemd.oplsua.DataFileReader`: datafile reader with
             atom, bond, element and other info.
-        :param scale float: scale the LJ dist by this to obtain marker size.
         """
         self.df_reader = df_reader
         self.fig = graph_objects.Figure()
-        self.scale = scale
         self.data = None
         self.elements = None
 
@@ -102,7 +100,7 @@ class FrameView:
 
         data = []
         for _, _, atom_id1, atom_id2 in self.df_reader.bonds.itertuples():
-            pnts = self.df_reader.atoms.loc[[atom_id1, atom_id2]][self.XYZU]
+            pnts = self.data.loc[[atom_id1, atom_id2]][self.XYZU]
             pnts = pd.concat([pnts, pnts.mean().to_frame().transpose()])
             data.append(self.getLine(pnts[::2], atom_id1))
             data.append(self.getLine(pnts[1::], atom_id2))
@@ -230,10 +228,12 @@ class FrameView:
         ]
         return [slider]
 
-    def getScene(self, autorange=True):
+    def getScene(self, autorange=False):
         """
         Return the scene with axis range and styles.
 
+        :param autorange bool: whether to let the axis range be adjusted
+            automatically.
         :return dict: keyword arguments for preference.
         """
         data = None
@@ -253,25 +253,31 @@ class FrameView:
             return
         dmin = data.min(axis=0)
         dmax = data.max(axis=0)
-        dspan = (dmax - dmin).max()
+        dspan = (dmax - dmin).max() / 2
         cnt = data.mean(axis=0)
-        lbs = cnt - dspan
-        hbs = cnt + dspan
+        lbs = (cnt - dspan)
+        hbs = (cnt + dspan)
         return dict(xaxis=dict(range=[lbs[0], hbs[0]], autorange=autorange),
                     yaxis=dict(range=[lbs[1], hbs[1]], autorange=autorange),
                     zaxis=dict(range=[lbs[2], hbs[2]], autorange=autorange),
                     aspectmode='cube')
 
-    def show(self, *arg, **kwargs):
+    def show(self, *arg, outfile=None, inav=False, **kwargs):
         """
         Show the figure with plot.
-        """
-        self.fig.show(*arg, **kwargs)
 
-    def clearData(self):
+        :param outfile str: the output file name for the figure.
+        :param inav bool: whether to show the figure in an interactive viewer.
         """
-        Clear the atom and bond plots.
+        self.fig.write_html(outfile)
+        if inav:
+            self.fig.show(*arg, **kwargs)
+
+    def reset(self):
         """
-        self.data = None
+        Reset the state.
+        """
         self.fig.data = []
         self.fig.frames = []
+        self.data = None
+        self.elements = None

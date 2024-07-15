@@ -502,16 +502,19 @@ class View(Base):
     """
 
     NAME = 'view'
+    DESCR = 'trajectory visualization'
+    HTML_EXT = '.html'
 
     def run(self):
         """
         Main method to run the visualization.
         """
-
         frm_vw = molview.FrameView(df_reader=self.df_reader)
         frm_vw.setData(self.frms[0])
         frm_vw.setElements()
         frm_vw.addTraces()
         frm_vw.setFrames(self.frms)
         frm_vw.updateLayout()
-        frm_vw.show()
+        outfile = f"{self.options.jobname}_{self.NAME}{self.HTML_EXT}"
+        frm_vw.show(outfile=outfile, inav=self.options.interactive)
+        self.log(f'{self.DESCR.capitalize()} data written into {outfile}')

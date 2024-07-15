@@ -1,0 +1,31 @@
+..........Command Options..........
+cru: O
+cru_num: 1
+mol_num: 3
+seed: None
+cell: grow
+density: 0.5
+timestep: 1
+stemp: 10
+temp: 300
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 1
+prod_time: 1
+prod_ens: NVE
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+interactive: False
+jobname: polymer_builder
+debug: False
+python: 2
+cpu: 7
+JobStart: 16:49:49 07/15/24
+...................................
+The minimum box span (5.64 Å) is smaller than 22.00 Å (Lennard-Jones Cutoff x 2) 
+Data file written into polymer_builder.data
+In script written into polymer_builder.in
+Finished.
+16:49:50 07/15/24

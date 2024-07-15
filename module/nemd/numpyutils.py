@@ -53,6 +53,10 @@ class IntArray(np.ndarray):
 
         :param ids: An iterable of indexes to add.
         :return list: the mapped indexes.
+        :raise KeyError: if any of the indexes is not in the on bits.
         """
         imap = {x: y for x, y in zip(self.on, range(self.sum()))}
-        return [imap[x] for x in ids]
+        try:
+            return [imap[x] for x in ids]
+        except KeyError:
+            raise KeyError(f"{ids} not in {imap.keys()}")
