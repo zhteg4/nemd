@@ -256,12 +256,6 @@ class Frame(pd.DataFrame):
         finally:
             fh.close()
 
-    def update(self, gids, xyz):
-        """
-        Update the coordinate frame based on the give gids and xyz.
-        """
-        self.xyz[gids, :] = xyz
-
     @property
     def volume(self):
         """
@@ -408,9 +402,23 @@ class Frame(pd.DataFrame):
         :rtype: DataFrame
         """
         df = super().assign(**kwargs)
-        df.box = self.box.copy()
+        if self.box is not None:
+            df.box = self.box.copy()
         df.step = self.step
         return df
+
+    def update(self, other, **kwargs):
+        """
+        Update the frame.
+
+        :param other: DataFrame, or object coercible into a DataFrame
+        :type other: other
+        """
+        super().update(other, **kwargs)
+        if isinstance(other, Frame):
+            if self.box is not None:
+                self.box = other.box.copy()
+            self.step = other.step
 
 
 class DistanceCell(Frame):

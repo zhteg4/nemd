@@ -103,7 +103,7 @@ class PackedConf(GriddedConf):
             self.rotateRandomly()
             pnt = self.mol.struct.dcell.box.getPoint()
             self.translate(pnt)
-            self.mol.struct.dcell.update(self.gids, self.GetPositions())
+            self.mol.struct.dcell.xyz[self.gids, :] = self.GetPositions()
             if self.hasClashes():
                 continue
             self.mol.struct.dcell.add(self.gids)
@@ -244,7 +244,7 @@ class GrownConf(PackedConf):
             self.translate(-centroid)
             self.rotateRandomly()
             self.translate(point)
-            self.mol.struct.dcell.update(self.gids, self.GetPositions())
+            self.mol.struct.dcell.xyz[self.gids, :] = self.GetPositions()
             if self.hasClashes(self.init_aids):
                 continue
             self.mol.struct.dcell.add(self.id_map[self.init_aids])
@@ -295,7 +295,7 @@ class GrownConf(PackedConf):
         """
         while frag.vals:
             frag.setDihedralDeg()
-            self.mol.struct.dcell.update(self.gids, self.GetPositions())
+            self.mol.struct.dcell.xyz[self.gids, :] = self.GetPositions()
             if self.hasClashes(frag.aids):
                 continue
             self.mol.struct.dcell.add(self.id_map[frag.aids])

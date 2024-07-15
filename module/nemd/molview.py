@@ -1,4 +1,3 @@
-import itertools
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as graph_objects
@@ -30,10 +29,7 @@ class FrameView:
         self.fig = graph_objects.Figure()
         self.scale = scale
         self.data = None
-        self.ele_sz = None
-        self.markers = []
-        self.lines = []
-        self.edges = []
+        self.elements = None
 
     def setData(self, frm=None):
         """
@@ -54,82 +50,73 @@ class FrameView:
         data = [self.df_reader.atoms[self.XYZU], elements, sizes, colors]
         self.data = traj.Frame(pd.concat(data, axis=1), box=self.df_reader.box)
 
-    def setDataFromTraj(self, frm):
-        """
-        Set the data from trajectory frames.
-
-        :param 'nemd.traj.Frame': the trajectory frame to create the data from.
-        """
-        if self.df_reader:
-            return
-        # Peekable doesn't work for yield generator
-        data = {self.ELEMENT: [self.X_ELE] * frm.shape[0]}
-        data[self.SIZE] = [self.X_SIZE] * frm.shape[0]
-        data[self.COLOR] = [self.X_COLOR] * frm.shape[0]
-        sz_clr = pd.DataFrame(data)
-        data = pd.concat((frm, sz_clr), axis=1)
-        self.data = traj.Frame(data, box=frm.box)
-
-    def setEleSz(self):
+    def setElements(self):
         """
         Set elements and sizes.
         """
         if self.data is None:
             return
-        ele_sz = self.data[[self.ELEMENT, self.SIZE]]
-        ele_sz = set([tuple(y.values) for x, y in ele_sz.iterrows()])
-        self.ele_sz = sorted(set(ele_sz), key=lambda x: x[1], reverse=True)
 
-    def setScatters(self):
+        elements = self.data[[self.ELEMENT, self.SIZE]].drop_duplicates()
+        elements.sort_values(by=self.SIZE, ascending=False, inplace=True)
+        self.elements = elements.element
+
+    @property
+    def scatters(self):
         """
         Set scattered markers for atoms.
+
+        :return list of Scatter3d: the scattered markers to represent atoms.
         """
         if self.data is None:
-            return
-        self.markers = []
-        for ele, size in self.ele_sz:
-            idx = (self.data[['element', 'size']] == [ele, size]).all(axis=1)
-            data = self.data[idx]
-            marker = dict(size=size, color=data['color'].values[0])
-            marker = graph_objects.Scatter3d(x=data.xu,
-                                             y=data.yu,
-                                             z=data.zu,
+            return []
+
+        data = []
+        for element in self.elements:
+            idx = self.data[self.ELEMENT] == element
+            selected = self.data[idx]
+            sizes = selected[self.SIZE]
+            colors = selected[self.COLOR]
+            marker = dict(size=sizes.values[0], color=colors.values[0])
+            marker = graph_objects.Scatter3d(x=selected.xu,
+                                             y=selected.yu,
+                                             z=selected.zu,
                                              opacity=0.9,
                                              mode='markers',
-                                             name=ele,
+                                             name=element,
                                              marker=marker,
                                              hovertemplate='%{customdata}',
-                                             customdata=data.index.values)
-            self.markers.append(marker)
+                                             customdata=selected.index.values)
+            data.append(marker)
+        return data
 
-    def setLines(self):
+    @property
+    def lines(self):
         """
         Set lines for bonds.
+
+        :return list of Scatter3d: the line traces to represent bonds.
         """
         if self.df_reader is None:
-            return
-        self.lines = []
-        return
-        for bond in self.df_reader.bonds.values():
-            atom1 = self.df_reader.atoms[bond.id1]
-            atom2 = self.df_reader.atoms[bond.id2]
-            pnts = self.data.loc[[atom1.id, atom2.id]][self.XYZU]
-            mid = pnts.mean().to_frame().transpose()
-            pnts = np.concatenate((pnts.values, mid.values))
-            pnts = pd.DataFrame(pnts, columns=self.XYZU)
-            self.setline(pnts[::2], atom1)
-            self.setline(pnts[1::], atom2)
+            return []
 
-    def setline(self, xyz, atom):
+        data = []
+        for _, _, atom_id1, atom_id2 in self.df_reader.bonds.itertuples():
+            pnts = self.df_reader.atoms.loc[[atom_id1, atom_id2]][self.XYZU]
+            pnts = pd.concat([pnts, pnts.mean().to_frame().transpose()])
+            data.append(self.getLine(pnts[::2], atom_id1))
+            data.append(self.getLine(pnts[1::], atom_id2))
+        return data
+
+    def getLine(self, xyz, atom_id):
         """
-        Set half bond spanning from one atom to the mid point.
+        Set half bond spanning from one atom to the middle point.
 
         :param xyz `numpy.ndarray`: the bond XYZU span
-        :param atom 'types.SimpleNamespace': the bonded atom
-        :return markers 'plotly.graph_objs._scatter3d.Scatter3d':
-            the line markers to represent bonds.
+        :param atom_id int: one bonded atom id
+        :return 'Scatter3d': the line markers to represent bonds.
         """
-        line = dict(width=8, color=self.data.xs(atom.id).color)
+        line = dict(width=8, color=self.data.xs(atom_id).color)
         line = graph_objects.Scatter3d(x=xyz.xu,
                                        y=xyz.yu,
                                        z=xyz.zu,
@@ -138,47 +125,33 @@ class FrameView:
                                        showlegend=False,
                                        line=line,
                                        hoverinfo='skip')
-        self.lines.append(line)
+        return line
 
-    def setEdges(self):
+    @property
+    def edges(self):
         """
         Set box edges.
+
+        :return list of Scatter3d: the box edges markers.
         """
-        self.edges = []
+        data = []
         for edge in self.data.box.edges:
-            self.setEdge(edge)
-
-    def setEdge(self, xyzs):
-        """
-        Set a box edges.
-
-        :param xyzs list of list: start and end points of the edge.
-        """
-        xyzs = np.array(xyzs)
-        edge = graph_objects.Scatter3d(x=xyzs[:, 0],
-                                       y=xyzs[:, 1],
-                                       z=xyzs[:, 2],
-                                       opacity=0.5,
-                                       mode='lines',
-                                       showlegend=False,
-                                       hoverinfo='skip',
-                                       line=dict(width=8, color='#b300ff'))
-        self.edges.append(edge)
-
-    def updateDataWithFrm(self, frm):
-        """
-        Update the data according to the trajectory frame.
-
-        :param frm 'nemd.traj.Frame': coordinate frame to update with
-        """
-        self.data[self.XYZU] = frm[self.XYZU]
-        self.data.box = frm.box
+            edge = graph_objects.Scatter3d(x=edge[:, 0],
+                                           y=edge[:, 1],
+                                           z=edge[:, 2],
+                                           opacity=0.5,
+                                           mode='lines',
+                                           showlegend=False,
+                                           hoverinfo='skip',
+                                           line=dict(width=8, color='#b300ff'))
+            data.append(edge)
+        return data
 
     def addTraces(self):
         """
         Add traces to the figure.
         """
-        self.fig.add_traces(self.markers + self.lines + self.edges)
+        self.fig.add_traces(self.scatters + self.lines + self.edges)
 
     def setFrames(self, frms):
         """
@@ -188,27 +161,13 @@ class FrameView:
             create the animation from.
         """
 
-        fig_frms = []
+        frames = []
         for idx, frm in enumerate(frms):
-            self.updateDataWithFrm(frm)
-            self.setScatters()
-            self.setLines()
-            self.setEdges()
-            data = self.markers + self.lines + self.edges
-            fig_frm = graph_objects.Frame(data=data, name=f'{idx}')
-            fig_frms.append(fig_frm)
-        self.fig.update(frames=fig_frms)
-
-    def clearData(self):
-        """
-        Clear the atom and bond plots.
-        """
-        self.data = None
-        self.fig.data = []
-        self.fig.frames = []
-        self.markers = []
-        self.lines = []
-        self.edges = []
+            self.data.update(frm)
+            data = self.scatters + self.lines + self.edges
+            frame = graph_objects.Frame(data=data, name=f'{idx}')
+            frames.append(frame)
+        self.fig.update(frames=frames)
 
     def updateLayout(self):
         """
@@ -239,8 +198,7 @@ class FrameView:
                                sliders=self.getSliders(),
                                updatemenus=[updatemenu],
                                overwrite=True,
-                               uirevision=True
-                               )
+                               uirevision=True)
 
     def getSliders(self):
         """
@@ -309,3 +267,11 @@ class FrameView:
         Show the figure with plot.
         """
         self.fig.show(*arg, **kwargs)
+
+    def clearData(self):
+        """
+        Clear the atom and bond plots.
+        """
+        self.data = None
+        self.fig.data = []
+        self.fig.frames = []
