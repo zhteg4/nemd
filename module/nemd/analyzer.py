@@ -509,8 +509,7 @@ class View(Base):
         """
 
         frm_vw = molview.FrameView(df_reader=self.df_reader)
-        frm_vw.setData()
-        frm_vw.setDataFromTraj(self.frms)
+        frm_vw.setData(self.frms[0])
         frm_vw.setEleSz()
         frm_vw.setScatters()
         frm_vw.setLines()

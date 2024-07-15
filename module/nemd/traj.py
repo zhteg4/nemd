@@ -136,8 +136,8 @@ class Frame(pd.DataFrame):
         self.xyz = XYZ(self)
         if not isinstance(data, Frame):
             return
-        if self.box is None:
-            self.box = data.box
+        if self.box is None and data.box is not None:
+            self.box = data.box.copy()
         if self.step is None:
             self.step = data.step
 
@@ -399,6 +399,18 @@ class Frame(pd.DataFrame):
                     header=header,
                     quotechar=' ',
                     float_format='%.4f')
+
+    def assign(self, **kwargs):
+        """
+        Assign new columns to a DataFrame.
+
+        :return: A new DataFrame with the new columns in addition.
+        :rtype: DataFrame
+        """
+        df = super().assign(**kwargs)
+        df.box = self.box.copy()
+        df.step = self.step
+        return df
 
 
 class DistanceCell(Frame):

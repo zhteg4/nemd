@@ -1,7 +1,6 @@
 import itertools
 import numpy as np
 import pandas as pd
-import more_itertools
 import plotly.graph_objects as graph_objects
 
 from nemd import traj
@@ -15,12 +14,11 @@ class FrameView:
     ELEMENT = 'element'
     SIZE = 'size'
     COLOR = 'color'
-    XYZU_ELE_SZ_CLR = XYZU + [ELEMENT, SIZE, COLOR]
     X_ELE = 'X'
     X_SIZE = 20
     # Color from https://webmail.life.nthu.edu.tw/~fmhsu/rasframe/CPKCLRS.HTM
     X_COLOR = '#FF1493'
-    COLOR = 'color'
+    ELE_SZ_CLR = {ELEMENT: X_ELE, SIZE: X_SIZE, COLOR: X_COLOR}
 
     def __init__(self, df_reader=None, scale=5.):
         """
@@ -37,12 +35,16 @@ class FrameView:
         self.lines = []
         self.edges = []
 
-    def setData(self):
+    def setData(self, frm=None):
         """
         Set data frame with coordinates, elements, marker sizes, and color info.
+
+        :param frm 'nemd.traj.Frame': the frame to create the data from.
         """
         if not self.df_reader:
+            self.data = frm.assign(**self.ELE_SZ_CLR)
             return
+
         elements = self.df_reader.elements
         smap = {i: x for i, x in self.df_reader.pair_coeffs.dist.items()}
         sizes = self.df_reader.atoms.type_id.map(smap).to_frame(name=self.SIZE)
@@ -52,17 +54,15 @@ class FrameView:
         data = [self.df_reader.atoms[self.XYZU], elements, sizes, colors]
         self.data = traj.Frame(pd.concat(data, axis=1), box=self.df_reader.box)
 
-    def setDataFromTraj(self, frms):
+    def setDataFromTraj(self, frm):
         """
         Set the data from trajectory frames.
 
-        :param frms generator of 'nemd.traj.Frame': the trajectory frames to
-            create the animation from.
+        :param 'nemd.traj.Frame': the trajectory frame to create the data from.
         """
         if self.df_reader:
             return
         # Peekable doesn't work for yield generator
-        frm = more_itertools.peekable(frms).peek()
         data = {self.ELEMENT: [self.X_ELE] * frm.shape[0]}
         data[self.SIZE] = [self.X_SIZE] * frm.shape[0]
         data[self.COLOR] = [self.X_COLOR] * frm.shape[0]
@@ -83,9 +83,6 @@ class FrameView:
     def setScatters(self):
         """
         Set scattered markers for atoms.
-
-        :return markers list of 'plotly.graph_objs._scatter3d.Scatter3d':
-            the scatter markers to represent atoms.
         """
         if self.data is None:
             return
@@ -108,9 +105,6 @@ class FrameView:
     def setLines(self):
         """
         Set lines for bonds.
-
-        :return markers list of 'plotly.graph_objs._scatter3d.Scatter3d':
-            the line markers to represent bonds.
         """
         if self.df_reader is None:
             return
@@ -193,14 +187,6 @@ class FrameView:
         :param frms generator of 'nemd.traj.Frame': the trajectory frames to
             create the animation from.
         """
-        if self.data is None:
-            frm = self.setDataFromTraj(frms)
-            frms = itertools.chain([frm], frms)
-            self.setEleSz()
-            self.setScatters()
-            self.setLines()
-            self.setEdges()
-            self.addTraces()
 
         fig_frms = []
         for idx, frm in enumerate(frms):
@@ -253,7 +239,8 @@ class FrameView:
                                sliders=self.getSliders(),
                                updatemenus=[updatemenu],
                                overwrite=True,
-                               uirevision=True)
+                               uirevision=True
+                               )
 
     def getSliders(self):
         """
@@ -285,7 +272,7 @@ class FrameView:
         ]
         return [slider]
 
-    def getScene(self):
+    def getScene(self, autorange=True):
         """
         Return the scene with axis range and styles.
 
@@ -312,9 +299,9 @@ class FrameView:
         cnt = data.mean(axis=0)
         lbs = cnt - dspan
         hbs = cnt + dspan
-        return dict(xaxis=dict(range=[lbs[0], hbs[0]], autorange=False),
-                    yaxis=dict(range=[lbs[1], hbs[1]], autorange=False),
-                    zaxis=dict(range=[lbs[2], hbs[2]], autorange=False),
+        return dict(xaxis=dict(range=[lbs[0], hbs[0]], autorange=autorange),
+                    yaxis=dict(range=[lbs[1], hbs[1]], autorange=autorange),
+                    zaxis=dict(range=[lbs[2], hbs[2]], autorange=autorange),
                     aspectmode='cube')
 
     def show(self, *arg, **kwargs):
