@@ -11,7 +11,6 @@ import io
 import os
 import math
 import gzip
-import sys
 
 import numba
 import types
@@ -31,21 +30,20 @@ from nemd import lammpsdata
 from nemd import numbautils
 from nemd import environutils
 
-FlAG_CUSTOM_DUMP = 'custom_dump'
-FlAG_DATA_FILE = '-data_file'
-ITEM_TIMESTEP = 'ITEM: TIMESTEP'
+FLAG_CUSTOM_DUMP = 'custom_dump'
+FLAG_DATA_FILE = '-data_file'
 
 
-def frame_steps(filename):
+def frame_steps(filename, marker='ITEM: TIMESTEP'):
     """
     Get the frame steps.
 
     :param filename str: the filename to read frames
+    :param marker str: the marker to find the step information
     :return 'numpy.ndarray': the step information of all steps
     """
     info = subprocess.run(
-        f"zgrep -A1 '{ITEM_TIMESTEP}' {filename} | "
-        f"sed '/{ITEM_TIMESTEP}/d;/^--$/d'",
+        f"zgrep -A1 '{marker}' {filename} | sed '/{marker}/d;/^--$/d'",
         capture_output=True,
         shell=True)
     return np.loadtxt(io.StringIO(info.stdout.decode("utf-8")), dtype=int)
@@ -632,7 +630,7 @@ class DistanceCell(Frame):
         for col, unique_map in zip(cols, unique_maps):
             self.nbr_map[col[0], col[1], col[2], :, :] = unique_map
         # getNbrMap() and the original mode generate nbr_map in different
-        # order: np.unique(nbr_map[i, j, j,:,:],axis=0) remains the same
+        # order: np.unique(nbr_map[i, j, j, :, :], axis=0) remains the same
 
     @staticmethod
     @numbautils.jit(parallel=True)

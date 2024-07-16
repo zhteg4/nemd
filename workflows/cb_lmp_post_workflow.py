@@ -199,7 +199,7 @@ def validate_options(argv):
     options = parser.parse_args(argv)
     if Lmp_Log.DRIVER.TOTENG not in options.task:
         options.task += [Lmp_Log.DRIVER.TOTENG]
-        index = argv.index(Lmp_Log.DRIVER.FlAG_TASK)
+        index = argv.index(Lmp_Log.DRIVER.FLAG_TASK)
         argv.insert(index + 1, Lmp_Log.DRIVER.TOTENG)
     return options
 

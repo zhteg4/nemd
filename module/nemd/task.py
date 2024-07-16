@@ -651,7 +651,7 @@ class Custom_Dump(BaseTask):
         dump_file = [x for x in dump_cmd if x.endswith(self.CUSTOM_EXT)][0]
         data_cmd = sh.grep(self.READ_DATA, log_file).split()
         data_file = [x for x in data_cmd if x.endswith(self.DATA_EXT)][0]
-        args = [dump_file, self.DRIVER.FlAG_DATA_FILE, data_file]
+        args = [dump_file, self.DRIVER.FLAG_DATA_FILE, data_file]
         args += list(self.doc[self.KNOWN_ARGS])[1:]
         self.doc[self.KNOWN_ARGS] = args
 
@@ -739,7 +739,7 @@ class Lmp_Log(BaseTask):
         log_file = self.doc[self.KNOWN_ARGS][0]
         data_cmd = sh.grep(self.READ_DATA, log_file).split()
         data_file = [x for x in data_cmd if x.endswith(self.DATA_EXT)][0]
-        args = [log_file, self.DRIVER.FlAG_DATA_FILE, data_file]
+        args = [log_file, self.DRIVER.FLAG_DATA_FILE, data_file]
         args += list(self.doc[self.KNOWN_ARGS])[1:]
         self.doc[self.KNOWN_ARGS] = args
 

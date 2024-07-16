@@ -10,7 +10,6 @@ import sh
 import os
 import sys
 import math
-import types
 import functools
 import numpy as np
 from scipy import constants
@@ -24,10 +23,10 @@ from nemd import analyzer
 from nemd import parserutils
 from nemd import environutils
 
-FlAG_CUSTOM_DUMP = traj.FlAG_CUSTOM_DUMP
-FlAG_DATA_FILE = traj.FlAG_DATA_FILE
-FlAG_TASK = '-task'
-FlAG_SEL = '-sel'
+FLAG_CUSTOM_DUMP = traj.FLAG_CUSTOM_DUMP
+FLAG_DATA_FILE = traj.FLAG_DATA_FILE
+FLAG_TASK = '-task'
+FLAG_SEL = '-sel'
 FLAG_LAST_PCT = '-last_pct'
 FLAG_SLICES = '-slices'
 
@@ -85,7 +84,7 @@ class CustomDump(object):
     """
     Analyze a dump custom file.
     """
-    TASK = FlAG_TASK[1:]
+    TASK = FLAG_TASK[1:]
     DATA_EXT = '_%s.csv'
     PNG_EXT = '_%s.png'
     RESULTS = analyzer.Base.RESULTS
@@ -264,15 +263,15 @@ def get_parser(parser=None):
     """
     if parser is None:
         parser = parserutils.get_parser(description=__doc__)
-        parser.add_argument(FlAG_CUSTOM_DUMP,
-                            metavar=FlAG_CUSTOM_DUMP.upper(),
+        parser.add_argument(FLAG_CUSTOM_DUMP,
+                            metavar=FLAG_CUSTOM_DUMP.upper(),
                             type=parserutils.type_file,
                             help='Custom dump file to analyze')
-        parser.add_argument(FlAG_DATA_FILE,
-                            metavar=FlAG_DATA_FILE[1:].upper(),
+        parser.add_argument(FLAG_DATA_FILE,
+                            metavar=FLAG_DATA_FILE[1:].upper(),
                             type=parserutils.type_file,
                             help='Data file to get force field information')
-    parser.add_argument(FlAG_TASK,
+    parser.add_argument(FLAG_TASK,
                         choices=[XYZ, CLASH, VIEW, DENSITY, MSD, RDF],
                         default=[DENSITY],
                         nargs='+',
@@ -282,7 +281,7 @@ def get_parser(parser=None):
                         f'density; {MSD} computes mean squared displacement '
                         f'and diffusion coefficient; {RDF} calculates the '
                         f'radial distribution function. ')
-    parser.add_argument(FlAG_SEL, help=f'The element of the selected atoms.')
+    parser.add_argument(FLAG_SEL, help=f'The element of the selected atoms.')
     parser.add_argument(
         FLAG_LAST_PCT,
         metavar=FLAG_LAST_PCT.upper(),
@@ -312,7 +311,7 @@ def validate_options(argv):
     options = parser.parse_args(argv)
     data_rqd_tasks = set(options.task).intersection(DATA_RQD_TASKS)
     if data_rqd_tasks and not options.data_file:
-        parser.error(f"Please specify {FlAG_DATA_FILE} to run {FlAG_TASK} "
+        parser.error(f"Please specify {FLAG_DATA_FILE} to run {FLAG_TASK} "
                      f"{', '.join(data_rqd_tasks)}")
 
     try:

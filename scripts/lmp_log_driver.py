@@ -21,8 +21,8 @@ from nemd import parserutils
 from nemd import environutils
 
 FlAG_LMP_LOG = 'lmp_log'
-FlAG_DATA_FILE = traj.FlAG_DATA_FILE
-FlAG_TASK = '-task'
+FLAG_DATA_FILE = traj.FLAG_DATA_FILE
+FLAG_TASK = '-task'
 FLAG_LAST_PCT = '-last_pct'
 FLAG_SLICE = '-slice'
 
@@ -83,7 +83,7 @@ class LmpLog(object):
     Analyze a lammps log.
     """
 
-    TASK = FlAG_TASK[1:]
+    TASK = FLAG_TASK[1:]
     DATA_EXT = '_%s.csv'
     AVE_DATA_EXT = '_ave' + DATA_EXT
     PNG_EXT = '_%s.png'
@@ -265,11 +265,11 @@ def get_parser(parser=None, jflags=None):
                             metavar=FlAG_LMP_LOG.upper(),
                             type=parserutils.type_file,
                             help='LAMMPS log file to analyze')
-        parser.add_argument(FlAG_DATA_FILE,
-                            metavar=FlAG_DATA_FILE[1:].upper(),
+        parser.add_argument(FLAG_DATA_FILE,
+                            metavar=FLAG_DATA_FILE[1:].upper(),
                             type=parserutils.type_file,
                             help='Data file to get force field information')
-    parser.add_argument(FlAG_TASK,
+    parser.add_argument(FLAG_TASK,
                         choices=THERMO_TASKS,
                         default=THERMO_TASKS,
                         nargs='+',
@@ -305,7 +305,7 @@ def validate_options(argv):
     options = parser.parse_args(argv)
     data_rqd_tasks = set(options.task).intersection(DATA_RQD_TASKS)
     if data_rqd_tasks and not options.data_file:
-        parser.error(f"Please specify {FlAG_DATA_FILE} to run {FlAG_TASK} "
+        parser.error(f"Please specify {FLAG_DATA_FILE} to run {FLAG_TASK} "
                      f"{', '.join(data_rqd_tasks)}")
 
     try:
