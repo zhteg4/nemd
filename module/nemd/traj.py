@@ -431,9 +431,9 @@ class DistanceCell(Frame):
     GRID_MAX = 20
     # https://pandas.pydata.org/docs/development/extending.html
     _internal_names = Frame._internal_names + [
-        'cut', 'neigh_ids', 'atom_cell', 'graph', 'orig_values',
+        'cut', 'nbr_ids', 'atom_cell', 'graph', 'orig_values',
         'orig_atom_cell', 'span', 'grids', 'indexes', 'indexes_numba',
-        'neigh_map', 'gindexes', 'ggrids', 'orig_graph', 'grids', 'radii',
+        'nbr_map', 'gindexes', 'ggrids', 'orig_graph', 'grids', 'radii',
         'excluded', 'gids', 'orig_gids'
     ]
     _internal_names_set = set(_internal_names)
@@ -452,7 +452,7 @@ class DistanceCell(Frame):
         self.struct = struct
         self.radii = None
         self.radii_numba = None
-        self.neigh_ids = None
+        self.nbr_ids = None
         self.atom_cell = None
         self.graph = None
         self.vals = None
@@ -606,48 +606,54 @@ class DistanceCell(Frame):
         max_ids = [math.ceil(self.cut / x) + 1 for x in self.grids]
         ijks = itertools.product(*[range(max_ids[x]) for x in range(3)])
         # Adjacent Cells are zero distance separated.
-        neigh_ids = [x for x in ijks if separation_dist(x) < self.cut]
+        nbr_ids = [x for x in ijks if separation_dist(x) < self.cut]
         # Keep itself (0,0,0) cell as multiple atoms may be in one cell.
         signs = itertools.product((-1, 1), (-1, 1), (-1, 1))
         signs = [np.array(x) for x in signs]
-        self.neigh_ids = set([tuple(y * x) for x in signs for y in neigh_ids])
+        uq_nbr_ids = set([tuple(y * x) for x in signs for y in nbr_ids])
+        self.nbr_ids = np.array(list(uq_nbr_ids))
 
     def setNeighborMap(self):
         """
         Set map between node id to neighbor node ids.
         """
-        neigh_ids = np.array(list(self.neigh_ids))
-        if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
-            self.neigh_map = np.zeros((*self.indexes, len(self.neigh_ids), 3),
-                                 dtype=int)
-            indexes = [range(x) for x in self.indexes]
-            nodes = list(itertools.product(*indexes))
-            for node in nodes:
-                self.neigh_map[node] = (neigh_ids + node) % self.indexes
+        if environutils.get_python_mode() != environutils.ORIGINAL_MODE:
+            self.nbr_map = self.getNbrMap(self.indexes_numba, self.nbr_ids)
             return
 
-        self.neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
+        nbr_map = np.zeros((*self.indexes, *self.nbr_ids.shape), dtype=int)
+        nodes = list(itertools.product(*[range(x) for x in self.indexes]))
+        for node in nodes:
+            nbr_map[node] = (self.nbr_ids + node) % self.indexes
+        cols = list(itertools.product(*[range(x) for x in self.indexes]))
+        unique_maps = [np.unique(nbr_map[tuple(x)], axis=0) for x in cols]
+        shape = np.unique([x.shape for x in unique_maps], axis=0).max(axis=0)
+        self.nbr_map = np.zeros((*self.indexes, *shape), dtype=int)
+        for col, unique_map in zip(cols, unique_maps):
+            self.nbr_map[col[0], col[1], col[2], :, :] = unique_map
+        # getNbrMap() and the original mode generate nbr_map in different
+        # order: np.unique(nbr_map[i, j, j,:,:],axis=0) remains the same
 
     @staticmethod
     @numbautils.jit(parallel=True)
-    def getNeighborMap(indexes, neigh_ids, nopython):
+    def getNbrMap(indexes, nbr_ids, nopython):
         """
         Get map between node id to neighbor node ids.
 
         :param indexes numpy.ndarray: the number of cells in three dimensions
-        :param neigh_ids numpy.ndarray: Neighbors cells (separation distances
+        :param nbr_ids numpy.ndarray: Neighbors cells (separation distances
             less than the cutoff)
         :param nopython bool: whether numba nopython mode is on
         :return numpy.ndarray: map between node id to neighbor node ids
         """
         # Unique neighbor cell ids
-        min_id = np.min(neigh_ids)
-        shifted_neigh_ids = neigh_ids - min_id
-        wrapped_neigh_ids = shifted_neigh_ids % indexes
-        ushape = np.max(wrapped_neigh_ids) + 1
+        min_id = np.min(nbr_ids)
+        shifted_nbr_ids = nbr_ids - min_id
+        wrapped_nbr_ids = shifted_nbr_ids % indexes
+        ushape = np.max(wrapped_nbr_ids) + 1
         boolean = numba.boolean if nopython else np.bool_
         uids = np.zeros((ushape, ushape, ushape), dtype=boolean)
-        for wrapped_ids in wrapped_neigh_ids:
+        for wrapped_ids in wrapped_nbr_ids:
             uids[wrapped_ids[0], wrapped_ids[1], wrapped_ids[2]] = True
         uq_ids = np.array(list([list(x) for x in uids.nonzero()])).T + min_id
         # Build neighbor map based on unique neighbor ids
@@ -747,16 +753,16 @@ class DistanceCell(Frame):
         """
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
             id = (xyz / self.grids).round().astype(int) % self.indexes
-            ids = self.neigh_map[tuple(id)]
+            ids = self.nbr_map[tuple(id)]
             return [
                 y for x in ids for y in self.atom_cell[tuple(x)].nonzero()[0]
             ]
         return self.getNeighborsNumba(xyz, self.grids, self.indexes_numba,
-                                      self.neigh_map, self.atom_cell)
+                                      self.nbr_map, self.atom_cell)
 
     @staticmethod
     @numbautils.jit
-    def getNeighborsNumba(xyz, grids, indexes, neigh_map, atom_cell, nopython):
+    def getNeighborsNumba(xyz, grids, indexes, nbr_map, atom_cell, nopython):
         """
         Get the neighbor atom ids from the neighbor cells (including the current
         cell itself) via Numba.
@@ -764,7 +770,7 @@ class DistanceCell(Frame):
         :param xyz 1x3 'numpy.ndarray': xyz of one atom coordinates
         :param grids 'numpy.ndarray': the length of the cell in each dimension
         :param indexes list of 'numba.int32': the number of the cell in each dimension
-        :param neigh_map ixjxkxnx3 'numpy.ndarray': map between cell id to neighbor cell ids
+        :param nbr_map ixjxkxnx3 'numpy.ndarray': map between cell id to neighbor cell ids
         :param atom_cell ixjxkxn array of floats: map cell id into containing atom ids
         :param nopython bool: whether numba nopython mode is on
         :return list of int: the atom ids of the neighbor atoms
@@ -772,7 +778,7 @@ class DistanceCell(Frame):
         # The cell id for xyz
         int32 = numba.int32 if nopython else np.int32
         idx = np.round(xyz / grids).astype(int32) % indexes
-        ids = neigh_map[idx[0], idx[1], idx[2], :]
+        ids = nbr_map[idx[0], idx[1], idx[2], :]
         # The atom ids from all neighbor cells
         neighbors = [
             y for x in ids for y in atom_cell[x[0], x[1], x[2], :].nonzero()[0]
@@ -782,7 +788,7 @@ class DistanceCell(Frame):
     @staticmethod
     @numbautils.jit
     def hasClashesNumba(gids, xyz, id_map, radii, excluded, grids, indexes,
-                        neigh_map, cell, span, nopython):
+                        nbr_map, cell, span, nopython):
         """
         Get the neighbor atom ids from the neighbor cells (including the current
         cell itself) via Numba.
@@ -793,7 +799,7 @@ class DistanceCell(Frame):
         :param excluded dict of int list: the atom ids to be excluded in clash check
         :param grids 'numpy.ndarray': the length of the cell in each dimension
         :param indexes list of 'numba.int32': the number of the cell in each dimension
-        :param neigh_map ixjxkxnx3 'numpy.ndarray': map between cell id to neighbor cell ids
+        :param nbr_map ixjxkxnx3 'numpy.ndarray': map between cell id to neighbor cell ids
         :param cell ixjxkxn array of floats: map cell id into containing atom ids
         :param span 1x3 'numpy.ndarray': the span of the box
         :param nopython bool: whether numba nopython mode is on
@@ -804,7 +810,7 @@ class DistanceCell(Frame):
         idxs = np.round(xyz[gids, :] / grids).astype(int32) % indexes
 
         for gid, idx in zip(gids, idxs):
-            ids = neigh_map[idx[0], idx[1], idx[2], :]
+            ids = nbr_map[idx[0], idx[1], idx[2], :]
             nbrs = np.array([
                 y for x in ids for y in cell[x[0], x[1], x[2], :].nonzero()[0]
                 if y not in excluded[gid]
@@ -843,7 +849,7 @@ class DistanceCell(Frame):
         return self.hasClashesNumba(gids, self.xyz, self.radii.id_map,
                                     self.radii_numba, self.excluded_numba,
                                     self.grids, self.indexes_numba,
-                                    self.neigh_map, self.atom_cell,
+                                    self.nbr_map, self.atom_cell,
                                     self.box.span)
 
     def getClashes(self, gids=None):
