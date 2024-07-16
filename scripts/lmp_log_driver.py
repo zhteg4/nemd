@@ -94,6 +94,7 @@ class LmpLog(object):
         :param options 'argparse.ArgumentParser': Parsed command-line options
         """
         self.options = options
+        self.lmp_log = None
         self.df_reader = None
 
     def run(self):
@@ -307,14 +308,6 @@ def validate_options(argv):
     if data_rqd_tasks and not options.data_file:
         parser.error(f"Please specify {FLAG_DATA_FILE} to run {FLAG_TASK} "
                      f"{', '.join(data_rqd_tasks)}")
-
-    try:
-        options.task.remove(analyzer.XYZ.NAME)
-    except ValueError:
-        pass
-    else:
-        # XYZ analyzer may change the coordinates
-        options.task.append(analyzer.XYZ.NAME)
     return options
 
 

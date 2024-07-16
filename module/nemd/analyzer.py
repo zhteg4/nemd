@@ -11,6 +11,7 @@ from nemd import traj
 from nemd import symbols
 from nemd import molview
 from nemd import logutils
+from nemd import jobutils
 from nemd import lammpsin
 from nemd import plotutils
 
@@ -19,9 +20,9 @@ class Base:
     """
     The base class subclassed by analyzers.
     """
-
-    DATA_EXT = '_%s.csv'
-    FIG_EXT = '_%s.png'
+    NAME = 'base'
+    DATA_EXT = '.csv'
+    FIG_EXT = '.png'
     TIME_LB = 'Time ps'
     TIME_RE = f"(?<={TIME_LB} \().+(?=\))"
     ILABEL = TIME_LB
@@ -59,6 +60,7 @@ class Base:
         self.options = options
         self.logger = logger
         self.data = None
+        self.outfile = f"{self.options.jobname}_{self.NAME}{self.DATA_EXT}"
 
     def run(self):
         """
@@ -88,9 +90,9 @@ class Base:
         """
         if self.data.empty:
             return
-        outfile = self.options.jobname + self.DATA_EXT % self.NAME
-        self.data.to_csv(outfile, float_format=float_format)
-        self.log(f'{self.DESCR.capitalize()} data written into {outfile}')
+        self.data.to_csv(self.outfile, float_format=float_format)
+        jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
+        self.log(f'{self.DESCR.capitalize()} data written into {self.outfile}')
 
     @classmethod
     def fit(cls, data, log=None):
@@ -156,8 +158,9 @@ class Base:
             xlabel = cls.TIME_LB if re.findall(cls.TIME_RE, xlabel) else xlabel
             ax.set_xlabel(xlabel)
             ax.set_ylabel(data.columns.values.tolist()[0])
-            fname = name + cls.FIG_EXT % cls.NAME
+            fname = f"{name}_{cls.NAME}{cls.FIG_EXT}"
             fig.savefig(fname)
+            jobutils.add_outfile(fname)
         log(f'{cls.DESCR.capitalize()} figure saved as {fname}')
 
     @classmethod
@@ -175,7 +178,7 @@ class Base:
         :return: x values, y average, y standard deviation
         :rtype: 'pandas.core.frame.DataFrame'
         """
-        filename = f"{name}" + cls.DATA_EXT % cls.NAME
+        filename = f"{name}_{ cls.NAME}{cls.DATA_EXT}"
         if os.path.exists(filename):
             data = pd.read_csv(filename, index_col=0)
             log(f"{cls.RESULTS}{cls.DESCR} found as {filename}")
@@ -463,8 +466,7 @@ class XYZ(Base):
         Not all combination make physical senses.
         """
 
-        outfile = self.options.jobname + self.DATA_EXT
-        with open(outfile, 'w') as self.out_fh:
+        with open(self.outfile, 'w') as self.out_fh:
             # XYZ analyzer may change the coordinates
             for frm in self.frms:
                 if wrapped:
@@ -472,7 +474,32 @@ class XYZ(Base):
                 if glue:
                     frm.glue(dreader=self.df_reader)
                 frm.write(self.out_fh, dreader=self.df_reader)
-        self.log(f"{self.DESCR} coordinates are written into {outfile}")
+        jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
+        self.log(f"{self.DESCR} coordinates are written into {self.outfile}")
+
+
+class View(Base):
+    """
+    The coordinate visualizer.
+    """
+
+    NAME = 'view'
+    DESCR = 'trajectory visualization'
+    DATA_EXT = '.html'
+
+    def run(self):
+        """
+        Main method to run the visualization.
+        """
+        frm_vw = molview.FrameView(df_reader=self.df_reader)
+        frm_vw.setData(self.frms[0])
+        frm_vw.setElements()
+        frm_vw.addTraces()
+        frm_vw.setFrames(self.frms)
+        frm_vw.updateLayout()
+        frm_vw.show(outfile=self.outfile, inav=self.options.interactive)
+        jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
+        self.log(f'{self.DESCR.capitalize()} data written into {self.outfile}')
 
 
 class Thermo(Base):
@@ -491,30 +518,5 @@ class Thermo(Base):
         :type name: str
         """
         for column in data.columns:
-            dat = data[[column]]
             aname = f"{name}_{column.split('(')[0].strip().lower()}"
-            super().plot(dat, aname, *args, **kwargs)
-
-
-class View(Base):
-    """
-    The coordinate visualizer.
-    """
-
-    NAME = 'view'
-    DESCR = 'trajectory visualization'
-    HTML_EXT = '.html'
-
-    def run(self):
-        """
-        Main method to run the visualization.
-        """
-        frm_vw = molview.FrameView(df_reader=self.df_reader)
-        frm_vw.setData(self.frms[0])
-        frm_vw.setElements()
-        frm_vw.addTraces()
-        frm_vw.setFrames(self.frms)
-        frm_vw.updateLayout()
-        outfile = f"{self.options.jobname}_{self.NAME}{self.HTML_EXT}"
-        frm_vw.show(outfile=outfile, inav=self.options.interactive)
-        self.log(f'{self.DESCR.capitalize()} data written into {outfile}')
+            super().plot(data[column], aname, *args, **kwargs)
