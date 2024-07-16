@@ -1,9 +1,9 @@
 import os
+import io
 import math
 import shutil
 import numpy as np
 import pandas as pd
-from io import StringIO
 from scipy import constants
 from dataclasses import dataclass
 from collections import namedtuple
@@ -293,6 +293,8 @@ class LammpsLog(LammpsBase):
     BARS = 'bars'
     KCAL_MOL = 'kcal/mol'
     EV = 'eV'
+    ANGSTROMS = 'Angstroms'
+    ANGSTROMS_CUBED = 'Angstroms^3'
     TIME = 'time'
     STEP = 'Step'
     TEMP = 'Temp'
@@ -300,11 +302,13 @@ class LammpsLog(LammpsBase):
     E_MOL = 'E_mol'
     TOTENG = 'TotEng'
     PRESS = 'Press'
+    VOLUME = 'Volume'
     TIME_UNITS = {REAL: FS, METAL: PS}
     STEP_UNITS = {REAL: N_STEP, METAL: N_STEP}
     TEMP_UNITS = {REAL: KELVIN, METAL: KELVIN}
     ENG_UNITS = {REAL: KCAL_MOL, METAL: EV}
     PRESS_UNITS = {REAL: ATMOSPHERES, METAL: BARS}
+    VOLUME_UNITS = {REAL: ANGSTROMS_CUBED, METAL: ANGSTROMS_CUBED}
     THERMO_UNITS = {
         TIME: TIME_UNITS,
         STEP: STEP_UNITS,
@@ -312,7 +316,8 @@ class LammpsLog(LammpsBase):
         E_PAIR: ENG_UNITS,
         E_MOL: ENG_UNITS,
         TOTENG: ENG_UNITS,
-        PRESS: PRESS_UNITS
+        PRESS: PRESS_UNITS,
+        VOLUME: VOLUME_UNITS
     }
 
     def __init__(self, filename, last_pct=0.2):
@@ -321,6 +326,7 @@ class LammpsLog(LammpsBase):
         self.unit = self.DEFAULT_UNIT
         self.timestep = None
         self.sidx = None
+        self.thermo = []
 
     def run(self):
         self.parse()
@@ -328,35 +334,36 @@ class LammpsLog(LammpsBase):
         self.setSidx()
 
     def parse(self):
-        blocks = []
+        """
+        Parse the LAMMPS log file to extract the thermodynamic data.
+        """
+        line, blk = symbols.RETURN, []
         with open(self.filename) as fh:
-            line, in_block = True, False
-            while (line):
-                line = fh.readline().strip()
-                # Thermo block
+            while line:
+                line = fh.readline()
                 if line.startswith('Loop time of'):
-                    data = [x.strip('\n').split() for x in block]
-                    block = pd.DataFrame(data, columns=header, dtype=float)
-                    blocks.append(block)
-                    in_block = False
-                if in_block:
-                    block.append(line)
-                    continue
-                if line.startswith('Per MPI rank memory allocation'):
-                    header = fh.readline().split()
-                    block = []
-                    in_block = True
-                # other information
-                if line.startswith(self.UNITS):
+                    # Finishing up previous thermo block
+                    blk = pd.read_csv(io.StringIO(''.join(blk)), sep=r'\s+')
+                    self.thermo.append(blk)
+                    blk = []
+                elif blk:
+                    # Inside thermo block: skip lines from fix rigid
+                    if not line.startswith(('SHAKE', 'Bond')):
+                        blk.append(line)
+                elif line.startswith('Per MPI rank memory allocation'):
+                    # Start a new block
+                    blk = [fh.readline()]
+                # Other information outside the thermo block
+                elif line.startswith(self.UNITS):
                     self.unit = line.strip(self.UNITS).strip()
-                if line.startswith(self.TIMESTEP):
+                elif line.startswith(self.TIMESTEP):
                     self.timestep = line.strip(self.TIMESTEP).strip()
-        self.thermo = pd.concat(blocks)
+        self.thermo = pd.concat(self.thermo)
 
     def setUnits(self):
         if self.timestep is None:
             self.timestep = self.DEFAULT_TIMESTEP[self.unit]
-        time = self.thermo[self.STEP] * self.timestep
+        time = self.thermo[self.STEP] * float(self.timestep)
         self.thermo.set_index(time)
         self.thermo.index.name = f"{self.TIME} ({self.TIME_UNITS[self.unit]})"
         self.thermo.columns = [
@@ -573,7 +580,7 @@ class LammpsLogReader(object):
                 while line and not line.startswith(self.LOOP):
                     data_str += line
                     line = file_log.readline()
-                data = np.loadtxt(StringIO(data_str), dtype=data_type)
+                data = np.loadtxt(io.StringIO(data_str), dtype=data_type)
                 self.all_data.append(LogData(fix=fix_line, data=data))
 
     def setCrossSectionalArea(self,
