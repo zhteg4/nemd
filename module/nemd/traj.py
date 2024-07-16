@@ -11,6 +11,7 @@ import io
 import os
 import math
 import gzip
+import sys
 
 import numba
 import types
@@ -617,23 +618,15 @@ class DistanceCell(Frame):
         """
         neigh_ids = np.array(list(self.neigh_ids))
         if environutils.get_python_mode() == environutils.ORIGINAL_MODE:
-            neigh_map = np.zeros((*self.indexes, len(self.neigh_ids), 3),
+            self.neigh_map = np.zeros((*self.indexes, len(self.neigh_ids), 3),
                                  dtype=int)
             indexes = [range(x) for x in self.indexes]
             nodes = list(itertools.product(*indexes))
             for node in nodes:
-                neigh_map[node] = (neigh_ids + node) % self.indexes
+                self.neigh_map[node] = (neigh_ids + node) % self.indexes
+            return
 
-        else:
-            neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
-
-        cols = list(itertools.product(*[range(x) for x in self.indexes]))
-        unique_maps = [np.unique(neigh_map[tuple(x)], axis=0) for x in cols]
-        num = np.unique([x.shape for x in unique_maps], axis=0).max(axis=0)[0]
-        self.neigh_map = np.zeros((*self.indexes, num, 3), dtype=int)
-        for col, unique_map in zip(cols, unique_maps):
-            start, end = unique_map.shape
-            self.neigh_map[col[0], col[1], col[2], :start, :end] = unique_map
+        self.neigh_map = self.getNeighborMap(self.indexes_numba, neigh_ids)
 
     @staticmethod
     @numbautils.jit(parallel=True)
@@ -647,13 +640,24 @@ class DistanceCell(Frame):
         :param nopython bool: whether numba nopython mode is on
         :return numpy.ndarray: map between node id to neighbor node ids
         """
-        shape = (indexes[0], indexes[1], indexes[2], len(neigh_ids), 3)
+        # Unique neighbor cell ids
+        min_id = np.min(neigh_ids)
+        shifted_neigh_ids = neigh_ids - min_id
+        wrapped_neigh_ids = shifted_neigh_ids % indexes
+        ushape = np.max(wrapped_neigh_ids) + 1
+        boolean = numba.boolean if nopython else np.bool_
+        uids = np.zeros((ushape, ushape, ushape), dtype=boolean)
+        for wrapped_ids in wrapped_neigh_ids:
+            uids[wrapped_ids[0], wrapped_ids[1], wrapped_ids[2]] = True
+        uq_ids = np.array(list([list(x) for x in uids.nonzero()])).T + min_id
+        # Build neighbor map based on unique neighbor ids
+        shape = (indexes[0], indexes[1], indexes[2], len(uq_ids), 3)
         neigh_mp = np.empty(shape, dtype=numba.int32 if nopython else np.int32)
         for xid in numba.prange(indexes[0]):
             for yid in numba.prange(indexes[1]):
                 for zid in numba.prange(indexes[2]):
-                    id = np.array([xid, yid, zid])
-                    neigh_mp[xid, yid, zid, :, :] = (neigh_ids + id) % indexes
+                    idx = np.array([xid, yid, zid])
+                    neigh_mp[xid, yid, zid, :, :] = (uq_ids + idx) % indexes
         return neigh_mp
 
     def setAtomCell(self):
@@ -805,6 +809,8 @@ class DistanceCell(Frame):
                 y for x in ids for y in cell[x[0], x[1], x[2], :].nonzero()[0]
                 if y not in excluded[gid]
             ])
+            if not nbrs.size:
+                continue
             delta = xyz[nbrs, :] - xyz[gid, :]
             delta -= np.round(np.divide(delta, span)) * span
             dists = [np.sqrt(x[0]**2 + x[1]**2 + x[2]**2) for x in delta]

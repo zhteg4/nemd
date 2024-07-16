@@ -333,7 +333,7 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
         parser.add_argument(FLAG_CPU,
                             type=type_positive_int,
                             dest=FLAG_CPU[1:].lower(),
-                            default=max([round(os.cpu_count() - 1), 1]),
+                            default=max([round(os.cpu_count()*0.75), 1]),
                             help='Number of CPU processors.')
 
 
