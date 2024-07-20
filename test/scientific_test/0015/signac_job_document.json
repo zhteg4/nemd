@@ -1,1 +1,1 @@
-{"outfiles": {"cb_lmp_post_workflow": ["cb_lmp_post_workflow-driver.log", "cb_lmp_post_workflow_ave_thermo.csv"]}, "logfile": {"cb_lmp_post_workflow": "cb_lmp_post_workflow-driver.log"}, "outfile": {"cb_lmp_post_workflow": "cb_lmp_post_workflow-driver.log"}}
+{"outfiles": {"cb_lmp_post_workflow": ["cb_lmp_post_workflow-driver.log", "cb_lmp_post_workflow_ave_thermo.csv"], "null": ["cb_lmp_post_workflow_press_thermo.png"]}, "logfile": {"cb_lmp_post_workflow": "cb_lmp_post_workflow-driver.log"}, "outfile": {"cb_lmp_post_workflow": "cb_lmp_post_workflow-driver.log"}}

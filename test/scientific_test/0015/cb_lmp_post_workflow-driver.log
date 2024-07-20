@@ -3,23 +3,24 @@ scaled_range: 0.999, 1.001, 2e-05
 name: Si
 dimension: 3, 3, 3
 scale_factor: (1, 1, 1)
-task: Press, TotEng
-last_pct: 0.2
-slice: None
 interactive: False
 jobname: cb_lmp_post_workflow
 debug: False
-cpu: 4
+python: 2
+cpu: 6
+task: Press, TotEng
+last_pct: 0.2
+slice: None
 clean: True
 jtype: task, aggregator
 prj_path: .
-JobStart: 17:13:27 03/13/24
+JobStart: 18:39:17 07/20/24
 ...................................
 100 / 100 completed jobs.
 Task timing breakdown:
-crystal_builder: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0.18 seconds (ave)
-lammps_runner: 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds, 16 seconds; 16 seconds (ave)
-lmp_log: 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 1 second, 1 second, 1 second, 1 second, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds, 0 seconds; 0.04 seconds (ave)
+crystal_builder: 1 second (0b8e), 1 second (dd43), 1 second (86b6), 1 second (6758), 1 second (507f), 1 second (7f19), 1 second (78ab), 1 second (b593), 1 second (3e42), 1 second (3625), 1 second (61a6), 1 second (2e20), 1 second (2b21), 1 second (c5fa), 1 second (c590), 1 second (2b92), 1 second (94f2), 1 second (c031), 1 second (465c), 1 second (81a9), 1 second (a40d), 1 second (9022); 1 second (ave)
+lammps_runner: 10 seconds (336e), 10 seconds (c68c), 10 seconds (e532), 10 seconds (46cd), 10 seconds (6f10), 10 seconds (5543), 10 seconds (e0b6), 10 seconds (0b8e), 10 seconds (5443), 10 seconds (dd43), 10 seconds (86b6), 10 seconds (6758), 10 seconds (461c), 10 seconds (4051), 10 seconds (2068), 10 seconds (3818), 10 seconds (fd7f), 10 seconds (decd), 10 seconds (b150), 10 seconds (b6de), 10 seconds (6059), 10 seconds (0419), 10 seconds (8a03), 10 seconds (219e), 10 seconds (c348), 10 seconds (0a22), 10 seconds (507f), 10 seconds (7f19), 10 seconds (1732), 10 seconds (7665), 10 seconds (9622), 10 seconds (b246), 10 seconds (1a70), 10 seconds (78ab), 10 seconds (9137), 10 seconds (b593), 10 seconds (7580), 10 seconds (4843), 10 seconds (84c5), 10 seconds (3e90), 10 seconds (534c), 10 seconds (3e42), 10 seconds (4b0f), 10 seconds (1f67), 10 seconds (f379), 10 seconds (514c), 10 seconds (ad46), 10 seconds (b4b7), 10 seconds (d6dd), 10 seconds (3625), 10 seconds (61a6), 10 seconds (9236), 10 seconds (6cc7), 10 seconds (d17a), 10 seconds (ff37), 10 seconds (7e3c), 10 seconds (2e20), 10 seconds (6104), 10 seconds (2b21), 10 seconds (a2c0), 10 seconds (096d), 10 seconds (fc39), 10 seconds (fc97), 10 seconds (0105), 10 seconds (6373), 10 seconds (c5fa), 10 seconds (c590), 10 seconds (2b92), 10 seconds (94f2), 10 seconds (cca3), 10 seconds (991a), 10 seconds (afb5), 10 seconds (3030), 10 seconds (1cb3), 10 seconds (2002), 10 seconds (c031), 10 seconds (465c), 10 seconds (d417), 10 seconds (8a16), 10 seconds (e167), 10 seconds (b55e), 10 seconds (745d), 10 seconds (6cf5), 10 seconds (a8b1), 10 seconds (e633), 10 seconds (14e5), 10 seconds (81a9), 10 seconds (d87d), 10 seconds (56b5), 10 seconds (0473), 10 seconds (b871), 10 seconds (5a27), 10 seconds (b59b), 10 seconds (add8), 10 seconds (0c35), 10 seconds (9b74), 10 seconds (a40d), 10 seconds (9022), 10 seconds (9dc5), 10 seconds (9e6c); 10 seconds (ave)
+lmp_log: 1 second (78ab), 1 second (b59b); 1 second (ave)
 100 jobs found for aggregation.
 Results for TotEng,Press written into cb_lmp_post_workflow_ave_thermo.csv
 Thermodynamic information figure saved as cb_lmp_post_workflow_toteng_thermo.png
@@ -27,4 +28,4 @@ Thermodynamic information figure saved as cb_lmp_post_workflow_press_thermo.png
 A scale factor of 1.0002200000000012 yields the minimum energy of -936.7052 eV
 The corresponding datafile is saved as in crystal_builder.data
 finished.
-17:17:46 03/13/24
+18:47:07 07/20/24

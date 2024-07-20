@@ -112,8 +112,8 @@ class LmpLog(object):
         if not self.options.data_file:
             return
 
-        self.df_reader = stillinger.get_df_reader(self.options.data_file)
-        self.df_reader.run()
+        self.df_reader = stillinger.DataFileReader.from_file(
+            self.options.data_file)
 
     def setThermo(self):
         """

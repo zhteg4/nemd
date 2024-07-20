@@ -519,4 +519,4 @@ class Thermo(Base):
         """
         for column in data.columns:
             aname = f"{name}_{column.split('(')[0].strip().lower()}"
-            super().plot(data[column], aname, *args, **kwargs)
+            super().plot(data[column].to_frame(), aname, *args, **kwargs)

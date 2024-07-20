@@ -137,7 +137,7 @@ class Runner(jobcontrol.Runner):
         job = [x for x in jobs if x.statepoint[jobutils.STATE_ID] == factor][0]
         datafile = [
             x for x in job.doc[jobutils.OUTFILES]['crystal_builder']
-            if x.endswith(stillinger.Data.DATA_EXT)
+            if x.endswith(stillinger.Struct.DATA_EXT)
         ][0]
         log(f'The corresponding datafile is saved as in {datafile}')
 

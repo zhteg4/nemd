@@ -88,11 +88,11 @@ def validate_options(argv):
     if options.temp_file and options.energy_file:
         return options
 
-    lammps_in = fileutils.LammpsInput(options.in_file)
-    lammps_in.run()
+    inscript = fileutils.LammpsInput(options.in_file)
+    inscript.run()
 
     if options.temp_file is None:
-        temp_file = lammps_in.getTempFile()
+        temp_file = inscript.getTempFile()
         if temp_file is None:
             parser.error(
                 f"{options.in_file} doesn't define a temperature file. ({FLAG_TEMP_FILE})"
@@ -105,7 +105,7 @@ def validate_options(argv):
             )
 
     if options.energy_file is None:
-        energy_file = lammps_in.getEnergyFile()
+        energy_file = inscript.getEnergyFile()
         if energy_file is None:
             parser.error(
                 f"{options.in_file} doesn't define a energy file. ({FlAG_ENEGER_FILE})"
@@ -125,7 +125,7 @@ class Nemd(object):
     def __init__(self, options, jobname):
         self.options = options
         self.jobname = jobname
-        self.lammps_in = None
+        self.inscript = None
         self.lammps_temp = None
         self.lammps_energy = None
         self.timestep = None
@@ -143,12 +143,12 @@ class Nemd(object):
         log('Finished', timestamp=True)
 
     def loadLammpsIn(self):
-        self.lammps_in = fileutils.LammpsInput(self.options.in_file)
-        self.lammps_in.run()
+        self.inscript = fileutils.LammpsInput(self.options.in_file)
+        self.inscript.run()
 
-        self.lammps_units = self.lammps_in.getUnits()
+        self.lammps_units = self.inscript.getUnits()
         log(f"Lammps units is {self.lammps_units}.")
-        self.timestep = self.lammps_in.getTimestep()
+        self.timestep = self.inscript.getTimestep()
         log(f"Timestep is {self.timestep} fs.")
 
     def loadLog(self):

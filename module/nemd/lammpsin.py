@@ -67,7 +67,7 @@ class In:
         :param options 'argparse.Namespace': command line options
         """
         self.options = options
-        self.lammps_in = None
+        self.inscript = None
         self.datafile = None
         self.lammps_dump = None
         self.fh = None
@@ -86,7 +86,7 @@ class In:
 
         :param jobname str: new jobname based on which out filenames are defined
         """
-        self.lammps_in = jobname + self.IN_EXT
+        self.inscript = jobname + self.IN_EXT
         self.datafile = jobname + self.DATA_EXT
         self.lammps_dump = jobname + self.CUSTOM_EXT
 
@@ -94,7 +94,7 @@ class In:
         """
         Write out LAMMPS in script.
         """
-        with open(self.lammps_in, 'w') as self.fh:
+        with open(self.inscript, 'w') as self.fh:
             self.writeSetup()
             self.readData()
             self.writeTimestep()

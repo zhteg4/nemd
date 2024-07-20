@@ -1199,6 +1199,7 @@ class DataFileReader(lammpsin.In):
     BLOCK_LABELS = [x.LABEL for x in BLOCK_CLASSES]
     NAME_RE = re.compile(f"^{'|'.join(BLOCK_NAMES)}$")
     COUNT_RE = re.compile(f"^[0-9]+\s+({'|'.join(BLOCK_LABELS)})$")
+    DESCR = Struct.DESCR.split(symbols.POUND)[0]
 
     def __init__(self, data_file=None, contents=None, delay=False):
         """

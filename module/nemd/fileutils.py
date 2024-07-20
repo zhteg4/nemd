@@ -337,17 +337,16 @@ class LammpsLog(LammpsBase):
         """
         Parse the LAMMPS log file to extract the thermodynamic data.
         """
-        line, blk = symbols.RETURN, []
+        blk = []
         with open(self.filename) as fh:
-            while line:
-                line = fh.readline()
+            while line := fh.readline():
                 if line.startswith('Loop time of'):
                     # Finishing up previous thermo block
-                    blk = pd.read_csv(io.StringIO(''.join(blk)), sep=r'\s+')
-                    self.thermo.append(blk)
+                    data = pd.read_csv(io.StringIO(''.join(blk)), sep=r'\s+')
+                    self.thermo.append(data)
                     blk = []
                 elif blk:
-                    # Inside thermo block: skip lines from fix rigid
+                    # Inside thermo block: skip lines from fix rigid outputs
                     if not line.startswith(('SHAKE', 'Bond')):
                         blk.append(line)
                 elif line.startswith('Per MPI rank memory allocation'):

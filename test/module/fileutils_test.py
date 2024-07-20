@@ -36,18 +36,18 @@ class TestEnergyReader(object):
 class TestLammpsInput(object):
 
     @pytest.fixture
-    def lammps_input_reader(self):
+    def inscriptput_reader(self):
         input_file = testutils.test_file(
             os.path.join(SINGLE_NEMD, 'in.nemd_cff91'))
-        lammps_in = fileutils.LammpsInput(input_file)
-        return lammps_in
+        inscript = fileutils.LammpsInput(input_file)
+        return inscript
 
-    def testRun(self, lammps_input_reader):
-        lammps_input_reader.run()
-        'real' == lammps_input_reader.cmd_items['units']
-        'full' == lammps_input_reader.cmd_items['atom_style']
-        '*' == lammps_input_reader.cmd_items['processors'].x
-        1 == lammps_input_reader.cmd_items['processors'].y
+    def testRun(self, inscriptput_reader):
+        inscriptput_reader.run()
+        'real' == inscriptput_reader.cmd_items['units']
+        'full' == inscriptput_reader.cmd_items['atom_style']
+        '*' == inscriptput_reader.cmd_items['processors'].x
+        1 == inscriptput_reader.cmd_items['processors'].y
 
 
 class TestLammpsLogReader(object):

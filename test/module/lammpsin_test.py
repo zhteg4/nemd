@@ -33,11 +33,11 @@ class TestIn(Base):
         return lmp_in
 
     def testSetFilenames(self, lmp_in):
-        assert lmp_in.lammps_in == 'test.in'
+        assert lmp_in.inscript == 'test.in'
         assert lmp_in.datafile == 'test.data'
         assert lmp_in.lammps_dump == 'test.custom.gz'
         lmp_in.setFilenames(jobname='new_test')
-        assert lmp_in.lammps_in == 'new_test.in'
+        assert lmp_in.inscript == 'new_test.in'
         assert lmp_in.datafile == 'new_test.data'
         assert lmp_in.lammps_dump == 'new_test.custom.gz'
 

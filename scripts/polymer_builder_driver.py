@@ -246,10 +246,10 @@ class AmorphousCell(object):
             log_warning(f'{warning}')
         self.struct.writeIn()
         log(f'Data file written into {self.struct.datafile}')
-        log(f'In script written into {self.struct.lammps_in}')
+        log(f'In script written into {self.struct.inscript}')
         jobutils.add_outfile(self.struct.datafile,
                              jobname=self.options.jobname)
-        jobutils.add_outfile(self.struct.lammps_in,
+        jobutils.add_outfile(self.struct.inscript,
                              jobname=self.options.jobname,
                              set_file=True)
 

@@ -1,5 +1,6 @@
 import sh
 import types
+import functools
 import numpy as np
 from nemd import xtal
 from nemd import symbols
@@ -28,7 +29,7 @@ class Struct(xtal.Struct):
         """
         Write out LAMMPS in script.
         """
-        with open(self.lammps_in, 'w') as self.fh:
+        with open(self.inscript, 'w') as self.fh:
             self.setElements()
             self.writeSetup()
             self.readData()
@@ -128,24 +129,36 @@ class Struct(xtal.Struct):
         self.data_fh.write(f"\n")
 
 
+class Atom(lammpsdata.Atom):
+
+    COLUMN_LABELS = [lammpsdata.ID, lammpsdata.TYPE_ID] + lammpsdata.Atom.XYZU
+    ID_COLS = None
+
+
 class DataFileReader(lammpsdata.DataFileReader):
 
-    def setAtoms(self):
+    @property
+    @functools.cache
+    def atoms(self):
         """
-        Parse the atom section for atom id and molecule id.
+        Parse the atom section.
+
+        :return `Atom`: the atom information such as atom id, molecule id,
+            type id, charge, position, etc.
         """
-        sidx = self.mk_idxes[self.ATOMS_CAP] + 2
-        for lid in range(sidx, sidx + self.struct_dsp[self.ATOMS]):
-            id, type_id, x, y, z = self.lines[lid].split()[:5]
-            self.atoms[int(id)] = types.SimpleNamespace(
-                id=int(id),
-                type_id=int(type_id),
-                xyz=(float(x), float(y), float(z)),
-                ele=self.masses[int(type_id)].ele)
+        return self.fromLines(Atom)
 
+    @classmethod
+    def from_file(cls, data_file):
+        """
+        Get the appropriate data file reader based on the atom style.
 
-def get_df_reader(data_file):
-    line = sh.grep(lammpsdata.DataBase.LAMMPS_DESCRIPTION[:-2], data_file)
-    if line.split(symbols.POUND)[1].strip() == lammpsdata.DataBase.ATOMIC:
-        return DataFileReader(data_file)
-    return lammpsdata.DataFileReader(data_file)
+        :param data_file: the lammps data file
+        :type data_file: str
+        :return: the appropriate data file reader
+        :rtype: DataFileReader
+        """
+        line = sh.grep(cls.DESCR.split(symbols.POUND)[0], data_file)
+        if line.split(symbols.POUND)[1].strip() == cls.ATOMIC:
+            return cls(data_file)
+        return lammpsdata.DataFileReader(data_file)
