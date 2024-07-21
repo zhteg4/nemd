@@ -4,24 +4,24 @@ data_file: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/polymer_builder.
 task: rdf, clash, density, msd, xyz
 sel: O
 last_pct: 0.05
-slices: None
+slices: 0, 150, 1
 interactive: False
 jobname: custom_dump
 debug: False
 python: 2
-cpu: 7
-JobStart: 21:40:36 07/12/24
+cpu: 6
+JobStart: 15:47:31 07/21/24
 ...................................
 0 atoms selected.
-3 trajectory frames found.
-clash, density, xyz analyze all frames and save per frame results ∈ [0.000, 2.000] ps
-rdf, density, msd average results from last 5.0% frames ∈ [ 2.000,  2.000] ps
+150 trajectory frames found.
+clash, density, xyz analyze all frames and save per frame results ∈ [0.000, 209.000] ps
+rdf, density, msd average results from last 5.0% frames ∈ [ 202.000,  209.000] ps
 RDF requires least two atoms selected.
 No atoms selected for clash counting.
 Density data written into custom_dump_density.csv
-0.8 ± nan g/cm^3 ∈ [2.0000, 2.0000] ps
+Density: 0.6596 ± 0.0008114 g/cm^3 ∈ [202.0000, 209.0000] ps
 Density figure saved as custom_dump_density.png
 No atoms selected for MSD.
-XYZ coordinates are written into custom_dump.xyz
+XYZ coordinates are written into custom_dump_xyz.xyz
 Finished.
-21:40:36 07/12/24
+15:47:37 07/21/24

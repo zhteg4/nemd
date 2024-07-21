@@ -1,21 +1,21 @@
 ..........Command Options..........
 lmp_log: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/lammps_runner_lammps.log
 data_file: /Users/tzhang/git/nemd/test/test_files/hexane_liquid/polymer_builder.data
-task: TotEng
+task: Volume
 last_pct: 0.9
 slice: None
-interactive: False
+interactive: True
 jobname: lmp_log
 debug: False
 python: 2
 cpu: 6
-JobStart: 11:49:21 07/21/24
+JobStart: 16:25:38 07/21/24
 ...................................
-225 steps of thermo data found.
-TotEng collects and saves results ∈ [0.000, 0.000] ps
-TotEng averages results from last 90.0% frames ∈ [16000.000, 215728.000] ps
-['TotEng'] information written into lmp_log_thermo.csv
-TotEng: -6319 ± 201.1 kcal/mol ∈ [16000.0000, 215728.0000] ps
-Thermodynamic information figure saved as lmp_log_toteng_thermo.png
+228 steps of thermo data found.
+Volume collects and saves results ∈ [0.000, 0.000] ps
+Volume averages results from last 90.0% frames ∈ [16.000, 182.027] ps
+['Volume'] information written into lmp_log_thermo.csv
+Volume: 1.045e+05 ± 6606 Angstroms^3 ∈ [16.0000, 182.0270] ps
+Thermodynamic information figure saved as lmp_log_volume_thermo.png
 Finished.
-11:49:21 07/21/24
+16:25:54 07/21/24

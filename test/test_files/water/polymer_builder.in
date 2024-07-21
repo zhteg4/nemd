@@ -18,8 +18,8 @@ dump_modify 1 sort id
 min_style fire
 minimize 1.0e-6 1.0e-8 1000000 10000000
 
-fix rigid all shake 0.0001 10 10000  b 0 a 0
-velocity all create 10 572171
+fix rigid all shake 0.0001 10 10000  b 1 a 1
+velocity all create 10 981041
 fix 1a all temp/berendsen 10 10 100
 fix 1b all nve
 run 1000

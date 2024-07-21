@@ -341,9 +341,8 @@ class BaseTask:
             tinfo = [x for x in tinfo if x.delta is not None]
             if not tinfo:
                 continue
-            ave = sum([x.delta
-                       for x in tinfo], start=timedelta(0)) / len(tinfo)
-            ave = humanfriendly.format_timespan(ave)
+            total = sum([x.delta for x in tinfo], start=timedelta(0))
+            ave = humanfriendly.format_timespan(total / len(tinfo))
             deltas = [
                 f"{humanfriendly.format_timespan(x.delta)} ({x.id[:4]})"
                 for x in tinfo

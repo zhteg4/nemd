@@ -276,7 +276,6 @@ class Density(TrajBase):
         mass_scaled = mass / (constants.angstrom / constants.centi)**3
         data = [mass_scaled / x.volume for x in self.frms]
         self.data = pd.DataFrame({self.LABEL: data}, index=self.time)
-        self.data.index.name += f" ({self.sidx})"
 
 
 class RDF(TrajBase):
@@ -389,7 +388,7 @@ class MSD(TrajBase):
             self.data = pd.DataFrame({self.LABEL: []})
             return
         gids = list(self.gids)
-        masses = self.df_reader.masses.mass[self.df_reader.atoms.type_id]
+        masses = self.df_reader.masses.mass[self.df_reader.atoms.type_id[gids]]
         frms = self.frms[self.sidx:]
         msd, num = [0], len(frms)
         for idx in range(1, num):
@@ -458,7 +457,6 @@ class Clash(TrajBase):
             dcell.setup(frm)
             data.append(len(dcell.getClashes()))
         self.data = pd.DataFrame(data={self.LABEL: data}, index=self.time)
-        self.data.index.name += f" ({self.sidx})"
 
 
 class XYZ(TrajBase):
@@ -537,7 +535,6 @@ class Thermo(Base):
             if self.COLUMN_RE.match(x).groups()[0] in self.tasks
         ]
         self.data = self.thermo[sel_cols]
-        self.data.index.name += f" ({self.sidx})"
 
     def saveData(self, float_format='%.8g'):
         """

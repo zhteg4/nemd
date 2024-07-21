@@ -33,7 +33,8 @@ EPAIR = 'E_pair'
 E_MOL = 'E_mol'
 TOTENG = 'TotEng'
 PRESS = 'Press'
-THERMO_TASKS = [TEMP, EPAIR, EPAIR, TOTENG, PRESS]
+VOLUME = 'Volume'
+THERMO_TASKS = [TEMP, EPAIR, EPAIR, TOTENG, PRESS, VOLUME]
 
 ALL_FRM_TASKS = THERMO_TASKS
 LAST_FRM_TASKS = ALL_FRM_TASKS
@@ -125,6 +126,7 @@ class LmpLog(object):
         self.lmp_log.run()
         self.sidx = math.floor(self.lmp_log.thermo.shape[0] *
                                (1 - self.options.last_pct))
+        self.lmp_log.thermo.index.name += f" ({self.sidx})"
 
         log(f"{self.lmp_log.thermo.shape[0]} steps of thermo data found.")
         af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]

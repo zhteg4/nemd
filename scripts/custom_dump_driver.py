@@ -164,11 +164,12 @@ class CustomDump(object):
         if len(self.frms) == 0:
             return
 
+        self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
         self.time = pd.Index([x.step * self.timestep for x in self.frms])
         if self.unit == symbols.FS:
             self.time *= constants.femto / constants.pico
-        self.time.name = symbols.TIME_LB.format(unit=symbols.PS)
-        self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
+        self.time.name = symbols.TIME_LB.format(
+            unit=symbols.PS) + f" ({self.sidx})"
         log(f"{len(self.frms)} trajectory frames found.")
         if af_tasks:
             log(f"{', '.join(af_tasks)} analyze all frames and save per frame "

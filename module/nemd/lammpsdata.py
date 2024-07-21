@@ -1161,8 +1161,8 @@ class Struct(structure.Struct, lammpsin.In):
         bonds, angles = list(map(list, zip(*data)))
         bonds = Bond.concat([x for x in bonds if not x.empty])
         angles = Angle.concat([x for x in angles if not x.empty])
-        bond_types = self.bnd_types.map(bonds.values.flatten())
-        angle_types = self.ang_types.map(angles.values.flatten())
+        bond_types = self.bnd_types.map(bonds.values.flatten()) + 1
+        angle_types = self.ang_types.map(angles.values.flatten()) + 1
         return [' '.join(map(str, x)) for x in [bond_types, angle_types]]
 
     def hasCharge(self):
