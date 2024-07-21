@@ -338,7 +338,7 @@ class BaseTask:
                 delta = logutils.get_time(job.fn(filename))
                 info[tname].append(SimpleNamespace(delta=delta, id=job.id))
         for tname, tinfo in info.items():
-            tinfo = [x for x in tinfo if x.delta]
+            tinfo = [x for x in tinfo if x.delta is not None]
             if not tinfo:
                 continue
             ave = sum([x.delta

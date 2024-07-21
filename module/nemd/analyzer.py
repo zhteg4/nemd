@@ -23,8 +23,8 @@ class Base:
     NAME = 'base'
     DATA_EXT = '.csv'
     FIG_EXT = '.png'
-    TIME_LB = 'Time ps'
-    TIME_RE = re.compile(f"(?<={TIME_LB} \().+(?=\))")
+    TIME_LB = symbols.TIME_LB
+    TIME_RE = re.compile(f'({TIME_LB.split()[0]} +\(.*\)) +\((\d+)\)')
     COLUMN_RE = re.compile('(.*) +\((.*)\)')
     INDEX_LB = TIME_LB
     RESULTS = 'Results for '
@@ -90,7 +90,7 @@ class Base:
         """
         if data.empty:
             return 0, None
-        sidx = int(cls.TIME_RE.findall(data.index.name)[0])
+        sidx = int(cls.TIME_RE.match(data.index.name).groups()[1])
         sel = data.iloc[sidx:]
         ave = sel.mean().iloc[0]
         std = sel.std().iloc[0] if sel.shape[1] == 1 else sel.mean().iloc[1]
@@ -151,8 +151,9 @@ class Base:
                 gdata = data.iloc[sidx:eidx]
                 ax.plot(gdata.index, gdata.iloc[:, 0], '.-g')
             xlabel = data.index.name
-            # f"{cls.TIME_RE} ({starting_frame_index})" vs f"{regular_label}"
-            xlabel = cls.TIME_LB if re.findall(cls.TIME_RE, xlabel) else xlabel
+            if cls.TIME_RE.match(xlabel):
+                # "Time (unit) (sidx)"
+                xlabel = cls.TIME_RE.match(xlabel).groups()[0]
             ax.set_xlabel(xlabel)
             ax.set_ylabel(data.columns.values.tolist()[0])
             fname = f"{name}_{cls.NAME}{cls.FIG_EXT}"
@@ -275,7 +276,7 @@ class Density(TrajBase):
         mass_scaled = mass / (constants.angstrom / constants.centi)**3
         data = [mass_scaled / x.volume for x in self.frms]
         self.data = pd.DataFrame({self.LABEL: data}, index=self.time)
-        self.data.index.name = f"{self.INDEX_LB} ({self.sidx})"
+        self.data.index.name += f" ({self.sidx})"
 
 
 class RDF(TrajBase):
@@ -457,7 +458,7 @@ class Clash(TrajBase):
             dcell.setup(frm)
             data.append(len(dcell.getClashes()))
         self.data = pd.DataFrame(data={self.LABEL: data}, index=self.time)
-        self.data.index.name = f"{self.INDEX_LB} ({self.sidx})"
+        self.data.index.name += f" ({self.sidx})"
 
 
 class XYZ(TrajBase):
@@ -536,7 +537,7 @@ class Thermo(Base):
             if self.COLUMN_RE.match(x).groups()[0] in self.tasks
         ]
         self.data = self.thermo[sel_cols]
-        self.data.index.name = f"{self.INDEX_LB} ({self.sidx})"
+        self.data.index.name += f" ({self.sidx})"
 
     def saveData(self, float_format='%.8g'):
         """

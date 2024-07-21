@@ -1,5 +1,4 @@
 import sh
-import types
 import functools
 import numpy as np
 from nemd import xtal

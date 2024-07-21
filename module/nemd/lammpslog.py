@@ -2,22 +2,26 @@ import io
 import pandas as pd
 from scipy import constants
 
+from nemd import symbols
 from nemd import lammpsin
 
 
 class Log(lammpsin.In):
+    """
+    Class to parse LAMMPS log file and extract data.
+    """
 
-    LJ = 'LJ'
-    METAL = 'metal'
+    LJ = lammpsin.In.LJ
+    METAL = lammpsin.In.METAL
     REAL = lammpsin.In.REAL
-    DEFAULT_UNIT = lammpsin.In.REAL
+    DEFAULT_UNIT = REAL
 
     DEFAULT_TIMESTEP = {LJ: 0.005, REAL: 1., METAL: 0.001}
     TIME_UNITS = {lammpsin.In.REAL: constants.femto, METAL: constants.pico}
     TIME_TO_PS = {x: y / constants.pico for x, y in TIME_UNITS.items()}
 
-    FS = 'fs'
-    PS = 'ps'
+    FS = symbols.FS
+    PS = symbols.PS
     N_STEP = 'n'
     KELVIN = 'K'
     ATMOSPHERES = 'atmospheres'
@@ -65,15 +69,15 @@ class Log(lammpsin.In):
         """
         Main method to parse the LAMMPS log file.
         """
-        self.parse()
-        self.finish()
+        self.read()
+        self.finalize()
 
-    def parse(self):
+    def read(self):
         """
-        Parse the LAMMPS log file to extract the thermodynamic data.
+        Read the LAMMPS log file to extract the thermodynamic data.
         """
-        blk = []
         with open(self.filename) as fh:
+            blk = []
             while line := fh.readline():
                 if line.startswith('Loop time of'):
                     # Finishing up previous thermo block
@@ -82,7 +86,7 @@ class Log(lammpsin.In):
                     blk = []
                 elif blk:
                     # Inside thermo block: skip lines from fix rigid outputs
-                    if not line.startswith(('SHAKE', 'Bond')):
+                    if not line.startswith(('SHAKE', 'Bond', 'Angle')):
                         blk.append(line)
                 elif line.startswith('Per MPI rank memory allocation'):
                     # Start a new block
@@ -91,19 +95,21 @@ class Log(lammpsin.In):
                 elif line.startswith(self.UNITS):
                     self.unit = line.strip(self.UNITS).strip()
                 elif line.startswith(self.TIMESTEP):
-                    self.timestep = line.strip(self.TIMESTEP).strip()
+                    self.timestep = int(line.strip(self.TIMESTEP).strip())
+        if self.timestep is None:
+            self.timestep = self.DEFAULT_TIMESTEP[self.unit]
 
-    def finish(self):
+    def finalize(self):
         """
-        Finish update thermodynamic data by unit conversion, time conversion,
+        Finalize the extracted data by unit conversion, time conversion,
         column renaming, index setting, and etc.
         """
-        timestep = self.DEFAULT_TIMESTEP[
-            self.unit] if self.timestep is None else self.timestep
-        time = self.thermo[self.STEP] * float(timestep)
-        self.thermo.set_index(time)
-        self.thermo.index.name = f"{self.TIME} ({self.TIME_UNITS[self.unit]})"
-        self.thermo.drop(columns=self.STEP, inplace=True)
+        self.thermo[self.STEP] = self.thermo[self.STEP] * float(self.timestep)
+        self.thermo.set_index(self.STEP, inplace=True)
+        time_unit = self.TIME_UNITS[self.unit]
+        if time_unit != self.PS:
+            self.thermo.index *= self.TIME_TO_PS[self.unit]
+        self.thermo.index.name = symbols.TIME_LB.format(unit=self.PS)
         self.thermo.columns = [
             f"{x} ({self.THERMO_UNITS[x][self.unit]})"
             for x in self.thermo.columns

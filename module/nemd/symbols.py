@@ -39,3 +39,6 @@ FF_MODEL = {OPLSUA: WMODELS}
 OPLSUA_TIP3P = f'{OPLSUA},{TIP3P}'
 SPACE = ' '
 SPACE_PATTERN = r'\s+'
+TIME_LB = 'Time ({unit})'
+FS = 'fs'
+PS = 'ps'

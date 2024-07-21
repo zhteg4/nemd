@@ -11,7 +11,7 @@ import os
 import sys
 import math
 import functools
-import numpy as np
+import pandas as pd
 from scipy import constants
 
 from nemd import traj
@@ -94,14 +94,16 @@ class CustomDump(object):
     ]
     ANALYZER = {getattr(x, 'NAME'): x for x in ANALYZER}
 
-    def __init__(self, options, timestep=1):
+    def __init__(self, options, timestep=1, unit=symbols.FS):
         """
         :param options 'argparse.ArgumentParser': Parsed command-line options
-        :param timestep float: the time step in fs
+        :param timestep float: the time step
+        :param unit str: the unit o time, default fs
         """
         self.options = options
         # FIXME: should read in timestep to calculate the time
         self.timestep = timestep
+        self.unit = unit
         self.frms = None
         self.gids = None
         self.df_reader = None
@@ -161,8 +163,11 @@ class CustomDump(object):
         self.frms = [x for x in frms]
         if len(self.frms) == 0:
             return
-        self.time = np.array([x.step * self.timestep for x in self.frms
-                              ]) * constants.femto / constants.pico
+
+        self.time = pd.Index([x.step * self.timestep for x in self.frms])
+        if self.unit == symbols.FS:
+            self.time *= constants.femto / constants.pico
+        self.time.name = symbols.TIME_LB.format(unit=symbols.PS)
         self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
         log(f"{len(self.frms)} trajectory frames found.")
         if af_tasks:

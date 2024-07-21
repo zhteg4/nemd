@@ -19,7 +19,11 @@ class In:
     DATA_EXT = '.data'
 
     UNITS = 'units'
+    REAL = 'real'
+    LJ = 'LJ'
+    METAL = 'metal'
     ATOMIC = 'atomic'
+    FULL = 'full'
 
     ATOM_STYLE = 'atom_style'
     BOND_STYLE = 'bond_style'
@@ -44,8 +48,6 @@ class In:
 
     MIX = 'mix'
     PPPM = 'pppm'
-    REAL = 'real'
-    FULL = 'full'
     OPLS = 'opls'
     CVFF = 'cvff'
     FIRE = 'fire'
