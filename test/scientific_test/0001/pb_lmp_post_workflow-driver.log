@@ -21,24 +21,24 @@ force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
 interactive: False
 jobname: pb_lmp_post_workflow
 debug: False
-cpu: 4
+python: 2
+cpu: 1
 task: density
 sel: None
 last_pct: 0.4
-slice: None
-clean: True
-jtype: task, aggregator
+slices: None
+clean: False
+jtype: aggregator
 prj_path: .
-JobStart: 08:50:53 03/20/24
+JobStart: 19:26:14 07/21/24
 ...................................
-4 / 4 completed jobs.
 Task timing breakdown:
-polymer_builder: 3 minutes and 24 seconds, 3 minutes and 22 seconds, 3 minutes and 25 seconds, 3 minutes and 24 seconds; 3 minutes and 23.75 seconds (ave)
-lammps_runner: 5 minutes and 1 second, 5 minutes and 1 second, 5 minutes and 1 second, 5 minutes and 1 second; 5 minutes and 1 second (ave)
-custom_dump: 16 seconds, 15 seconds, 16 seconds, 16 seconds; 15.75 seconds (ave)
+polymer_builder: 5 seconds (8010), 5 seconds (eb1a), 5 seconds (5474), 5 seconds (c928); 5 seconds (ave)
+lammps_runner: 6 minutes and 22 seconds (8010), 6 minutes and 22 seconds (eb1a), 6 minutes and 22 seconds (5474), 6 minutes and 22 seconds (c928); 6 minutes and 22 seconds (ave)
+custom_dump: 6 seconds (8010), 6 seconds (eb1a), 5 seconds (5474), 6 seconds (c928); 5.75 seconds (ave)
 4 jobs found for aggregation.
-Results for density saved to pb_lmp_post_workflow_density.csv
-0.0006597 ± 1.155e-07 g/cm^3 ∈ [1380.0000, 2301.0000] ps
+Results for density found as pb_lmp_post_workflow_density.csv
+Density: 0.0006597 ± 1.883e-07 g/cm^3 ∈ [2224.0000, 3108.0000] ps
 Density figure saved as pb_lmp_post_workflow_density.png
 finished.
-09:00:37 03/20/24
+19:26:15 07/21/24

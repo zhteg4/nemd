@@ -24,7 +24,7 @@ class Base:
     DATA_EXT = '.csv'
     FIG_EXT = '.png'
     TIME_LB = symbols.TIME_LB
-    TIME_RE = re.compile(f'({TIME_LB.split()[0]} +\(.*\)) +\((\d+)\)')
+    TIME_RE = re.compile(f'({symbols.TIME} +\(.*\)) +\((\d+)\)')
     COLUMN_RE = re.compile('(.*) +\((.*)\)')
     INDEX_LB = TIME_LB
     RESULTS = 'Results for '
@@ -94,7 +94,10 @@ class Base:
         sel = data.iloc[sidx:]
         ave = sel.mean().iloc[0]
         std = sel.std().iloc[0] if sel.shape[1] == 1 else sel.mean().iloc[1]
-        label, unit = re.findall(cls.COLUMN_RE, data.columns[0])[0]
+        label, unit = cls.COLUMN_RE.match(data.columns[0]).groups()
+        if cls.COLUMN_RE.match(label):
+            # 'Density (g/cm^3) (num=4)' as data.columns[0]
+            label, unit = cls.COLUMN_RE.match(label).groups()
         log(f'{label}: {ave:.4g} {symbols.PLUS_MIN} {std:.4g} {unit} '
             f'{symbols.ELEMENT_OF} [{data.index[sidx]:.4f}, '
             f'{data.index[-1]:.4f}] ps')
