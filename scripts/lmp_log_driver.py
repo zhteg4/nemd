@@ -14,7 +14,7 @@ import pandas as pd
 from nemd import traj
 from nemd import symbols
 from nemd import stillinger
-from nemd import fileutils
+from nemd import lammpslog
 from nemd import jobutils
 from nemd import logutils
 from nemd import analyzer
@@ -121,7 +121,7 @@ class LmpLog(object):
         Grep thermo output information.
         """
 
-        self.lmp_log = fileutils.LammpsLog(self.options.lmp_log)
+        self.lmp_log = lammpslog.Log(self.options.lmp_log)
         self.lmp_log.run()
         self.sidx = math.floor(self.lmp_log.thermo.shape[0] *
                                (1 - self.options.last_pct))

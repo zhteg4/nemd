@@ -19,7 +19,6 @@ class In:
     DATA_EXT = '.data'
 
     UNITS = 'units'
-    METAL = 'metal'
     ATOMIC = 'atomic'
 
     ATOM_STYLE = 'atom_style'
