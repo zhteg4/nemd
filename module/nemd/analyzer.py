@@ -24,43 +24,29 @@ class Base:
     DATA_EXT = '.csv'
     FIG_EXT = '.png'
     TIME_LB = 'Time ps'
-    TIME_RE = f"(?<={TIME_LB} \().+(?=\))"
-    ILABEL = TIME_LB
+    TIME_RE = re.compile(f"(?<={TIME_LB} \().+(?=\))")
+    COLUMN_RE = re.compile('(.*) +\((.*)\)')
+    INDEX_LB = TIME_LB
     RESULTS = 'Results for '
 
-    def __init__(self,
-                 time,
-                 frms,
-                 sidx=None,
-                 df_reader=None,
-                 gids=None,
-                 options=None,
-                 logger=None):
+    def __init__(self, sidx=None, df_reader=None, options=None, logger=None):
         """
-        :param time: time array
-        :type time: 'numpy.ndarray'
-        :param frms: traj frames
-        :type frms: list of 'nemd.traj.Frame'
         :param sidx: the starting frame index after excluding the first xxx pct
         :type sidx: int
         :param df_reader: data file reader containing structural information
         :type df_reader: 'nemd.oplsua.DataFileReader'
-        :param gids: global ids for the selected atom
-        :type gids: list of int
-        :param options: parsed commandline options
+        :param options: the options from command line
         :type options: 'argparse.Namespace'
-        :param logger: the handle to print info
+        :param logger: the logger to log messages
         :type logger: 'logging.Logger'
         """
-        self.time = time
-        self.frms = frms
         self.sidx = sidx
         self.df_reader = df_reader
-        self.gids = gids
         self.options = options
         self.logger = logger
         self.data = None
         self.outfile = f"{self.options.jobname}_{self.NAME}{self.DATA_EXT}"
+        jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
 
     def run(self):
         """
@@ -91,7 +77,6 @@ class Base:
         if self.data.empty:
             return
         self.data.to_csv(self.outfile, float_format=float_format)
-        jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
         self.log(f'{self.DESCR.capitalize()} data written into {self.outfile}')
 
     @classmethod
@@ -105,17 +90,25 @@ class Base:
         """
         if data.empty:
             return 0, None
-        sidx = int(re.findall(cls.TIME_RE, data.index.name)[0])
+        sidx = int(cls.TIME_RE.findall(data.index.name)[0])
         sel = data.iloc[sidx:]
         ave = sel.mean().iloc[0]
         std = sel.std().iloc[0] if sel.shape[1] == 1 else sel.mean().iloc[1]
-        log(f'{ave:.4g} {symbols.PLUS_MIN} {std:.4g} {cls.UNIT} '
+        label, unit = re.findall(cls.COLUMN_RE, data.columns[0])[0]
+        log(f'{label}: {ave:.4g} {symbols.PLUS_MIN} {std:.4g} {unit} '
             f'{symbols.ELEMENT_OF} [{data.index[sidx]:.4f}, '
             f'{data.index[-1]:.4f}] ps')
         return sidx, None
 
     @classmethod
-    def plot(cls, data, name, sidx=None, eidx=None, log=None, inav=False):
+    def plot(cls,
+             data,
+             name,
+             sidx=None,
+             eidx=None,
+             log=None,
+             inav=False,
+             marker_num=10):
         """
         Plot and save the data (interactively).
 
@@ -132,6 +125,8 @@ class Base:
         :param inav: pop up window and show plot during code execution if
             interactive mode is on
         :type inav: bool
+        :param marker_num: add markers when the number of points equals or is
+            less than this value
         """
         if data.empty:
             return
@@ -139,6 +134,8 @@ class Base:
             fig = plt.figure(figsize=(10, 6))
             ax = fig.add_axes([0.13, 0.1, 0.8, 0.8])
             line_style = '--' if any([sidx, eidx]) else '-'
+            if len(data) < marker_num:
+                line_style += '*'
             ax.plot(data.index, data.iloc[:, 0], line_style, label='average')
             if data.shape[-1] == 2 and data.iloc[:, 1].any():
                 # Data has non-zero standard deviation column
@@ -239,7 +236,27 @@ class Base:
             print(msg)
 
 
-class Density(Base):
+class TrajBase(Base):
+    """
+    The base class for trajectory analyzers.
+    """
+
+    def __init__(self, time, frms, gids=None, **kwargs):
+        """
+        :param time: time array
+        :type time: 'numpy.ndarray'
+        :param frms: traj frames
+        :type frms: list of 'nemd.traj.Frame'
+        :param gids: global ids for the selected atom
+        :type gids: list of int
+        """
+        super().__init__(**kwargs)
+        self.time = time
+        self.frms = frms
+        self.gids = gids
+
+
+class Density(TrajBase):
     """
     The density analyzer.
     """
@@ -258,10 +275,10 @@ class Density(Base):
         mass_scaled = mass / (constants.angstrom / constants.centi)**3
         data = [mass_scaled / x.volume for x in self.frms]
         self.data = pd.DataFrame({self.LABEL: data}, index=self.time)
-        self.data.index.name = f"{self.ILABEL} ({self.sidx})"
+        self.data.index.name = f"{self.INDEX_LB} ({self.sidx})"
 
 
-class RDF(Base):
+class RDF(TrajBase):
     """
     The radial distribution function analyzer.
     """
@@ -271,7 +288,7 @@ class RDF(Base):
     PNAME = 'g'
     UNIT = 'r'
     LABEL = f'{PNAME} ({UNIT})'
-    ILABEL = f'r ({symbols.ANGSTROM})'
+    INDEX_LB = f'r ({symbols.ANGSTROM})'
     DEFAULT_CUT = lammpsin.In.DEFAULT_CUT
 
     def setData(self, res=0.02, dcut=None):
@@ -287,7 +304,7 @@ class RDF(Base):
             self.log_warning("RDF requires least two atoms selected.")
             self.data = pd.DataFrame(data={self.LABEL: []})
             return
-        # self.data = pd.DataFrame(data={self.LABEL: rdf}, index=index)
+
         frms = self.frms[self.sidx:]
         span = np.array([x.box.span for x in frms])
         vol = span.prod(axis=1)
@@ -327,7 +344,7 @@ class RDF(Base):
                 threshold = round(threshold + tenth, 1)
         rdf /= len(frms)
         mid, rdf = np.concatenate(([0], mid)), np.concatenate(([0], rdf))
-        index = pd.Index(data=mid, name=self.ILABEL)
+        index = pd.Index(data=mid, name=self.INDEX_LB)
         self.data = pd.DataFrame(data={self.LABEL: rdf}, index=index)
 
     @classmethod
@@ -350,7 +367,7 @@ class RDF(Base):
         return None, None
 
 
-class MSD(Base):
+class MSD(TrajBase):
     """
     The mean squared displacement analyzer.
     """
@@ -360,7 +377,7 @@ class MSD(Base):
     PNAME = NAME.upper()
     UNIT = f'{symbols.ANGSTROM}^2'
     LABEL = f'{PNAME} ({UNIT})'
-    ILABEL = 'Tau (ps)'
+    INDEX_LB = 'Tau (ps)'
 
     def setData(self):
         """
@@ -383,7 +400,7 @@ class MSD(Base):
             sdata = np.square(data)
             msd.append(np.average(sdata.mean(axis=0), weights=masses))
         ps_time = self.time[self.sidx:][:num]
-        tau_idx = pd.Index(data=ps_time - ps_time[0], name=self.ILABEL)
+        tau_idx = pd.Index(data=ps_time - ps_time[0], name=self.INDEX_LB)
         self.data = pd.DataFrame({self.LABEL: msd}, index=tau_idx)
 
     @classmethod
@@ -415,7 +432,7 @@ class MSD(Base):
         return sidx, eidx
 
 
-class Clash(Base):
+class Clash(TrajBase):
     """
     The clash analyzer.
     """
@@ -440,10 +457,10 @@ class Clash(Base):
             dcell.setup(frm)
             data.append(len(dcell.getClashes()))
         self.data = pd.DataFrame(data={self.LABEL: data}, index=self.time)
-        self.data.index.name = f"{self.ILABEL} ({self.sidx})"
+        self.data.index.name = f"{self.INDEX_LB} ({self.sidx})"
 
 
-class XYZ(Base):
+class XYZ(TrajBase):
     """
     The XYZ coordinate converter.
     """
@@ -474,11 +491,10 @@ class XYZ(Base):
                 if glue:
                     frm.glue(dreader=self.df_reader)
                 frm.write(self.out_fh, dreader=self.df_reader)
-        jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
         self.log(f"{self.DESCR} coordinates are written into {self.outfile}")
 
 
-class View(Base):
+class View(TrajBase):
     """
     The coordinate visualizer.
     """
@@ -498,7 +514,6 @@ class View(Base):
         frm_vw.setFrames(self.frms)
         frm_vw.updateLayout()
         frm_vw.show(outfile=self.outfile, inav=self.options.interactive)
-        jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
         self.log(f'{self.DESCR.capitalize()} data written into {self.outfile}')
 
 
@@ -506,6 +521,46 @@ class Thermo(Base):
 
     NAME = 'thermo'
     DESCR = 'Thermodynamic information'
+
+    def __init__(self, thermo, tasks=None, **kwargs):
+        super().__init__(**kwargs)
+        self.thermo = thermo
+        self.tasks = tasks
+
+    def setData(self):
+        """
+        Select data by thermo task names.
+        """
+        sel_cols = [
+            x for x in self.thermo.columns
+            if self.COLUMN_RE.match(x).groups()[0] in self.tasks
+        ]
+        self.data = self.thermo[sel_cols]
+        self.data.index.name = f"{self.INDEX_LB} ({self.sidx})"
+
+    def saveData(self, float_format='%.8g'):
+        """
+        Save the selected data into a CSV file.
+
+        :param float_format str: the format for floating point numbers
+        """
+        self.data.to_csv(self.outfile, float_format=float_format)
+        self.log(f'{self.tasks} information written into {self.outfile}')
+
+    @classmethod
+    def fit(self, data, log=None):
+        """
+        Fit the data and report.
+
+        :param data: distance vs count
+        :type data: 'pandas.core.frame.DataFrame'
+        :param log: the function to print user-facing information
+        :type log: 'function'
+        :return int, int: the start and end index for the selected data
+        """
+        for column in data.columns:
+            sidx, eidx = super().fit(data[column].to_frame(), log=log)
+        return sidx, eidx
 
     @classmethod
     def plot(cls, data, name, *args, **kwargs):

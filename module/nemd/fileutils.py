@@ -320,18 +320,15 @@ class LammpsLog(LammpsBase):
         VOLUME: VOLUME_UNITS
     }
 
-    def __init__(self, filename, last_pct=0.2):
+    def __init__(self, filename):
         self.filename = filename
-        self.last_pct = last_pct
         self.unit = self.DEFAULT_UNIT
         self.timestep = None
-        self.sidx = None
         self.thermo = []
 
     def run(self):
         self.parse()
         self.setUnits()
-        self.setSidx()
 
     def parse(self):
         """
@@ -369,21 +366,6 @@ class LammpsLog(LammpsBase):
             f"{x} ({self.THERMO_UNITS[x][self.unit]})"
             for x in self.thermo.columns
         ]
-
-    def setSidx(self):
-        self.sidx = math.floor(self.thermo.shape[0] * (1 - self.last_pct))
-
-    def write(self, tasks, filename):
-        sel_cols = [
-            x for x in self.thermo.columns if x.split('(')[0].strip() in tasks
-        ]
-        dat = self.thermo[sel_cols]
-        averaged = dat[self.sidx:].mean(axis=0)
-        ave_index = pd.Index([np.average(dat[self.sidx:].index)])
-        ave_row = pd.DataFrame([averaged], index=ave_index)
-        dat = pd.concat([dat, ave_row])
-        dat.index.name = self.thermo.index.name
-        dat.to_csv(filename)
 
 
 class EnergyReader(object):

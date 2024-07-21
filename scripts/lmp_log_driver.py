@@ -7,6 +7,7 @@ import re
 import sh
 import os
 import sys
+import math
 import functools
 import pandas as pd
 
@@ -120,9 +121,10 @@ class LmpLog(object):
         Grep thermo output information.
         """
 
-        self.lmp_log = fileutils.LammpsLog(self.options.lmp_log,
-                                           last_pct=self.options.last_pct)
+        self.lmp_log = fileutils.LammpsLog(self.options.lmp_log)
         self.lmp_log.run()
+        self.sidx = math.floor(self.lmp_log.thermo.shape[0] *
+                               (1 - self.options.last_pct))
 
         log(f"{self.lmp_log.thermo.shape[0]} steps of thermo data found.")
         af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
@@ -134,8 +136,8 @@ class LmpLog(object):
         if lf_tasks:
             log(f"{', '.join(lf_tasks)} averages results from last "
                 f"{self.options.last_pct * 100}% frames {symbols.ELEMENT_OF} "
-                f"[{self.lmp_log.thermo.index[self.lmp_log.sidx]: .3f}, "
-                f"{self.lmp_log.thermo.index[-1]: .3f}] ps")
+                f"[{self.lmp_log.thermo.index[self.sidx]:.3f}, "
+                f"{self.lmp_log.thermo.index[-1]:.3f}] ps")
 
     def analyze(self):
         """
@@ -144,10 +146,13 @@ class LmpLog(object):
 
         thermo_tasks = [x for x in THERMO_TASKS if x in self.options.task]
         if thermo_tasks:
-            filename = self.options.jobname + self.DATA_EXT % THERMO
-            self.lmp_log.write(thermo_tasks, filename)
-            jobutils.add_outfile(filename, jobname=self.options.jobname)
-            log(f'{thermo_tasks} info written into {filename}')
+            anl = analyzer.Thermo(self.lmp_log.thermo,
+                                  tasks=thermo_tasks,
+                                  options=self.options,
+                                  logger=logger,
+                                  sidx=self.sidx,
+                                  df_reader=self.df_reader)
+            anl.run()
 
     @classmethod
     def getOutfiles(cls, logfile):
