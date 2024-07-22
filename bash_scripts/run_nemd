@@ -44,7 +44,7 @@ fi
 FILE_WITH_ARGS=${!FILE_IDX} && [[ -n "$DEBUG" ]] && echo "Python file with arguments: $FILE_WITH_ARGS"
 FILE=`echo $FILE_WITH_ARGS | sed 's/::.*$//'` && [[ -n "$DEBUG" ]] && echo "Python file: $FILE"
 DIR="$(dirname $FILE)" && [[ -n "$DEBUG" ]] && echo "File dir: $DIR"
-BASENAME="$(basename $FILE)" && [[ -n "$DEBUG" ]] && echo "Filename: $BASENAME"
+BASENAME="$(basename $FILE)" && [[ -n "$DEBUG" ]] && echo "Fileame: $BASENAME"
 # Assume that the file come with absolute or relative path (curdir implicitly)
 SPATH="$(cd "$DIR"; pwd)/$BASENAME" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
 [ ! -f "$SPATH" ] && [ -n "$NEMD_SCRIPTS" ] && SPATH="$NEMD_SCRIPTS/$BASENAME" && [[ -n "$DEBUG" ]] && echo "SPATH: $SPATH"
@@ -70,6 +70,8 @@ LD_LIBRARY_PATH=`pip3 show tbb | grep 'Location:' | sed 's/^.*: //;s/python.*\/s
 LAMMPS_PATH=`pip3 show lammps | grep 'Location:' | sed 's/^.*: //'`/lammps
 [[ -n "$LAMMPS_PATH" ]] && [[ ":$PYTHONPATH:" != *":$LAMMPS_PATH:"* ]] &&
   export PYTHONPATH="${PYTHONPATH}:$LAMMPS_PATH" && [[ -n "$DEBUG" ]] && echo "PYTHONPATH: $PYTHONPATH"
+# Set jobname based on the python script filename
+[ -z "$JOBNAME" ] && export JOBNAME=`echo $BASENAME | sed -E 's/(_(workflow|driver))?.py$//'` && [ -n "$DEBUG" ] && echo "JOBNAME: $JOBNAME"
 # Finalize the command so that Python script is of absolute path
 SCRIPT_ARGS="python3 ${*:1:$FILE_IDX-1} $SPATH ${*:$FILE_IDX+1}"
 echo "Running $SCRIPT_ARGS" && $SCRIPT_ARGS

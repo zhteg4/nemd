@@ -25,7 +25,7 @@ from nemd import parserutils
 from nemd import environutils
 
 PATH = os.path.basename(__file__)
-JOBNAME = PATH.split('.')[0].replace('_driver', '')
+JOBNAME = PATH.split('.')[0].replace('_workflow', '')
 
 FLAG_DIR = itestutils.DIR
 FLAG_SLOW = '-slow'

@@ -1,5 +1,5 @@
 # Methane Gas: polymer builder on C via -grow; lammps simulation; density
 run_nemd pb_lmp_post_workflow.py C -cru_num 10 -mol_num 200 -seed 5678 -temp 298.15 -prod_ens NPT -last_pct 0.4 -task density -cpu 4 -state_num 4 -clean
-grep "g/cm^3" pb_lmp_post_workflow-driver.log
+grep "g/cm^3" pb_lmp_post-driver.log
 # 0.657 kg/m3(gas, 25 °C, 1 atm) from https://en.wikipedia.org/wiki/Methane
 

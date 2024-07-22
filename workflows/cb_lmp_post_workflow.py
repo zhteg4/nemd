@@ -19,7 +19,7 @@ from nemd import environutils
 from nemd.task import Crystal_Builder, Lammps, Lmp_Log
 
 PATH = os.path.basename(__file__)
-JOBNAME = PATH.split('.')[0].replace('_driver', '')
+JOBNAME = PATH.split('.')[0].replace('_workflow', '')
 
 FLAG_SCALED_RANGE = '-scaled_range'
 

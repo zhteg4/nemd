@@ -1,1 +1,1 @@
-{"outfiles": {"pb_lmp_post_workflow": ["pb_lmp_post_workflow-driver.log"], "null": ["pb_lmp_post_workflow_density.png"]}, "logfile": {"pb_lmp_post_workflow": "pb_lmp_post_workflow-driver.log"}, "outfile": {"pb_lmp_post_workflow": "pb_lmp_post_workflow-driver.log"}}
+{"outfiles": {"pb_lmp_post": ["pb_lmp_post-driver.log", "pb_lmp_post_density.csv", "pb_lmp_post_density.png"]}, "logfile": {"pb_lmp_post": "pb_lmp_post-driver.log"}, "outfile": {"pb_lmp_post": "pb_lmp_post-driver.log"}}

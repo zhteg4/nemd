@@ -120,6 +120,15 @@ def get_jobname(default_jobname):
     return default_jobname
 
 
+def set_jobname(jobname):
+    """
+    Set the jobname to the environment settings.
+
+    :param jobname str: the jobname to be set.
+    """
+    os.environ[JOBNAME] = jobname
+
+
 def is_interactive():
     """
     Whether interactive mode is on.

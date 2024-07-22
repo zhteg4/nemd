@@ -59,7 +59,7 @@ class Base:
                   inav=self.options.interactive,
                   sidx=sidx,
                   eidx=eidx,
-                  name=self.options.jobname,
+                  jobname=self.options.jobname,
                   log=self.log)
 
     def setData(self):
@@ -106,19 +106,20 @@ class Base:
     @classmethod
     def plot(cls,
              data,
-             name,
+             jobname,
              sidx=None,
              eidx=None,
              log=None,
              inav=False,
-             marker_num=10):
+             marker_num=10,
+             use_column=False):
         """
         Plot and save the data (interactively).
 
         :param data: data to plot
         :type data: 'pandas.core.frame.DataFrame'
-        :param name: the taskname based on which output file is set
-        :type name: str
+        :param jobname: the jobname
+        :type jobname: str
         :param sidx: the starting index when selecting data
         :type sidx: int
         :param eidx: the ending index when selecting data
@@ -130,6 +131,9 @@ class Base:
         :type inav: bool
         :param marker_num: add markers when the number of points equals or is
             less than this value
+        :type inav: int
+        :param use_column: use column label in output filename
+        :type use_column: bool
         """
         if data.empty:
             return
@@ -159,18 +163,21 @@ class Base:
                 xlabel = cls.TIME_RE.match(xlabel).groups()[0]
             ax.set_xlabel(xlabel)
             ax.set_ylabel(data.columns.values.tolist()[0])
-            fname = f"{name}_{cls.NAME}{cls.FIG_EXT}"
+            fname = f"{jobname}_{cls.NAME}{cls.FIG_EXT}"
+            if use_column:
+                colunm_name = data.columns[0].split('(')[0].strip().lower()
+                fname = f"{jobname}_{colunm_name}_{cls.NAME}{cls.FIG_EXT}"
             fig.savefig(fname)
-            jobutils.add_outfile(fname)
+            jobutils.add_outfile(fname, jobname=jobname)
         log(f'{cls.DESCR.capitalize()} figure saved as {fname}')
 
     @classmethod
-    def read(cls, name, files=None, log=None, float_format='%.4g'):
+    def read(cls, jobname, files=None, log=None, float_format='%.4g'):
         """
         Read the output file based on jobname or input files.
 
-        :param name: the jobname based on which output file is searched
-        :type name: str
+        :param jobname: the jobname based on which output file is searched
+        :type jobname: str
         :param files: the output files from analyzers
         :type files: list of str
         :param log: the function to print user-facing information
@@ -179,7 +186,7 @@ class Base:
         :return: x values, y average, y standard deviation
         :rtype: 'pandas.core.frame.DataFrame'
         """
-        filename = f"{name}_{ cls.NAME}{cls.DATA_EXT}"
+        filename = f"{jobname}_{ cls.NAME}{cls.DATA_EXT}"
         if os.path.exists(filename):
             data = pd.read_csv(filename, index_col=0)
             log(f"{cls.RESULTS}{cls.DESCR} found as {filename}")
@@ -203,6 +210,7 @@ class Base:
         data.columns = [f'{cname} (num={num})', f'std (num={num})']
         data.index.name = iname
         data.to_csv(filename, float_format=float_format)
+        jobutils.add_outfile(filename, jobname=jobname)
         log(f"{cls.RESULTS}{cls.DESCR} saved to {filename}")
         return data
 
@@ -564,15 +572,15 @@ class Thermo(Base):
         return sidx, eidx
 
     @classmethod
-    def plot(cls, data, name, *args, **kwargs):
+    def plot(cls, data, jobname, *args, **kwargs):
         """
         Plot and save the data (interactively).
 
         :param data: data to plot
         :type data: 'pandas.core.frame.DataFrame'
-        :param name: the taskname based on which output file is set
-        :type name: str
+        :param jobname: the jobname
+        :type jobname: str
         """
         for column in data.columns:
-            aname = f"{name}_{column.split('(')[0].strip().lower()}"
-            super().plot(data[column].to_frame(), aname, *args, **kwargs)
+            df = data[column].to_frame()
+            super().plot(df, jobname, use_column=True, *args, **kwargs)

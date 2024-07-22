@@ -1,4 +1,4 @@
 #!/bin/bash
 
-SCRIPT_ARGS="run_nemd integration_driver.py $*"
+SCRIPT_ARGS="run_nemd integration_workflow.py $*"
 echo "$SCRIPT_ARGS" && $SCRIPT_ARGS

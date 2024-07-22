@@ -17,7 +17,7 @@ from nemd import jobcontrol
 from nemd.task import Polymer_Builder, Lammps, Custom_Dump
 
 PATH = os.path.basename(__file__)
-JOBNAME = PATH.split('.')[0].replace('_driver', '')
+JOBNAME = PATH.split('.')[0].replace('_workflow.py', '')
 
 FLAG_STATE_NUM = '-state_num'
 
