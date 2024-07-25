@@ -643,7 +643,8 @@ class GriddedStruct(Struct):
         """
         Set coordinates.
         """
-        idxes = [list(range(x)) for x in map(int, self.box.span / self.size)]
+        idxes = (self.box.span / self.size).round().astype(int)
+        idxes = [list(range(x)) for x in idxes]
         # vectors shifts molecules by the largest box size
         vectors = [x * self.size for x in itertools.product(*idxes)]
         np.random.shuffle(vectors)

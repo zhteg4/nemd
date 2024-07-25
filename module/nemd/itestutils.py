@@ -18,7 +18,7 @@ MSG = task.MSG
 class Integration_Driver(task.BaseTask):
 
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
-    JOBNAME_RE = re.compile('.* +(.*)_(driver|workflow).py ?.*')
+    JOBNAME_RE = re.compile('.* +(.*)_(driver|workflow).py( +.*)?$')
 
     @staticmethod
     def operator(*args, **kwargs):
