@@ -1,0 +1,37 @@
+dash testing
+brew install --cask chromedriver
+cd /usr/local/bin
+xattr -d com.apple.quarantine chromedriver
+spctl --add --label 'Approved' chromedriver
+
+visco-elastic
+https://xiresearch.org/
+Equilibrium and non-equilibrium molecular dynamics approaches for the linear viscoelasticity of polymer melts
+
+force field:
+https://openforcefield.org/
+https://foyer.mosdef.org/en/stable/getting_started/quickstart.html
+http://zarbi.chem.yale.edu/oplsaam.html
+https://github.com/pdynamo/pDynamo3
+https://docs.quantumatk.com/manual/Types/OPLSPotentialBuilder/OPLSPotentialBuilder.html
+https://github.com/openmm/openmmforcefields
+OpenFF Toolkit https://open-forcefield-toolkit.readthedocs.io/_/downloads/en/latest/pdf/
+Discover program needs the forcefield atom type of each atom in the molecule or system in order to determine which forcefield parameters
+http://www.uoxray.uoregon.edu/local/manuals/biosym/discovery/General/Forcefields/Assign_Atom_Types.html#Intro
+sGDML, ML force field https://pubs.acs.org/doi/full/10.1021/acs.chemrev.0c01111
+ChemoPy, freely available python package for computational biology and chemoinformatics
+
+JobControl:
+https://docs.signac.io/en/latest/tutorial.html#implementing-a-simple-workflow
+https://github.com/kedro-org/kedro-viz/blob/main/.github/img/banner.png
+https://github.com/kedro-org/kedro
+
+Towards molecular simulations that are transparent, reproducible, usable by others, and extensible (TRUE)
+https://www.tandfonline.com/doi/full/10.1080/00268976.2020.1742938
+https://www.nsf.gov/awardsearch/showAward?AWD_ID=1835630
+https://zenodo.org/ Transform to OPen Science (TOPS)
+
+Thermally Conductivie Plastics Market: https://www.marketsandmarkets.com/Market-Reports/thermally-conductive-plastics-market-148526587.html
+
+Machine Learning:
+ https://github.com/ samoturk/mol2vec

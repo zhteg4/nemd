@@ -1,0 +1,53 @@
+git clone https://github.com/amix/vimrc.git ~/.vim_runtime
+sh ~/.vim_runtime/install_awesome_vimrc.sh
+
+ssh
+# https://linuxize.com/post/how-to-enable-ssh-on-ubuntu-20-04/
+sudo /etc/init.d/ssh start
+ssh ubuntu@192.168.3.204
+ssh -Y ubuntu@192.168.3.204
+
+# git
+sudo apt-get update
+sudo apt install git
+
+ssh-keygen -o -t rsa -C “ssh@github.com”
+cat id_rsa.pub
+git clone git@github.com:zhteg4/nemd.git
+
+# pip
+sudo apt install python3-pip
+sudo add-apt-repository ppa:okirby/qt6-backports
+sudo apt update
+sudo apt install qt6-base-dev
+# GUI Ubuntu 22.04
+sudo apt-get install build-essential libgl1-mesa-dev qt6-base-dev
+sudo apt install '^libxcb.*-dev' libx11-xcb-dev libglu1-mesa-dev libxrender-dev libxkbcommon-dev libxkbcommon-x11-dev
+
+# The following may not be useful
+# https://www.jianshu.com/p/a87da7a75d6c
+# fatal: unable to access 'https://github.com/zhteg4/nemd.git/': GnuTLS recv error (-110): The TLS connection was non-properly terminated.
+sudo apt-get install gnutls-bin
+git config --global --unset http.https://github.com.proxy
+git clone https://github.com/zhteg4/nemd.git
+pip3 install --upgrade pip
+pip install setuptools
+
+# https://linuxize.com/post/how-to-enable-ssh-on-ubuntu-20-04/
+sudo /etc/init.d/ssh start
+ssh ubuntu@192.168.3.204
+ssh -Y ubuntu@192.168.3.204
+
+# cmake lammps
+sudo apt-get install libblas-dev liblapack-dev ffmpeg libzstd-dev voro++ libceres-dev libfftw3-double3 fftw3 clang-format
+# fftw3 http://fftw.org/download.html
+tar -zxvf fftw-3.3.10.tar.gz
+cd fftw-3.3.10
+./configure
+make
+sudo make install
+cd ..
+mkdir build
+cd build/
+cmake -C ../cmake/presets/most.cmake -DPKG_GPU=yes ../cmake
+cmake --build .

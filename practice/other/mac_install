@@ -1,0 +1,39 @@
+# zsh to bash shell
+chsh -s /bin/bash
+# Head to System Preferences > Users & Groups on your Mac. Click the lock icon and enter your password. Hold the Ctrl key, click your user account’s name in the left pane, and select “Advanced Options.”
+
+# https://brew.sh # install brew
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+brew update
+
+# You must reboot for the installation of osxfuse to take effect.
+# `brew cask` is no longer a `brew` command. Use `brew <command> --cask` instead.
+brew install osxfuse --cask
+# deprecated due to closed-source macFUSE!
+# brew install sshfs
+# brew install https://raw.githubusercontent.com/kadwanev/bigboybrew/master/Library/Formula/sshpass.rb
+
+# https://www.python.org/downloads/mac-osx/
+curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+python3 get-pip.py
+pip3 install pytest
+pip3 install numpy
+pip3 install scipy
+pip3 install matplotlib
+pip3 install yapf
+pip3 install PyQt5
+
+# Mac File Comparison Tools and Diff Tools
+brew install meld
+
+# ssh is looking for xauth in /usr/X11R6/bin and on macOS with XQuartz it is in /opt/X11/bin
+# Edit ~/.ssh/config, add XAuthLocation /opt/X11/bin/xauth to the host config.
+
+# Store git password
+# git config --global credential.helper store
+
+# visualization softwware to investigate
+# https://blog.csdn.net/weixin_39760434/article/details/110526957
+# https://amber-md.github.io/pytraj/latest/installation.html#install-anaconda-for-all-python-packages
+# https://two.avogadro.cc/install/index.html
+# https://mdtraj.org/1.9.4/installation.html

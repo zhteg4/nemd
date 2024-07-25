@@ -96,6 +96,10 @@ class Log(lammpsin.In):
                     self.unit = line.strip(self.UNITS).strip()
                 elif line.startswith(self.TIMESTEP):
                     self.timestep = int(line.strip(self.TIMESTEP).strip())
+        if blk:
+            # Finishing up the last running thermo block
+            data = pd.read_csv(io.StringIO(''.join(blk)), sep=r'\s+')
+            self.thermo = pd.concat((self.thermo, data))
         if self.timestep is None:
             self.timestep = self.DEFAULT_TIMESTEP[self.unit]
 

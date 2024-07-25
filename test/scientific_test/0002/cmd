@@ -1,5 +1,4 @@
-# Ethane Gas: polymer builder on CC via -pack; lammps simulation; density
-run_nemd pb_lmp_post_workflow.py *C* -cru_num 2 -mol_num 200 -seed 5678 -cell pack -temp 300 -prod_ens NPT -prod_time 4 -last_pct 0.4 -task density -cpu 4 -state_num 4 -clean
-grep "g/cm^3" pb_lmp_post_workflow-driver.log
-grep "g/cm^3" custom_dump-driver.log
+# Ethane Gas: polymer builder on CC via; lammps simulation; density
+run_nemd pb_lmp_post_workflow.py *C* -cru_num 2 -mol_num 700 -seed 5678 -temp 300 -prod_ens NPT -relax_time 10 -prod_time 10  -last_pct 0.4 -task density -cpu 4 -state_num 4 -clean
+grep "g/cm^3" pb_lmp_post-driver.log
 # 1.214 at 300K https://www.engineeringtoolbox.com/ethane-C2H6-density-specific-weight-temperature-pressure-d_2088.html

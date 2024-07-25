@@ -237,6 +237,7 @@ class Scale(Press):
         super().__init__(*args, **kwargs)
         self.vol = None
         self.factor = 1
+        self.fitted_press = None
 
     def run(self):
         """
@@ -280,11 +281,13 @@ class Scale(Press):
         right_bound = int(self.fitted_press.shape[0] * (1 - excluded_ratio))
         fitted_press = self.fitted_press[left_bound + 1:right_bound]
         vol = self.vol[left_bound + 1:right_bound]
-        if self.press < fitted_press.min():
+        vol_cl = [x for x in self.data.columns if x.endswith(self.VOL)][0]
+        delta = self.data.groupby(by=vol_cl).std().mean().iloc[0] / 20
+        if self.press < fitted_press.min() - delta:
             # Expand the volume as the target pressure is smaller
             self.factor = self.vol.max() / vol.mean()
             return
-        if self.press > fitted_press.max():
+        if self.press > fitted_press.max() + delta:
             # Compress the volume as the target pressure is larger
             self.factor = self.vol.min() / vol.mean()
             return

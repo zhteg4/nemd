@@ -1,0 +1,18 @@
+# Distributor ID:	Ubuntu
+# Description:	Ubuntu 22.04.3 LTS
+# Release:	22.04
+# Codename:	jammy
+sudo apt update
+sudo apt-get install build-essential git vim gh python3-pip -y
+gh auth login --hostname GitHub.com --web
+gh auth setup-git
+git config --global user.email zhteg4@gmail.com
+git config --global user.name 'Tony Zhang'
+git config --global core.editor "vim"
+mkdir -p ~/git; cd ~/git
+gh repo clone zhteg4/nemd
+# LAMMPS Version:   20230802
+# The CXX compiler identification is GNU 11.4.0
+# Found MPI_CXX: /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so (found version "3.1")
+# Found OpenMP_CXX: -fopenmp (found version "4.5")
+# CMake Version:    3.22.1

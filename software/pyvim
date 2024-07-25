@@ -1,3 +1,0 @@
-# https://github.com/prompt-toolkit/pyvim/blob/master/examples/config/pyvimrc
-mv xxx ~/.pyvimrc
-# editor.enable_mouse_support = False

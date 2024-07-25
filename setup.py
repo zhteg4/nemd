@@ -325,8 +325,8 @@ setup(name='nemd',
       classifiers=[
           'Development Status :: 1 - Planning',
           'Intended Audience :: Science/Research',
-          'License :: OSI Approved :: BSD License',
+          'License :: OSI Approved :: BSD-3-Clause',
           'Operating System :: POSIX :: Linux',
-          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.10',
       ],
       cmdclass={'install': CustomInstallCommand})

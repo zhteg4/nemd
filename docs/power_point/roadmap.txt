@@ -1,0 +1,21 @@
+1 fix shake for water and maybe other Hs
+2 adjust bond lengths and angles
+3 run minimerize on monomer
+
+in queue:
+1. traj_viewer.py use upload api for path and file extension
+2. marker atom by adding scatter object to data and frames
+3. atom selection to smiles
+4. datafile to rdkit mol
+5. on-the-fly trajectory analysis in the viewer by smiles selection for distribution and/or std
+7. load -driver.log which automatically load data and dump or load data file which automatically search and load dump (doable after the 1 item: new upload API)
+
+known issues:
+1. traj viewer's camera eye only preserves without frames. (the state after loading the frame is not stored)
+
+one project created:
+  High-throughout Molecular Dynamics Software
+two labels created:
+  trajectory_viewer
+  data_file
+7 Jira cases created

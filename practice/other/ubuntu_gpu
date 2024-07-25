@@ -1,0 +1,27 @@
+# https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=deb_local
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt-get update
+sudo apt-get -y install cuda
+nvidia-smi
+# sudo reboot
+cmake .. -DPKG_PYTHON=yes -DPKG_MOLECULE=yes -D GPU_API=cuda  -D GPU_ARCH=sm_70 -D PKG_GPU=on
+cmake --build .
+
+# https://zoomadmin.com/HowToInstall/UbuntuPackage/libtrilinos-kokkos-dev
+sudo apt-get install -y libtrilinos-kokkos-dev
+# https://linuxhint.com/install-cuda-on-ubuntu-22-04-lts/
+sudo apt update
+sudo apt install build-essential
+gcc --version
+g++ --version
+sudo apt install nvidia-cuda-toolkit nvidia-cuda-toolkit-gcc
+nvcc --version
+
+# The following GPU driver mismatch rises, and fixes itself by restarting the computer
+# https://support.d2iq.com/hc/en-us/articles/4409480561300-How-to-resolve-Failed-to-initialize-NVML-Driver-library-version-mismatch-error
+# run-time driver information
+cat /proc/driver/nvidia/version 
+# Compare against the version for drivers installed
+dpkg -l | grep nvidia-driver
+

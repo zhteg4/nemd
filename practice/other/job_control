@@ -1,0 +1,25 @@
+https://hpc.nih.gov/docs/job_dependencies.html
+sbatch - Slurm Workload Manager
+Building pipelines using slurm dependencies
+Job Dependencies
+https://hpc.nih.gov/docs/userguide.html#depend
+
+pip3 install kubernetes
+brew install kubectl
+https://github.com/kubernetes-client/python
+https://kubernetes.io/blog/2022/12/09/kubernetes-v1-26-release/
+https://github.com/kubernetes/cli-runtime
+https://github.com/kubernetes/sample-cli-plugin
+
+# install kubernetes for local
+brew install hyperkit
+brew install minikube
+
+https://www.youtube.com/watch?v=X48VuDVv0do
+
+# Macbook M2 install
+# https://eric-price.net/posts/2022-06-15-install-minikube-m1-mac/
+https://github.com/kubernetes/minikube/releases/download/v1.28.0/minikube-darwin-arm64
+#curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-darwin-arm64
+sudo install minikube-darwin-arm64 /usr/local/bin/minikube
+minikube start --driver=docker

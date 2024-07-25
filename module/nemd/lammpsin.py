@@ -312,7 +312,7 @@ class FixWriter:
                  stemp=self.stemp,
                  temp=self.stemp)
 
-    def nvt(self, nstep=1E4, stemp=300, temp=300, style=BERENDSEN, pre=''):
+    def nvt(self, nstep=1E4, stemp=None, temp=300, style=BERENDSEN, pre=''):
         """
         Append command for constant volume and temperature.
 
@@ -322,6 +322,8 @@ class FixWriter:
         :style str: the style for the command
         :pre str: additional pre-conditions
         """
+        if stemp is None:
+            stemp = temp
         if style == self.BERENDSEN:
             cmd1 = self.FIX_TEMP_BERENDSEN.format(stemp=stemp,
                                                   temp=temp,
@@ -350,8 +352,10 @@ class FixWriter:
                      press=self.press)
             return
 
-        self.nvt(nstep=self.relax_step / 1E2, stemp=self.stemp, temp=self.temp)
+        self.nvt(nstep=self.relax_step / 2E1, stemp=self.stemp, temp=self.temp)
+        self.nvt(nstep=self.relax_step / 2E1, stemp=self.temp, temp=self.temp)
         self.cycleToPress()
+        self.nvt(nstep=self.relax_step / 1E1, temp=self.temp)
         self.npt(nstep=self.relax_step / 1E1,
                  stemp=self.temp,
                  temp=self.temp,
@@ -395,7 +399,7 @@ class FixWriter:
         self.cmd.append(cmd + self.RUN_STEP % nstep + self.UNFIX * len(fix))
 
     def cycleToPress(self,
-                     max_loop=100,
+                     max_loop=1000,
                      num=3,
                      record_num=100,
                      defm_id='defm_id',
@@ -414,9 +418,10 @@ class FixWriter:
         :param defm_start str: Each deformation loop starts with this label
         :param defm_break str: Terminate the loop by go to the this label
         """
-        # The number of steps for one sinusoidal cycle that yields 10 records
-        nstep = int(self.relax_step / max_loop / (num + 1))
+        nstep = int(self.relax_step * 10 / max_loop / (num + 1))
+        # One sinusoidal cycle that yields at least 10 records
         nstep = max([int(nstep / record_num), 10]) * record_num
+        # Maximum Total Cycle Steps (cyc_nstep): self.relax_steps * 10
         cyc_nstep = nstep * (num + 1)
         # Each cycle dumps one trajectory frame
         self.cmd.append(self.DUMP_EVERY.format(id=self.DUMP_ID, arg=cyc_nstep))
