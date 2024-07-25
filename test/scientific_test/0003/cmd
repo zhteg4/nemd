@@ -1,4 +1,4 @@
-# Ethane Gas: polymer builder on CCC via -grid; lammps simulation; density
-run_nemd pb_lmp_post_workflow.py *C* -cru_num 3 -mol_num 200 -seed 5678 -cell grid -temp 298.15 -prod_ens NPT -prod_time 4 -last_pct 0.4 -task density -cpu 4 -state_num 4 -clean
+# Propane Gas: polymer builder on CCC via -grid; lammps simulation; density
+run_nemd pb_lmp_post_workflow.py *C* -cru_num 3 -mol_num 200 -seed 5678 -cell grid -temp 298.15 -prod_ens NPT -relax_time 10 -prod_time 5 -last_pct 0.2 -task density -cpu 4 -state_num 4 -clean
 grep "g/cm^3" custom_dump-driver.log
 # 1.808 kg/m3 at 25 C https://en.wikipedia.org/wiki/Propane#Density

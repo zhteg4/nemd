@@ -167,6 +167,7 @@ class Integration(jobcontrol.Runner):
         if self.options.check_only:
             itestutils.Results.getOpr(name='result', cmd=False)
             return
+
         cmd = itestutils.Integration_Driver.getOpr(name='cmd')
         result = itestutils.Results.getOpr(name='result', cmd=False)
         self.setPrereq(result, cmd)

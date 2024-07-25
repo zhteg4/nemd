@@ -5,6 +5,7 @@ import filecmp
 from nemd import task
 from nemd import symbols
 from nemd import logutils
+from nemd import jobutils
 
 DIR = 'dir'
 CMD = 'cmd'
@@ -15,6 +16,9 @@ MSG = task.MSG
 
 
 class Integration_Driver(task.BaseTask):
+
+    FLAG_JOBNAME = jobutils.FLAG_JOBNAME
+    JOBNAME_RE = re.compile('.* +(.*)_(driver|workflow).py ?.*')
 
     @staticmethod
     def operator(*args, **kwargs):
@@ -33,6 +37,7 @@ class Integration_Driver(task.BaseTask):
         :param write bool: the msg to be printed
         :return str: the command as str
         """
+
         cmd_file = os.path.join(self.job.document[DIR], CMD)
         with open(cmd_file) as fh:
             lines = [x.strip() for x in fh.readlines()]
@@ -42,6 +47,9 @@ class Integration_Driver(task.BaseTask):
         if write:
             with open(f"{self.job.statepoint[self.STATE_ID]}_cmd", 'w') as fh:
                 fh.write(cmd)
+        if self.FLAG_JOBNAME not in cmd:
+            jobname = self.JOBNAME_RE.match(cmd).groups()[0]
+            cmd += f" {self.FLAG_JOBNAME} {jobname}"
         return f"echo \"{os.path.basename(self.job.document[DIR])} {comment}\"; {cmd}"
 
     @classmethod
