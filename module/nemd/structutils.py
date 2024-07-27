@@ -478,11 +478,11 @@ class PackedMol(Mol):
 
     ConfClass = PackedConf
 
-    def adjustBondLength(self):
+    def updateAll(self):
         """
-        Adjust bond length according to the force field and store.
+        Store the original coordinates of all conformers in addition to the
+        regular updateAll().
         """
-        super().adjustBondLength()
         for conf in self.GetConformers():
             conf.oxyz = conf.GetPositions()
 

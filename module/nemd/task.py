@@ -213,13 +213,20 @@ class BaseTask:
             return True
         return False
 
-    @staticmethod
-    def operator(job):
+    @classmethod
+    def operator(cls, job, *arg, name=None, **kwargs):
         """
         The main opterator (function) for a job task executed after
         pre-conditions are met.
+        :param job: the signac job instance
+        :type job: 'signac.contrib.job.Job'
+        :param name: the jobname
+        :type name: str
+        :return str: the command to run a task.
         """
-        pass
+        obj = cls(job, name=name)
+        obj.run()
+        return obj.getCmd()
 
     @classmethod
     def getOpr(cls,
@@ -256,21 +263,29 @@ class BaseTask:
         :type tname: str
         :return: the operation to execute
         :rtype: 'function'
+        :raise ValueError: the function cannot be found
         """
         if post is None:
             post = cls.post
         if pre is None:
             pre = cls.pre
 
-        func = cls.dupeFunc(attr, name)
+        if isinstance(attr, str):
+            opr = getattr(cls, attr)
+        elif isinstance(attr, types.FunctionType):
+            opr = attr
+        else:
+            raise ValueError(f"{attr} is not a callable function or str.")
+
         # Pass jobname, taskname, and logging function
         kwargs.update({'name': name})
         if tname:
             kwargs['tname'] = tname
         if log:
             kwargs['log'] = log
-        func = functools.update_wrapper(functools.partial(func, **kwargs),
-                                        func)
+        func = functools.update_wrapper(functools.partial(opr, **kwargs), opr)
+        func.__name__ = name
+
         func = FlowProject.operation(cmd=cmd,
                                      with_job=with_job,
                                      name=name,
@@ -285,39 +300,6 @@ class BaseTask:
             fp_pre = functools.update_wrapper(fp_pre, pre)
             func = FlowProject.pre(lambda *x: fp_pre(*x))(func)
         log_debug(f'Operator: {func.__name__}: {func}')
-        return func
-
-    @classmethod
-    def dupeFunc(cls, attr, name):
-        """
-        Duplicate a function or static method with new naming.
-        From http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)
-
-        :param attr: the attribute name of a staticmethod method or callable function
-        :type attr: str or types.FunctionType
-        :param name: the taskname
-        :type name: str
-        :return: the function to execute
-        :rtype: 'function'
-        """
-        if isinstance(attr, str):
-            ofunc = getattr(cls, attr)
-        elif isinstance(attr, types.FunctionType):
-            ofunc = attr
-        else:
-            raise ValueError(f"{attr} is not a callable function or str.")
-        origin_name = ofunc.__name__
-        if name is None:
-            name = ofunc.__name__
-        ofunc.__name__ = name
-        func = types.FunctionType(ofunc.__code__,
-                                  ofunc.__globals__,
-                                  name=name,
-                                  argdefs=ofunc.__defaults__,
-                                  closure=ofunc.__closure__)
-        func = functools.update_wrapper(func, ofunc)
-        func.__kwdefaults__ = cls.operator.__kwdefaults__
-        ofunc.__name__ = origin_name
         return func
 
     @staticmethod
@@ -438,17 +420,6 @@ class Polymer_Builder(BaseTask):
         seed = int(seed) + int(state.get(self.STATE_ID, state.get(self.ID)))
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SEED, seed)
 
-    @staticmethod
-    def operator(*args, **kwargs):
-        """
-        Get the polymer builder operation command.
-
-        :return str: the command to run a task.
-        """
-        polymer_builder = Polymer_Builder(*args, **kwargs)
-        polymer_builder.run()
-        return polymer_builder.getCmd()
-
 
 class Crystal_Builder(BaseTask):
 
@@ -474,17 +445,6 @@ class Crystal_Builder(BaseTask):
             state.get(self.STATE_ID, state.get(self.ID)))
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SCALED_FACTOR,
                          scaled_factor)
-
-    @staticmethod
-    def operator(*arg, **kwargs):
-        """
-        Get the crystal builder operation command.
-
-        :return str: the command to run a task.
-        """
-        xtal_builder = Crystal_Builder(*arg, **kwargs)
-        xtal_builder.run()
-        return xtal_builder.getCmd()
 
 
 class Lammps_Driver:
@@ -536,14 +496,12 @@ class Lammps(BaseTask):
         """
         super().__init__(*args, pre_run=pre_run, **kwargs)
 
-    @staticmethod
-    def operator(*arg, **kwargs):
+    @classmethod
+    def operator(cls, *arg, **kwargs):
         """
         Get the lammps operation command.
         """
-        lmp = Lammps(*arg, **kwargs)
-        lmp.run()
-        cmd = lmp.getCmd()
+        cmd = super().operator(*arg, **kwargs)
         # run_nemd echo Running xxx
         return f'echo Running {cmd}; {cmd}'
 
@@ -629,17 +587,6 @@ class Custom_Dump(BaseTask):
     DATA_EXT = lammpsin.In.DATA_EXT
     RESULTS = DRIVER.CustomDump.RESULTS
 
-    @staticmethod
-    def operator(*arg, **kwargs):
-        """
-        Get the polymer builder operation command.
-
-        :return str: the command to run a task.
-        """
-        custom_dump = Custom_Dump(*arg, **kwargs)
-        custom_dump.run()
-        return custom_dump.getCmd()
-
     def setArgs(self):
         """
         Set the args for custom dump task.
@@ -718,17 +665,6 @@ class Lmp_Log(BaseTask):
     READ_DATA = lammpsin.In.READ_DATA
     DATA_EXT = lammpsin.In.DATA_EXT
     RESULTS = DRIVER.LmpLog.RESULTS
-
-    @staticmethod
-    def operator(*arg, **kwargs):
-        """
-        Get the polymer builder operation command.
-
-        :return str: the command to run a task.
-        """
-        lmp_Log = Lmp_Log(*arg, **kwargs)
-        lmp_Log.run()
-        return lmp_Log.getCmd()
 
     def setArgs(self):
         """
