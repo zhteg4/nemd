@@ -35,6 +35,9 @@ FlAG_MOL_NUM = '-mol_num'
 FlAG_DENSITY = '-density'
 FlAG_CELL = '-cell'
 FLAG_SUBSTRUCT = '-substruct'
+FLAG_NO_MINIMIZE = '-no_minimize'
+FLAG_RIGID_BOND = '-rigid_bond'
+FLAG_RIGID_ANGLE = '-rigid_angle'
 GRID = 'grid'
 PACK = 'pack'
 GROW = 'grow'
@@ -84,60 +87,6 @@ def log_error(msg):
     """
     log(msg + '\nAborting...', timestamp=True)
     sys.exit(1)
-
-
-class Validator:
-
-    def __init__(self, options):
-        self.options = options
-
-    def run(self):
-        """
-        Main method to run the validation.
-        """
-        self.cruNum()
-        self.molNum()
-
-    def cruNum(self):
-        """
-        Validate (or set) the number of repeat units.
-        """
-        if self.options.cru_num is None:
-            self.options.cru_num = [1] * len(self.options.cru)
-            return
-        if len(self.options.cru_num) == len(self.options.cru):
-            return
-        raise ValueError(f'{len(self.options.cru_num)} cru num defined, but '
-                         f'{len(self.options.cru_num)} cru found.')
-
-    def molNum(self):
-        """
-        Validate (or set) the number of molecules.
-        """
-        if self.options.mol_num is None:
-            self.options.mol_num = [1] * len(self.options.cru_num)
-            return
-        if len(self.options.cru_num) == len(self.options.mol_num):
-            return
-        raise ValueError(f'{len(self.options.cru_num)} cru num defined, but '
-                         f'{len(self.options.mol_num)} molecules found.')
-
-
-def validate_options(argv):
-    """
-    Parse and validate the command args
-
-    :param argv list: list of command input.
-    :return: 'argparse.ArgumentParser':  Parsed command-line options out of sys.argv
-    """
-    parser = get_parser()
-    options = parser.parse_args(argv)
-    validator = Validator(options)
-    try:
-        validator.run()
-    except ValueError as err:
-        parser.error(err)
-    return validator.options
 
 
 class AmorphousCell(object):
@@ -301,7 +250,6 @@ class Mol(structure.Mol):
         self.markMonomer()
         self.polymerize()
         self.embedMol()
-        self.setSubstructure()
         self.setConformers()
 
     def setCruMol(self):
@@ -396,25 +344,6 @@ class Mol(structure.Mol):
 
         trans_conf = Conformer(self, self.cru_mol, options=self.options)
         trans_conf.run()
-
-    def setSubstructure(self):
-        """
-        Set substructure.
-        """
-        if self.options.substruct is None:
-            return
-        substruct, value = self.options.substruct
-        if not self.HasSubstructMatch(substruct):
-            return
-        tpl_conf = self.GetConformer(0)
-        ids = self.GetSubstructMatch(substruct)
-        match len(ids):
-            case 2:
-                Chem.rdMolTransforms.SetBondLength(tpl_conf, *ids, value)
-            case 3:
-                Chem.rdMolTransforms.SetAngleDeg(tpl_conf, *ids, value)
-            case 4:
-                Chem.rdMolTransforms.SetDihedralDeg(tpl_conf, *ids, value)
 
     def setConformers(self):
         """
@@ -708,6 +637,21 @@ def get_parser(parser=None):
         default=0.5,
         help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
     )
+    parser.add_argument(FLAG_NO_MINIMIZE,
+                        action='store_true',
+                        help='Skip the structure minimization step.')
+    parser.add_argument(
+        FLAG_RIGID_BOND,
+        metavar=FLAG_RIGID_BOND[1:].upper(),
+        type=parserutils.type_positive_int,
+        nargs='+',
+        help='The bond types whose lengths are fixed during the simulation.')
+    parser.add_argument(
+        FLAG_RIGID_ANGLE,
+        metavar=FLAG_RIGID_ANGLE[1:].upper(),
+        type=parserutils.type_positive_int,
+        nargs='+',
+        help='The angles of these types remain fixed during the simulation.')
     parser.add_argument(
         FLAG_SUBSTRUCT,
         metavar='SMILES:VALUE',
@@ -717,6 +661,60 @@ def get_parser(parser=None):
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
     return parser
+
+
+class Validator:
+
+    def __init__(self, options):
+        self.options = options
+
+    def run(self):
+        """
+        Main method to run the validation.
+        """
+        self.cruNum()
+        self.molNum()
+
+    def cruNum(self):
+        """
+        Validate (or set) the number of repeat units.
+        """
+        if self.options.cru_num is None:
+            self.options.cru_num = [1] * len(self.options.cru)
+            return
+        if len(self.options.cru_num) == len(self.options.cru):
+            return
+        raise ValueError(f'{len(self.options.cru_num)} cru num defined, but '
+                         f'{len(self.options.cru_num)} cru found.')
+
+    def molNum(self):
+        """
+        Validate (or set) the number of molecules.
+        """
+        if self.options.mol_num is None:
+            self.options.mol_num = [1] * len(self.options.cru_num)
+            return
+        if len(self.options.cru_num) == len(self.options.mol_num):
+            return
+        raise ValueError(f'{len(self.options.cru_num)} cru num defined, but '
+                         f'{len(self.options.mol_num)} molecules found.')
+
+
+def validate_options(argv):
+    """
+    Parse and validate the command args
+
+    :param argv list: list of command input.
+    :return: 'argparse.ArgumentParser':  Parsed command-line options out of sys.argv
+    """
+    parser = get_parser()
+    options = parser.parse_args(argv)
+    validator = Validator(options)
+    try:
+        validator.run()
+    except ValueError as err:
+        parser.error(err)
+    return validator.options
 
 
 logger = None

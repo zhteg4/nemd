@@ -1143,12 +1143,15 @@ class Struct(structure.Struct, lammpsin.In):
         Write command to further equilibrate the system with molecules
         information considered.
         """
-        btypes, atypes = self.getRigid()
-        testing = self.conformer_total == 1 and self.atom_total < 100
-        struct_info = types.SimpleNamespace(btypes=btypes,
-                                            atypes=atypes,
-                                            testing=testing)
-        super().writeRun(*arg, struct_info=struct_info, **kwarg)
+        if self.options.rigid_bond is None and self.options.rigid_angle is None:
+            btypes, atypes = self.getRigid()
+            self.options.rigid_bond = btypes
+            self.options.rigid_angle = atypes
+        single_molecule = self.conformer_total == 1
+        small_molecule = self.atom_total < 100
+        single_point_energy = not self.options.temp
+        testing = any([small_molecule, small_molecule, single_point_energy])
+        super().writeRun(*arg, testing=testing, **kwarg)
 
     def getRigid(self):
         """

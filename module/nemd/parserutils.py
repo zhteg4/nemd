@@ -162,10 +162,10 @@ def type_substruct(arg):
     try:
         smiles, value = arg.split(':')
     except ValueError:
-        raise argparse.ArgumentTypeError('Please input the substructure in the '
-                                         'format of "SMILES:VALUE".')
-    return [type_smiles(smiles), float(value)]
-
+        raise argparse.ArgumentTypeError(
+            'Please input the substructure in the format of "SMILES:VALUE".')
+    type_smiles(smiles)
+    return [smiles, float(value)]
 
 
 def type_monomer_smiles(arg, allow_mol=False, canonize=True):
@@ -234,9 +234,10 @@ def add_md_arguments(parser):
         help=argparse.SUPPRESS)
     parser.add_argument(FLAG_TEMP,
                         metavar=FLAG_TEMP[1:].upper(),
-                        type=type_positive_float,
+                        type=type_nonnegative_float,
                         default=300,
-                        help=f'The equilibrium temperature target .')
+                        help=f'The equilibrium temperature target. A zero '
+                        f'value means single point energy calculation.')
     parser.add_argument(
         FLAG_TDAMP,
         metavar=FLAG_TDAMP[1:].upper(),
@@ -245,7 +246,7 @@ def add_md_arguments(parser):
         # Temperature damping parameter (x timestep to get the param)
         help=argparse.SUPPRESS)
     parser.add_argument(FLAG_PRESS,
-                        metavar='at',
+                        metavar=FLAG_PRESS[1:].upper(),
                         type=float,
                         default=1,
                         help="The equilibrium pressure target.")

@@ -150,6 +150,8 @@ class In:
                 f"{self.DUMP} {self.DUMP_ID} all custom {self.DUMP_Q} "
                 f"dump{self.CUSTOM_EXT} id xu yu zu\n")
             self.fh.write(f"{self.DUMP_MODIFY} 1 sort id\n")
+        if self.options.no_minimize:
+            return
         self.fh.write(f"{self.MIN_STYLE} {min_style}\n")
         self.fh.write(f"{self.MINIMIZE} 1.0e-6 1.0e-8 1000000 10000000\n\n")
 
@@ -161,19 +163,13 @@ class In:
         self.fh.write(f'{self.THERMO_MODIFY} flush yes\n')
         self.fh.write(f'{self.THERMO} 1000\n')
 
-    def writeRun(self, struct_info=None):
+    def writeRun(self, testing=False):
         """
         Write command to further equilibrate the system.
 
-        :param struct_info 'types.Namespace': structure information.
+        :param testing 'bool': testing flag.
         """
-        if struct_info is None:
-            struct_info = types.SimpleNamespace(btypes=None,
-                                                atypes=None,
-                                                testing=False)
-        options = {x: y for x, y in self.options._get_kwargs()}
-        options = types.SimpleNamespace(**options, **struct_info.__dict__)
-        fwriter = FixWriter(self.fh, options=options)
+        fwriter = FixWriter(self.fh, options=self.options, testing=testing)
         fwriter.run()
 
 
@@ -227,14 +223,16 @@ class FixWriter:
     PRESS_VAR = f'${{{PRESS}}}'
     MODULUS_VAR = f'${{{MODULUS}}}'
 
-    def __init__(self, fh, options=None):
+    def __init__(self, fh, options=None, testing=False):
         """
         :param fh '_io.TextIOWrapper': file handdle to write fix commands
         :param options 'types.Namespace': command line options and structure
             information such as bond types, angle types, and testing flag.
+        :param testing 'bool': Testing flag.
         """
         self.fh = fh
         self.options = options
+        self.testing = testing
         self.cmd = []
         self.timestep = self.options.timestep
         self.relax_time = self.options.relax_time
@@ -266,10 +264,10 @@ class FixWriter:
         Write fix shake command to enforce constant bond length and angel values.
         """
         fixed_types = ''
-        if self.options.btypes:
-            fixed_types += f' b {self.options.btypes}'
-        if self.options.atypes:
-            fixed_types += f' a {self.options.atypes}'
+        if self.options.rigid_bond:
+            fixed_types += f' b {self.options.rigid_bond}'
+        if self.options.rigid_bond:
+            fixed_types += f' a {self.options.rigid_bond}'
         if not fixed_types:
             return
         self.fh.write(self.FIX_RIGID_SHAKE.format(types=fixed_types))
@@ -278,6 +276,8 @@ class FixWriter:
         """
         Create initial velocity for the system.
         """
+        if not self.options.temp:
+            return
         seed = np.random.randint(0, high=constants.LARGE_NUM)
         self.fh.write(
             f"{self.VELOCITY} all create {self.options.stemp} {seed}\n")
@@ -288,7 +288,10 @@ class FixWriter:
 
         :nstep int: run this steps for time integration.
         """
-        if not self.options.testing:
+        if not self.testing:
+            return
+        if not self.options.temp:
+            self.fh.write(self.RUN_STEP % 0)
             return
         self.nve(nstep=nstep)
 
@@ -306,7 +309,7 @@ class FixWriter:
         """
         Start simulation from low temperature and constant volume.
         """
-        if self.options.testing:
+        if self.testing:
             return
         self.nvt(nstep=self.relax_step / 1E3,
                  stemp=self.stemp,
@@ -343,7 +346,7 @@ class FixWriter:
         volume, calculate the averaged pressure at high temperature, and changes
         volume to reach the target pressure.
         """
-        if self.options.testing:
+        if self.testing:
             return
         if ensemble == self.NPT:
             self.npt(nstep=self.relax_step / 1E1,
@@ -491,7 +494,7 @@ class FixWriter:
         """
         Longer relaxation at constant temperature and deform to the mean size.
         """
-        if self.options.testing:
+        if self.testing:
             return
         if self.options.prod_ens == self.NPT:
             self.npt(nstep=self.relax_step,
@@ -517,7 +520,7 @@ class FixWriter:
         requires for good energy conservation in time integration. NVT and NPT
         may help for disturbance non-sensitive property.
         """
-        if self.options.testing:
+        if self.testing:
             return
         if self.options.prod_ens == self.NVE:
             self.nve(nstep=self.prod_step)

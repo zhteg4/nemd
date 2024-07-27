@@ -82,6 +82,15 @@ class GriddedConf(lammpsdata.Conformer):
         """
         rdkit.Chem.rdMolTransforms.SetAngleDeg(self, *aids, val)
 
+    def setDihedralDeg(self, dihe, val):
+        """
+        Set angle degree of the given dihedral.
+
+        :param dihe tuple of int: the dihedral atom indices.
+        :param val float: the angle degree.
+        """
+        rdkit.Chem.rdMolTransforms.SetDihedralDeg(self, *dihe, val)
+
 
 class ConfError(RuntimeError):
     """
@@ -208,15 +217,6 @@ class GrownConf(PackedConf):
         changed = np.isclose(oxyz, xyz)
         self.setDihedralDeg(dihe, oval)
         return [i for i, x in enumerate(changed) if not all(x)]
-
-    def setDihedralDeg(self, dihe, val):
-        """
-        Set angle degree of the given dihedral.
-
-        :param dihe tuple of int: the dihedral atom indices.
-        :param val float: the angle degree.
-        """
-        rdkit.Chem.rdMolTransforms.SetDihedralDeg(self, *dihe, val)
 
     def getDihedralDeg(self, dihe):
         """
@@ -358,11 +358,13 @@ class Mol(lammpsdata.Mol):
         super().__init__(*args, **kwargs)
         if self.delay:
             return
-        self.adjustBondLength()
+        self.setCoords()
+        self.setSubstructure()
+        self.updateAll()
 
-    def adjustBondLength(self):
+    def setCoords(self):
         """
-        Adjust bond length according to the force field parameters.
+        Set the coordinates by adjusting bonds, angles, and dihedrals.
         """
         # Set the bond lengths of one conformer
         tpl = self.GetConformer()
@@ -371,8 +373,31 @@ class Mol(lammpsdata.Mol):
         # Set the angle degree of one conformer
         for type_id, *ids in self.angles.values:
             tpl.setAngleDeg(list(map(int, ids)), self.ff.angles[type_id].deg)
-        # Update all conformers
-        xyz = tpl.GetPositions()
+
+    def setSubstructure(self):
+        """
+        Set substructure.
+        """
+        if self.struct.options.substruct is None:
+            return
+        substruct = rdkit.Chem.MolFromSmiles(self.struct.options.substruct[0])
+        if not self.HasSubstructMatch(substruct):
+            return
+        tpl = self.GetConformer()
+        ids = self.GetSubstructMatch(substruct)
+        match len(ids):
+            case 2:
+                tpl.setBondLength(ids, self.struct.options.substruct[1])
+            case 3:
+                tpl.setAngleDeg(ids, self.struct.options.substruct[1])
+            case 4:
+                tpl.setDihedralDeg(ids, self.struct.options.substruct[1])
+
+    def updateAll(self):
+        """
+        Update all conformers.
+        """
+        xyz = self.GetConformer().GetPositions()
         for conf in self.GetConformers():
             conf.setPositions(xyz)
 
@@ -596,10 +621,6 @@ class GrownMol(PackedMol):
 class Struct(lammpsdata.Struct):
 
     def __init__(self, *args, **kwargs):
-        """
-        :param ff 'OplsParser': the force field class.
-        :param options 'argparse.Namespace': command line options
-        """
         super().__init__(*args, **kwargs)
         self.density = None
         self.box = None
@@ -691,9 +712,6 @@ class PackedStruct(Struct):
     MAX_TRIAL_PER_DENSITY = 50
 
     def __init__(self, *args, **kwargs):
-        """
-        :param options 'argparse.Namespace': command line options
-        """
         # Force field -> Molecular weight -> Box -> Frame -> Distance cell
         super().__init__(*args, **kwargs)
         self.dcell = None
@@ -809,6 +827,9 @@ class GrownStruct(PackedStruct):
         self.init_tf = None
 
     def finalize(self):
+        """
+        See parent class.
+        """
         super().finalize()
         self.fragmentize()
 
