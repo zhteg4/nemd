@@ -1144,13 +1144,11 @@ class Struct(structure.Struct, lammpsin.In):
         information considered.
         """
         if self.options.rigid_bond is None and self.options.rigid_angle is None:
-            btypes, atypes = self.getRigid()
-            self.options.rigid_bond = btypes
-            self.options.rigid_angle = atypes
+            self.options.rigid_bond, self.options.rigid_angle = self.getRigid()
         single_molecule = self.conformer_total == 1
         small_molecule = self.atom_total < 100
         single_point_energy = not self.options.temp
-        testing = any([small_molecule, small_molecule, single_point_energy])
+        testing = any([single_molecule, small_molecule, single_point_energy])
         super().writeRun(*arg, testing=testing, **kwarg)
 
     def getRigid(self):

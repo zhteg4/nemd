@@ -287,9 +287,10 @@ class BaseTask:
         func.__name__ = name
 
         func = FlowProject.operation(cmd=cmd,
+                                     func=func,
                                      with_job=with_job,
                                      name=name,
-                                     aggregator=aggregator)(func)
+                                     aggregator=aggregator)
         # Add FlowProject decorators (pre / post conditions)
         if post:
             fp_post = functools.partial(post, name=name)
@@ -402,6 +403,7 @@ class Polymer_Builder(BaseTask):
     import polymer_builder_driver as DRIVER
     FLAG_SEED = jobutils.FLAG_SEED
 
+<<<<<<< HEAD
     def run(self):
         """
         The main method to run.
