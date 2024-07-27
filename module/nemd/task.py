@@ -272,9 +272,10 @@ class BaseTask:
         func = functools.update_wrapper(functools.partial(func, **kwargs),
                                         func)
         func = FlowProject.operation(cmd=cmd,
+                                     func=func,
                                      with_job=with_job,
                                      name=name,
-                                     aggregator=aggregator)(func)
+                                     aggregator=aggregator)
         # Add FlowProject decorators (pre / post conditions)
         if post:
             fp_post = functools.partial(post, name=name)
@@ -306,6 +307,7 @@ class BaseTask:
             ofunc = attr
         else:
             raise ValueError(f"{attr} is not a callable function or str.")
+        return ofunc
         origin_name = ofunc.__name__
         if name is None:
             name = ofunc.__name__
@@ -419,24 +421,6 @@ class Polymer_Builder(BaseTask):
 
     import polymer_builder_driver as DRIVER
     FLAG_SEED = jobutils.FLAG_SEED
-
-    def run(self):
-        """
-        The main method to run.
-        """
-        super().run()
-        self.setSeed()
-
-    def setSeed(self):
-        """
-        Set the random seed based on state id so that each task starts from a
-        different state in phase space and the task collection can better
-        approach the ergodicity.
-        """
-        seed = jobutils.get_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SEED, 0)
-        state = self.job.statepoint()
-        seed = int(seed) + int(state.get(self.STATE_ID, state.get(self.ID)))
-        jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SEED, seed)
 
     @staticmethod
     def operator(*args, **kwargs):
