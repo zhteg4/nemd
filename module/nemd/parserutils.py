@@ -159,10 +159,13 @@ def type_smiles(arg):
 
 
 def type_substruct(arg):
-    args = arg.split(':')
-    smiles = args[0]
+    try:
+        smiles, value = arg.split(':')
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            'Please input the substructure in the format of "SMILES:VALUE".')
     type_smiles(smiles)
-    return [smiles, 180] if len(args) == 1 else [smiles, float(args[1])]
+    return [smiles, float(value)]
 
 
 def type_monomer_smiles(arg, allow_mol=False, canonize=True):
