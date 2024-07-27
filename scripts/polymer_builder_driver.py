@@ -34,6 +34,7 @@ FlAG_CRU_NUM = '-cru_num'
 FlAG_MOL_NUM = '-mol_num'
 FlAG_DENSITY = '-density'
 FlAG_CELL = '-cell'
+FLAG_SUBSTRUCT = '-substruct'
 GRID = 'grid'
 PACK = 'pack'
 GROW = 'grow'
@@ -300,6 +301,7 @@ class Mol(structure.Mol):
         self.markMonomer()
         self.polymerize()
         self.embedMol()
+        self.setSubstructure()
         self.setConformers()
 
     def setCruMol(self):
@@ -380,9 +382,6 @@ class Mol(structure.Mol):
     def embedMol(self):
         """
         Embed the molecule with coordinates.
-
-        :param trans bool: If True, all_trans conformer without entanglements is
-            built.
         """
 
         if self.GetNumAtoms() <= 200:
@@ -397,6 +396,25 @@ class Mol(structure.Mol):
 
         trans_conf = Conformer(self, self.cru_mol, options=self.options)
         trans_conf.run()
+
+    def setSubstructure(self):
+        """
+        Set substructure.
+        """
+        if self.options.substruct is None:
+            return
+        substruct, value = self.options.substruct
+        if not self.HasSubstructMatch(substruct):
+            return
+        tpl_conf = self.GetConformer(0)
+        ids = self.GetSubstructMatch(substruct)
+        match len(ids):
+            case 2:
+                Chem.rdMolTransforms.SetBondLength(tpl_conf, *ids, value)
+            case 3:
+                Chem.rdMolTransforms.SetAngleDeg(tpl_conf, *ids, value)
+            case 4:
+                Chem.rdMolTransforms.SetDihedralDeg(tpl_conf, *ids, value)
 
     def setConformers(self):
         """
@@ -690,6 +708,11 @@ def get_parser(parser=None):
         default=0.5,
         help=f'The density used for {PACK} and {GROW} amorphous cell. (g/cm^3)'
     )
+    parser.add_argument(
+        FLAG_SUBSTRUCT,
+        metavar='SMILES:VALUE',
+        type=parserutils.type_substruct,
+        help='Select a substructure and set the coordinates accordingly.')
     parserutils.add_md_arguments(parser)
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))

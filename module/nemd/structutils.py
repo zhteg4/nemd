@@ -69,9 +69,18 @@ class GriddedConf(lammpsdata.Conformer):
         Set bond length of the given dihedral.
 
         :param bonded tuple of int: the bonded atom indices.
-        :param val val: the bond distance.
+        :param val: the bond distance.
         """
         rdkit.Chem.rdMolTransforms.SetBondLength(self, *bonded, val)
+
+    def setAngleDeg(self, aids, val):
+        """
+        Set bond length of the given dihedral.
+
+        :param aids tuple of int: the atom indices in one angle.
+        :param val: the angle degree.
+        """
+        rdkit.Chem.rdMolTransforms.SetAngleDeg(self, *aids, val)
 
 
 class ConfError(RuntimeError):
@@ -357,8 +366,11 @@ class Mol(lammpsdata.Mol):
         """
         # Set the bond lengths of one conformer
         tpl = self.GetConformer()
-        for _, type_id, atom1, atom2 in self.bonds.itertuples():
-            tpl.setBondLength([atom1, atom2], self.ff.bonds[type_id].dist)
+        for type_id, *ids in self.bonds.values:
+            tpl.setBondLength(list(map(int, ids)), self.ff.bonds[type_id].dist)
+        # Set the angle degree of one conformer
+        for type_id, *ids in self.angles.values:
+            tpl.setAngleDeg(list(map(int, ids)), self.ff.angles[type_id].deg)
         # Update all conformers
         xyz = tpl.GetPositions()
         for conf in self.GetConformers():
