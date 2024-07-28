@@ -411,7 +411,8 @@ class GriddedMol(Mol):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # size = xyz span + buffer
-        self.buffer = np.array([4, 4, 4])
+        buffer = self.struct.options.buffer if self.struct.options.buffer else 4
+        self.buffer = np.array([buffer, buffer, buffer])
         # The number of molecules per box edge
         self.mol_num = np.array([1, 1, 1])
         # The xyz shift within one box

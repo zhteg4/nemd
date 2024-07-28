@@ -3,6 +3,7 @@ import re
 import sh
 import types
 import logging
+import argparse
 import functools
 import collections
 import subprocess
@@ -397,56 +398,30 @@ class BaseTask:
             return False
         return cls.TIME_REPORTED
 
+    @staticmethod
+    def suppress(parser, to_supress=None):
+        """
+        Suppress certain command line arguments.
+
+        :param parser 'argparse.ArgumentParser': the argument parser object
+        :param to_supress list: the list of arguments to suppress
+        """
+        if to_supress is None:
+            return
+        to_supress = set(to_supress)
+        for action in parser._actions:
+            if to_supress.intersection(action.option_strings):
+                action.help = argparse.SUPPRESS
+
 
 class Polymer_Builder(BaseTask):
 
     import polymer_builder_driver as DRIVER
-    FLAG_SEED = jobutils.FLAG_SEED
-
-<<<<<<< HEAD
-    def run(self):
-        """
-        The main method to run.
-        """
-        super().run()
-        self.setSeed()
-
-    def setSeed(self):
-        """
-        Set the random seed based on state id so that each task starts from a
-        different state in phase space and the task collection can better
-        approach the ergodicity.
-        """
-        seed = jobutils.get_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SEED, 0)
-        state = self.job.statepoint()
-        seed = int(seed) + int(state.get(self.STATE_ID, state.get(self.ID)))
-        jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SEED, seed)
 
 
 class Crystal_Builder(BaseTask):
 
     import crystal_builder_driver as DRIVER
-    FLAG_SCALED_FACTOR = DRIVER.FLAG_SCALED_FACTOR
-
-    def run(self):
-        """
-        The main method to run.
-        """
-        super().run()
-        self.setScaledFactor()
-
-    def setScaledFactor(self):
-        """
-        Set the scaled factor so that each cell starts from different vectors.
-        """
-
-        scaled_factor = jobutils.get_arg(self.doc[self.KNOWN_ARGS],
-                                         self.FLAG_SCALED_FACTOR, 1)
-        state = self.job.statepoint()
-        scaled_factor = float(scaled_factor) * float(
-            state.get(self.STATE_ID, state.get(self.ID)))
-        jobutils.set_arg(self.doc[self.KNOWN_ARGS], self.FLAG_SCALED_FACTOR,
-                         scaled_factor)
 
 
 class Lammps_Driver:
@@ -670,7 +645,7 @@ class Lmp_Log(BaseTask):
 
     def setArgs(self):
         """
-        Set the args for custom dump task.
+        Set the args for lmp log task.
         """
         super().setArgs()
         log_file = self.doc[self.KNOWN_ARGS][0]
@@ -683,7 +658,7 @@ class Lmp_Log(BaseTask):
     @staticmethod
     def aggregator(*jobs, log=None, name=None, tname=None, **kwargs):
         """
-        The aggregator job task that combines the output files lmp log jobs.
+        The aggregator job task that combines the lammps log analysis.
 
         :param jobs: the task jobs the aggregator collected
         :type jobs: list of 'signac.contrib.job.Job'
@@ -745,41 +720,3 @@ class Lmp_Log(BaseTask):
         ext = '.' + cls.DRIVER.LmpLog.DATA_EXT.split('.')[-1]
         filenames = [x for x in lines if x.split()[-1].endswith(ext)]
         return f'{len(filenames)} files found'
-
-    @staticmethod
-    def aggregator(*jobs, log=None, name=None, tname=None, **kwargs):
-        """
-        The aggregator job task that combines the lammps log analysis.
-
-        :param jobs: the task jobs the aggregator collected
-        :type jobs: list of 'signac.contrib.job.Job'
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :param name: the jobname based on which output files are named
-        :type name: str
-        :param tname: aggregate the job tasks of this name
-        :type tname: str
-        """
-        log(f"{len(jobs)} jobs found for aggregation.")
-        job = jobs[0]
-        logfile = job.fn(job.document[jobutils.OUTFILE][tname])
-        outfiles = Lmp_Log.DRIVER.LmpLog.getOutfiles(logfile)
-        if kwargs.get(jobutils.FLAG_CLEAN[1:]):
-            jname = name.split(BaseTask.SEP)[0]
-            for filename in outfiles.values():
-                try:
-                    os.remove(filename.replace(tname, jname))
-                except FileNotFoundError:
-                    pass
-        jobs = sorted(jobs, key=lambda x: x.statepoint[BaseTask.STATE_ID])
-        outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
-        jname = name.split(BaseTask.SEP)[0]
-        inav = environutils.is_interactive()
-        state_ids = [x.statepoint[BaseTask.STATE_ID] for x in jobs]
-        state_label = kwargs.get('state_label')
-        iname = pd.Index(state_ids, name=state_label) if state_label else None
-        Lmp_Log.DRIVER.LmpLog.combine(outfiles,
-                                      log,
-                                      jname,
-                                      inav=inav,
-                                      iname=iname)

@@ -1,6 +1,5 @@
 import os
 import math
-import types
 import string
 import numpy as np
 

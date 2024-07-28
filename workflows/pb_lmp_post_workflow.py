@@ -65,7 +65,7 @@ def label(job):
     return str(job.statepoint())
 
 
-class Polymer_Builder_Post(Polymer_Builder):
+class Polymer_Builder(Polymer_Builder):
 
     def run(self):
         """
@@ -80,7 +80,8 @@ class Polymer_Builder_Post(Polymer_Builder):
         different state in phase space and the task collection can better
         approach the ergodicity.
         """
-        seed = jobutils.get_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_SEED, 0)
+        seed = jobutils.get_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_SEED,
+                                0)
         state = self.job.statepoint()
         seed = int(seed) + int(state.get(self.STATE_ID, state.get(self.ID)))
         jobutils.set_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_SEED, seed)

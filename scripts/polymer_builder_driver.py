@@ -29,15 +29,16 @@ from nemd import structutils
 from nemd import parserutils
 from nemd import environutils
 
-FlAG_CRU = 'cru'
-FlAG_CRU_NUM = '-cru_num'
-FlAG_MOL_NUM = '-mol_num'
-FlAG_DENSITY = '-density'
-FlAG_CELL = '-cell'
+FLAG_CRU = 'cru'
+FLAG_CRU_NUM = '-cru_num'
+FLAG_MOL_NUM = '-mol_num'
+FLAG_DENSITY = '-density'
+FLAG_CELL = '-cell'
 FLAG_SUBSTRUCT = '-substruct'
 FLAG_NO_MINIMIZE = '-no_minimize'
 FLAG_RIGID_BOND = '-rigid_bond'
 FLAG_RIGID_ANGLE = '-rigid_angle'
+FLAG_BUFFER = '-buffer'
 GRID = 'grid'
 PACK = 'pack'
 GROW = 'grow'
@@ -597,20 +598,20 @@ def get_parser(parser=None):
     if parser is None:
         parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(
-        FlAG_CRU,
-        metavar=FlAG_CRU.upper(),
+        FLAG_CRU,
+        metavar=FLAG_CRU.upper(),
         type=functools.partial(parserutils.type_monomer_smiles,
                                allow_mol=True),
         nargs='+',
         help='SMILES of the constitutional repeat unit (monomer)')
     parser.add_argument(
-        FlAG_CRU_NUM,
-        metavar=FlAG_CRU_NUM[1:].upper(),
+        FLAG_CRU_NUM,
+        metavar=FLAG_CRU_NUM[1:].upper(),
         type=parserutils.type_positive_int,
         nargs='+',
         help='Number of constitutional repeat unit per polymer')
-    parser.add_argument(FlAG_MOL_NUM,
-                        metavar=FlAG_MOL_NUM[1:].upper(),
+    parser.add_argument(FLAG_MOL_NUM,
+                        metavar=FLAG_MOL_NUM[1:].upper(),
                         type=parserutils.type_positive_int,
                         nargs='+',
                         help='Number of molecules in the amorphous cell')
@@ -619,8 +620,8 @@ def get_parser(parser=None):
                         type=parserutils.type_random_seed,
                         help='Set random state using this seed.')
     parser.add_argument(
-        FlAG_CELL,
-        metavar=FlAG_CELL[1:].upper(),
+        FLAG_CELL,
+        metavar=FLAG_CELL[1:].upper(),
         choices=[GRID, PACK, GROW],
         default=GROW,
         help=f'Amorphous cell type: \'{GRID}\' grids the space and '
@@ -628,8 +629,8 @@ def get_parser(parser=None):
         f'rotates and translates molecules; \'{GROW}\' grows '
         f'molecules from the smallest rigid fragments.')
     parser.add_argument(
-        FlAG_DENSITY,
-        metavar=FlAG_DENSITY[1:].upper(),
+        FLAG_DENSITY,
+        metavar=FLAG_DENSITY[1:].upper(),
         type=functools.partial(parserutils.type_ranged_float,
                                bottom=0,
                                included_bottom=False,
@@ -657,6 +658,11 @@ def get_parser(parser=None):
         metavar='SMILES:VALUE',
         type=parserutils.type_substruct,
         help='Select a substructure and set the coordinates accordingly.')
+    parser.add_argument(
+        FLAG_BUFFER,
+        metavar=FLAG_BUFFER[1:].upper(),
+        type=parserutils.type_positive_float,
+        help='The buffer distance between molecules in the grid cell.')
     parserutils.add_md_arguments(parser)
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
