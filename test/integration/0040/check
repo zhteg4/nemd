@@ -1,0 +1,1 @@
+cmp('cb_lmp_log_ave_thermo.csv', 'cb_lmp_log_ave_thermo.csv')

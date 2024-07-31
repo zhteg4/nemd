@@ -195,8 +195,6 @@ class Integration(jobcontrol.Runner):
         fjobs = [x for x in jobs if not x.document.get(itestutils.SUCCESS)]
         log(f"{len(sjobs)} succeed; {len(fjobs)} failed.")
         for job in fjobs:
-            if job.document[itestutils.SUCCESS]:
-                continue
             id = job.statepoint[self.STATE_ID]
             dir = job.doc[itestutils.DIR]
             log(f'id: {id}; dir: {dir}')

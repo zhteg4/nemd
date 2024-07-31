@@ -35,6 +35,62 @@ def log_debug(msg):
     logger.debug(msg)
 
 
+class Job:
+
+    TARGS = jobutils.TARGS
+    SPECIAL_CHAR_RE = re.compile("[@!#$%^&*()<>?/|}{~:]")
+
+    def __init__(self, job, name, driver):
+        self.job = job
+        self.name = name
+        self.driver = driver
+        self.doc = self.job.document
+        self.args = None
+
+    def setArgs(self):
+        """
+        Set arguments.
+        """
+        self.args = list(self.doc.get(self.TARGS, {}).get(self.name, []))
+        self.args += list(self.doc[self.ARGS])
+        self.args = list(map(str, self.args))
+
+    def removeUnkArgs(self):
+        """
+        Set unknown arguments.
+
+        Remove unknown arguments instead of keeping known so that the same flag
+        across different tasks can be used multiple times.
+        """
+        parser = self.driver.get_parser()
+        _, unknown = parser.parse_known_args(self.args)
+        flags = [x for x in unknown if x.startswith('-')]
+        # Positional arguments are ahead of optional arguments with flags
+        positionals = unknown[:unknown.index(flags[0])] if flags else unknown
+        # Remove unknown positional arguments without flags
+        for arg in positionals:
+            self.args.remove(arg)
+        # Remove optional arguments with flags
+        for flag, nfrag in zip(flags, flags[1:] + [None]):
+            sidx = unknown.index(flag)
+            eidx = unknown.index(nfrag) if nfrag else len(unknown)
+            index = self.args.index(flag)
+            self.args = self.args[:index] + self.args[index + eidx - sidx:]
+
+    def setName(self):
+        """
+        Set the jobname of the known args.
+        """
+        jobutils.set_arg(self.args, jobutils.FLAG_JOBNAME, self.name)
+
+    def addQuote(self):
+        """
+        Add quotes for str with special characters.
+        """
+        quote_needed = self.SPECIAL_CHAR_RE.search
+        self.args = [f'"{x}"' if quote_needed(x) else x for x in self.args]
+
+
 class BaseTask:
     """
     The task base class.
@@ -57,8 +113,8 @@ class BaseTask:
     DRIVER_LOG = logutils.DRIVER_LOG
     KNOWN_ARGS = jobutils.KNOWN_ARGS
     UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
-    QUOTED_CHAR = re.compile("[@!#$%^&*()<>?/|}{~:]")
     DRIVER = SimpleNamespace(PATH=None)
+    QUOTED_CHAR = re.compile("[@!#$%^&*()<>?/|}{~:]")
 
     def __init__(self, job, pre_run=RUN_NEMD, name=None):
         """
@@ -72,7 +128,7 @@ class BaseTask:
         self.job = job
         self.pre_run = pre_run
         self.name = name
-        self.doc = self.job.document
+        self.doc = job.document
         self.run_driver = [self.DRIVER.PATH]
         if self.pre_run:
             self.run_driver = [self.pre_run] + self.run_driver
@@ -93,7 +149,7 @@ class BaseTask:
         args = list(self.doc.get(self.TARGS, {}).get(self.name, []))
         args += list(self.doc[self.ARGS])
         _, unknown = parser.parse_known_args(args)
-        self.doc[self.UNKNOWN_ARGS] = unknown
+        # self.doc[self.UNKNOWN_ARGS] = unknown
         flags = [x for x in unknown if x.startswith('-')]
         # Positional arguments without flags
         pos_unknown = unknown[:unknown.index(flags[0])] if flags else unknown
@@ -304,8 +360,8 @@ class BaseTask:
         log_debug(f'Operator: {func.__name__}: {func}')
         return func
 
-    @staticmethod
-    def aggregator(*jobs, log=None, **kwargs):
+    @classmethod
+    def aggregator(cls, *jobs, log=None, **kwargs):
         """
         The aggregator job task to report the time cost of each task.
 
@@ -578,8 +634,8 @@ class Custom_Dump(BaseTask):
         args += list(self.doc[self.KNOWN_ARGS])[1:]
         self.doc[self.KNOWN_ARGS] = args
 
-    @staticmethod
-    def aggregator(*jobs, log=None, name=None, tname=None, **kwargs):
+    @classmethod
+    def aggregator(cls, *jobs, log=None, name=None, tname=None, **kwargs):
         """
         The aggregator job task that combines the output files of a custom dump
         task.
@@ -596,7 +652,7 @@ class Custom_Dump(BaseTask):
         log(f"{len(jobs)} jobs found for aggregation.")
         job = jobs[0]
         logfile = job.fn(job.document[jobutils.OUTFILE][tname])
-        outfiles = Custom_Dump.DRIVER.CustomDump.getOutfiles(logfile)
+        outfiles = cls.DRIVER.CustomDump.getOutfiles(logfile)
         if kwargs.get(jobutils.FLAG_CLEAN[1:]):
             jname = name.split(BaseTask.SEP)[0]
             for filename in outfiles.values():
@@ -607,7 +663,7 @@ class Custom_Dump(BaseTask):
         outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
         jname = name.split(BaseTask.SEP)[0]
         inav = environutils.is_interactive()
-        Custom_Dump.DRIVER.CustomDump.combine(outfiles, log, jname, inav=inav)
+        cls.DRIVER.CustomDump.combine(outfiles, log, jname, inav=inav)
 
     @classmethod
     def postAgg(cls, *jobs, name=None):
@@ -655,8 +711,8 @@ class Lmp_Log(BaseTask):
         args += list(self.doc[self.KNOWN_ARGS])[1:]
         self.doc[self.KNOWN_ARGS] = args
 
-    @staticmethod
-    def aggregator(*jobs, log=None, name=None, tname=None, **kwargs):
+    @classmethod
+    def aggregator(cls, *jobs, log=None, name=None, tname=None, **kwargs):
         """
         The aggregator job task that combines the lammps log analysis.
 
@@ -672,7 +728,7 @@ class Lmp_Log(BaseTask):
         log(f"{len(jobs)} jobs found for aggregation.")
         job = jobs[0]
         logfile = job.fn(job.document[jobutils.OUTFILE][tname])
-        outfiles = Lmp_Log.DRIVER.LmpLog.getOutfiles(logfile)
+        outfiles = cls.DRIVER.LmpLog.getOutfiles(logfile)
         if kwargs.get(jobutils.FLAG_CLEAN[1:]):
             jname = name.split(BaseTask.SEP)[0]
             for filename in outfiles.values():
@@ -687,7 +743,7 @@ class Lmp_Log(BaseTask):
         state_ids = [x.statepoint[BaseTask.STATE_ID] for x in jobs]
         state_label = kwargs.get('state_label')
         iname = pd.Index(state_ids, name=state_label) if state_label else None
-        Lmp_Log.DRIVER.LmpLog.combine(outfiles,
+        cls.DRIVER.LmpLog.combine(outfiles,
                                       log,
                                       jname,
                                       inav=inav,

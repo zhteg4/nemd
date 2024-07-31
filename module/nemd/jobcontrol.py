@@ -3,7 +3,7 @@ import shutil
 import collections
 import numpy as np
 import networkx as nx
-from flow import FlowProject
+from nemd.nproject import FlowProject
 
 from nemd import symbols
 from nemd import logutils
@@ -43,6 +43,7 @@ class Runner:
         self.status_file = self.options.jobname + fileutils.STATUS_LOG
         # flow/project.py gets logger from logging.getLogger(__name__)
         logutils.createModuleLogger(self.FLOW_PROJECT, file_ext=fileutils.LOG)
+        self.flow_project = None
         self.status_fh = None
         self.prereq = collections.defaultdict(list)
 
@@ -111,8 +112,8 @@ class Runner:
         :param ids list: the job ids based on which state points are set.
         """
         ids = range(self.options.state_num) if ids is None else ids
-        for id in ids:
-            job = self.project.open_job({self.STATE_ID: id})
+        for idx in ids:
+            job = self.project.open_job({self.STATE_ID: idx})
             job.doc[jobutils.OUTFILE] = job.doc.get(jobutils.OUTFILE, {})
             job.doc[jobutils.OUTFILES] = job.doc.get(jobutils.OUTFILES, {})
             job.document[self.ARGS] = self.argv[:]
