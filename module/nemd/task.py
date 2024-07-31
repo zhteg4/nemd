@@ -2,11 +2,9 @@ import os
 import re
 import sh
 import types
-import logging
 import argparse
 import functools
 import collections
-import subprocess
 import humanfriendly
 import pandas as pd
 from datetime import timedelta
@@ -17,7 +15,6 @@ from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
 from nemd import lammpsin
-from nemd import parserutils
 from nemd import environutils
 
 FILE = jobutils.FILE
@@ -37,15 +34,29 @@ def log_debug(msg):
 
 class Job:
 
+    ARGS = jobutils.ARGS
     TARGS = jobutils.TARGS
     SPECIAL_CHAR_RE = re.compile("[@!#$%^&*()<>?/|}{~:]")
+    UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
+    RUN_NEMD = jobutils.RUN_NEMD
 
-    def __init__(self, job, name, driver):
+    def __init__(self, job, name, driver, pre_run=RUN_NEMD):
         self.job = job
         self.name = name
         self.driver = driver
+        self.pre_run = pre_run
         self.doc = self.job.document
         self.args = None
+        self.run_driver = [self.driver.PATH]
+        if self.pre_run:
+            self.run_driver = [self.pre_run] + self.run_driver
+
+    def run(self):
+        self.setArgs()
+        self.removeUnkArgs()
+        self.setName()
+        self.addQuote()
+        self.doc[self.UNKNOWN_ARGS] = self.args
 
     def setArgs(self):
         """
@@ -90,12 +101,28 @@ class Job:
         quote_needed = self.SPECIAL_CHAR_RE.search
         self.args = [f'"{x}"' if quote_needed(x) else x for x in self.args]
 
+    def getCmd(self, write=True, extra_args=None):
+        """
+        Get command line str.
+
+        :param write bool: the msg to be printed
+        :param extra_args list: extra args for the specific task
+        :return str: the command as str
+        """
+        if extra_args:
+            self.args += extra_args
+        cmd = ' '.join(list(map(str, self.run_driver + self.args)))
+        if write:
+            with open(f"{self.name}_cmd", 'w') as fh:
+                fh.write(cmd)
+        return cmd
+
 
 class BaseTask:
     """
     The task base class.
     """
-
+    JobClass = Job
     ID = 'id'
     TIME = 'time'
     STIME = 'stime'
@@ -109,6 +136,7 @@ class BaseTask:
     PREREQ = jobutils.PREREQ
     OUTFILE = jobutils.OUTFILE
     RUN_NEMD = jobutils.RUN_NEMD
+    PRE_RUN = RUN_NEMD
     FINISHED = jobutils.FINISHED
     DRIVER_LOG = logutils.DRIVER_LOG
     KNOWN_ARGS = jobutils.KNOWN_ARGS
@@ -129,75 +157,6 @@ class BaseTask:
         self.pre_run = pre_run
         self.name = name
         self.doc = job.document
-        self.run_driver = [self.DRIVER.PATH]
-        if self.pre_run:
-            self.run_driver = [self.pre_run] + self.run_driver
-
-    def run(self):
-        """
-        The main method to run.
-        """
-        self.setArgs()
-        self.setName()
-        self.addQuote()
-
-    def setArgs(self):
-        """
-        Set known and unknown arguments.
-        """
-        parser = self.DRIVER.get_parser()
-        args = list(self.doc.get(self.TARGS, {}).get(self.name, []))
-        args += list(self.doc[self.ARGS])
-        _, unknown = parser.parse_known_args(args)
-        # self.doc[self.UNKNOWN_ARGS] = unknown
-        flags = [x for x in unknown if x.startswith('-')]
-        # Positional arguments without flags
-        pos_unknown = unknown[:unknown.index(flags[0])] if flags else unknown
-        for arg in pos_unknown:
-            args.remove(arg)
-        for sval, eval in zip(flags, flags[1:] + [None]):
-            if eval:
-                uargs = unknown[unknown.index(sval):unknown.index(eval)]
-            else:
-                uargs = unknown[unknown.index(sval):]
-            index = args.index(sval)
-            # Optional arguments with flags
-            args = args[:index] + args[index + len(uargs):]
-        self.doc[self.KNOWN_ARGS] = args
-
-    def setName(self):
-        """
-        Set the jobname of the known args.
-        """
-        jobutils.set_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_JOBNAME,
-                         self.name)
-
-    def getCmd(self, write=True, extra_args=None):
-        """
-        Get command line str.
-
-        :param write bool: the msg to be printed
-        :param extra_args list: extra args for the specific task
-        :return str: the command as str
-        """
-        # self.doc[KNOWN_ARGS] is not a list but BufferedJSONAttrLists
-        args = list(self.doc[self.KNOWN_ARGS])
-        if extra_args:
-            args += extra_args
-        cmd = ' '.join(list(map(str, self.run_driver + args)))
-        if write:
-            with open(f"{self.name}_cmd", 'w') as fh:
-                fh.write(cmd)
-        return cmd
-
-    def addQuote(self):
-        """
-        Add quotes for str with special characters.
-        """
-        self.doc[self.KNOWN_ARGS] = [
-            f'"{x}"' if self.QUOTED_CHAR.search(str(x)) else x
-            for x in self.doc[self.KNOWN_ARGS]
-        ]
 
     @classmethod
     def success(cls, job, name):
@@ -281,7 +240,7 @@ class BaseTask:
         :type name: str
         :return str: the command to run a task.
         """
-        obj = cls(job, name=name)
+        obj = cls.JobClass(job, name, cls.DRIVER, pre_run=cls.PRE_RUN)
         obj.run()
         return obj.getCmd()
 
@@ -480,135 +439,9 @@ class Crystal_Builder(BaseTask):
     import crystal_builder_driver as DRIVER
 
 
-class Lammps_Driver:
-    """
-    LAMMPS wrapper to package the imported software as a nemd driver.
-    """
-
-    LMP_SERIAL = 'lmp_serial'
-    PATH = LMP_SERIAL
-    JOBNAME = 'lammps'
-    FLAG_IN = '-in'
-    FLAG_SCREEN = '-screen'
-    FLAG_LOG = '-log'
-    DRIVER_LOG = '_lammps.log'
-
-    ARGS_TMPL = [FLAG_IN, FILE, FLAG_SCREEN, 'none']
-
-    @classmethod
-    def get_parser(cls):
-        """
-        Get the customized parser wrapper for lammps executable.
-
-        :return: the customized parser wrapper
-        :rtype: 'argparse.ArgumentParser'
-        """
-        parser = parserutils.get_parser(
-            description='This is a customized parser wrapper for lammps.')
-        parser.add_argument(cls.FLAG_IN,
-                            metavar='IN_SCRIPT',
-                            type=parserutils.type_file,
-                            required=True,
-                            help='Read input from this file.')
-        parser.add_argument(cls.FLAG_SCREEN,
-                            choices=['none', 'filename'],
-                            help='where to send screen output (-sc)')
-        parser.add_argument(cls.FLAG_LOG,
-                            help='Print logging information into this file.')
-        return parser
-
-
 class Lammps(BaseTask):
 
-    DRIVER = Lammps_Driver
-
-    def __init__(self, *args, pre_run=None, **kwargs):
-        """
-        :param pre_run: lammps driver itself is a executable file omitting pre_run
-        :type pre_run: None or str
-        """
-        super().__init__(*args, pre_run=pre_run, **kwargs)
-
-    @classmethod
-    def operator(cls, *arg, **kwargs):
-        """
-        Get the lammps operation command.
-        """
-        cmd = super().operator(*arg, **kwargs)
-        # run_nemd echo Running xxx
-        return f'echo Running {cmd}; {cmd}'
-
-    def run(self):
-        """
-        The main method to run.
-        """
-        super().run()
-        self.setLammpsLog()
-        self.setDriverLog()
-
-    def setName(self):
-        """
-        Overwrite the parent as lammps executable doesn't take jobname flag.
-        """
-        pass
-
-    def getCmd(self, write=True):
-        """
-        Get command line str.
-
-        :param write bool: the msg to be printed
-        :return str: the command as str
-        """
-        lmp = subprocess.run(f'{self.DRIVER.LMP_SERIAL} -h | grep GPU',
-                             capture_output=True,
-                             shell=True)
-        extra_args = ['-sf', 'gpu', '-pk', 'gpu', '1'] if lmp.stdout else None
-        return super().getCmd(write=write, extra_args=extra_args)
-
-    def setLammpsLog(self):
-        """
-        Set the output log name based on jobname.
-        """
-        logfile = self.name + self.DRIVER.DRIVER_LOG
-        jobutils.set_arg(self.doc[self.KNOWN_ARGS], '-log', logfile)
-
-    def setDriverLog(self):
-        parser = self.DRIVER.get_parser()
-        options = parser.parse_args(self.doc[self.KNOWN_ARGS])
-        logger = logutils.createDriverLogger(jobname=self.name)
-        logutils.logOptions(logger, options)
-        logutils.log(logger, 'Running lammps simulations..')
-
-    @classmethod
-    def post(cls, job, name=None):
-        """
-        Set the output for the job.
-
-        :param job: the signac job instance
-        :type job: 'signac.contrib.job.Job'
-        :param name: the jobname
-        :type name: str
-        :return: True if the post-conditions are met
-        :rtype: bool
-        """
-
-        basename = name + cls.DRIVER.DRIVER_LOG
-        logfile = job.fn(basename)
-        if not os.path.exists(logfile):
-            return False
-        if super().post(job, name):
-            return True
-        if not os.popen(f'tail -2 {logfile}').read().startswith(
-                'ERROR') and os.popen(f'tail -1 {logfile}').read().startswith(
-                    'Total'):
-            jobutils.add_outfile(basename,
-                                 jobname=name,
-                                 job=job,
-                                 document=job.fn(jobutils.FN_DOCUMENT),
-                                 set_file=True)
-            logger = logging.getLogger(name)
-            logutils.log(logger, logutils.FINISHED, timestamp=True)
-        return super().post(job, name)
+    import lammps_driver as DRIVER
 
 
 class Custom_Dump(BaseTask):
