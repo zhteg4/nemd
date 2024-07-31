@@ -2,6 +2,7 @@
 This runs lammps executable with the given input file and output file.
 """
 import os
+import re
 import sys
 import lammps
 import subprocess
@@ -9,13 +10,14 @@ import subprocess
 from nemd import symbols
 from nemd import jobutils
 from nemd import logutils
+from nemd import lammpsin
 from nemd import parserutils
 from nemd import environutils
-
 
 FLAG_INSCRIPT = '-inscript'
 FLAG_SCREEN = '-screen'
 FLAG_LOG = '-log'
+FLAG_DATA_FILE = parserutils.FLAG_DATA_FILE
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
@@ -48,8 +50,11 @@ def log_error(msg):
 
 class Lammps:
 
+    FLAG_IN = '-in'
     LMP_SERIAL = 'lmp_serial'
     GREP_GPU = f'{LMP_SERIAL} -h | grep GPU'
+    READ_DATA = re.compile(f'^{lammpsin.In.READ_DATA} +(.*)$')
+    GREP_DATA = f'grep {lammpsin.In.READ_DATA} {{inscript}}'
     LOG = '.log'
 
     def __init__(self, options):
@@ -85,9 +90,13 @@ class Lammps:
         """
         Run lammps executable with the given input file and output file.
         """
+        read_data = f'{lammpsin.In.READ_DATA} {self.options.data_file}'
         log('Running lammps simulations...')
         lmp = lammps.lammps(cmdargs=self.args)
-        lmp.file(self.options.inscript)
+        with open(self.options.inscript, 'r') as fh:
+            cmds = fh.readlines()
+            cmds = [read_data if self.READ_DATA.match(x) else x for x in cmds]
+            lmp.commands_list(cmds)
         lmp.close()
 
 
@@ -113,9 +122,52 @@ def get_parser():
     parser.add_argument(FLAG_LOG,
                         metavar=FLAG_LOG[1:].upper(),
                         help='Print logging information into this file.')
+    parser.add_argument(FLAG_DATA_FILE,
+                        metavar=FLAG_DATA_FILE[1:].upper(),
+                        type=parserutils.type_file,
+                        help='Data file to get force field information')
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
     return parser
+
+
+class Validator:
+
+    def __init__(self, options):
+        """
+        param options: Command line options.
+        """
+        self.options = options
+
+    def run(self):
+        """
+        Main method to run the validation.
+        """
+        self.dataFile()
+
+    def dataFile(self):
+        """
+        Check if the data file exists.
+
+        :raises FileNotFoundError: if the data file is required but does not
+            exist.
+        """
+        if self.options.data_file:
+            return
+
+        cmd = Lammps.GREP_DATA.format(inscript=self.options.inscript)
+        info = subprocess.run(cmd, capture_output=True, shell=True)
+        if not info.stdout:
+            return
+
+        file = Lammps.READ_DATA.match(info.stdout.decode('utf-8')).groups()[0]
+        if not os.path.isfile(file):
+            dirname = os.path.dirname(self.options.inscript)
+            file = os.path.join(dirname, file)
+
+        if not os.path.isfile(file):
+            raise FileNotFoundError(f'Data file {file} does not exist.')
+        self.options.data_file = file
 
 
 def validate_options(argv):
@@ -127,6 +179,12 @@ def validate_options(argv):
     """
     parser = get_parser()
     options = parser.parse_args(argv)
+    validator = Validator(options)
+    try:
+        validator.run()
+    except (FileNotFoundError, ValueError) as err:
+        parser.error(err)
+    return validator.options
     return options
 
 

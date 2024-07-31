@@ -1,6 +1,5 @@
 import io
 import re
-import types
 import base64
 import itertools
 import functools

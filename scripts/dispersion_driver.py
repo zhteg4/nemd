@@ -165,10 +165,10 @@ class Dispersion(object):
             self.lmp_dat.datafile = f"{jobname}{self.LAMMPS_EXT}"
             self.lmp_dat.writeLammpsIn()
             self.dumpfiles.append(self.lmp_dat.lammps_dump)
-            lmp_log = f"{self.options.jobname}{index}{task.Lammps_Driver.DRIVER_LOG}"
-            cmd = f"{task.Lammps_Driver.LMP_SERIAL} {task.Lammps_Driver.FLAG_IN} " \
-                  f"{self.lmp_dat.inscript} {task.Lammps_Driver.FLAG_LOG} {lmp_log} " \
-                  f"{task.Lammps_Driver.FLAG_SCREEN} none"
+            lmp_log = f"{self.options.jobname}{index}{task.Lammps.DRIVER.Lammps.LOG}"
+            cmd = f"{task.Lammps.DRIVER.Lammps.LMP_SERIAL} {task.Lammps.DRIVER.Lammps.FLAG_IN} " \
+                  f"{self.lmp_dat.inscript} {task.Lammps.DRIVER.FLAG_LOG} {lmp_log} " \
+                  f"{task.Lammps.DRIVER.FLAG_SCREEN} none"
             log(f"Running {cmd}")
             subprocess.run(cmd, capture_output=True, shell=True)
 

@@ -576,11 +576,7 @@ class Lmp_Log(BaseTask):
         state_ids = [x.statepoint[BaseTask.STATE_ID] for x in jobs]
         state_label = kwargs.get('state_label')
         iname = pd.Index(state_ids, name=state_label) if state_label else None
-        cls.DRIVER.LmpLog.combine(outfiles,
-                                      log,
-                                      jname,
-                                      inav=inav,
-                                      iname=iname)
+        cls.DRIVER.LmpLog.combine(outfiles, log, jname, inav=inav, iname=iname)
 
     @classmethod
     def postAgg(cls, *jobs, name=None):

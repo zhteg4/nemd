@@ -34,6 +34,9 @@ FLAG_PROD_TIME = '-prod_time'
 FLAG_PROD_ENS = '-prod_ens'
 FlAG_FORCE_FIELD = '-force_field'
 
+FLAG_CUSTOM_DUMP = 'custom_dump'
+FLAG_DATA_FILE = '-data_file'
+
 
 class ArgumentDefaultsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
 

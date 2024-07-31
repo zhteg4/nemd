@@ -30,9 +30,6 @@ from nemd import lammpsdata
 from nemd import numbautils
 from nemd import environutils
 
-FLAG_CUSTOM_DUMP = 'custom_dump'
-FLAG_DATA_FILE = '-data_file'
-
 
 def frame_steps(filename, marker='ITEM: TIMESTEP'):
     """

@@ -1,0 +1,10 @@
+units metal
+atom_style atomic
+boundary p p p
+read_data crystal_builder.data
+
+pair_style sw
+pair_coeff * * /Users/tzhang/git/nemd/submodule/alamode/alamode/example/Si_LAMMPS/Si.sw Si
+dump 1 all custom 1 crystal_builder.dump id xu yu zu 
+dump_modify 1 format float '%20.15f'
+run 0

@@ -11,7 +11,6 @@ import math
 import functools
 import pandas as pd
 
-from nemd import traj
 from nemd import symbols
 from nemd import stillinger
 from nemd import lammpslog
@@ -22,7 +21,7 @@ from nemd import parserutils
 from nemd import environutils
 
 FlAG_LMP_LOG = 'lmp_log'
-FLAG_DATA_FILE = traj.FLAG_DATA_FILE
+FLAG_DATA_FILE = parserutils.FLAG_DATA_FILE
 FLAG_TASK = '-task'
 FLAG_LAST_PCT = '-last_pct'
 FLAG_SLICE = '-slice'

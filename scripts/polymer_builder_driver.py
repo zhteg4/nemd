@@ -672,6 +672,9 @@ def get_parser(parser=None):
 class Validator:
 
     def __init__(self, options):
+        """
+        param options: Command line options.
+        """
         self.options = options
 
     def run(self):

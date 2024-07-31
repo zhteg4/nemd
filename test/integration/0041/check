@@ -1,0 +1,1 @@
+cmp('crystal_builder.dump', 'crystal_builder.dump')

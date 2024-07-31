@@ -122,6 +122,7 @@ class Polymer_Builder(Polymer_Builder):
         ]
         super().suppress(parser, to_supress)
 
+
 class Lmp_Log(Lmp_Log):
 
     @classmethod
@@ -144,6 +145,7 @@ class Lmp_Log(Lmp_Log):
         """
         to_supress = [self.DRIVER.FLAG_SLICE, self.DRIVER.FLAG_LAST_PCT]
         super().suppress(parser, to_supress)
+
 
 class Runner(jobcontrol.Runner):
 

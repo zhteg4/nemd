@@ -23,8 +23,8 @@ from nemd import analyzer
 from nemd import parserutils
 from nemd import environutils
 
-FLAG_CUSTOM_DUMP = traj.FLAG_CUSTOM_DUMP
-FLAG_DATA_FILE = traj.FLAG_DATA_FILE
+FLAG_CUSTOM_DUMP = parserutils.FLAG_CUSTOM_DUMP
+FLAG_DATA_FILE = parserutils.FLAG_DATA_FILE
 FLAG_TASK = '-task'
 FLAG_SEL = '-sel'
 FLAG_LAST_PCT = '-last_pct'
