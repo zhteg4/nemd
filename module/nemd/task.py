@@ -47,11 +47,11 @@ class Job:
         self.pre_run = pre_run
         self.doc = self.job.document
         self.args = None
-        self.run_driver = [self.driver.PATH]
-        if self.pre_run:
-            self.run_driver = [self.pre_run] + self.run_driver
 
     def run(self):
+        """
+        Main method to setup the job.
+        """
         self.setArgs()
         self.removeUnkArgs()
         self.setName()
@@ -63,7 +63,7 @@ class Job:
         Set arguments.
         """
         self.args = list(self.doc.get(self.TARGS, {}).get(self.name, []))
-        self.args += list(self.doc[self.ARGS])
+        self.args += list(self.doc.get(self.ARGS, []))
         self.args = list(map(str, self.args))
 
     def removeUnkArgs(self):
@@ -99,19 +99,28 @@ class Job:
         Add quotes for str with special characters.
         """
         quote_needed = self.SPECIAL_CHAR_RE.search
-        self.args = [f'"{x}"' if quote_needed(x) else x for x in self.args]
+        self.args = [f"'{x}'" if quote_needed(x) else x for x in self.args]
 
-    def getCmd(self, write=True, extra_args=None):
+    def getCmd(self, write=True, extra_args=None, sep=' ', pre_cmd=None):
         """
         Get command line str.
 
         :param write bool: the msg to be printed
         :param extra_args list: extra args for the specific task
+        :param sep str: the separator between args
+        :param pre_cmd list: the pre-command to run before the args
         :return str: the command as str
         """
         if extra_args:
             self.args += extra_args
-        cmd = ' '.join(list(map(str, self.run_driver + self.args)))
+
+        if pre_cmd is None:
+            pre_cmd = [self.pre_run] if self.pre_run else []
+            if self.driver:
+                pre_cmd += [self.driver.PATH]
+
+        cmd = sep.join(list(map(str, pre_cmd + self.args)))
+
         if write:
             with open(f"{self.name}_cmd", 'w') as fh:
                 fh.write(cmd)
@@ -141,7 +150,7 @@ class BaseTask:
     DRIVER_LOG = logutils.DRIVER_LOG
     KNOWN_ARGS = jobutils.KNOWN_ARGS
     UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
-    DRIVER = SimpleNamespace(PATH=None)
+    DRIVER = None
     QUOTED_CHAR = re.compile("[@!#$%^&*()<>?/|}{~:]")
 
     def __init__(self, job, pre_run=RUN_NEMD, name=None):

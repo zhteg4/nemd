@@ -15,20 +15,50 @@ SUCCESS = task.SUCCESS
 MSG = task.MSG
 
 
-class Integration_Driver(task.BaseTask):
+class Job(task.Job):
+    """
+    The class to setup a job cmd for the integration test.
+    """
 
+    STATE_ID = jobutils.STATE_ID
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
     JOBNAME_RE = re.compile('.* +(.*)_(driver|workflow).py( +.*)?$')
 
-    @staticmethod
-    def operator(*args, **kwargs):
-        """
-        Get the integration test cmd command.
+    def __init__(self, *args, pre_run=None, **kwargs):
+        super().__init__(*args, pre_run=pre_run,**kwargs)
+        self.comments = []
+        self.name = self.job.statepoint[self.STATE_ID]
 
-        :return str: the command to run a task.
+    def setArgs(self):
         """
-        integration_driver = Integration_Driver(*args, **kwargs)
-        return integration_driver.getCmd()
+        Set arguments.
+        """
+        cmd_file = os.path.join(self.doc[DIR], CMD)
+        with open(cmd_file) as fh:
+            self.args = [x.strip() for x in fh.readlines()]
+
+    def removeUnkArgs(self):
+        """
+        Remove unknown arguments.
+        """
+        self.comments = [x.strip('#') for x in self.args if x.startswith('#')]
+        self.args = [x for x in self.args if x and not x.startswith('#')]
+
+    def setName(self):
+        """
+        Set the jobname of the known args.
+        """
+        for idx, cmd in enumerate(self.args):
+            if cmd.startswith('#'):
+                continue
+            if self.FLAG_JOBNAME in cmd:
+                continue
+            jobname = self.JOBNAME_RE.match(cmd).groups()[0]
+            cmd += f" {self.FLAG_JOBNAME} {jobname}"
+            self.args[idx] = cmd
+
+    def addQuote(self):
+        pass
 
     def getCmd(self, write=True):
         """
@@ -37,20 +67,14 @@ class Integration_Driver(task.BaseTask):
         :param write bool: the msg to be printed
         :return str: the command as str
         """
+        comment = symbols.COMMA.join(self.comments)
+        pre = [f"echo \'# {os.path.basename(self.doc[DIR])}: {comment}\'"]
+        return super().getCmd(write=write, sep=symbols.SEMICOLON, pre_cmd=pre)
 
-        cmd_file = os.path.join(self.job.document[DIR], CMD)
-        with open(cmd_file) as fh:
-            lines = [x.strip() for x in fh.readlines()]
-        comment = symbols.COMMA.join([x for x in lines if x.startswith('#')])
-        cmd = symbols.SEMICOLON.join(
-            [x for x in lines if not x.startswith('#')])
-        if write:
-            with open(f"{self.job.statepoint[self.STATE_ID]}_cmd", 'w') as fh:
-                fh.write(cmd)
-        if self.FLAG_JOBNAME not in cmd:
-            jobname = self.JOBNAME_RE.match(cmd).groups()[0]
-            cmd += f" {self.FLAG_JOBNAME} {jobname}"
-        return f"echo \"{os.path.basename(self.job.document[DIR])} {comment}\"; {cmd}"
+
+class Integration_Driver(task.BaseTask):
+
+    JobClass = Job
 
     @classmethod
     def post(cls, job, **kwargs):
