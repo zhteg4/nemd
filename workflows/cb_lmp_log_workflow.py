@@ -153,7 +153,7 @@ class Runner(jobcontrol.Runner):
         data = pd.read_csv(filename, index_col=0)
         columns = [x for x in data.columns if x.split('(')[0].strip() == tname]
         index = data[columns[0]].argmin()
-        factor = data.iloc[index].name
+        factor = str(data.iloc[index].name)
         val = data.iloc[index][columns[0]]
         unit = columns[0].split('(')[-1].split(')')[0]
         log(f"A scale factor of {factor} {Runner.MINIMUM_ENERGY} {val} {unit}")

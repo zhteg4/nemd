@@ -1,0 +1,3 @@
+# Run two driver jobs in serial
+run_nemd lammps_driver.py $NEMD_SRC/test/test_files/si/crystal_builder.in -cpu 1 -JOBNAME lammps_runner
+run_nemd lmp_log_driver.py lammps_runner.log -task TotEng -cpu 1 -JOBNAME lmp_log

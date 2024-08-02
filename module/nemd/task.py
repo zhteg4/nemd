@@ -71,7 +71,7 @@ class Job:
         """
         self.args = list(self.doc.get(self.TARGS, {}).get(self.name, []))
         self.args += list(self.doc.get(self.ARGS, []))
-        self.args = list(map(str, self.args))
+        self.args = [x for x in map(str, self.args) if x]
 
     def removeUnkArgs(self):
         """

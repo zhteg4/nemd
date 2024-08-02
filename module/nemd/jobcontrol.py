@@ -113,12 +113,12 @@ class Runner:
         """
         ids = range(self.options.state_num) if ids is None else ids
         for idx in ids:
-            job = self.project.open_job({self.STATE_ID: idx})
+            # _StatePointDict warns NumpyConversionWarning if state_id not str
+            job = self.project.open_job({self.STATE_ID: str(idx)})
             job.doc[jobutils.OUTFILE] = job.doc.get(jobutils.OUTFILE, {})
             job.doc[jobutils.OUTFILES] = job.doc.get(jobutils.OUTFILES, {})
             job.document[self.ARGS] = self.argv[:]
             job.document.update({self.PREREQ: self.prereq})
-            job.init()
 
     def runProject(self):
         """

@@ -1,7 +1,10 @@
 import os
 import sh
+import io
 import logging
 import pathlib
+import wurlitzer
+import contextlib
 
 from nemd import environutils
 from nemd import timeutils
@@ -195,3 +198,26 @@ def get_time(filepath, dtype=DELTA):
         return dtime
     delta = dtime - stime
     return delta
+
+
+@contextlib.contextmanager
+def redirect(*args, logger=None, **kwds):
+    """
+    Redirecting all kinds of stdout in Python via wurlitzer
+    https://eli.thegreenplace.net/2015/redirecting-all-kinds-of-stdout-in-python/
+
+    :param logger 'logging.Logger': the logger to print the out and err messages.
+    """
+    out, err = io.StringIO(), io.StringIO()
+    try:
+        with wurlitzer.pipes(out, err) as handler:
+            yield handler
+    finally:
+        if logger is None:
+            return
+        out = out.getvalue()
+        if out:
+            logger.warning(out)
+        err = err.getvalue()
+        if err:
+            logger.warning(err)

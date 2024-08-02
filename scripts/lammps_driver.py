@@ -90,14 +90,17 @@ class Lammps:
         """
         Run lammps executable with the given input file and output file.
         """
-        read_data = f'{lammpsin.In.READ_DATA} {self.options.data_file}'
         log('Running lammps simulations...')
-        lmp = lammps.lammps(cmdargs=self.args)
-        with open(self.options.inscript, 'r') as fh:
-            cmds = fh.readlines()
-            cmds = [read_data if self.READ_DATA.match(x) else x for x in cmds]
-            lmp.commands_list(cmds)
-        lmp.close()
+        with logutils.redirect(logger=logger):
+            # "[xxx.local:xxx] shmem: mmap: an error occurred while determining
+            # whether or not xxx could be created." while lammps.lammps()
+            lmp = lammps.lammps(cmdargs=self.args)
+            with open(self.options.inscript, 'r') as fh:
+                cmds = fh.readlines()
+                rdata = f'{lammpsin.In.READ_DATA} {self.options.data_file}'
+                cmds = [rdata if self.READ_DATA.match(x) else x for x in cmds]
+                lmp.commands_list(cmds)
+            lmp.close()
 
 
 def get_parser(parser=None):

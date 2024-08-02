@@ -1,6 +1,5 @@
 import os
 import re
-import sh
 import filecmp
 from nemd import task
 from nemd import symbols
@@ -20,6 +19,7 @@ class Job(task.Job):
     STATE_ID = jobutils.STATE_ID
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
     JOBNAME_RE = re.compile('.* +(.*)_(driver|workflow).py( +.*)?$')
+    POUND = symbols.POUND
 
     def __init__(self, *args, pre_run=None, **kwargs):
         """
@@ -30,7 +30,7 @@ class Job(task.Job):
 
         """
         super().__init__(*args, pre_run=pre_run, **kwargs)
-        self.comments = []
+        self.comment = None
         self.name = self.job.statepoint[self.STATE_ID]
 
     def setArgs(self):
@@ -39,14 +39,15 @@ class Job(task.Job):
         """
         cmd_file = os.path.join(self.doc[DIR], CMD)
         with open(cmd_file) as fh:
-            self.args = [x.strip() for x in fh.readlines()]
+            self.args = [x.strip() for x in fh.readlines() if x.strip()]
 
     def removeUnkArgs(self):
         """
         Remove unknown arguments.
         """
-        self.comments = [x.strip('#') for x in self.args if x.startswith('#')]
-        self.args = [x for x in self.args if x and not x.startswith('#')]
+        cmt = [x for x in self.args if x.startswith(self.POUND)]
+        self.comment = symbols.COMMA.join([x.strip(self.POUND) for x in cmt])
+        self.args = [x for x in self.args if not x.startswith(self.POUND)]
 
     def setName(self):
         """
@@ -57,7 +58,10 @@ class Job(task.Job):
                 continue
             if self.FLAG_JOBNAME in cmd:
                 continue
-            jobname = self.JOBNAME_RE.match(cmd).groups()[0]
+            match = self.JOBNAME_RE.match(cmd)
+            if not match:
+                continue
+            jobname = match.groups()[0]
             cmd += f" {self.FLAG_JOBNAME} {jobname}"
             self.args[idx] = cmd
 
@@ -78,8 +82,9 @@ class Job(task.Job):
         :param write bool: the msg to be printed
         :return str: the command as str
         """
-        comment = symbols.COMMA.join(self.comments)
-        pre = [f"echo \'# {os.path.basename(self.doc[DIR])}: {comment}\'"]
+        dirname = os.path.basename(self.doc[DIR])
+        msg = f"{dirname}: {self.comment}" if self.comment else dirname
+        pre = [f"echo \'# {msg}\'"]
         return super().getCmd(write=write, sep=symbols.SEMICOLON, pre_cmd=pre)
 
 
@@ -88,7 +93,7 @@ class Integration(task.BaseTask):
     JobClass = Job
 
     @classmethod
-    def post(cls, job, name=None):
+    def post(cls, job, **kwargs):
         """
         The job is considered finished when the post-conditions return True.
 
