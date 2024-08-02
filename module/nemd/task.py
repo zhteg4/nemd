@@ -36,11 +36,20 @@ class Job:
 
     ARGS = jobutils.ARGS
     TARGS = jobutils.TARGS
-    SPECIAL_CHAR_RE = re.compile("[@!#$%^&*()<>?/|}{~:]")
+    SPECIAL_CHAR_RE = re.compile("[@!#%^&*()<>?|}{:]")
+    QUOTED_RE = re.compile('^".*"$|^\'.*\'$')
     UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
     RUN_NEMD = jobutils.RUN_NEMD
 
     def __init__(self, job, name, driver, pre_run=RUN_NEMD):
+        """
+        :param job: the signac job instance
+        :type job: 'signac.contrib.job.Job'
+        :param pre_run: append this str before the driver path
+        :type pre_run: str
+        :param driver: imported driver module
+        :type driver: 'module'
+        """
         self.job = job
         self.name = name
         self.driver = driver
@@ -98,7 +107,8 @@ class Job:
         """
         Add quotes for str with special characters.
         """
-        quote_needed = self.SPECIAL_CHAR_RE.search
+        quote_needed = lambda x: self.SPECIAL_CHAR_RE.search(
+            x) and not self.QUOTED_RE.match(x)
         self.args = [f"'{x}'" if quote_needed(x) else x for x in self.args]
 
     def getCmd(self, write=True, extra_args=None, sep=' ', pre_cmd=None):
@@ -151,7 +161,6 @@ class BaseTask:
     KNOWN_ARGS = jobutils.KNOWN_ARGS
     UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
     DRIVER = None
-    QUOTED_CHAR = re.compile("[@!#$%^&*()<>?/|}{~:]")
 
     def __init__(self, job, pre_run=RUN_NEMD, name=None):
         """

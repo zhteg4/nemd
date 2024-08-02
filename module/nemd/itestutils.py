@@ -25,7 +25,14 @@ class Job(task.Job):
     JOBNAME_RE = re.compile('.* +(.*)_(driver|workflow).py( +.*)?$')
 
     def __init__(self, *args, pre_run=None, **kwargs):
-        super().__init__(*args, pre_run=pre_run,**kwargs)
+        """
+        :param job: the signac job instance
+        :type job: 'signac.contrib.job.Job'
+        :param pre_run: append this str before the driver path
+        :type pre_run: str
+
+        """
+        super().__init__(*args, pre_run=pre_run, **kwargs)
         self.comments = []
         self.name = self.job.statepoint[self.STATE_ID]
 
@@ -58,7 +65,14 @@ class Job(task.Job):
             self.args[idx] = cmd
 
     def addQuote(self):
-        pass
+        """
+        Add quotes for str with special characters.
+        """
+        quote_needed = lambda x: self.SPECIAL_CHAR_RE.search(
+            x) and not self.QUOTED_RE.match(x)
+        for idx, cmd in enumerate(self.args):
+            cmd = [f"'{x}'" if quote_needed(x) else x for x in cmd.split()]
+            self.args[idx] = ' '.join(cmd)
 
     def getCmd(self, write=True):
         """
