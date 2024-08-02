@@ -14,7 +14,7 @@ from nemd import lammpsin
 from nemd import parserutils
 from nemd import environutils
 
-FLAG_INSCRIPT = '-inscript'
+FLAG_INSCRIPT = 'inscript'
 FLAG_SCREEN = '-screen'
 FLAG_LOG = '-log'
 FLAG_DATA_FILE = parserutils.FLAG_DATA_FILE
@@ -23,7 +23,7 @@ PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
 
 # Positional command-argument holders to take task input under jobcontrol
-ARGS_TMPL = [FLAG_INSCRIPT, jobutils.FILE]
+ARGS_TMPL = [jobutils.FILE]
 
 
 def log(msg, timestamp=False):
@@ -100,20 +100,20 @@ class Lammps:
         lmp.close()
 
 
-def get_parser():
+def get_parser(parser=None):
     """
     Get the customized parser wrapper for lammps executable.
 
     :return: the customized parser wrapper
     :rtype: 'argparse.ArgumentParser'
     """
-    parser = parserutils.get_parser(
-        description='This is a customized parser wrapper for lammps.')
-    parser.add_argument(FLAG_INSCRIPT,
-                        metavar=FLAG_INSCRIPT[1:].upper(),
-                        type=parserutils.type_file,
-                        required=True,
-                        help='Read input from this file.')
+    if parser is None:
+        parser = parserutils.get_parser(
+            description='This is a customized parser wrapper for lammps.')
+        parser.add_argument(FLAG_INSCRIPT,
+                            metavar=FLAG_INSCRIPT.upper(),
+                            type=parserutils.type_file,
+                            help='Read input from this file.')
     parser.add_argument(FLAG_SCREEN,
                         metavar=FLAG_SCREEN[1:].upper(),
                         choices=[symbols.NONE, symbols.FILENAME],

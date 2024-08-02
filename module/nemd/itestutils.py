@@ -1,18 +1,15 @@
 import os
 import re
-import glob
+import sh
 import filecmp
 from nemd import task
 from nemd import symbols
-from nemd import logutils
 from nemd import jobutils
 
 DIR = 'dir'
 CMD = 'cmd'
 CHECK = 'check'
 AND_RE = r'and\s+'
-SUCCESS = task.SUCCESS
-MSG = task.MSG
 
 
 class Job(task.Job):
@@ -86,30 +83,23 @@ class Job(task.Job):
         return super().getCmd(write=write, sep=symbols.SEMICOLON, pre_cmd=pre)
 
 
-class Integration_Driver(task.BaseTask):
+class Integration(task.BaseTask):
 
     JobClass = Job
 
     @classmethod
-    def post(cls, job, **kwargs):
+    def post(cls, job, name=None):
         """
-        The function to determine whether the main command has been executed.
+        The job is considered finished when the post-conditions return True.
 
-        :param job 'signac.contrib.job.Job': the job object
-        :return bool: whether the main command has been executed.
-
-        NOTE：This should be modified when using with slurm schedular.
+        :param job: the signac job instance
+        :type job: 'signac.contrib.job.Job'
+        :param name: the jobname
+        :type name: str
+        :return: True if the post-conditions are met
+        :rtype: bool
         """
-        filenames = glob.glob(
-            job.fn(f"{symbols.WILD_CARD}{logutils.DRIVER_LOG}"))
-        if not filenames:
-            return False
-        jobnames = [
-            os.path.basename(x).replace(logutils.DRIVER_LOG, '')
-            for x in filenames
-        ]
-        success = [cls.success(job, x) for x in jobnames]
-        return all(success)
+        return super().post(job, name=None)
 
 
 class EXIST:
@@ -178,22 +168,21 @@ class CMP:
             raise ValueError(f"{self.orignal} and {self.target} are different")
 
 
-class Results(task.BaseTask):
+class ResultJob(task.Job):
     """
-    Class to parse the check file and execute the inside operations.
+    The class to check the results for one cmd integration test.
     """
 
     CMD_BRACKET_RE = '\s.*?\(.*?\)'
     PAIRED_BRACKET_RE = '\(.*?\)'
     CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
+    MSG = task.MSG
 
-    def __init__(self, args, **kwargs):
-        """
-        :param job 'signac.contrib.job.Job': the signac job
-        """
-        super().__init__(args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.line = None
         self.operators = []
+        self.doc[self.MSG] = False
 
     def run(self):
         """
@@ -229,7 +218,10 @@ class Results(task.BaseTask):
         print(f"{self.job.statepoint[self.STATE_ID]}: "
               f"Analyzing {symbols.COMMA.join(self.operators)}")
         for operator in self.operators:
-            self.execute(operator)
+            try:
+                self.execute(operator)
+            except (FileNotFoundError, KeyError, ValueError) as err:
+                self.doc[self.MSG] = str(err)
 
     def execute(self, operator):
         """
@@ -245,21 +237,13 @@ class Results(task.BaseTask):
         runner = runner_class(*bracketed[1:-1].split(','), job=self.job)
         runner.run()
 
-    @staticmethod
-    def operator(job, *args, **kwargs):
-        """
-        Get results.
-        """
-        # from remote_pdb import set_trace; set_trace()
-        # nc -tC 127.0.0.1 62500
-        results = Results(job)
-        try:
-            results.run()
-        except (FileNotFoundError, KeyError, ValueError) as err:
-            job.document[SUCCESS] = False
-            job.document[MSG] = str(err)
-        else:
-            job.document[SUCCESS] = True
+
+class Results(task.BaseTask):
+    """
+    Class to parse the check file and execute the inside operations.
+    """
+
+    JobClass = ResultJob
 
     @classmethod
     def post(cls, job, **kwargs):
@@ -269,4 +253,4 @@ class Results(task.BaseTask):
         :param job 'signac.contrib.job.Job': the job object
         :return str: the shell command to execute
         """
-        return SUCCESS in job.document
+        return ResultJob.MSG in job.document

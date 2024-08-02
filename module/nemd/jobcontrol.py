@@ -213,5 +213,10 @@ class Runner:
             print(msg)
 
     def log_error(self, msg):
+        """
+        Print this message and exit the program.
+
+        :param msg str: the msg to be printed
+        """
         self.log(msg + '\nAborting...', timestamp=True)
         sys.exit(1)

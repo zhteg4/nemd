@@ -1,1 +1,2 @@
-run_nemd lammps_driver.py -inscript $NEMD_SRC/test/test_files/si/crystal_builder.in -cpu 1 -JOBNAME lammps_runner
+# Lammps single point energy
+run_nemd lammps_driver.py $NEMD_SRC/test/test_files/si/crystal_builder.in -cpu 1 -JOBNAME lammps_runner

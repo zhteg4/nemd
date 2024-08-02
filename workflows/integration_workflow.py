@@ -64,6 +64,7 @@ class Integration(jobcontrol.Runner):
     TAG = 'tag'
     SLOW = 'slow'
     TAG_KEYS = [SLOW]
+    MSG = itestutils.ResultJob.MSG
 
     def __init__(self, options, logger=None):
         """
@@ -168,7 +169,7 @@ class Integration(jobcontrol.Runner):
             itestutils.Results.getOpr(name='result', cmd=False)
             return
 
-        cmd = itestutils.Integration_Driver.getOpr(name='cmd')
+        cmd = itestutils.Integration.getOpr(name='cmd')
         result = itestutils.Results.getOpr(name='result', cmd=False)
         self.setPrereq(result, cmd)
 
@@ -183,7 +184,7 @@ class Integration(jobcontrol.Runner):
             job.document[itestutils.DIR] = test_dir
             job.init()
             if self.options.check_only:
-                job.doc.pop(itestutils.SUCCESS)
+                job.doc.pop(self.MSG)
 
     def logStatus(self):
         """
@@ -191,14 +192,14 @@ class Integration(jobcontrol.Runner):
         """
         super().logStatus()
         jobs = self.project.find_jobs()
-        sjobs = [x for x in jobs if x.document.get(itestutils.SUCCESS)]
-        fjobs = [x for x in jobs if not x.document.get(itestutils.SUCCESS)]
+        sjobs = [x for x in jobs if not x.document.get(self.MSG)]
+        fjobs = [x for x in jobs if x.document.get(self.MSG)]
         log(f"{len(sjobs)} succeed; {len(fjobs)} failed.")
         for job in fjobs:
             id = job.statepoint[self.STATE_ID]
             dir = job.doc[itestutils.DIR]
             log(f'id: {id}; dir: {dir}')
-            log(f'{job.document[itestutils.MSG]}')
+            log(f'{job.document[self.MSG]}')
 
 
 def get_parser():

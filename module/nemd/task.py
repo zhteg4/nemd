@@ -21,7 +21,6 @@ FILE = jobutils.FILE
 
 logger = logutils.createModuleLogger(file_path=__file__)
 
-SUCCESS = 'success'
 MSG = 'msg'
 
 
@@ -34,11 +33,11 @@ def log_debug(msg):
 
 class Job:
 
+    STATE_ID = jobutils.STATE_ID
     ARGS = jobutils.ARGS
     TARGS = jobutils.TARGS
     SPECIAL_CHAR_RE = re.compile("[@!#%^&*()<>?|}{:]")
     QUOTED_RE = re.compile('^".*"$|^\'.*\'$')
-    UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
     RUN_NEMD = jobutils.RUN_NEMD
 
     def __init__(self, job, name, driver, pre_run=RUN_NEMD):
@@ -65,7 +64,6 @@ class Job:
         self.removeUnkArgs()
         self.setName()
         self.addQuote()
-        self.doc[self.UNKNOWN_ARGS] = self.args
 
     def setArgs(self):
         """
@@ -121,6 +119,9 @@ class Job:
         :param pre_cmd list: the pre-command to run before the args
         :return str: the command as str
         """
+        if self.args is None:
+            return
+
         if extra_args:
             self.args += extra_args
 
@@ -159,7 +160,6 @@ class BaseTask:
     FINISHED = jobutils.FINISHED
     DRIVER_LOG = logutils.DRIVER_LOG
     KNOWN_ARGS = jobutils.KNOWN_ARGS
-    UNKNOWN_ARGS = jobutils.UNKNOWN_ARGS
     DRIVER = None
 
     def __init__(self, job, pre_run=RUN_NEMD, name=None):
@@ -175,22 +175,6 @@ class BaseTask:
         self.pre_run = pre_run
         self.name = name
         self.doc = job.document
-
-    @classmethod
-    def success(cls, job, name):
-        """
-        Whether job is successful based on job logging.
-
-        :param job: the signac job instance
-        :type job: 'signac.contrib.job.Job'
-        :param name: the jobname
-        :type name: str
-        :return: whether job is successful
-        :rtype: bool
-        """
-        logfile = job.fn(name + cls.DRIVER_LOG)
-        return os.path.exists(logfile) and sh.tail('-2', logfile).split(
-            symbols.RETURN)[0].endswith(cls.FINISHED)
 
     @classmethod
     def pre(cls, job, name=None):
@@ -210,10 +194,11 @@ class BaseTask:
             # The job doesn't have any prerequisite jobs
             log_debug(f'Pre-conditions: {name} (True): no pre-conditions')
             return True
-        if not all(job.doc[cls.OUTFILE][x] for x in pre_jobs):
+        if not all(job.doc[cls.OUTFILE].get(x) for x in pre_jobs):
             # The job has incomplete prerequisite jobs and has to wait
             log_debug(
-                f'Pre-conditions: {name} (False): {[f"{x} ({job.doc[cls.OUTFILE][x]})" for x in pre_jobs]}'
+                f'Pre-conditions: {name} (False): '
+                f'{[f"{x} ({job.doc[cls.OUTFILE].get(x)})" for x in pre_jobs]}'
             )
             return False
         args = cls.DRIVER.ARGS_TMPL[:]
@@ -229,10 +214,7 @@ class BaseTask:
     @classmethod
     def post(cls, job, name=None):
         """
-        Check post-conditions after the job has started (FIXME: I am not sure
-        whether this runs during the execution. I guess that this runs after
-        the execution but before the job is considered as completion. Please
-        revise or correct the doc string after verification).
+        The job is considered finished when the post-conditions return True.
 
         :param job: the signac job instance
         :type job: 'signac.contrib.job.Job'
@@ -241,11 +223,12 @@ class BaseTask:
         :return: True if the post-conditions are met
         :rtype: bool
         """
-        outfile = job.document.get(cls.OUTFILE, {}).get(name)
+        outfiles = job.document.get(cls.OUTFILE, {})
+        if name is None:
+            return bool(outfiles)
+        outfile = outfiles.get(name)
         log_debug(f'Post-conditions: {name}: {outfile}')
-        if outfile:
-            return True
-        return False
+        return bool(outfile)
 
     @classmethod
     def operator(cls, job, *arg, name=None, **kwargs):
@@ -319,7 +302,6 @@ class BaseTask:
             kwargs['log'] = log
         func = functools.update_wrapper(functools.partial(opr, **kwargs), opr)
         func.__name__ = name
-
         func = FlowProject.operation(cmd=cmd,
                                      func=func,
                                      with_job=with_job,
