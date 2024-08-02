@@ -201,7 +201,7 @@ def get_time(filepath, dtype=DELTA):
 
 
 @contextlib.contextmanager
-def redirect(*args, logger=None, **kwds):
+def redirect(*args, logger=None, **kwargs):
     """
     Redirecting all kinds of stdout in Python via wurlitzer
     https://eli.thegreenplace.net/2015/redirecting-all-kinds-of-stdout-in-python/
@@ -210,8 +210,8 @@ def redirect(*args, logger=None, **kwds):
     """
     out, err = io.StringIO(), io.StringIO()
     try:
-        with wurlitzer.pipes(out, err) as handler:
-            yield handler
+        with wurlitzer.pipes(out, err):
+            yield None
     finally:
         if logger is None:
             return

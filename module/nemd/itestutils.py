@@ -45,8 +45,9 @@ class Job(task.Job):
         """
         Remove unknown arguments.
         """
-        cmt = [x for x in self.args if x.startswith(self.POUND)]
-        self.comment = symbols.COMMA.join([x.strip(self.POUND) for x in cmt])
+        comments = [x for x in self.args if x.startswith(self.POUND)]
+        comment = [x.strip(self.POUND).strip() for x in comments]
+        self.comment = symbols.COMMA.join(comment)
         self.args = [x for x in self.args if not x.startswith(self.POUND)]
 
     def setName(self):
