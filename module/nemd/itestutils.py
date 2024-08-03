@@ -3,12 +3,8 @@ import re
 import filecmp
 from nemd import task
 from nemd import symbols
-from nemd import jobutils
 
 DIR = 'dir'
-CMD = 'cmd'
-CHECK = 'check'
-AND_RE = r'and\s+'
 
 
 class Job(task.Job):
@@ -16,20 +12,18 @@ class Job(task.Job):
     The class to setup a job cmd for the integration test.
     """
 
-    STATE_ID = jobutils.STATE_ID
-    FLAG_JOBNAME = jobutils.FLAG_JOBNAME
     JOBNAME_RE = re.compile('.* +(.*)_(driver|workflow).py( +.*)?$')
     POUND = symbols.POUND
+    CMD = 'cmd'
+    PRE_RUN = None
+    SEP = symbols.SEMICOLON
 
-    def __init__(self, *args, pre_run=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         """
         :param job: the signac job instance
         :type job: 'signac.contrib.job.Job'
-        :param pre_run: append this str before the driver path
-        :type pre_run: str
-
         """
-        super().__init__(*args, pre_run=pre_run, **kwargs)
+        super().__init__(*args, **kwargs)
         self.comment = None
         self.name = self.job.statepoint[self.STATE_ID]
 
@@ -37,8 +31,7 @@ class Job(task.Job):
         """
         Set arguments.
         """
-        cmd_file = os.path.join(self.doc[DIR], CMD)
-        with open(cmd_file) as fh:
+        with open(os.path.join(self.doc[DIR], self.CMD)) as fh:
             self.args = [x.strip() for x in fh.readlines() if x.strip()]
 
     def removeUnkArgs(self):
@@ -70,11 +63,9 @@ class Job(task.Job):
         """
         Add quotes for str with special characters.
         """
-        quote_needed = lambda x: self.SPECIAL_CHAR_RE.search(
-            x) and not self.QUOTED_RE.match(x)
         for idx, cmd in enumerate(self.args):
-            cmd = [f"'{x}'" if quote_needed(x) else x for x in cmd.split()]
-            self.args[idx] = ' '.join(cmd)
+            cmd = [self.quoteArg(x.strip()) for x in cmd.split()]
+            self.args[idx] = symbols.SPACE.join(cmd)
 
     def getCmd(self, write=True):
         """
@@ -85,8 +76,8 @@ class Job(task.Job):
         """
         dirname = os.path.basename(self.doc[DIR])
         msg = f"{dirname}: {self.comment}" if self.comment else dirname
-        pre = [f"echo \'# {msg}\'"]
-        return super().getCmd(write=write, sep=symbols.SEMICOLON, pre_cmd=pre)
+        pre_cmd = [f"echo \'# {msg}\'"]
+        return super().getCmd(write=write, pre_cmd=pre_cmd)
 
 
 class Integration(task.BaseTask):
@@ -174,7 +165,7 @@ class CMP:
             raise ValueError(f"{self.orignal} and {self.target} are different")
 
 
-class ResultJob(task.Job):
+class ResultJob(task.BaseJob):
     """
     The class to check the results for one cmd integration test.
     """
@@ -182,7 +173,9 @@ class ResultJob(task.Job):
     CMD_BRACKET_RE = '\s.*?\(.*?\)'
     PAIRED_BRACKET_RE = '\(.*?\)'
     CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
-    MSG = task.MSG
+    MSG = 'msg'
+    CHECK = 'check'
+    AND_RE = r'and\s+'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -202,8 +195,7 @@ class ResultJob(task.Job):
         """
         Set the one line command by locating, reading, and cleaning the check file.
         """
-        check_file = os.path.join(self.job.document[DIR], CHECK)
-        with open(check_file) as fh:
+        with open(os.path.join(self.doc[DIR], self.CHECK)) as fh:
             lines = [x.strip() for x in fh.readlines()]
         operators = [x for x in lines if not x.startswith(symbols.POUND)]
         self.line = ' ' + ' '.join(operators)
@@ -214,7 +206,7 @@ class ResultJob(task.Job):
         """
         for operator in re.finditer(self.CMD_BRACKET_RE, self.line):
             operator = operator.group().strip()
-            operator = re.sub(AND_RE, '', operator)
+            operator = re.sub(self.AND_RE, '', operator)
             self.operators.append(operator)
 
     def executeOperators(self):

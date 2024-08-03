@@ -21,8 +21,6 @@ FILE = jobutils.FILE
 
 logger = logutils.createModuleLogger(file_path=__file__)
 
-MSG = 'msg'
-
 
 def log_debug(msg):
 
@@ -31,29 +29,51 @@ def log_debug(msg):
     logger.debug(msg)
 
 
-class Job:
+class BaseJob:
 
     STATE_ID = jobutils.STATE_ID
+    FLAG_JOBNAME = jobutils.FLAG_JOBNAME
+    PRE_RUN = None
+
+    def __init__(self, job, name=None, **kwargs):
+        """
+        :param job: the signac job instance
+        :type job: 'signac.contrib.job.Job'
+        :param name: the jobname
+        :type name: str
+        """
+        self.job = job
+        self.name = name
+        self.doc = self.job.document
+
+    def run(self):
+        """
+        Override this method to run the job.
+        """
+        pass
+
+
+class Job(BaseJob):
+    """
+    The class to setup a run_nemd driver job in a workflow.
+    """
+
     ARGS = jobutils.ARGS
     TARGS = jobutils.TARGS
     SPECIAL_CHAR_RE = re.compile("[@!#%^&*()<>?|}{:]")
     QUOTED_RE = re.compile('^".*"$|^\'.*\'$')
-    RUN_NEMD = jobutils.RUN_NEMD
+    PRE_RUN = jobutils.RUN_NEMD
+    SEP = symbols.SPACE
 
-    def __init__(self, job, name, driver, pre_run=RUN_NEMD):
+    def __init__(self, job, name=None, driver=None):
         """
         :param job: the signac job instance
         :type job: 'signac.contrib.job.Job'
-        :param pre_run: append this str before the driver path
-        :type pre_run: str
         :param driver: imported driver module
         :type driver: 'module'
         """
-        self.job = job
-        self.name = name
+        super().__init__(job, name=name)
         self.driver = driver
-        self.pre_run = pre_run
-        self.doc = self.job.document
         self.args = None
 
     def run(self):
@@ -99,42 +119,49 @@ class Job:
         """
         Set the jobname of the known args.
         """
-        jobutils.set_arg(self.args, jobutils.FLAG_JOBNAME, self.name)
+        jobutils.set_arg(self.args, self.FLAG_JOBNAME, self.name)
 
     def addQuote(self):
         """
         Add quotes for str with special characters.
         """
-        quote_needed = lambda x: self.SPECIAL_CHAR_RE.search(
-            x) and not self.QUOTED_RE.match(x)
-        self.args = [f"'{x}'" if quote_needed(x) else x for x in self.args]
+        self.args = [self.quoteArg(x) for x in self.args]
 
-    def getCmd(self, write=True, extra_args=None, sep=' ', pre_cmd=None):
+    @classmethod
+    def quoteArg(self, arg):
+        """
+        Quote the unquoted argument that contains special characters.
+        """
+        if self.SPECIAL_CHAR_RE.search(arg) and not self.QUOTED_RE.match(arg):
+            return f"'{arg}'"
+        return arg
+
+    def getCmd(self, pre_cmd=None, extra_args=None, write=True):
         """
         Get command line str.
 
-        :param write bool: the msg to be printed
-        :param extra_args list: extra args for the specific task
-        :param sep str: the separator between args
         :param pre_cmd list: the pre-command to run before the args
+        :param extra_args list: extra args for the specific task
+        :param write bool: the msg to be printed
         :return str: the command as str
         """
-        if self.args is None:
-            return
-
-        if extra_args:
-            self.args += extra_args
 
         if pre_cmd is None:
-            pre_cmd = [self.pre_run] if self.pre_run else []
+            pre_cmd = []
+            if self.PRE_RUN:
+                pre_cmd.append(self.PRE_RUN)
             if self.driver:
-                pre_cmd += [self.driver.PATH]
+                pre_cmd.append(self.driver.PATH)
 
-        cmd = sep.join(list(map(str, pre_cmd + self.args)))
+        if extra_args is None:
+            extra_args = []
+
+        cmd = self.SEP.join(map(str, pre_cmd + self.args + extra_args))
 
         if write:
             with open(f"{self.name}_cmd", 'w') as fh:
                 fh.write(cmd)
+
         return cmd
 
 
@@ -155,26 +182,10 @@ class BaseTask:
     TARGS = jobutils.TARGS
     PREREQ = jobutils.PREREQ
     OUTFILE = jobutils.OUTFILE
-    RUN_NEMD = jobutils.RUN_NEMD
-    PRE_RUN = RUN_NEMD
     FINISHED = jobutils.FINISHED
     DRIVER_LOG = logutils.DRIVER_LOG
     KNOWN_ARGS = jobutils.KNOWN_ARGS
     DRIVER = None
-
-    def __init__(self, job, pre_run=RUN_NEMD, name=None):
-        """
-        :param job: the signac job instance
-        :type job: 'signac.contrib.job.Job'
-        :param pre_run: append this str before the driver path
-        :type pre_run: str
-        :param name: the jobname
-        :type name: str
-        """
-        self.job = job
-        self.pre_run = pre_run
-        self.name = name
-        self.doc = job.document
 
     @classmethod
     def pre(cls, job, name=None):
@@ -225,7 +236,7 @@ class BaseTask:
         return bool(outfile)
 
     @classmethod
-    def operator(cls, job, *arg, name=None, **kwargs):
+    def operator(cls, job, *args, name=None, **kwargs):
         """
         The main opterator (function) for a job task executed after
         pre-conditions are met.
@@ -235,13 +246,14 @@ class BaseTask:
         :type name: str
         :return str: the command to run a task.
         """
-        obj = cls.JobClass(job, name, cls.DRIVER, pre_run=cls.PRE_RUN)
+        obj = cls.JobClass(job, name=name, driver=cls.DRIVER)
         obj.run()
-        return obj.getCmd()
+        if hasattr(obj, 'getCmd'):
+            return obj.getCmd()
 
     @classmethod
     def getOpr(cls,
-               cmd=True,
+               cmd=None,
                with_job=True,
                name=None,
                attr='operator',
@@ -276,6 +288,8 @@ class BaseTask:
         :rtype: 'function'
         :raise ValueError: the function cannot be found
         """
+        if cmd is None:
+            cmd = hasattr(cls.JobClass, 'getCmd')
         if post is None:
             post = cls.post
         if pre is None:

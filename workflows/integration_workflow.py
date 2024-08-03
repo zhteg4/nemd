@@ -162,11 +162,11 @@ class Integration(jobcontrol.Runner):
         Set operators. For example, run cmd and check results.
         """
         if self.options.check_only:
-            itestutils.Results.getOpr(name='result', cmd=False)
+            itestutils.Results.getOpr(name='result')
             return
 
         cmd = itestutils.Integration.getOpr(name='cmd')
-        result = itestutils.Results.getOpr(name='result', cmd=False)
+        result = itestutils.Results.getOpr(name='result')
         self.setPrereq(result, cmd)
 
     def addJobs(self):
