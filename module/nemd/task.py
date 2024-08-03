@@ -188,25 +188,19 @@ class BaseTask:
         :return: True if the pre-conditions are met
         :rtype: bool
         """
-        try:
-            pre_jobs = job.doc[cls.PREREQ][name]
-        except KeyError:
+        pre_jobs = job.doc[cls.PREREQ].get(name)
+        if not pre_jobs:
             # The job doesn't have any prerequisite jobs
             log_debug(f'Pre-conditions: {name} (True): no pre-conditions')
             return True
-        if not all(job.doc[cls.OUTFILE].get(x) for x in pre_jobs):
-            # The job has incomplete prerequisite jobs and has to wait
-            log_debug(
-                f'Pre-conditions: {name} (False): '
-                f'{[f"{x} ({job.doc[cls.OUTFILE].get(x)})" for x in pre_jobs]}'
-            )
-            return False
+        if cls.DRIVER is None:
+            return True
         args = cls.DRIVER.ARGS_TMPL[:]
         # Pass the outfiles of the prerequisite jobs to the current via cmd args
         # Please rearrange or modify the prerequisite jobs' input by subclassing
-        for pre in job.doc[cls.PREREQ][name]:
+        for pre_job in pre_jobs:
             index = args.index(FILE)
-            args[index] = job.doc[cls.OUTFILE][pre]
+            args[index] = job.doc[cls.OUTFILE][pre_job]
         job.doc.setdefault(cls.TARGS, {})[name] = args
         log_debug(f'Pre-conditions: {name} (True): {args}')
         return True

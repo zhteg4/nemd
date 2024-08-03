@@ -47,7 +47,7 @@ class Job(task.Job):
         """
         comments = [x for x in self.args if x.startswith(self.POUND)]
         comment = [x.strip(self.POUND).strip() for x in comments]
-        self.comment = symbols.COMMA.join(comment)
+        self.comment = symbols.SPACE.join(comment)
         self.args = [x for x in self.args if not x.startswith(self.POUND)]
 
     def setName(self):

@@ -66,12 +66,8 @@ class Integration(jobcontrol.Runner):
     TAG_KEYS = [SLOW]
     MSG = itestutils.ResultJob.MSG
 
-    def __init__(self, options, logger=None):
-        """
-        :param options 'argparse.Namespace': parsed commandline options.
-        :param logger 'logging.Logger': print to this logger if exists.
-        """
-        super().__init__(options, [], logger=logger)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.test_dirs = None
 
     def setTasks(self):
@@ -177,12 +173,10 @@ class Integration(jobcontrol.Runner):
         """
         Add jobs to the project.
         """
-
-        for test_dir in self.test_dirs:
-            statepoint = {self.STATE_ID: os.path.basename(test_dir)}
-            job = self.project.open_job(statepoint)
+        ids = [os.path.basename(x) for x in self.test_dirs]
+        super().addJobs(ids=ids)
+        for job, test_dir in zip(self.project.find_jobs(), self.test_dirs):
             job.document[itestutils.DIR] = test_dir
-            job.init()
             if self.options.check_only:
                 job.doc.pop(self.MSG)
 
@@ -264,7 +258,7 @@ def main(argv):
     jobname = environutils.get_jobname(JOBNAME)
     logger = logutils.createDriverLogger(jobname=jobname)
     logutils.logOptions(logger, options)
-    integration = Integration(options, logger=logger)
+    integration = Integration(options, argv, logger=logger)
     integration.run()
     log('Finished.', timestamp=True)
 
