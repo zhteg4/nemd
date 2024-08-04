@@ -59,11 +59,12 @@ class Job(BaseJob):
     """
 
     ARGS = jobutils.ARGS
-    TARGS = jobutils.TARGS
     SPECIAL_CHAR_RE = re.compile("[@!#%^&*()<>?|}{:]")
     QUOTED_RE = re.compile('^".*"$|^\'.*\'$')
     PRE_RUN = jobutils.RUN_NEMD
     SEP = symbols.SPACE
+    PREREQ = jobutils.PREREQ
+    OUTFILE = jobutils.OUTFILE
 
     def __init__(self, job, name=None, driver=None):
         """
@@ -89,9 +90,20 @@ class Job(BaseJob):
         """
         Set arguments.
         """
-        self.args = list(self.doc.get(self.TARGS, {}).get(self.name, []))
-        self.args += list(self.doc.get(self.ARGS, []))
-        self.args = [x for x in map(str, self.args) if x]
+        self.args = list(map(str, self.doc.get(self.ARGS, [])))
+        pre_jobs = self.doc[self.PREREQ].get(self.name)
+        if pre_jobs is None:
+            return
+        try:
+            args = self.driver.ARGS_TMPL[:]
+        except AttributeError:
+            return
+        # Pass the outfiles of the prerequisite jobs to the current via cmd args
+        # Please rearrange or modify the prerequisite jobs' input by subclassing
+        for pre_job in pre_jobs:
+            index = args.index(FILE)
+            args[index] = self.doc[self.OUTFILE][pre_job]
+        self.args = args + self.args
 
     def removeUnkArgs(self):
         """
@@ -179,8 +191,6 @@ class BaseTask:
     TIME_BREAKDOWN = 'Task timing breakdown:'
     SEP = symbols.SEP
     ARGS = jobutils.ARGS
-    TARGS = jobutils.TARGS
-    PREREQ = jobutils.PREREQ
     OUTFILE = jobutils.OUTFILE
     FINISHED = jobutils.FINISHED
     DRIVER_LOG = logutils.DRIVER_LOG
@@ -199,21 +209,6 @@ class BaseTask:
         :return: True if the pre-conditions are met
         :rtype: bool
         """
-        pre_jobs = job.doc[cls.PREREQ].get(name)
-        if not pre_jobs:
-            # The job doesn't have any prerequisite jobs
-            log_debug(f'Pre-conditions: {name} (True): no pre-conditions')
-            return True
-        if cls.DRIVER is None:
-            return True
-        args = cls.DRIVER.ARGS_TMPL[:]
-        # Pass the outfiles of the prerequisite jobs to the current via cmd args
-        # Please rearrange or modify the prerequisite jobs' input by subclassing
-        for pre_job in pre_jobs:
-            index = args.index(FILE)
-            args[index] = job.doc[cls.OUTFILE][pre_job]
-        job.doc.setdefault(cls.TARGS, {})[name] = args
-        log_debug(f'Pre-conditions: {name} (True): {args}')
         return True
 
     @classmethod
@@ -257,7 +252,7 @@ class BaseTask:
                with_job=True,
                name=None,
                attr='operator',
-               pre=None,
+               pre=False,
                post=None,
                aggregator=None,
                log=None,
@@ -265,6 +260,11 @@ class BaseTask:
                **kwargs):
         """
         Duplicate and return the operator with jobname and decorators.
+
+        NOTE: post-condition must be provided so that the current job can check
+        submission eligibility using post-condition of its prerequisite job.
+        On the other hand, the absence of pre-condition means the current is
+        eligible for submission as long as its prerequisite jobs are completed.
 
         :param cmd: Whether the aggregator function returns a command to run
         :type cmd: bool
