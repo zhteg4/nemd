@@ -22,7 +22,7 @@ from nemd import environutils
 
 FlAG_LMP_LOG = 'lmp_log'
 FLAG_DATA_FILE = parserutils.FLAG_DATA_FILE
-FLAG_TASK = '-task'
+FLAG_TASK = jobutils.FLAG_TASK
 FLAG_LAST_PCT = '-last_pct'
 FLAG_SLICE = '-slice'
 

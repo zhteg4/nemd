@@ -15,6 +15,8 @@ from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
 from nemd import lammpsin
+from nemd import analyzer
+from nemd import timeutils
 from nemd import environutils
 
 FILE = jobutils.FILE
@@ -31,26 +33,42 @@ def log_debug(msg):
 
 class BaseJob:
 
+    ARGS = jobutils.ARGS
     STATE_ID = jobutils.STATE_ID
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
     PRE_RUN = None
 
-    def __init__(self, job, name=None, **kwargs):
+    def __init__(self, job, name=None, logger=None, **kwargs):
         """
         :param job: the signac job instance
         :type job: 'signac.contrib.job.Job'
         :param name: the jobname
         :type name: str
+        :param logger:  print to this logger
+        :type logger: 'logging.Logger'
         """
         self.job = job
         self.name = name
+        self.logger = logger
         self.doc = self.job.document
 
-    def run(self):
+    def log(self, msg, timestamp=False):
         """
-        Override this method to run the job.
+        Log message to the logger.
+
+        :param logger:  print to this logger
+        :type logger: 'logging.Logger'
+        :param msg: the message to be printed out
+        :type msg: str
+        :param timestamp: append time information after the message
+        :type timestamp: bool
         """
-        pass
+        if self.logger is None:
+            print(msg)
+            return
+        self.logger.info(msg)
+        if timestamp:
+            self.logger.info(timeutils.ctime())
 
 
 class Job(BaseJob):
@@ -58,7 +76,6 @@ class Job(BaseJob):
     The class to setup a run_nemd driver job in a workflow.
     """
 
-    ARGS = jobutils.ARGS
     SPECIAL_CHAR_RE = re.compile("[@!#%^&*()<>?|}{:]")
     QUOTED_RE = re.compile('^".*"$|^\'.*\'$')
     PRE_RUN = jobutils.RUN_NEMD
@@ -185,7 +202,6 @@ class BaseTask:
     TIME = 'time'
     STATE_ID = jobutils.STATE_ID
     TIME_BREAKDOWN = 'Task timing breakdown:'
-    SEP = symbols.SEP
     ARGS = jobutils.ARGS
     OUTFILE = jobutils.OUTFILE
     FINISHED = jobutils.FINISHED
@@ -250,8 +266,7 @@ class BaseTask:
                pre=False,
                post=None,
                aggregator=None,
-               log=None,
-               tname=None,
+               logger=None,
                **kwargs):
         """
         Duplicate and return the operator with jobname and decorators.
@@ -275,10 +290,8 @@ class BaseTask:
         :type post: bool
         :param aggregator: the criteria to collect jobs
         :type aggregator: 'flow.aggregates.aggregator'
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :param tname: aggregate the job tasks of this name
-        :type tname: str
+        :param logger:  print to this logger
+        :type logger: 'logging.Logger'
         :return: the operation to execute
         :rtype: 'function'
         :raise ValueError: the function cannot be found
@@ -299,10 +312,8 @@ class BaseTask:
 
         # Pass jobname, taskname, and logging function
         kwargs.update({'name': name})
-        if tname:
-            kwargs['tname'] = tname
-        if log:
-            kwargs['log'] = log
+        if logger:
+            kwargs['logger'] = logger
         func = functools.update_wrapper(functools.partial(opr, **kwargs), opr)
         func.__name__ = name
         func = FlowProject.operation(cmd=cmd,
@@ -323,16 +334,16 @@ class BaseTask:
         return func
 
     @classmethod
-    def aggregator(cls, *jobs, log=None, **kwargs):
+    def aggregator(cls, *jobs, logger=None, **kwargs):
         """
         The aggregator job task to report the time cost of each task.
 
         :param jobs: the task jobs the aggregator collected
         :type jobs: list of 'signac.contrib.job.Job'
-        :param log: the function to print user-facing information
-        :type log: 'function'
+        :param logger:  print to this logger
+        :type logger: 'logging.Logger'
         """
-        log(BaseTask.TIME_BREAKDOWN)
+        logger.info(BaseTask.TIME_BREAKDOWN)
         info = collections.defaultdict(list)
         for job in jobs:
             for tname, filename in job.doc[jobutils.LOGFILE].items():
@@ -348,7 +359,7 @@ class BaseTask:
                 f"{humanfriendly.format_timespan(x.delta)} ({x.id[:4]})"
                 for x in tinfo
             ]
-            log(f"{tname}: {', '.join(deltas)}; {ave} (ave)")
+            logger.info(f"{tname}: {', '.join(deltas)}; {ave} (ave)")
 
     @classmethod
     def getAgg(cls,
@@ -356,9 +367,7 @@ class BaseTask:
                with_job=False,
                name=None,
                attr='aggregator',
-               pre=False,
                post=None,
-               log=None,
                tname=None,
                **kwargs):
         """
@@ -372,12 +381,8 @@ class BaseTask:
         :type name: str
         :param attr: the attribute name of a staticmethod method or callable function
         :type attr: str or types.FunctionType
-        :param pre: add pre-condition for the aggregator if True
-        :type pre: bool
         :param post: add post-condition for the aggregator if True
         :type post: bool
-        :param log: the function to print user-facing information
-        :type log: 'function'
         :param tname: aggregate the job tasks of this name
         :type tname: str
         :return: the operation to execute
@@ -385,15 +390,14 @@ class BaseTask:
         """
         if post is None:
             post = cls.postAgg
+        if tname:
+            name = f"{name}{symbols.POUND_SEP}{tname}"
         return cls.getOpr(aggregator=aggregator(),
                           cmd=cmd,
                           with_job=with_job,
                           name=name,
                           attr=attr,
-                          pre=pre,
                           post=post,
-                          log=log,
-                          tname=tname,
                           **kwargs)
 
     @classmethod
@@ -475,6 +479,39 @@ class DumpJob(PostLmpJob):
         self.args = [dump_file] + self.getDataFile() + self.args[1:]
 
 
+class DumpAgg(BaseJob):
+
+    TASK = jobutils.FLAG_TASK.lower()[1:]
+
+    def __init__(self, *jobs, **kwargs):
+        """
+        """
+        super().__init__(jobs[0], **kwargs)
+        self.jobs = jobs
+        jobname, self.subname = self.name.split(symbols.POUND_SEP)
+        inav = jobutils.get_arg(self.doc[self.ARGS], jobutils.FLAG_INTERACTIVE)
+        self.options = SimpleNamespace(jobname=jobname, interactive=inav)
+        self.tasks = jobutils.get_arg(self.doc[self.ARGS],
+                                      jobutils.FLAG_TASK,
+                                      first=False)
+
+    def run(self):
+        """
+        Combine multiple outfiles from the same task into one.
+        """
+        self.log(f"{len(self.jobs)} jobs found for aggregation.")
+        for task in self.tasks:
+            Analyzer = analyzer.ANALYZER[task]
+            if Analyzer in analyzer.NO_COMBINE:
+                continue
+            filename = Analyzer.getFilename(self.subname)
+            files = [x.fn(filename) for x in self.jobs]
+            anlz = Analyzer(options=self.options,
+                            logger=self.logger,
+                            files=files)
+            anlz.run()
+
+
 class Custom_Dump(BaseTask):
 
     import custom_dump_driver as DRIVER
@@ -482,35 +519,13 @@ class Custom_Dump(BaseTask):
     RESULTS = DRIVER.CustomDump.RESULTS
 
     @classmethod
-    def aggregator(cls, *jobs, log=None, name=None, tname=None, **kwargs):
+    def aggregator(cls, *args, **kwargs):
         """
-        The aggregator job task that combines the output files of a custom dump
-        task.
-
-        :param jobs: the task jobs the aggregator collected
-        :type jobs: list of 'signac.contrib.job.Job'
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :param name: the jobname based on which output files are named
-        :type name: str
-        :param tname: aggregate the job tasks of this name
-        :type tname: str
+        The aggregator job task that aggregator the output files of a custom
+        dump task.
         """
-        log(f"{len(jobs)} jobs found for aggregation.")
-        job = jobs[0]
-        logfile = job.fn(job.document[jobutils.OUTFILE][tname])
-        outfiles = cls.DRIVER.CustomDump.getOutfiles(logfile)
-        if kwargs.get(jobutils.FLAG_CLEAN[1:]):
-            jname = name.split(BaseTask.SEP)[0]
-            for filename in outfiles.values():
-                try:
-                    os.remove(filename.replace(tname, jname))
-                except FileNotFoundError:
-                    pass
-        outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
-        jname = name.split(BaseTask.SEP)[0]
-        inav = environutils.is_interactive()
-        cls.DRIVER.CustomDump.combine(outfiles, log, jname, inav=inav)
+        agg = DumpAgg(*args, **kwargs)
+        agg.run()
 
     @classmethod
     def postAgg(cls, *jobs, name=None):
@@ -525,8 +540,7 @@ class Custom_Dump(BaseTask):
         :return: the label after job completion
         :rtype: str
         """
-
-        jname = name.split(cls.SEP)[0]
+        jname = name.split(symbols.POUND_SEP)[0]
         logfile = jname + logutils.DRIVER_LOG
         try:
             line = sh.grep(cls.RESULTS, logfile)

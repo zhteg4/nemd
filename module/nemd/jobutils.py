@@ -26,6 +26,7 @@ FLAG_JTYPE = '-jtype'
 FLAG_CPU = '-cpu'
 FLAG_PRJ_PATH = '-prj_path'
 PREREQ = 'prereq'
+FLAG_TASK = '-task'
 
 FINISHED = 'Finished.'
 FILE = "$FILE"
@@ -35,7 +36,7 @@ AGGREGATOR = 'aggregator'
 STATE_ID = 'state_id'
 
 
-def get_arg(args, flag, val=None):
+def get_arg(args, flag, val=None, first=True):
     """
     Get the value after the flag in command arg list.
 
@@ -45,15 +46,25 @@ def get_arg(args, flag, val=None):
     :type flag: str
     :param val: the default value if the flag doesn't exist
     :type val: str
-    :return: the value after the flag
-    :rtype: str
+    :param first: only return the first value after the flag
+    :type first: bool
+    :return: the value(s) after the flag
+    :rtype: str or list
     """
     try:
         idx = args.index(flag)
     except ValueError:
         return val
-    else:
+
+    if first:
         return args[idx + 1]
+
+    selected = []
+    for delta, arg in enumerate(args[idx + 1:]):
+        if arg.startswith('-'):
+            break
+        selected.append(arg)
+    return selected
 
 
 def set_arg(args, flag, val):

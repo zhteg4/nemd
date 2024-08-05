@@ -106,11 +106,9 @@ class Runner(jobcontrol.Runner):
         Aggregate post analysis jobs.
         """
         super().setAggregation()
-        name = f"{self.options.jobname}{self.SEP}{self.CUSTOM_DUMP}"
-        Custom_Dump.getAgg(name=name,
+        Custom_Dump.getAgg(name=self.options.jobname,
                            tname=self.CUSTOM_DUMP,
-                           log=log,
-                           clean=self.options.clean)
+                           logger=logger)
 
 
 def get_parser():

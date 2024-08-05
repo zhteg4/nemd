@@ -6,6 +6,7 @@ import pathlib
 import wurlitzer
 import contextlib
 
+from nemd import symbols
 from nemd import environutils
 from nemd import timeutils
 from nemd import jobutils
@@ -16,6 +17,11 @@ FINISHED = 'Finished.'
 START = 'start'
 END = 'end'
 DELTA = 'delta'
+COMMAND_OPTIONS = 'Command Options'
+COMMAND_OPTIONS_START = f"." * 10 + COMMAND_OPTIONS + f"." * 10
+COMMAND_OPTIONS_END = f"." * (20 + len(COMMAND_OPTIONS))
+COLON_SEP = f'{symbols.COLON} '
+COMMA_SEP = f'{symbols.COMMA} '
 
 
 class FileHandler(logging.FileHandler):
@@ -147,14 +153,13 @@ def logOptions(logger, options):
     :param options: command-line options
     :type options: 'argparse.Namespace'
     """
-    command_options = 'Command Options'
-    logger.info(f"." * 10 + command_options + f"." * 10)
+    logger.info(COMMAND_OPTIONS_START)
     for key, val in options.__dict__.items():
         if type(val) is list:
-            val = ', '.join(map(str, val))
-        logger.info(f"{key}: {val}")
+            val = COMMA_SEP.join(map(str, val))
+        logger.info(f"{key}{COLON_SEP}{val}")
     logger.info(f"{JOBSTART} {timeutils.ctime()}")
-    logger.info(f"." * (20 + len(command_options)))
+    logger.info(COMMAND_OPTIONS_END)
 
 
 def log(logger, msg, timestamp=False):
@@ -171,6 +176,73 @@ def log(logger, msg, timestamp=False):
     logger.info(msg)
     if timestamp:
         logger.info(timeutils.ctime())
+
+
+@contextlib.contextmanager
+def redirect(*args, logger=None, **kwargs):
+    """
+    Redirecting all kinds of stdout in Python via wurlitzer
+    https://eli.thegreenplace.net/2015/redirecting-all-kinds-of-stdout-in-python/
+
+    :param logger 'logging.Logger': the logger to print the out and err messages.
+    """
+    out, err = io.StringIO(), io.StringIO()
+    try:
+        with wurlitzer.pipes(out, err):
+            yield None
+    finally:
+        if logger is None:
+            return
+        out = out.getvalue()
+        if out:
+            logger.warning(out)
+        err = err.getvalue()
+        if err:
+            logger.warning(err)
+
+
+class LogReader:
+    """
+    A class to read the log file.
+    """
+    JOBNAME = jobutils.FLAG_JOBNAME.lower()[1:]
+    TASK = jobutils.FLAG_TASK.lower()[1:]
+
+    def __init__(self, filepath):
+        self.filepath = filepath
+        self.lines = []
+        self.options = {}
+        self.sidx = None
+
+    def run(self):
+        self.read()
+        self.setOptions()
+
+    def read(self):
+        with open(self.filepath, 'r') as fh:
+            self.lines = [x.strip() for x in fh.readlines()]
+
+    def setOptions(self):
+        block = None
+        for idx, line in enumerate(self.lines):
+            if line == COMMAND_OPTIONS_END:
+                self.sidx = idx + 1
+                break
+            if block is not None:
+                block.append(line)
+            if line == COMMAND_OPTIONS_START:
+                block = []
+        for line in block:
+            key, val = line.split(COLON_SEP)
+            vals = val.split(COMMA_SEP)
+            self.options[key] = val if len(vals) == 1 else vals
+
+    def getOptions(self, key=JOBNAME):
+        return self.options.get(key)
+
+    def getTasks(self):
+        tasks = self.getOptions(key=self.TASK)
+        return tasks if isinstance(tasks, list) else [tasks]
 
 
 def get_time(filepath, dtype=DELTA):
@@ -198,26 +270,3 @@ def get_time(filepath, dtype=DELTA):
         return dtime
     delta = dtime - stime
     return delta
-
-
-@contextlib.contextmanager
-def redirect(*args, logger=None, **kwargs):
-    """
-    Redirecting all kinds of stdout in Python via wurlitzer
-    https://eli.thegreenplace.net/2015/redirecting-all-kinds-of-stdout-in-python/
-
-    :param logger 'logging.Logger': the logger to print the out and err messages.
-    """
-    out, err = io.StringIO(), io.StringIO()
-    try:
-        with wurlitzer.pipes(out, err):
-            yield None
-    finally:
-        if logger is None:
-            return
-        out = out.getvalue()
-        if out:
-            logger.warning(out)
-        err = err.getvalue()
-        if err:
-            logger.warning(err)

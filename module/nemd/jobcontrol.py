@@ -25,7 +25,6 @@ class Runner:
     COMPLETED = 'completed'
     OPERATIONS = 'operations'
     JOB_ID = 'job_id'
-    SEP = symbols.SEP
 
     def __init__(self, options, argv, logger=None):
         """
@@ -183,7 +182,7 @@ class Runner:
         """
         Collect jobs and analyze for statics, chemical space, and states.
         """
-        BaseTask.getAgg(log=self.log, name=self.options.jobname)
+        BaseTask.getAgg(logger=self.logger, name=self.options.jobname)
 
     def runAggregation(self):
         """

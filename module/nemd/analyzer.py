@@ -29,7 +29,12 @@ class Base:
     INDEX_LB = TIME_LB
     RESULTS = 'Results for '
 
-    def __init__(self, sidx=None, df_reader=None, options=None, logger=None):
+    def __init__(self,
+                 sidx=None,
+                 df_reader=None,
+                 options=None,
+                 logger=None,
+                 files=None):
         """
         :param sidx: the starting frame index after excluding the first xxx pct
         :type sidx: int
@@ -39,22 +44,35 @@ class Base:
         :type options: 'argparse.Namespace'
         :param logger: the logger to log messages
         :type logger: 'logging.Logger'
+        :param files: the data are read from these files
+        :type files: list
         """
         self.sidx = sidx
         self.df_reader = df_reader
         self.options = options
         self.logger = logger
+        self.files = files
         self.data = None
-        self.outfile = f"{self.options.jobname}_{self.NAME}{self.DATA_EXT}"
+        self.outfile = self.getFilename(self.options.jobname)
         jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
+
+    @classmethod
+    def getFilename(cls, name):
+        """
+        :param name: jobname
+        :type name: str
+        :return str: the filename of the data file.
+        """
+        return f"{name}_{cls.NAME}{cls.DATA_EXT}"
 
     def run(self):
         """
         Main method to run the analyzer.
         """
+        self.read()
         self.setData()
         self.saveData()
-        sidx, eidx = self.fit(self.data, log=self.log)
+        sidx, eidx = self.fit()
         self.plot(self.data,
                   inav=self.options.interactive,
                   sidx=sidx,
@@ -62,11 +80,34 @@ class Base:
                   jobname=self.options.jobname,
                   log=self.log)
 
+    def read(self):
+        """
+        Read the output files to set the data.
+        """
+        if self.files is None:
+            return
+        datas = [pd.read_csv(x, index_col=0) for x in self.files]
+        frm_num = min([x.shape[0] for x in datas])
+        iname = min(datas, key=lambda x: x.shape[0]).index.name
+        datas = [x.iloc[-frm_num:] for x in datas]
+        xvals = [x.index.to_numpy().reshape(-1, 1) for x in datas]
+        xvals = np.concatenate(xvals, axis=1)
+        x_ave = xvals.mean(axis=1).reshape(-1, 1)
+        yvals = [x.iloc[:, 0].to_numpy().reshape(-1, 1) for x in datas]
+        yvals = np.concatenate(yvals, axis=1)
+        y_std = yvals.std(axis=1).reshape(-1, 1)
+        y_mean = yvals.mean(axis=1).reshape(-1, 1)
+        data = np.concatenate((x_ave, y_mean, y_std), axis=1)
+        self.data = pd.DataFrame(data[:, 1:], index=data[:, 0])
+        cname, num = datas[0].columns[0], len(datas)
+        self.data.columns = [f'{cname} (num={num})', f'std (num={num})']
+        self.data.index.name = iname
+
     def setData(self):
         """
-        Set the data. Must be over-written by the subclass.
+        Set the data.
         """
-        raise NotImplemented
+        pass
 
     def saveData(self, float_format='%.4g'):
         """
@@ -79,28 +120,25 @@ class Base:
         self.data.to_csv(self.outfile, float_format=float_format)
         self.log(f'{self.DESCR.capitalize()} data written into {self.outfile}')
 
-    @classmethod
-    def fit(cls, data, log=None):
+    def fit(self):
         """
         Select the data and report average with std.
 
-        :param data 'pandas.core.frame.DataFrame': time vs data
-        :param log 'function': the function to print user-facing information
         :return int, int: the start and end index for the selected data
         """
-        if data.empty:
+        if self.data.empty:
             return 0, None
-        sidx = int(cls.TIME_RE.match(data.index.name).groups()[1])
-        sel = data.iloc[sidx:]
+        sidx = int(self.TIME_RE.match(self.data.index.name).groups()[1])
+        sel = self.data.iloc[sidx:]
         ave = sel.mean().iloc[0]
         std = sel.std().iloc[0] if sel.shape[1] == 1 else sel.mean().iloc[1]
-        label, unit = cls.COLUMN_RE.match(data.columns[0]).groups()
-        if cls.COLUMN_RE.match(label):
+        label, unit = self.COLUMN_RE.match(self.data.columns[0]).groups()
+        if self.COLUMN_RE.match(label):
             # 'Density (g/cm^3) (num=4)' as data.columns[0]
-            label, unit = cls.COLUMN_RE.match(label).groups()
-        log(f'{label}: {ave:.4g} {symbols.PLUS_MIN} {std:.4g} {unit} '
-            f'{symbols.ELEMENT_OF} [{data.index[sidx]:.4f}, '
-            f'{data.index[-1]:.4f}] ps')
+            label, unit = self.COLUMN_RE.match(label).groups()
+        self.log(f'{label}: {ave:.4g} {symbols.PLUS_MIN} {std:.4g} {unit} '
+                 f'{symbols.ELEMENT_OF} [{self.data.index[sidx]:.4f}, '
+                 f'{self.data.index[-1]:.4f}] ps')
         return sidx, None
 
     @classmethod
@@ -171,49 +209,6 @@ class Base:
             jobutils.add_outfile(fname, jobname=jobname)
         log(f'{cls.DESCR.capitalize()} figure saved as {fname}')
 
-    @classmethod
-    def read(cls, jobname, files=None, log=None, float_format='%.4g'):
-        """
-        Read the output file based on jobname or input files.
-
-        :param jobname: the jobname based on which output file is searched
-        :type jobname: str
-        :param files: the output files from analyzers
-        :type files: list of str
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :param float_format str: the format to save float
-        :return: x values, y average, y standard deviation
-        :rtype: 'pandas.core.frame.DataFrame'
-        """
-        filename = f"{jobname}_{ cls.NAME}{cls.DATA_EXT}"
-        if os.path.exists(filename):
-            data = pd.read_csv(filename, index_col=0)
-            log(f"{cls.RESULTS}{cls.DESCR} found as {filename}")
-            return data
-        if files is None:
-            return
-        datas = [pd.read_csv(x, index_col=0) for x in files]
-        frm_num = min([x.shape[0] for x in datas])
-        iname = min(datas, key=lambda x: x.shape[0]).index.name
-        datas = [x.iloc[-frm_num:] for x in datas]
-        xvals = [x.index.to_numpy().reshape(-1, 1) for x in datas]
-        xvals = np.concatenate(xvals, axis=1)
-        x_ave = xvals.mean(axis=1).reshape(-1, 1)
-        yvals = [x.iloc[:, 0].to_numpy().reshape(-1, 1) for x in datas]
-        yvals = np.concatenate(yvals, axis=1)
-        y_std = yvals.std(axis=1).reshape(-1, 1)
-        y_mean = yvals.mean(axis=1).reshape(-1, 1)
-        data = np.concatenate((x_ave, y_mean, y_std), axis=1)
-        data = pd.DataFrame(data[:, 1:], index=data[:, 0])
-        cname, num = datas[0].columns[0], len(datas)
-        data.columns = [f'{cname} (num={num})', f'std (num={num})']
-        data.index.name = iname
-        data.to_csv(filename, float_format=float_format)
-        jobutils.add_outfile(filename, jobname=jobname)
-        log(f"{cls.RESULTS}{cls.DESCR} saved to {filename}")
-        return data
-
     def log(self, msg):
         """
         Print this message into the log file as information.
@@ -253,7 +248,7 @@ class TrajBase(Base):
     The base class for trajectory analyzers.
     """
 
-    def __init__(self, time, frms, gids=None, **kwargs):
+    def __init__(self, time=None, frms=None, gids=None, **kwargs):
         """
         :param time: time array
         :type time: 'numpy.ndarray'
@@ -283,6 +278,8 @@ class Density(TrajBase):
         """
         Set the time vs density data.
         """
+        if self.data is not None:
+            return
         mass = self.df_reader.molecular_weight / constants.Avogadro
         mass_scaled = mass / (constants.angstrom / constants.centi)**3
         data = [mass_scaled / x.volume for x in self.frms]
@@ -311,6 +308,8 @@ class RDF(TrajBase):
             all the neighbors are counted when the cell is not significantly
              larger than the LJ cutoff.
         """
+        if self.data is not None:
+            return
         if len(self.gids) < 2:
             self.log_warning("RDF requires least two atoms selected.")
             self.data = pd.DataFrame(data={self.LABEL: []})
@@ -394,6 +393,8 @@ class MSD(TrajBase):
         """
         Set the mean squared displacement and diffusion coefficient.
         """
+        if self.data is not None:
+            return
         if not self.gids:
             self.log_warning("No atoms selected for MSD.")
             self.data = pd.DataFrame({self.LABEL: []})
@@ -458,6 +459,8 @@ class Clash(TrajBase):
         """
         Set the time vs clash number.
         """
+        if self.data is not None:
+            return
         if not self.gids:
             self.log_warning("No atoms selected for clash counting.")
             self.data = pd.DataFrame({self.LABEL: []})
@@ -541,6 +544,8 @@ class Thermo(Base):
         """
         Select data by thermo task names.
         """
+        if self.data is not None:
+            return
         sel_cols = [
             x for x in self.thermo.columns
             if self.COLUMN_RE.match(x).groups()[0] in self.tasks
@@ -556,7 +561,6 @@ class Thermo(Base):
         self.data.to_csv(self.outfile, float_format=float_format)
         self.log(f'{self.tasks} information written into {self.outfile}')
 
-    @classmethod
     def fit(self, data, log=None):
         """
         Fit the data and report.
@@ -568,7 +572,7 @@ class Thermo(Base):
         :return int, int: the start and end index for the selected data
         """
         for column in data.columns:
-            sidx, eidx = super().fit(data[column].to_frame(), log=log)
+            sidx, eidx = super().fit(data[column].to_frame())
         return sidx, eidx
 
     @classmethod
@@ -584,3 +588,8 @@ class Thermo(Base):
         for column in data.columns:
             df = data[column].to_frame()
             super().plot(df, jobname, use_column=True, *args, **kwargs)
+
+
+ANALYZER = [Density, RDF, MSD, Clash, View, XYZ]
+ANALYZER = {getattr(x, 'NAME'): x for x in ANALYZER}
+NO_COMBINE = [View, XYZ]
