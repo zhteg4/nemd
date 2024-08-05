@@ -30,8 +30,6 @@ PREREQ = 'prereq'
 FINISHED = 'Finished.'
 FILE = "$FILE"
 ARGS = 'args'
-KNOWN_ARGS = 'known_args'
-FN_DOCUMENT = job.Job.FN_DOCUMENT
 TASK = 'task'
 AGGREGATOR = 'aggregator'
 STATE_ID = 'state_id'
@@ -82,7 +80,7 @@ def add_outfile(outfile,
                 jobname=None,
                 default_jobname=None,
                 job=None,
-                document=FN_DOCUMENT,
+                document=job.Job.FN_DOCUMENT,
                 set_file=False,
                 log_file=False):
     """

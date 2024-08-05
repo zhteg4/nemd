@@ -182,19 +182,14 @@ class BaseTask:
     The task base class.
     """
     JobClass = Job
-    ID = 'id'
     TIME = 'time'
-    STIME = 'stime'
-    ETIME = 'etime'
     STATE_ID = jobutils.STATE_ID
-    TIME_REPORTED = 'time_reported'
     TIME_BREAKDOWN = 'Task timing breakdown:'
     SEP = symbols.SEP
     ARGS = jobutils.ARGS
     OUTFILE = jobutils.OUTFILE
     FINISHED = jobutils.FINISHED
     DRIVER_LOG = logutils.DRIVER_LOG
-    KNOWN_ARGS = jobutils.KNOWN_ARGS
     DRIVER = None
 
     @classmethod
@@ -337,7 +332,6 @@ class BaseTask:
         :param log: the function to print user-facing information
         :type log: 'function'
         """
-
         log(BaseTask.TIME_BREAKDOWN)
         info = collections.defaultdict(list)
         for job in jobs:
@@ -419,7 +413,7 @@ class BaseTask:
             sh.grep(cls.TIME_BREAKDOWN, log_file)
         except sh.ErrorReturnCode_1:
             return False
-        return cls.TIME_REPORTED
+        return True
 
     @staticmethod
     def suppress(parser, to_supress=None):

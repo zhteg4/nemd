@@ -737,7 +737,7 @@ def main(argv):
     logutils.logOptions(logger, options)
     cell = AmorphousCell(options)
     cell.run()
-    log('Finished.', timestamp=True)
+    log(jobutils.FINISHED, timestamp=True)
 
 
 if __name__ == "__main__":

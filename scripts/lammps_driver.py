@@ -228,7 +228,7 @@ def main(argv):
     logutils.logOptions(logger, options)
     lmp = Lammps(options)
     lmp.run()
-    log('Finished.', timestamp=True)
+    log(jobutils.FINISHED, timestamp=True)
 
 
 if __name__ == "__main__":

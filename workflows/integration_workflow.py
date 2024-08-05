@@ -19,6 +19,7 @@ import datetime
 
 from nemd import symbols
 from nemd import logutils
+from nemd import jobutils
 from nemd import itestutils
 from nemd import jobcontrol
 from nemd import parserutils
@@ -260,7 +261,7 @@ def main(argv):
     logutils.logOptions(logger, options)
     integration = Integration(options, argv, logger=logger)
     integration.run()
-    log('Finished.', timestamp=True)
+    log(jobutils.FINISHED, timestamp=True)
 
 
 if __name__ == "__main__":

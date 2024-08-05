@@ -188,7 +188,7 @@ def main(argv):
     reciprocal.run()
     log_file = os.path.basename(logger.handlers[0].baseFilename)
     jobutils.add_outfile(log_file, options.jobname, set_file=True)
-    log('Finished.', timestamp=True)
+    log(jobutils.FINISHED, timestamp=True)
 
 
 if __name__ == "__main__":
