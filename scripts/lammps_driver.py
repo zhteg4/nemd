@@ -3,8 +3,8 @@ This runs lammps executable with the given input file and output file.
 """
 import os
 import re
+import sh
 import sys
-import lammps
 import subprocess
 
 from nemd import symbols
@@ -60,6 +60,10 @@ class Lammps:
     def __init__(self, options):
         self.options = options
         self.args = []
+        self.outfile = self.options.jobname + self.LOG
+        jobutils.add_outfile(self.outfile,
+                             jobname=self.options.jobname,
+                             set_file=True)
 
     def run(self):
         """
@@ -73,9 +77,20 @@ class Lammps:
         """
         Set the arguments for the lammps executable.
         """
-        file = self.options.jobname + self.LOG
-        self.args += [FLAG_LOG, file, FLAG_SCREEN, self.options.screen]
-        jobutils.add_outfile(file, jobname=self.options.jobname, set_file=True)
+        self.args += [FLAG_LOG, self.outfile, FLAG_SCREEN, self.options.screen]
+        info = sh.grep(lammpsin.In.READ_DATA, self.options.inscript)
+        if not info:
+            return
+        inscript = os.path.basename(self.options.inscript)
+        if os.path.isfile(inscript):
+            return
+        with open(self.options.inscript, 'r') as fh:
+            original_contents = fh.read()
+            read_data = f'{lammpsin.In.READ_DATA} {self.options.data_file}'
+            contents = original_contents.replace(info, read_data)
+        with open(inscript, 'w') as fh:
+            fh.writelines(contents)
+        self.options.inscript = inscript
 
     def setGpu(self):
         """
@@ -91,16 +106,27 @@ class Lammps:
         Run lammps executable with the given input file and output file.
         """
         log('Running lammps simulations...')
-        with logutils.redirect(logger=logger):
-            # "[xxx.local:xxx] shmem: mmap: an error occurred while determining
-            # whether or not xxx could be created." while lammps.lammps()
-            lmp = lammps.lammps(cmdargs=self.args)
-            with open(self.options.inscript, 'r') as fh:
-                cmds = fh.readlines()
-                rdata = f'{lammpsin.In.READ_DATA} {self.options.data_file}'
-                cmds = [rdata if self.READ_DATA.match(x) else x for x in cmds]
-                lmp.commands_list(cmds)
-            lmp.close()
+        cmd = [self.LMP_SERIAL, '-in', self.options.inscript] + self.args
+        cmd = symbols.SPACE.join(cmd)
+        info = subprocess.run(cmd, capture_output=True, shell=True)
+        if info.stderr:
+            log('WARNING:' + info.stderr.decode('utf-8'))
+        if info.stdout:
+            log(info.stdout.decode('utf-8'))
+        # https://docs.lammps.org/jump.html
+        # The SELF option is not guaranteed to work when the current input
+        # script is being read through stdin (standard input), e.g.
+        # with logutils.redirect(logger=logger):
+        #     # "[xxx.local:xxx] shmem: mmap: an error occurred while determining
+        #     # whether or not xxx could be created." while lammps.lammps()
+        #     lmp = lammps.lammps(cmdargs=self.args)
+        # with open(self.options.inscript, 'r') as fh:
+        #     cmds = fh.readlines()
+        #     rdata = f'{lammpsin.In.READ_DATA} {self.options.data_file}'
+        #     cmds = [rdata if self.READ_DATA.match(x) else x for x in cmds]
+        #     breakpoint()
+        #     lmp.commands_list(cmds)
+        # lmp.close()
 
 
 def get_parser(parser=None):

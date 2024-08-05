@@ -1144,6 +1144,8 @@ class Struct(structure.Struct, lammpsin.In):
         """
         if self.options.rigid_bond is None and self.options.rigid_angle is None:
             self.options.rigid_bond, self.options.rigid_angle = self.getRigid()
+        if self.atom_total == 1:
+            self.options.temp = 0
         single_molecule = self.conformer_total == 1
         small_molecule = self.atom_total < 100
         single_point_energy = not self.options.temp

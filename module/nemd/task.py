@@ -452,28 +452,40 @@ class Lammps(BaseTask):
     import lammps_driver as DRIVER
 
 
-class Custom_Dump(BaseTask):
+class PostLmpJob(Job):
+    """
+    The base class for post-processing LAMMPS jobs.
+    """
 
-    import custom_dump_driver as DRIVER
-    CUSTOM_EXT = lammpsin.In.CUSTOM_EXT
-    DUMP = lammpsin.In.DUMP
-    READ_DATA = lammpsin.In.READ_DATA
     DATA_EXT = lammpsin.In.DATA_EXT
-    RESULTS = DRIVER.CustomDump.RESULTS
+    READ_DATA = lammpsin.In.READ_DATA
+
+    def getDataFile(self):
+        data_cmd = sh.grep(self.READ_DATA, self.args[0]).split()
+        files = [x for x in data_cmd if x.endswith(self.DATA_EXT)]
+        return [self.driver.FLAG_DATA_FILE, files[0]] if files else []
+
+
+class DumpJob(PostLmpJob):
+
+    DUMP = lammpsin.In.DUMP
+    CUSTOM_EXT = lammpsin.In.CUSTOM_EXT
 
     def setArgs(self):
         """
-        Set the args for custom dump task.
+        Set arguments to analyze the custom dump file.
         """
         super().setArgs()
-        log_file = self.doc[self.KNOWN_ARGS][0]
-        dump_cmd = sh.grep(self.DUMP, log_file).split()
+        dump_cmd = sh.grep(self.DUMP, self.args[0]).split()
         dump_file = [x for x in dump_cmd if x.endswith(self.CUSTOM_EXT)][0]
-        data_cmd = sh.grep(self.READ_DATA, log_file).split()
-        data_file = [x for x in data_cmd if x.endswith(self.DATA_EXT)][0]
-        args = [dump_file, self.DRIVER.FLAG_DATA_FILE, data_file]
-        args += list(self.doc[self.KNOWN_ARGS])[1:]
-        self.doc[self.KNOWN_ARGS] = args
+        self.args = [dump_file] + self.getDataFile() + self.args[1:]
+
+
+class Custom_Dump(BaseTask):
+
+    import custom_dump_driver as DRIVER
+    JobClass = DumpJob
+    RESULTS = DRIVER.CustomDump.RESULTS
 
     @classmethod
     def aggregator(cls, *jobs, log=None, name=None, tname=None, **kwargs):
@@ -533,24 +545,21 @@ class Custom_Dump(BaseTask):
         return f'{len(filenames)} files found'
 
 
-class Lmp_Log(BaseTask):
-
-    import lmp_log_driver as DRIVER
-    READ_DATA = lammpsin.In.READ_DATA
-    DATA_EXT = lammpsin.In.DATA_EXT
-    RESULTS = DRIVER.LmpLog.RESULTS
+class LogJob(PostLmpJob):
 
     def setArgs(self):
         """
-        Set the args for lmp log task.
+        Set arguments to analyze the log file.
         """
         super().setArgs()
-        log_file = self.doc[self.KNOWN_ARGS][0]
-        data_cmd = sh.grep(self.READ_DATA, log_file).split()
-        data_file = [x for x in data_cmd if x.endswith(self.DATA_EXT)][0]
-        args = [log_file, self.DRIVER.FLAG_DATA_FILE, data_file]
-        args += list(self.doc[self.KNOWN_ARGS])[1:]
-        self.doc[self.KNOWN_ARGS] = args
+        self.args = self.args[:1] + self.getDataFile() + self.args[1:]
+
+
+class Lmp_Log(BaseTask):
+
+    import lmp_log_driver as DRIVER
+    JobClass = LogJob
+    RESULTS = DRIVER.LmpLog.RESULTS
 
     @classmethod
     def aggregator(cls, *jobs, log=None, name=None, tname=None, **kwargs):
