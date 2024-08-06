@@ -21,7 +21,7 @@ COMMAND_OPTIONS = 'Command Options'
 COMMAND_OPTIONS_START = f"." * 10 + COMMAND_OPTIONS + f"." * 10
 COMMAND_OPTIONS_END = f"." * (20 + len(COMMAND_OPTIONS))
 COLON_SEP = f'{symbols.COLON} '
-COMMA_SEP = f'{symbols.COMMA} '
+COMMA_SEP = symbols.COMMA_SEP
 
 
 class FileHandler(logging.FileHandler):

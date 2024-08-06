@@ -69,6 +69,17 @@ def log(msg, timestamp=False):
     logutils.log(logger, msg, timestamp=timestamp)
 
 
+def log_warning(msg):
+    """
+    Print this warning message into log file.
+
+    :param msg: the msg to print
+    """
+    if not logger:
+        return
+    logger.warning(msg)
+
+
 def log_error(msg):
     """
     Print this message and exit the program.
@@ -89,6 +100,7 @@ class LmpLog(object):
     AVE_DATA_EXT = '_ave' + DATA_EXT
     PNG_EXT = '_%s.png'
     RESULTS = analyzer.Thermo.RESULTS
+    COLUMN_RE = analyzer.Base.COLUMN_RE
 
     def __init__(self, options):
         """
@@ -97,6 +109,7 @@ class LmpLog(object):
         self.options = options
         self.lmp_log = None
         self.df_reader = None
+        self.tasks = [x for x in THERMO_TASKS if x in self.options.task]
 
     def run(self):
         """
@@ -104,6 +117,7 @@ class LmpLog(object):
         """
         self.setStruct()
         self.setThermo()
+        self.setTasks()
         self.analyze()
 
     def setStruct(self):
@@ -140,15 +154,27 @@ class LmpLog(object):
                 f"[{self.lmp_log.thermo.index[self.sidx]:.3f}, "
                 f"{self.lmp_log.thermo.index[-1]:.3f}] ps")
 
+    def setTasks(self):
+        """
+        Set the tasks to be performed.
+        """
+        columns = self.lmp_log.thermo.columns
+        available = [self.COLUMN_RE.match(x).groups()[0] for x in columns]
+        selected = set(self.tasks).intersection(available)
+        if len(selected) == len(self.tasks):
+            return
+        missed = symbols.COMMA_SEP.join(set(self.tasks).difference(selected))
+        available = symbols.COMMA_SEP.join(available)
+        log_warning(f"{missed} tasks cannot be found out of {available}.")
+        self.tasks = list(selected)
+
     def analyze(self):
         """
         Run analyzers.
         """
-
-        thermo_tasks = [x for x in THERMO_TASKS if x in self.options.task]
-        if thermo_tasks:
+        for task in self.tasks:
             anl = analyzer.Thermo(self.lmp_log.thermo,
-                                  tasks=thermo_tasks,
+                                  task=task,
                                   options=self.options,
                                   logger=logger,
                                   sidx=self.sidx,

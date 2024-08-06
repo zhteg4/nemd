@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from flow import FlowProject
 
+from nemd import task
 from nemd import logutils
 from nemd import stillinger
 from nemd import jobutils
@@ -67,35 +68,27 @@ def label(job):
     return str(job.statepoint())
 
 
-class Crystal_Builder(Crystal_Builder):
+class Job(task.Job):
 
-    def run(self):
-        """
-        The main method to run.
-        """
-        super().run()
-        self.setScaledFactor()
-
-    def setScaledFactor(self):
+    def setArgs(self):
         """
         Set the scaled factor so that each cell starts from different vectors.
         """
+        super().setArgs()
+        factor = self.job.statepoint[self.STATE_ID]
+        self.args += [self.driver.FLAG_SCALED_FACTOR, factor]
 
-        scaled_factor = jobutils.get_arg(self.doc[self.KNOWN_ARGS],
-                                         self.DRIVER.FLAG_SCALED_FACTOR, 1)
-        state = self.job.statepoint()
-        scaled_factor = float(scaled_factor) * float(
-            state.get(self.STATE_ID, state.get(self.ID)))
-        jobutils.set_arg(self.doc[self.KNOWN_ARGS],
-                         self.DRIVER.FLAG_SCALED_FACTOR, scaled_factor)
+
+class Crystal_Builder(Crystal_Builder):
+
+    JobClass = Job
 
 
 class Runner(jobcontrol.Runner):
 
     MINIMUM_ENERGY = "yields the minimum energy of"
-    LMP_LOG = 'lmp_log'
 
-    def setTasks(self):
+    def setJob(self):
         """
         Set crystal builder, lammps runner, and log analyzer tasks.
         """
@@ -105,26 +98,23 @@ class Runner(jobcontrol.Runner):
         lmp_log = Lmp_Log.getOpr(name='lmp_log')
         self.setPrereq(lmp_log, lammps_runner)
 
-    def addJobs(self):
+    def setStateIds(self):
         """
-        Add jobs to the project.
+        Set the state ids for all jobs.
         """
-        ids = np.arange(*self.options.scaled_range)
-        super().addJobs(ids=ids)
+        self.state_ids = np.arange(*self.options.scaled_range)
 
     def setAggregation(self):
         """
         Aggregate post analysis jobs.
         """
         super().setAggregation()
-        name = f"{self.options.jobname}{self.SEP}{self.LMP_LOG}"
-        combine_agg = Lmp_Log.getAgg(name=name,
-                                     tname=self.LMP_LOG,
+        combine_agg = Lmp_Log.getAgg(name=self.options.jobname,
+                                     tname='lmp_log',
                                      log=log,
                                      clean=self.options.clean,
                                      state_label='Scale Factor')
-        name = f"{self.options.jobname}{self.SEP}fitting"
-        fit_agg = Lmp_Log.getAgg(name=name,
+        fit_agg = Lmp_Log.getAgg(name=self.options.jobname,
                                  attr=self.minEneAgg,
                                  tname=Lmp_Log.DRIVER.TOTENG,
                                  post=self.minEnePost,

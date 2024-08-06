@@ -101,6 +101,12 @@ class Runner(jobcontrol.Runner):
         custom_dump = Custom_Dump.getOpr(name=self.CUSTOM_DUMP)
         self.setPrereq(custom_dump, lammps_runner)
 
+    def setStateIds(self):
+        """
+        Set the state ids for all jobs.
+        """
+        self.state_ids = range(self.options.state_num)
+
     def setAggJobs(self):
         """
         Aggregate post analysis jobs.

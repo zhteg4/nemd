@@ -3,29 +3,26 @@ import shutil
 import collections
 import numpy as np
 import networkx as nx
-from nemd.nproject import FlowProject
 
-from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
 from nemd import fileutils
 from nemd.task import BaseTask
+from nemd.nproject import FlowProject
 
 
 class Runner:
     """
-    The main class to run integration tests.
+    The main class to setup a workflow.
     """
 
     STATE_ID = 'state_id'
     WORKSPACE = 'workspace'
-    FLOW_PROJECT = 'flow.project'
     ARGS = jobutils.ARGS
     PREREQ = jobutils.PREREQ
     COMPLETED = 'completed'
     OPERATIONS = 'operations'
     JOB_ID = 'job_id'
-    MSG = symbols.MSG
 
     def __init__(self, options, argv, logger=None):
         """
@@ -39,13 +36,12 @@ class Runner:
         self.options = options
         self.argv = argv
         self.logger = logger
+        self.state_ids = None
         self.project = None
-        self.status_file = self.options.jobname + fileutils.STATUS_LOG
-        # flow/project.py gets logger from logging.getLogger(__name__)
-        logutils.createModuleLogger(self.FLOW_PROJECT, file_ext=fileutils.LOG)
         self.agg_project = None
-        self.status_fh = None
         self.prereq = collections.defaultdict(list)
+        # flow/project.py gets logger from logging.getLogger(__name__)
+        logutils.createModuleLogger('flow.project', file_ext=fileutils.LOG)
 
     def run(self):
         """
@@ -56,19 +52,19 @@ class Runner:
         2) run a project with task jobs
         3) run a project with aggregator jobs
         """
-        with open(self.status_file, 'w') as self.status_fh:
-            if jobutils.TASK in self.options.jtype:
-                self.cleanJobs()
-                self.setJob()
-                self.setProject()
-                self.addJobs()
-                self.runJobs()
-                self.logStatus()
-            if jobutils.AGGREGATOR in self.options.jtype:
-                self.setAggJobs()
-                self.setAggProject()
-                self.cleanAggJobs()
-                self.runAggJobs()
+        if jobutils.TASK in self.options.jtype:
+            self.cleanJobs()
+            self.setJob()
+            self.setProject()
+            self.setStateIds()
+            self.addJobs()
+            self.runJobs()
+            self.logStatus()
+        if jobutils.AGGREGATOR in self.options.jtype:
+            self.setAggJobs()
+            self.setAggProject()
+            self.cleanAggJobs()
+            self.runAggJobs()
 
     def cleanJobs(self):
         """
@@ -86,9 +82,6 @@ class Runner:
     def setJob(self):
         """
         Set the tasks for the job.
-
-        Must be over-written by subclass and called before init_project()
-        so that functions can be registered via decoration.
         """
         raise NotImplementedError('This method adds operators as job tasks. ')
 
@@ -98,18 +91,19 @@ class Runner:
         """
         self.project = FlowProject.init_project()
 
-    def addJobs(self, ids=None):
+    def setStateIds(self):
+        """
+        Set the state ids for all jobs.
+        """
+        raise NotImplementedError('This method sets the state ids for jobs. ')
+
+    def addJobs(self):
         """
         Add jobs to the project.
-
-        :param ids list: the job ids based on which state points are set.
         """
-        ids = range(self.options.state_num) if ids is None else ids
-        for idx in ids:
+        for state_id in self.state_ids:
             # _StatePointDict warns NumpyConversionWarning if state_id not str
-            job = self.project.open_job({self.STATE_ID: str(idx)})
-            job.doc[jobutils.OUTFILE] = job.doc.get(jobutils.OUTFILE, {})
-            job.doc[jobutils.OUTFILES] = job.doc.get(jobutils.OUTFILES, {})
+            job = self.project.open_job({self.STATE_ID: str(state_id)})
             job.document[self.ARGS] = self.argv[:]
             job.document.update({self.PREREQ: self.prereq})
 
@@ -145,10 +139,11 @@ class Runner:
         """
         Look into each job and report the status.
         """
-        # Fetching status and Fetching labels are printed to err handler
-        self.project.print_status(detailed=True,
-                                  file=self.status_fh,
-                                  err=self.status_fh)
+        status_file = self.options.jobname + fileutils.STATUS_LOG
+        with open(status_file, 'w') as fh:
+            # Fetching status and Fetching labels are printed to err handler
+            self.project.print_status(detailed=True, file=fh, err=fh)
+        # Log job status
         jobs = self.project.find_jobs()
         status = [self.project.get_job_status(x) for x in jobs]
         ops = [x[self.OPERATIONS] for x in status]

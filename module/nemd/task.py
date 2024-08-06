@@ -258,14 +258,16 @@ class BaseTask:
     """
     The task base class.
     """
+
     JobClass = Job
     AggClass = AggJob
+    DRIVER = None
+
     STATE_ID = jobutils.STATE_ID
     ARGS = jobutils.ARGS
     OUTFILE = jobutils.OUTFILE
     FINISHED = jobutils.FINISHED
     DRIVER_LOG = logutils.DRIVER_LOG
-    DRIVER = None
 
     @classmethod
     def pre(cls, *args, **kwargs):
@@ -300,25 +302,19 @@ class BaseTask:
         return obj.post()
 
     @classmethod
-    def aggregator(cls, *jobs, **kwargs):
+    def aggregator(cls, *args, **kwargs):
         """
-        The aggregator job task to report the time cost of each task.
-
-        :param jobs: the task jobs the aggregator collected
-        :type jobs: list of 'signac.contrib.job.Job'
-        :param logger:  print to this logger
-        :type logger: 'logging.Logger'
+        The aggregator job task.
         """
-        obj = cls.AggClass(*jobs, **kwargs)
+        obj = cls.AggClass(*args, **kwargs)
         obj.run()
 
     @classmethod
     def postAgg(cls, *args, **kwargs):
         """
-        Post-condition for task time reporting.
+        Post-condition for aggregator task.
 
-        :return: the label after job completion
-        :rtype: str
+        :return bool: True if the post-conditions are met
         """
         obj = cls.AggClass(*args, **kwargs)
         return obj.post()
@@ -538,7 +534,7 @@ class Custom_Dump(BaseTask):
 
     import custom_dump_driver as DRIVER
     JobClass = DumpJob
-    RESULTS = DRIVER.CustomDump.RESULTS
+    AggClass = DumpAgg
 
 
 class LogJob(PostLmpJob):

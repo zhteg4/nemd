@@ -1,5 +1,4 @@
 import re
-import os
 import math
 import numpy as np
 import pandas as pd
@@ -73,12 +72,7 @@ class Base:
         self.setData()
         self.saveData()
         sidx, eidx = self.fit()
-        self.plot(self.data,
-                  inav=self.options.interactive,
-                  sidx=sidx,
-                  eidx=eidx,
-                  jobname=self.options.jobname,
-                  log=self.log)
+        self.plot(sidx=sidx, eidx=eidx)
 
     def readData(self):
         """
@@ -141,51 +135,37 @@ class Base:
                  f'{self.data.index[-1]:.4f}] ps')
         return sidx, None
 
-    @classmethod
-    def plot(cls,
-             data,
-             jobname,
-             sidx=None,
-             eidx=None,
-             log=None,
-             inav=False,
-             marker_num=10,
-             use_column=False):
+    def plot(self, sidx=None, eidx=None, marker_num=10, use_column=False):
         """
         Plot and save the data (interactively).
 
-        :param data: data to plot
-        :type data: 'pandas.core.frame.DataFrame'
-        :param jobname: the jobname
-        :type jobname: str
         :param sidx: the starting index when selecting data
         :type sidx: int
         :param eidx: the ending index when selecting data
         :type eidx: int
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :param inav: pop up window and show plot during code execution if
-            interactive mode is on
-        :type inav: bool
         :param marker_num: add markers when the number of points equals or is
             less than this value
-        :type inav: int
+        :type marker_num: int
         :param use_column: use column label in output filename
         :type use_column: bool
         """
-        if data.empty:
+        if self.data.empty:
             return
-        with plotutils.get_pyplot(inav=inav, name=cls.DESCR.upper()) as plt:
+        with plotutils.get_pyplot(inav=self.options.interactive,
+                                  name=self.DESCR.upper()) as plt:
             fig = plt.figure(figsize=(10, 6))
             ax = fig.add_axes([0.13, 0.1, 0.8, 0.8])
             line_style = '--' if any([sidx, eidx]) else '-'
-            if len(data) < marker_num:
+            if len(self.data) < marker_num:
                 line_style += '*'
-            ax.plot(data.index, data.iloc[:, 0], line_style, label='average')
-            if data.shape[-1] == 2 and data.iloc[:, 1].any():
+            ax.plot(self.data.index,
+                    self.data.iloc[:, 0],
+                    line_style,
+                    label='average')
+            if self.data.shape[-1] == 2 and self.data.iloc[:, 1].any():
                 # Data has non-zero standard deviation column
-                vals, errors = data.iloc[:, 0], data.iloc[:, 1]
-                ax.fill_between(data.index,
+                vals, errors = self.data.iloc[:, 0], self.data.iloc[:, 1]
+                ax.fill_between(self.data.index,
                                 vals - errors,
                                 vals + errors,
                                 color='y',
@@ -193,21 +173,21 @@ class Base:
                                 alpha=0.3)
                 ax.legend()
             if any([sidx, eidx]):
-                gdata = data.iloc[sidx:eidx]
+                gdata = self.data.iloc[sidx:eidx]
                 ax.plot(gdata.index, gdata.iloc[:, 0], '.-g')
-            xlabel = data.index.name
-            if cls.TIME_RE.match(xlabel):
+            xlabel = self.data.index.name
+            if self.TIME_RE.match(xlabel):
                 # "Time (unit) (sidx)"
-                xlabel = cls.TIME_RE.match(xlabel).groups()[0]
+                xlabel = self.TIME_RE.match(xlabel).groups()[0]
             ax.set_xlabel(xlabel)
-            ax.set_ylabel(data.columns.values.tolist()[0])
-            fname = f"{jobname}_{cls.NAME}{cls.FIG_EXT}"
+            ax.set_ylabel(self.data.columns.values.tolist()[0])
+            fname = f"{self.options.jobname}_{self.NAME}{self.FIG_EXT}"
             if use_column:
-                colunm_name = data.columns[0].split('(')[0].strip().lower()
-                fname = f"{jobname}_{colunm_name}_{cls.NAME}{cls.FIG_EXT}"
+                name = self.data.columns[0].split('(')[0].strip().lower()
+                fname = f"{self.options.jobname}_{name}_{self.NAME}{self.FIG_EXT}"
             fig.savefig(fname)
-            jobutils.add_outfile(fname, jobname=jobname)
-        log(f'{cls.DESCR.capitalize()} figure saved as {fname}')
+            jobutils.add_outfile(fname, jobname=self.options.jobname)
+        self.log(f'{self.DESCR.capitalize()} figure saved as {fname}')
 
     def log(self, msg):
         """
@@ -535,10 +515,12 @@ class Thermo(Base):
     NAME = 'thermo'
     DESCR = 'Thermodynamic information'
 
-    def __init__(self, thermo, tasks=None, **kwargs):
+    def __init__(self, thermo, task=None, **kwargs):
         super().__init__(**kwargs)
         self.thermo = thermo
-        self.tasks = tasks
+        self.task = task
+        self.NAME = self.task.lower()
+        self.DESCR = self.task.capitalize()
 
     def setData(self):
         """
@@ -546,48 +528,9 @@ class Thermo(Base):
         """
         if self.data is not None:
             return
-        sel_cols = [
-            x for x in self.thermo.columns
-            if self.COLUMN_RE.match(x).groups()[0] in self.tasks
-        ]
-        self.data = self.thermo[sel_cols]
-
-    def saveData(self, float_format='%.8g'):
-        """
-        Save the selected data into a CSV file.
-
-        :param float_format str: the format for floating point numbers
-        """
-        self.data.to_csv(self.outfile, float_format=float_format)
-        self.log(f'{self.tasks} information written into {self.outfile}')
-
-    def fit(self, data, log=None):
-        """
-        Fit the data and report.
-
-        :param data: distance vs count
-        :type data: 'pandas.core.frame.DataFrame'
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :return int, int: the start and end index for the selected data
-        """
-        for column in data.columns:
-            sidx, eidx = super().fit(data[column].to_frame())
-        return sidx, eidx
-
-    @classmethod
-    def plot(cls, data, jobname, *args, **kwargs):
-        """
-        Plot and save the data (interactively).
-
-        :param data: data to plot
-        :type data: 'pandas.core.frame.DataFrame'
-        :param jobname: the jobname
-        :type jobname: str
-        """
-        for column in data.columns:
-            df = data[column].to_frame()
-            super().plot(df, jobname, use_column=True, *args, **kwargs)
+        column_re = re.compile(f"{self.task} +\((.*)\)")
+        column = [x for x in self.thermo.columns if column_re.match(x)][0]
+        self.data = self.thermo[column].to_frame()
 
 
 ANALYZER = [Density, RDF, MSD, Clash, View, XYZ]
