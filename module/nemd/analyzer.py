@@ -69,7 +69,7 @@ class Base:
         """
         Main method to run the analyzer.
         """
-        self.read()
+        self.readData()
         self.setData()
         self.saveData()
         sidx, eidx = self.fit()
@@ -80,7 +80,7 @@ class Base:
                   jobname=self.options.jobname,
                   log=self.log)
 
-    def read(self):
+    def readData(self):
         """
         Read the output files to set the data.
         """

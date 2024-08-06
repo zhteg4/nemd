@@ -65,7 +65,6 @@ class Integration(jobcontrol.Runner):
     TAG = 'tag'
     SLOW = 'slow'
     TAG_KEYS = [SLOW]
-    MSG = itestutils.ResultJob.MSG
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -91,7 +91,7 @@ class Runner(jobcontrol.Runner):
 
     CUSTOM_DUMP = 'custom_dump'
 
-    def setTasks(self):
+    def setJob(self):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
         """
@@ -101,11 +101,11 @@ class Runner(jobcontrol.Runner):
         custom_dump = Custom_Dump.getOpr(name=self.CUSTOM_DUMP)
         self.setPrereq(custom_dump, lammps_runner)
 
-    def setAggregation(self):
+    def setAggJobs(self):
         """
         Aggregate post analysis jobs.
         """
-        super().setAggregation()
+        super().setAggJobs()
         Custom_Dump.getAgg(name=self.options.jobname,
                            tname=self.CUSTOM_DUMP,
                            logger=logger)

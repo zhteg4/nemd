@@ -25,6 +25,7 @@ class Runner:
     COMPLETED = 'completed'
     OPERATIONS = 'operations'
     JOB_ID = 'job_id'
+    MSG = symbols.MSG
 
     def __init__(self, options, argv, logger=None):
         """
@@ -42,7 +43,7 @@ class Runner:
         self.status_file = self.options.jobname + fileutils.STATUS_LOG
         # flow/project.py gets logger from logging.getLogger(__name__)
         logutils.createModuleLogger(self.FLOW_PROJECT, file_ext=fileutils.LOG)
-        self.flow_project = None
+        self.agg_project = None
         self.status_fh = None
         self.prereq = collections.defaultdict(list)
 
@@ -56,28 +57,33 @@ class Runner:
         3) run a project with aggregator jobs
         """
         with open(self.status_file, 'w') as self.status_fh:
-            if self.options.clean and jobutils.TASK in self.options.jtype:
-                self.clean()
             if jobutils.TASK in self.options.jtype:
-                self.setTasks()
+                self.cleanJobs()
+                self.setJob()
                 self.setProject()
                 self.addJobs()
-                self.runProject()
+                self.runJobs()
                 self.logStatus()
             if jobutils.AGGREGATOR in self.options.jtype:
-                self.setAggregation()
-                self.runAggregation()
+                self.setAggJobs()
+                self.setAggProject()
+                self.cleanAggJobs()
+                self.runAggJobs()
 
-    def clean(self):
+    def cleanJobs(self):
         """
         Remove the previous task results on request.
         """
-        try:
-            shutil.rmtree(self.WORKSPACE)
-        except FileNotFoundError:
-            pass
+        if not self.options.clean:
+            return
+        if jobutils.TASK in self.options.jtype:
+            try:
+                shutil.rmtree(self.WORKSPACE)
+            except FileNotFoundError:
+                pass
+            return
 
-    def setTasks(self):
+    def setJob(self):
         """
         Set the tasks for the job.
 
@@ -85,18 +91,6 @@ class Runner:
         so that functions can be registered via decoration.
         """
         raise NotImplementedError('This method adds operators as job tasks. ')
-
-    def setPrereq(self, cur, pre):
-        """
-        Set the prerequisite of a job.
-
-        :param cur: the operation (function) who runs after the prerequisite job
-        :type cur: 'function'
-        :param pre: the operation (function) runs first
-        :type pre: 'function'
-        """
-        FlowProject.pre.after(pre)(cur)
-        self.prereq[cur.__name__].append(pre.__name__)
 
     def setProject(self):
         """
@@ -119,7 +113,7 @@ class Runner:
             job.document[self.ARGS] = self.argv[:]
             job.document.update({self.PREREQ: self.prereq})
 
-    def runProject(self):
+    def runJobs(self):
         """
         Run all jobs registered in the project.
         """
@@ -158,44 +152,64 @@ class Runner:
         jobs = self.project.find_jobs()
         status = [self.project.get_job_status(x) for x in jobs]
         ops = [x[self.OPERATIONS] for x in status]
-        completed = [[y[self.COMPLETED] for y in x.values()] for x in ops]
-        completed_job = [all(x) for x in completed]
-        completed_job_num = collections.Counter(completed_job)[True]
-        self.log(f"{completed_job_num} / {len(status)} completed jobs.")
-        if completed_job_num == len(status):
+        completed = [all([y[self.COMPLETED] for y in x.values()]) for x in ops]
+        failed_num = len([x for x in completed if not x])
+        self.log(f"{len(jobs) - failed_num} / {len(jobs)} completed jobs.")
+        if not failed_num:
             return
-        for job in self.project.find_jobs():
-            stat = self.project.get_job_status(job)
-            if all(x[self.COMPLETED] for x in stat[self.OPERATIONS].values()):
+        for job, completed in zip(jobs, completed):
+            if completed:
                 continue
-            ops = stat[self.OPERATIONS]
-            succ_tasks = [x for x, y in ops.items() if y[self.COMPLETED]]
-            succ_tasks = ', '.join(reversed(succ_tasks))
             failed_tasks = [x for x, y in ops.items() if not y[self.COMPLETED]]
             failed_tasks = ', '.join(reversed(failed_tasks))
             labels = ', '.join([x for x in self.project.labels(job)])
-            self.log(f"Failed tasks are {failed_tasks} while successful ones "
-                     f"are {succ_tasks} for the job with {labels} labels "
-                     f"and id {stat[self.JOB_ID]}")
+            self.log(f"Failed tasks are {failed_tasks}. (label: {labels}, "
+                     f"id: {status[self.JOB_ID]}")
 
-    def setAggregation(self):
+    def setAggJobs(self):
         """
         Collect jobs and analyze for statics, chemical space, and states.
         """
         BaseTask.getAgg(logger=self.logger, name=self.options.jobname)
 
-    def runAggregation(self):
+    def setAggProject(self):
         """
-        Run aggregation project.
+        Initiate the aggregation project.
         """
-
         prj_path = self.project.path if self.project else self.options.prj_path
         try:
-            self.flow_project = FlowProject.get_project(prj_path)
+            self.agg_project = FlowProject.get_project(prj_path)
         except LookupError as err:
             self.log_error(str(err))
 
-        self.flow_project.run()
+    def cleanAggJobs(self):
+        """
+        Run aggregation project.
+        """
+        if not self.options.clean:
+            return
+        if not jobutils.AGGREGATOR in self.options.jtype:
+            return
+        for name in self.agg_project.operations.keys():
+            self.agg_project.doc.pop(name)
+
+    def runAggJobs(self):
+        """
+        Run aggregation project.
+        """
+        self.agg_project.run()
+
+    def setPrereq(self, cur, pre):
+        """
+        Set the prerequisite of a job.
+
+        :param cur: the operation (function) who runs after the prerequisite job
+        :type cur: 'function'
+        :param pre: the operation (function) runs first
+        :type pre: 'function'
+        """
+        FlowProject.pre.after(pre)(cur)
+        self.prereq[cur.__name__].append(pre.__name__)
 
     def log(self, msg, timestamp=False):
         """
