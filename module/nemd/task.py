@@ -1,4 +1,3 @@
-import os
 import re
 import sh
 import types
@@ -6,7 +5,6 @@ import argparse
 import functools
 import collections
 import humanfriendly
-import pandas as pd
 from datetime import timedelta
 from types import SimpleNamespace
 from flow import FlowProject, aggregator
@@ -17,7 +15,6 @@ from nemd import jobutils
 from nemd import lammpsin
 from nemd import analyzer
 from nemd import timeutils
-from nemd import environutils
 
 FILE = jobutils.FILE
 
@@ -38,17 +35,20 @@ class BaseJob:
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
     PRE_RUN = None
 
-    def __init__(self, job, name=None, logger=None, **kwargs):
+    def __init__(self, job, name=None, driver=None, logger=None, **kwargs):
         """
         :param job: the signac job instance
         :type job: 'signac.contrib.job.Job'
         :param name: the jobname
         :type name: str
+        :param driver: imported driver module
+        :type driver: 'module'
         :param logger:  print to this logger
         :type logger: 'logging.Logger'
         """
         self.job = job
         self.name = name
+        self.driver = driver
         self.logger = logger
         self.doc = self.job.document
 
@@ -85,15 +85,8 @@ class Job(BaseJob):
     PREREQ = jobutils.PREREQ
     OUTFILE = jobutils.OUTFILE
 
-    def __init__(self, job, name=None, driver=None):
-        """
-        :param job: the signac job instance
-        :type job: 'signac.contrib.job.Job'
-        :param driver: imported driver module
-        :type driver: 'module'
-        """
-        super().__init__(job, name=name)
-        self.driver = driver
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.args = None
 
     def run(self):
@@ -306,7 +299,7 @@ class BaseTask:
         """
         The aggregator job task.
         """
-        obj = cls.AggClass(*args, **kwargs)
+        obj = cls.AggClass(*args, driver=cls.DRIVER, **kwargs)
         obj.run()
 
     @classmethod
@@ -316,7 +309,7 @@ class BaseTask:
 
         :return bool: True if the post-conditions are met
         """
-        obj = cls.AggClass(*args, **kwargs)
+        obj = cls.AggClass(*args, driver=cls.DRIVER, **kwargs)
         return obj.post()
 
     @classmethod
@@ -547,70 +540,69 @@ class LogJob(PostLmpJob):
         self.args = self.args[:1] + self.getDatafile() + self.args[1:]
 
 
+class LogAgg(DumpAgg):
+
+    TASK = jobutils.FLAG_TASK.lower()[1:]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tasks = [x for x in self.driver.THERMO_TASKS if x in self.tasks]
+
+    def run(self):
+        """
+        Main method to run the aggregator job.
+        """
+        self.log(f"{len(self.jobs)} jobs found for aggregation.")
+        filename = analyzer.Thermo.getFilename(self.subname)
+        files = [x.fn(filename) for x in self.jobs]
+        params = [x.statepoint[self.STATE_ID] for x in self.jobs]
+        for task in self.tasks:
+            anlz = analyzer.Thermo(task=task,
+                                   options=self.options,
+                                   logger=self.logger,
+                                   files=files,
+                                   params=params)
+            anlz.run()
+        self.jobs[0].project.doc[self.name] = False
+
+
 class Lmp_Log(BaseTask):
 
     import lmp_log_driver as DRIVER
     JobClass = LogJob
+    AggClass = LogAgg
     RESULTS = DRIVER.LmpLog.RESULTS
 
-    @classmethod
-    def aggregator(cls, *jobs, log=None, name=None, tname=None, **kwargs):
-        """
-        The aggregator job task that combines the lammps log analysis.
-
-        :param jobs: the task jobs the aggregator collected
-        :type jobs: list of 'signac.contrib.job.Job'
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :param name: the jobname based on which output files are named
-        :type name: str
-        :param tname: aggregate the job tasks of this name
-        :type tname: str
-        """
-        log(f"{len(jobs)} jobs found for aggregation.")
-        job = jobs[0]
-        logfile = job.fn(job.document[jobutils.OUTFILE][tname])
-        outfiles = cls.DRIVER.LmpLog.getOutfiles(logfile)
-        if kwargs.get(jobutils.FLAG_CLEAN[1:]):
-            jname = name.split(BaseTask.SEP)[0]
-            for filename in outfiles.values():
-                try:
-                    os.remove(filename.replace(tname, jname))
-                except FileNotFoundError:
-                    pass
-        jobs = sorted(jobs, key=lambda x: x.statepoint[BaseTask.STATE_ID])
-        outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
-        jname = name.split(BaseTask.SEP)[0]
-        inav = environutils.is_interactive()
-        state_ids = [x.statepoint[BaseTask.STATE_ID] for x in jobs]
-        state_label = kwargs.get('state_label')
-        iname = pd.Index(state_ids, name=state_label) if state_label else None
-        cls.DRIVER.LmpLog.combine(outfiles, log, jname, inav=inav, iname=iname)
-
-    @classmethod
-    def postAgg(cls, *jobs, name=None):
-        """
-        Report the status of the aggregation over all lmp log task output
-        files.
-
-        Main driver log should report results found the csv saved on the success
-        of aggregation.
-
-        :param jobs: the task jobs the aggregator collected
-        :type jobs: list of 'signac.contrib.job.Job'
-        :param name: jobname based on which log file is found
-        :type name: str
-        :return: the label after job completion
-        :rtype: str
-        """
-        jname = name.split(cls.SEP)[0]
-        logfile = jname + logutils.DRIVER_LOG
-        try:
-            line = sh.grep(cls.RESULTS, logfile)
-        except sh.ErrorReturnCode_1:
-            return False
-        line = line.strip().split('\n')
-        lines = [x.split(cls.RESULTS)[-1].strip() for x in line]
-        ext = '.' + cls.DRIVER.LmpLog.DATA_EXT.split('.')[-1]
-        filenames = [x for x in lines if x.split()[-1].endswith(ext)]
-        return f'{len(filenames)} files found'
+    # @classmethod
+    # def aggregator(cls, *jobs, log=None, name=None, tname=None, **kwargs):
+    #     """
+    #     The aggregator job task that combines the lammps log analysis.
+    #
+    #     :param jobs: the task jobs the aggregator collected
+    #     :type jobs: list of 'signac.contrib.job.Job'
+    #     :param log: the function to print user-facing information
+    #     :type log: 'function'
+    #     :param name: the jobname based on which output files are named
+    #     :type name: str
+    #     :param tname: aggregate the job tasks of this name
+    #     :type tname: str
+    #     """
+    #     log(f"{len(jobs)} jobs found for aggregation.")
+    #     job = jobs[0]
+    #     logfile = job.fn(job.document[jobutils.OUTFILE][tname])
+    #     outfiles = cls.DRIVER.LmpLog.getOutfiles(logfile)
+    #     if kwargs.get(jobutils.FLAG_CLEAN[1:]):
+    #         jname = name.split(BaseTask.SEP)[0]
+    #         for filename in outfiles.values():
+    #             try:
+    #                 os.remove(filename.replace(tname, jname))
+    #             except FileNotFoundError:
+    #                 pass
+    #     jobs = sorted(jobs, key=lambda x: x.statepoint[BaseTask.STATE_ID])
+    #     outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
+    #     jname = name.split(BaseTask.SEP)[0]
+    #     inav = environutils.is_interactive()
+    #     state_ids = [x.statepoint[BaseTask.STATE_ID] for x in jobs]
+    #     state_label = kwargs.get('state_label')
+    #     iname = pd.Index(state_ids, name=state_label) if state_label else None
+    #     cls.DRIVER.LmpLog.combine(outfiles, log, jname, inav=inav, iname=iname)

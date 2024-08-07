@@ -104,24 +104,24 @@ class Runner(jobcontrol.Runner):
         """
         self.state_ids = np.arange(*self.options.scaled_range)
 
-    def setAggregation(self):
+    def setAggJobs(self):
         """
         Aggregate post analysis jobs.
         """
-        super().setAggregation()
+        # super().setAggJobs()
         combine_agg = Lmp_Log.getAgg(name=self.options.jobname,
                                      tname='lmp_log',
                                      log=log,
                                      clean=self.options.clean,
                                      state_label='Scale Factor')
-        fit_agg = Lmp_Log.getAgg(name=self.options.jobname,
-                                 attr=self.minEneAgg,
-                                 tname=Lmp_Log.DRIVER.TOTENG,
-                                 post=self.minEnePost,
-                                 log=log,
-                                 clean=self.options.clean,
-                                 state_label='Scale Factor')
-        self.setPrereq(fit_agg, combine_agg)
+        # fit_agg = Lmp_Log.getAgg(name=self.options.jobname,
+        #                          attr=self.minEneAgg,
+        #                          tname=Lmp_Log.DRIVER.TOTENG,
+        #                          post=self.minEnePost,
+        #                          log=log,
+        #                          clean=self.options.clean,
+        #                          state_label='Scale Factor')
+        # self.setPrereq(fit_agg, combine_agg)
 
     @staticmethod
     def minEneAgg(*jobs, log=None, name=None, tname=None, **kwargs):

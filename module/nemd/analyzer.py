@@ -33,7 +33,8 @@ class Base:
                  df_reader=None,
                  options=None,
                  logger=None,
-                 files=None):
+                 files=None,
+                 params=None):
         """
         :param sidx: the starting frame index after excluding the first xxx pct
         :type sidx: int
@@ -45,12 +46,15 @@ class Base:
         :type logger: 'logging.Logger'
         :param files: the data are read from these files
         :type files: list
+        :param params: the parameters that set the difference between jobs
+        :type params: list
         """
         self.sidx = sidx
         self.df_reader = df_reader
         self.options = options
         self.logger = logger
         self.files = files
+        self.params = params
         self.data = None
         self.outfile = self.getFilename(self.options.jobname)
         jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
@@ -76,26 +80,52 @@ class Base:
 
     def readData(self):
         """
-        Read the output files to set the data.
+        Read the output files from independent runs to set the data.
         """
         if self.files is None:
             return
         datas = [pd.read_csv(x, index_col=0) for x in self.files]
-        frm_num = min([x.shape[0] for x in datas])
-        iname = min(datas, key=lambda x: x.shape[0]).index.name
-        datas = [x.iloc[-frm_num:] for x in datas]
+        if len(datas) == 1:
+            # One single run
+            self.data = datas[0]
+            return
+        index_name = min(datas, key=lambda x: x.shape[0]).index.name
+        num = min([x.shape[0] for x in datas])
+        datas = [x.iloc[-num:] for x in datas]
         xvals = [x.index.to_numpy().reshape(-1, 1) for x in datas]
-        xvals = np.concatenate(xvals, axis=1)
-        x_ave = xvals.mean(axis=1).reshape(-1, 1)
+        x_ave = np.concatenate(xvals, axis=1).mean(axis=1)
+        if self.params is not None:
+            # Runs with different parameters
+            for data in datas:
+                data.index = x_ave
+            self.data = pd.concat(datas, axis=1)
+            matches = [self.COLUMN_RE.match(x) for x in self.data.columns]
+            params = [(*x.groups(), y) for x, y in zip(matches, self.params)]
+            self.data.columns = [f"{x} ({y}) ({z})" for x, y, z in params]
+            self.data.index.name = index_name
+            return
+        # Independent runs
         yvals = [x.iloc[:, 0].to_numpy().reshape(-1, 1) for x in datas]
         yvals = np.concatenate(yvals, axis=1)
-        y_std = yvals.std(axis=1).reshape(-1, 1)
         y_mean = yvals.mean(axis=1).reshape(-1, 1)
-        data = np.concatenate((x_ave, y_mean, y_std), axis=1)
+        y_std = yvals.std(axis=1).reshape(-1, 1)
+        data = np.concatenate((x_ave.reshape(-1, 1), y_mean, y_std), axis=1)
         self.data = pd.DataFrame(data[:, 1:], index=data[:, 0])
         cname, num = datas[0].columns[0], len(datas)
         self.data.columns = [f'{cname} (num={num})', f'std (num={num})']
-        self.data.index.name = iname
+        self.data.index.name = index_name
+
+    def Data(self):
+        """
+        Read the output files from parameterized runs to set the data.
+        """
+        if self.files is None or isinstance(self.options.ind_data, dict):
+            return
+        datas = [pd.read_csv(x, index_col=0) for x in self.files.values()]
+        num = min([x.shape[0] for x in datas])
+        datas = [x.iloc[-num:] for x in datas]
+        xvals = [x.index.to_numpy().reshape(-1, 1) for x in datas]
+        yvals = [x.iloc[:, 0].to_numpy().reshape(-1, 1) for x in datas]
 
     def setData(self):
         """
@@ -124,15 +154,20 @@ class Base:
             return 0, None
         sidx = int(self.TIME_RE.match(self.data.index.name).groups()[1])
         sel = self.data.iloc[sidx:]
-        ave = sel.mean().iloc[0]
-        std = sel.std().iloc[0] if sel.shape[1] == 1 else sel.mean().iloc[1]
+        ave = sel.mean()
         label, unit = self.COLUMN_RE.match(self.data.columns[0]).groups()
         if self.COLUMN_RE.match(label):
             # 'Density (g/cm^3) (num=4)' as data.columns[0]
             label, unit = self.COLUMN_RE.match(label).groups()
-        self.log(f'{label}: {ave:.4g} {symbols.PLUS_MIN} {std:.4g} {unit} '
-                 f'{symbols.ELEMENT_OF} [{self.data.index[sidx]:.4f}, '
-                 f'{self.data.index[-1]:.4f}] ps')
+        if self.params is not None:
+            for (name, column), param in zip(self.data.items(), self.params):
+                self.log(f"{label}: {column.iloc[0]:.4g} {unit} ({param})")
+            return sidx, None
+        std = sel.std().iloc[0] if sel.shape[1] == 1 else sel.mean().iloc[1]
+        self.log(
+            f'{label}: {ave.iloc[0]:.4g} {symbols.PLUS_MIN} {std:.4g} {unit} '
+            f'{symbols.ELEMENT_OF} [{self.data.index[sidx]:.4f}, '
+            f'{self.data.index[-1]:.4f}] ps')
         return sidx, None
 
     def plot(self, sidx=None, eidx=None, marker_num=10, use_column=False):
@@ -515,7 +550,10 @@ class Thermo(Base):
     NAME = 'thermo'
     DESCR = 'Thermodynamic information'
 
-    def __init__(self, thermo, task=None, **kwargs):
+    def __init__(self, thermo=None, task=None, **kwargs):
+        """
+
+        """
         super().__init__(**kwargs)
         self.thermo = thermo
         self.task = task
