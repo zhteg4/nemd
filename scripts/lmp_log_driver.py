@@ -26,16 +26,7 @@ FLAG_TASK = jobutils.FLAG_TASK
 FLAG_LAST_PCT = '-last_pct'
 FLAG_SLICE = '-slice'
 
-THERMO = 'thermo'
-TEMP = 'Temp'
-EPAIR = 'E_pair'
-E_MOL = 'E_mol'
-TOTENG = 'TotEng'
-PRESS = 'Press'
-VOLUME = 'Volume'
-THERMO_TASKS = [TEMP, EPAIR, E_MOL, TOTENG, PRESS, VOLUME]
-
-ALL_FRM_TASKS = THERMO_TASKS
+ALL_FRM_TASKS = analyzer.Thermo.TASKS
 LAST_FRM_TASKS = ALL_FRM_TASKS
 AVE_FRM_TASKS = LAST_FRM_TASKS
 DATA_RQD_TASKS = []
@@ -108,7 +99,7 @@ class LmpLog(object):
         self.options = options
         self.lmp_log = None
         self.df_reader = None
-        self.tasks = [x for x in THERMO_TASKS if x in self.options.task]
+        self.tasks = [x for x in analyzer.Thermo.TASKS if x in self.options.task]
 
     def run(self):
         """
@@ -301,11 +292,11 @@ def get_parser(parser=None, jflags=None):
                             type=parserutils.type_file,
                             help='Data file to get force field information')
     parser.add_argument(FLAG_TASK,
-                        choices=THERMO_TASKS,
-                        default=THERMO_TASKS,
+                        choices=analyzer.Thermo.TASKS,
+                        default=analyzer.Thermo.TOTENG,
                         nargs='+',
-                        help=f'{THERMO} searches, combines and averages '
-                        f'thermodynamic info. ')
+                        help=f'{analyzer.Thermo.NAME} searches, combines and '
+                             f'averages thermodynamic info. ')
     parser.add_argument(
         FLAG_LAST_PCT,
         metavar=FLAG_LAST_PCT.upper(),

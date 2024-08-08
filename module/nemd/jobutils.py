@@ -76,7 +76,7 @@ def get_arg(args, flag, val=None, first=True):
 
 def pop_arg(args, flag, val=None):
     """
-    Get the value after the flag in command arg list.
+    Pop the value after the flag in command arg list.
 
     :param args: the arg list
     :type args: list

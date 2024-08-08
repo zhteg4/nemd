@@ -114,7 +114,7 @@ class Runner:
         argvs = [[[x, z] for z in y] for x, y in self.state.items()]
         for argv in itertools.product(*argvs):
             # e.g. arg = (['-seed', '0'], ['-scale_factor', '0.95'])
-            job = self.project.open_job(dict({*x} for x in argv))
+            job = self.project.open_job(dict(tuple(x) for x in argv))
             job.document[self.ARGS] = self.argv[:] + sum(argv, [])
             job.document.update({self.PREREQ: self.prereq})
 

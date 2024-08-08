@@ -458,7 +458,7 @@ class Lammps(BaseTask):
     import lammps_driver as DRIVER
 
 
-class PostLmpJob(Job):
+class LmpPostJob(Job):
     """
     The base class for post-processing LAMMPS jobs.
     """
@@ -477,7 +477,7 @@ class PostLmpJob(Job):
         return [self.driver.FLAG_DATA_FILE, files[0]] if files else []
 
 
-class DumpJob(PostLmpJob):
+class DumpJob(LmpPostJob):
 
     DUMP = lammpsin.In.DUMP
     CUSTOM_EXT = lammpsin.In.CUSTOM_EXT
@@ -511,8 +511,8 @@ class DumpAgg(AggJob):
         """
         self.log(f"{len(self.jobs)} jobs found for aggregation.")
         for task in self.tasks:
-            Analyzer = analyzer.ANALYZER[task]
-            if Analyzer in analyzer.NO_COMBINE:
+            Analyzer = self.getAnalyzer(task)
+            if Analyzer is None:
                 continue
             filename = Analyzer.getFilename(self.subname)
             files = [x.fn(filename) for x in self.jobs]
@@ -520,7 +520,19 @@ class DumpAgg(AggJob):
                             logger=self.logger,
                             files=files)
             anlz.run()
-        self.jobs[0].project.doc[self.name] = False
+        self.project.doc[self.name] = False
+
+    def getAnalyzer(self, task):
+        """
+        Get the dump analyzer class for the given task.
+
+        :param task `class`: the task class
+        :return: the analyzer class or None if combination is not supported.
+        """
+        Analyzer = analyzer.ANALYZER[task]
+        if Analyzer in analyzer.NO_COMBINE:
+            return
+        return Analyzer
 
 
 class Custom_Dump(BaseTask):
@@ -530,7 +542,7 @@ class Custom_Dump(BaseTask):
     AggClass = DumpAgg
 
 
-class LogJob(PostLmpJob):
+class LogJob(LmpPostJob):
 
     def setArgs(self):
         """
@@ -546,22 +558,18 @@ class LogAgg(DumpAgg):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.tasks = [x for x in self.driver.THERMO_TASKS if x in self.tasks]
+        self.tasks = [x for x in analyzer.Thermo.TASKS if x in self.tasks]
 
-    def run(self):
+    def getAnalyzer(self, task):
         """
-        Main method to run the aggregator job.
+        Get the log analyzer class for the given task.
+
+        :param task `class`: the task class
+        :return: the analyzer class
         """
-        self.log(f"{len(self.jobs)} jobs found for aggregation.")
-        filename = analyzer.Thermo.getFilename(self.subname)
-        files = [x.fn(filename) for x in self.jobs]
-        for task in self.tasks:
-            anlz = analyzer.Thermo(task=task,
-                                   options=self.options,
-                                   logger=self.logger,
-                                   files=files)
-            anlz.run()
-        self.jobs[0].project.doc[self.name] = False
+        Analyzer = functools.partial(analyzer.Thermo, task=task)
+        Analyzer.getFilename = analyzer.Thermo.getFilename
+        return Analyzer
 
 
 class Lmp_Log(BaseTask):

@@ -68,22 +68,6 @@ def label(job):
     return str(job.statepoint())
 
 
-class Job(task.Job):
-
-    def setArgs(self):
-        """
-        Set the scaled factor so that each cell starts from different vectors.
-        """
-        super().setArgs()
-        factor = self.job.statepoint[self.driver.FLAG_SCALED_FACTOR]
-        self.args += [self.driver.FLAG_SCALED_FACTOR, factor]
-
-
-class Crystal_Builder(Crystal_Builder):
-
-    JobClass = Job
-
-
 class Runner(jobcontrol.Runner):
 
     MINIMUM_ENERGY = "yields the minimum energy of"
@@ -113,9 +97,7 @@ class Runner(jobcontrol.Runner):
         # super().setAggJobs()
         combine_agg = Lmp_Log.getAgg(name=self.options.jobname,
                                      tname='lmp_log',
-                                     log=log,
-                                     clean=self.options.clean,
-                                     state_label='Scale Factor')
+                                     logger=logger)
         # fit_agg = Lmp_Log.getAgg(name=self.options.jobname,
         #                          attr=self.minEneAgg,
         #                          tname=Lmp_Log.DRIVER.TOTENG,
@@ -212,10 +194,6 @@ def validate_options(argv):
     """
     parser = get_parser()
     options = parser.parse_args(argv)
-    if Lmp_Log.DRIVER.TOTENG not in options.task:
-        options.task += [Lmp_Log.DRIVER.TOTENG]
-        index = argv.index(Lmp_Log.DRIVER.FLAG_TASK)
-        argv.insert(index + 1, Lmp_Log.DRIVER.TOTENG)
     return options
 
 

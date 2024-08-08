@@ -44,7 +44,7 @@ class Base:
         self.files = files
         self.data = None
         self.idx = 0
-        self.sidx = 0
+        self.sidx = None
         self.eidx = None
         self.outfile = self.getFilename(self.options.jobname)
         jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
@@ -125,7 +125,8 @@ class Base:
         """
         if self.data.empty:
             return
-        self.sidx = self.idx
+        if self.sidx is None:
+            self.sidx = self.idx
         sel = self.data.iloc[self.sidx:]
         ave = sel.mean()
         std = ave.iloc[1] if sel.shape[1] == 2 else sel.std().iloc[0]
@@ -431,8 +432,9 @@ class MSD(TrajBase):
         if self.data.empty:
             return
         num = self.data.shape[0]
-        self.sidx = math.floor(num * spct)
-        self.eidx = math.ceil(num * (1 - epct))
+        if self.sidx is None:
+            self.sidx = math.floor(num * spct)
+            self.eidx = math.ceil(num * (1 - epct))
         sel = self.data.iloc[self.sidx:self.eidx]
         # Standard error of the slope, under the assumption of residual normality
         xvals = sel.index * constants.pico
@@ -534,6 +536,14 @@ class Thermo(Base):
 
     NAME = 'thermo'
     DESCR = 'Thermodynamic information'
+    THERMO = 'thermo'
+    TEMP = 'Temp'
+    EPAIR = 'E_pair'
+    E_MOL = 'E_mol'
+    TOTENG = 'TotEng'
+    PRESS = 'Press'
+    VOLUME = 'Volume'
+    TASKS = [TEMP, EPAIR, E_MOL, TOTENG, PRESS, VOLUME]
 
     def __init__(self, thermo=None, task=None, **kwargs):
         """
