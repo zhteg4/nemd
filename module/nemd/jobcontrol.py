@@ -16,7 +16,8 @@ class Runner:
     The main class to setup a workflow.
     """
 
-    STATE_ID = 'state_id'
+    STATE_FLAG = jobutils.STATE_FLAG
+    STATE_ID = jobutils.STATE_ID
     WORKSPACE = 'workspace'
     ARGS = jobutils.ARGS
     PREREQ = jobutils.PREREQ

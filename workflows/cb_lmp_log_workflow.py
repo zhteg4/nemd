@@ -102,6 +102,7 @@ class Runner(jobcontrol.Runner):
         """
         Set the state ids for all jobs.
         """
+        self.project.doc[self.STATE_FLAG] = FLAG_SCALED_RANGE
         self.state_ids = np.arange(*self.options.scaled_range)
 
     def setAggJobs(self):

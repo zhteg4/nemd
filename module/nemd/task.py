@@ -32,6 +32,7 @@ class BaseJob:
 
     ARGS = jobutils.ARGS
     STATE_ID = jobutils.STATE_ID
+    STATE_FLAG = jobutils.STATE_FLAG
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
     PRE_RUN = None
 
@@ -555,13 +556,11 @@ class LogAgg(DumpAgg):
         self.log(f"{len(self.jobs)} jobs found for aggregation.")
         filename = analyzer.Thermo.getFilename(self.subname)
         files = [x.fn(filename) for x in self.jobs]
-        params = [x.statepoint[self.STATE_ID] for x in self.jobs]
         for task in self.tasks:
             anlz = analyzer.Thermo(task=task,
                                    options=self.options,
                                    logger=self.logger,
-                                   files=files,
-                                   params=params)
+                                   files=files)
             anlz.run()
         self.jobs[0].project.doc[self.name] = False
 

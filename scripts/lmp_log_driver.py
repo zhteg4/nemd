@@ -100,7 +100,6 @@ class LmpLog(object):
     AVE_DATA_EXT = '_ave' + DATA_EXT
     PNG_EXT = '_%s.png'
     RESULTS = analyzer.Thermo.RESULTS
-    COLUMN_RE = analyzer.Base.COLUMN_RE
 
     def __init__(self, options):
         """
@@ -159,7 +158,7 @@ class LmpLog(object):
         Set the tasks to be performed.
         """
         columns = self.lmp_log.thermo.columns
-        available = [self.COLUMN_RE.match(x).groups()[0] for x in columns]
+        available = [analyzer.Base.parseLabel(x)[0] for x in columns]
         selected = set(self.tasks).intersection(available)
         if len(selected) == len(self.tasks):
             return
@@ -177,7 +176,6 @@ class LmpLog(object):
                                   task=task,
                                   options=self.options,
                                   logger=logger,
-                                  sidx=self.sidx,
                                   df_reader=self.df_reader)
             anl.run()
 

@@ -27,6 +27,7 @@ FLAG_CPU = '-cpu'
 FLAG_PRJ_PATH = '-prj_path'
 PREREQ = 'prereq'
 FLAG_STATE_NUM = '-state_num'
+STATE_FLAG = 'state_flag'
 FLAG_TASK = '-task'
 
 FINISHED = 'Finished.'

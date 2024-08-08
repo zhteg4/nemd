@@ -19,7 +19,7 @@ from nemd.task import Polymer_Builder, Lammps, Custom_Dump
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_workflow.py', '')
 
-FLAG_STATE_NUM = '-state_num'
+FLAG_STATE_NUM = jobutils.FLAG_STATE_NUM
 
 
 def log_debug(msg):
@@ -105,6 +105,7 @@ class Runner(jobcontrol.Runner):
         """
         Set the state ids for all jobs.
         """
+        self.project.doc[self.STATE_FLAG] = FLAG_STATE_NUM
         self.state_ids = range(self.options.state_num)
 
     def setAggJobs(self):
@@ -128,7 +129,7 @@ def get_parser():
     parser.add_argument(
         FLAG_STATE_NUM,
         default=1,
-        metavar=FLAG_STATE_NUM.upper(),
+        metavar=FLAG_STATE_NUM[1:].upper(),
         type=parserutils.type_positive_int,
         help='Number of states for the dynamical system via random seed')
     parser = Polymer_Builder.DRIVER.get_parser(parser)

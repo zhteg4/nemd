@@ -184,7 +184,6 @@ class CustomDump(object):
             Analyzer = analyzer.ANALYZER[name]
             anl = Analyzer(self.time,
                            self.frms,
-                           sidx=self.sidx,
                            df_reader=self.df_reader,
                            gids=self.gids,
                            options=self.options,
