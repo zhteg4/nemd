@@ -20,7 +20,7 @@ class Runner:
     STATE_ID = jobutils.STATE_ID
     WORKSPACE = 'workspace'
     ARGS = jobutils.ARGS
-    PREREQ = jobutils.PREREQ
+    PREREQ = jobutils.PREREQCrystal_Builder
     COMPLETED = 'completed'
     OPERATIONS = 'operations'
     JOB_ID = 'job_id'
@@ -37,7 +37,7 @@ class Runner:
         self.options = options
         self.argv = argv
         self.logger = logger
-        self.state_ids = None
+        self.state = {self.STATE_FLAG: [0]}
         self.project = None
         self.agg_project = None
         self.prereq = collections.defaultdict(list)
@@ -57,7 +57,7 @@ class Runner:
             self.cleanJobs()
             self.setJob()
             self.setProject()
-            self.setStateIds()
+            self.setState()
             self.addJobs()
             self.runJobs()
             self.logStatus()
@@ -92,21 +92,26 @@ class Runner:
         """
         self.project = FlowProject.init_project()
 
-    def setStateIds(self):
+    def setState(self):
         """
-        Set the state ids for all jobs.
+        Set the state flags and values.
         """
-        raise NotImplementedError('This method sets the state ids for jobs. ')
+        pass
 
     def addJobs(self):
         """
         Add jobs to the project.
+
+        NOTE:  _StatePointDict warns NumpyConversionWarning if statepoint dict
+        contains numerical data types.
         """
-        for state_id in self.state_ids:
-            # _StatePointDict warns NumpyConversionWarning if state_id not str
-            job = self.project.open_job({self.STATE_ID: str(state_id)})
-            job.document[self.ARGS] = self.argv[:]
-            job.document.update({self.PREREQ: self.prereq})
+        for flag, values in self.state.items():
+            for value in map(str, values):
+                for state_id in map(str, range(self.options.state_num)):
+                    statepoint = {flag: value, self.STATE_ID: state_id}
+                    job = self.project.open_job(statepoint)
+                    job.document[self.ARGS] = self.argv[:]
+                    job.document.update({self.PREREQ: self.prereq})
 
     def runJobs(self):
         """

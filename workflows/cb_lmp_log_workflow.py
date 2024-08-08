@@ -75,7 +75,7 @@ class Job(task.Job):
         Set the scaled factor so that each cell starts from different vectors.
         """
         super().setArgs()
-        factor = self.job.statepoint[self.STATE_ID]
+        factor = self.job.statepoint[self.driver.FLAG_SCALED_FACTOR]
         self.args += [self.driver.FLAG_SCALED_FACTOR, factor]
 
 
@@ -98,12 +98,12 @@ class Runner(jobcontrol.Runner):
         lmp_log = Lmp_Log.getOpr(name='lmp_log')
         self.setPrereq(lmp_log, lammps_runner)
 
-    def setStateIds(self):
+    def setState(self):
         """
-        Set the state ids for all jobs.
+        Set the state keys and values.
         """
-        self.project.doc[self.STATE_FLAG] = FLAG_SCALED_RANGE
-        self.state_ids = np.arange(*self.options.scaled_range)
+        scaled_range = list(map(str, np.arange(*self.options.scaled_range)))
+        self.state = {Crystal_Builder.DRIVER.FLAG_SCALED_FACTOR: scaled_range}
 
     def setAggJobs(self):
         """

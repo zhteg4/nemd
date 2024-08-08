@@ -11,6 +11,7 @@ from nemd import constants
 from nemd import environutils
 from nemd import jobutils
 
+FLAG_STATE_NUM = jobutils.FLAG_STATE_NUM
 FLAG_CLEAN = jobutils.FLAG_CLEAN
 FLAG_JTYPE = jobutils.FLAG_JTYPE
 FLAG_CPU = jobutils.FLAG_CPU
@@ -358,7 +359,14 @@ def add_workflow_arguments(parser, arg_flags=None):
     :type arg_flags: list
     """
     if arg_flags is None:
-        arg_flags = [FLAG_CLEAN, FLAG_JTYPE, FLAG_CPU]
+        arg_flags = [FLAG_STATE_NUM, FLAG_CLEAN, FLAG_JTYPE, FLAG_CPU]
+    if FLAG_STATE_NUM in arg_flags:
+        parser.add_argument(
+            FLAG_STATE_NUM,
+            default=1,
+            metavar=FLAG_STATE_NUM[1:].upper(),
+            type=type_positive_int,
+            help='Number of states for the dynamical system via random seed')
     if FLAG_CLEAN in arg_flags:
         parser.add_argument(
             FLAG_CLEAN,

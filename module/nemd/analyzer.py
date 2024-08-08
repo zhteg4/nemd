@@ -43,7 +43,7 @@ class Base:
         self.logger = logger
         self.files = files
         self.data = None
-        self.idx = None
+        self.idx = 0
         self.sidx = 0
         self.eidx = None
         self.outfile = self.getFilename(self.options.jobname)
