@@ -102,8 +102,9 @@ class Runner(jobcontrol.Runner):
         """
         Set the state keys and values.
         """
+        super().setState()
         scaled_range = list(map(str, np.arange(*self.options.scaled_range)))
-        self.state = {Crystal_Builder.DRIVER.FLAG_SCALED_FACTOR: scaled_range}
+        self.state[Crystal_Builder.DRIVER.FLAG_SCALED_FACTOR] = scaled_range
 
     def setAggJobs(self):
         """

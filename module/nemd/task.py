@@ -32,7 +32,6 @@ class BaseJob:
 
     ARGS = jobutils.ARGS
     STATE_ID = jobutils.STATE_ID
-    STATE_FLAG = jobutils.STATE_FLAG
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
     PRE_RUN = None
 

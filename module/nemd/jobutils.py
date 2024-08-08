@@ -27,7 +27,6 @@ FLAG_CPU = '-cpu'
 FLAG_PRJ_PATH = '-prj_path'
 PREREQ = 'prereq'
 FLAG_STATE_NUM = '-state_num'
-STATE_FLAG = 'state_flag'
 FLAG_TASK = '-task'
 
 FINISHED = 'Finished.'
@@ -46,7 +45,7 @@ def get_arg(args, flag, val=None, first=True):
     :type args: list
     :param flag: set the value after this flag
     :type flag: str
-    :param val: the default value if the flag doesn't exist
+    :param val: the default if the flag doesn't exist or not followed by value(s)
     :type val: str
     :param first: only return the first value after the flag
     :type first: bool
@@ -56,10 +55,16 @@ def get_arg(args, flag, val=None, first=True):
     try:
         idx = args.index(flag)
     except ValueError:
+        # Flag not found
         return val
 
+    val = args[idx + 1]
+    if val.startswith('-'):
+        # Flag followed by another flag
+        return
+
     if first:
-        return args[idx + 1]
+        return val
 
     selected = []
     for delta, arg in enumerate(args[idx + 1:]):
@@ -67,6 +72,34 @@ def get_arg(args, flag, val=None, first=True):
             break
         selected.append(arg)
     return selected
+
+
+def pop_arg(args, flag, val=None):
+    """
+    Get the value after the flag in command arg list.
+
+    :param args: the arg list
+    :type args: list
+    :param flag: set the value after this flag
+    :type flag: str
+    :param val: the default if the flag doesn't exist or not followed by value(s)
+    :type val: str
+    :return: the value(s) after the flag
+    :rtype: str or list
+    """
+    arg = get_arg(args, flag)
+    if arg is None:
+        try:
+            args.remove(flag)
+        except ValueError:
+            pass
+        return val
+
+    flag_idx = args.index(flag)
+    deta = len(arg) if isinstance(arg, list) else 1
+    for idx in reversed(range(flag_idx, flag_idx + deta + 1)):
+        args.pop(idx)
+    return arg
 
 
 def set_arg(args, flag, val):

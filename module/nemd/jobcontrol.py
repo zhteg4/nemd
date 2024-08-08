@@ -1,5 +1,6 @@
 import sys
 import shutil
+import itertools
 import collections
 import numpy as np
 import networkx as nx
@@ -16,14 +17,14 @@ class Runner:
     The main class to setup a workflow.
     """
 
-    STATE_FLAG = jobutils.STATE_FLAG
     STATE_ID = jobutils.STATE_ID
     WORKSPACE = 'workspace'
     ARGS = jobutils.ARGS
-    PREREQ = jobutils.PREREQCrystal_Builder
+    PREREQ = jobutils.PREREQ
     COMPLETED = 'completed'
     OPERATIONS = 'operations'
     JOB_ID = 'job_id'
+    FLAG_SEED = jobutils.FLAG_SEED
 
     def __init__(self, options, argv, logger=None):
         """
@@ -37,7 +38,7 @@ class Runner:
         self.options = options
         self.argv = argv
         self.logger = logger
-        self.state = {self.STATE_FLAG: [0]}
+        self.state = {}
         self.project = None
         self.agg_project = None
         self.prereq = collections.defaultdict(list)
@@ -96,7 +97,12 @@ class Runner:
         """
         Set the state flags and values.
         """
-        pass
+        try:
+            seed_incre = np.arange(self.options.state_num)
+        except AttributeError:
+            return
+        seed = int(jobutils.pop_arg(self.argv, self.FLAG_SEED, 0))
+        self.state = {self.FLAG_SEED: list(map(str, seed + seed_incre))}
 
     def addJobs(self):
         """
@@ -105,13 +111,12 @@ class Runner:
         NOTE:  _StatePointDict warns NumpyConversionWarning if statepoint dict
         contains numerical data types.
         """
-        for flag, values in self.state.items():
-            for value in map(str, values):
-                for state_id in map(str, range(self.options.state_num)):
-                    statepoint = {flag: value, self.STATE_ID: state_id}
-                    job = self.project.open_job(statepoint)
-                    job.document[self.ARGS] = self.argv[:]
-                    job.document.update({self.PREREQ: self.prereq})
+        argvs = [[[x, z] for z in y] for x, y in self.state.items()]
+        for argv in itertools.product(*argvs):
+            # e.g. arg = (['-seed', '0'], ['-scale_factor', '0.95'])
+            job = self.project.open_job(dict({*x} for x in argv))
+            job.document[self.ARGS] = self.argv[:] + sum(argv, [])
+            job.document.update({self.PREREQ: self.prereq})
 
     def runJobs(self):
         """

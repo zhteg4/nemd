@@ -19,11 +19,7 @@ from nemd.task import Polymer_Builder, Lammps, Custom_Dump
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_workflow.py', '')
 
-<<<<<<< HEAD
 FLAG_STATE_NUM = jobutils.FLAG_STATE_NUM
-
-=======
->>>>>>> b14543f (rm param)
 
 def log_debug(msg):
     """
@@ -129,15 +125,6 @@ def get_parser():
         out of sys.argv.
     """
     parser = parserutils.get_parser(description=__doc__)
-<<<<<<< HEAD
-    parser.add_argument(
-        FLAG_STATE_NUM,
-        default=1,
-        metavar=FLAG_STATE_NUM[1:].upper(),
-        type=parserutils.type_positive_int,
-        help='Number of states for the dynamical system via random seed')
-=======
->>>>>>> b14543f (rm param)
     parser = Polymer_Builder.DRIVER.get_parser(parser)
     parser = Custom_Dump.DRIVER.get_parser(parser)
     parserutils.add_job_arguments(parser,
