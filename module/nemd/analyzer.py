@@ -28,7 +28,7 @@ class Base:
     LABEL_RE = re.compile('(.*) +\((.*)\)')
     RESULTS = 'Results for '
 
-    def __init__(self, df_reader=None, options=None, logger=None, agg=None):
+    def __init__(self, df_reader=None, options=None, logger=None):
         """
         :param df_reader: data file reader containing structural information
         :type df_reader: 'nemd.oplsua.DataFileReader'
@@ -36,33 +36,31 @@ class Base:
         :type options: 'argparse.Namespace'
         :param logger: the logger to log messages
         :type logger: 'logging.Logger'
-        :param agg: the data are read from the aggregation information
-        :type agg: SimpleNamespace
         """
         self.df_reader = df_reader
         self.options = options
         self.logger = logger
-        self.agg = agg
         self.data = None
         self.idx = 0
         self.sidx = None
         self.eidx = None
-        self.outfile = self.getFilename(self.options.jobname, agg=self.agg)
+        self.result = None
+        self.outfile = self.getFilename(self.options)
         jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
 
     @classmethod
-    def getFilename(cls, name, agg=None):
+    def getFilename(cls, options):
         """
-        :param name: jobname
-        :type name: str
-        :param agg: the data are read from the aggregation information
-        :type agg: SimpleNamespace
+        :param options: the options from command line
+        :type options: 'argparse.Namespace' or str
         :return str: the filename of the data file.
         """
-        if agg is None:
-            return f"{name}_{cls.NAME}{cls.DATA_EXT}"
-        filename = f"{name}_{cls.NAME}_{agg.id}{cls.DATA_EXT}"
-        return os.path.join(agg.dir, filename)
+        if isinstance(options, str):
+            return f"{options}_{cls.NAME}{cls.DATA_EXT}"
+        if not hasattr(options, 'jobs'):
+            return f"{options.jobname}_{cls.NAME}{cls.DATA_EXT}"
+        filename = f"{options.jobname}_{cls.NAME}_{options.id}{cls.DATA_EXT}"
+        return os.path.join(options.dir, filename)
 
     def run(self):
         """
@@ -78,10 +76,10 @@ class Base:
         """
         Read the output files from independent runs to set the data.
         """
-        if self.agg is None:
+        if not hasattr(self.options, 'jobs'):
             return
-        filename = self.getFilename(self.agg.name)
-        files = [x.fn(filename) for x in self.agg.jobs]
+        filename = self.getFilename(self.options.name)
+        files = [x.fn(filename) for x in self.options.jobs]
         datas = [pd.read_csv(x, index_col=0) for x in files]
         # 'Time (ps)': None; 'Time (ps) (0)': '0'; 'Time (ps) (0, 1)': '0, 1'
         names = [self.parseIndexName(x.index.name) for x in datas]
@@ -104,7 +102,7 @@ class Base:
         vals = [x.iloc[:, 0].to_numpy().reshape(-1, 1) for x in datas]
         vals = np.concatenate(vals, axis=1)
         mean_lb = f'{datas[0].columns[0]} (num={vals.shape[-1]})'
-        sd_lb = f'sd (num={vals.shape[-1]})'
+        sd_lb = symbols.SD_PREFIX + mean_lb
         data = {mean_lb: vals.mean(axis=1), sd_lb: vals.std(axis=1)}
         self.data = pd.DataFrame(data, index=index)
 
@@ -135,14 +133,19 @@ class Base:
             return
         if self.sidx is None:
             self.sidx = self.idx
-        sel = self.data.iloc[self.sidx:]
-        ave = sel.mean()
-        std = ave.iloc[1] if sel.shape[1] == 2 else sel.std().iloc[0]
+        sel = self.data.iloc[self.sidx:self.eidx]
+        data_lb = sel.columns[0]
+        ave = sel[data_lb].mean()
+        sd_lb = None if len(sel.columns) == 1 else sel.columns[1]
+        sd = sel[data_lb].std() if sd_lb is None else sel[sd_lb].mean()
+        if sd_lb is None:
+            sd_lb = symbols.SD_PREFIX + data_lb
+        self.result = pd.Series({data_lb: ave, sd_lb: sd})
+        self.result.index.name = sel.index.name
         label, unit, _ = self.parseLabel(self.data.columns[0])
-        self.log(
-            f'{label}: {ave.iloc[0]:.4g} {symbols.PLUS_MIN} {std:.4g} {unit} '
-            f'{symbols.ELEMENT_OF} [{self.data.index[self.sidx]:.4f}, '
-            f'{self.data.index[-1]:.4f}] ps')
+        stime, etime = sel.index[0], sel.index[-1]
+        self.log(f'{label}: {ave:.4g} {symbols.PLUS_MIN} {sd:.4g} {unit} '
+                 f'{symbols.ELEMENT_OF} [{stime:.4f}, {etime:.4f}] ps')
 
     def parseIndexName(self, name, sidx=0, eidx=None):
         """
@@ -452,7 +455,7 @@ class MSD(TrajBase):
         # MSD=2nDt https://en.wikipedia.org/wiki/Mean_squared_displacement
         log(f'{slope/6:.4g} {symbols.PLUS_MIN} {std_err/6:.4g} cm^2/s'
             f' (R-squared: {rvalue**2:.4f}) linear fit of'
-            f' [{sel.index.values[0]:.4f} {sel.index.values[-1]:.4f}] ps')
+            f' [{sel.index[0]:.4f} {sel.index[-1]:.4f}] ps')
 
 
 class Clash(TrajBase):

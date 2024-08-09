@@ -1,6 +1,7 @@
 import re
 import os
 import sh
+import copy
 import types
 import argparse
 import functools
@@ -35,6 +36,7 @@ class BaseJob:
     ARGS = jobutils.ARGS
     STATE_ID = jobutils.STATE_ID
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
+    DATA_EXT = '.csv'
     PRE_RUN = None
 
     def __init__(self, job, name=None, driver=None, logger=None, **kwargs):
@@ -254,8 +256,8 @@ class AggJob(BaseJob):
         Group jobs by the statepoints so that the jobs within one group only
         differ by the FLAG_SEED.
 
-        return iterator of pandas.Series list, 'signac.job.Job' list:
-            state point parameters, list of jobs
+        return lsit of (pandas.Series, 'signac.job.Job') tuples: state point
+            parameters, grouped jobs
         """
         jobs = collections.defaultdict(list)
         series = {}
@@ -267,10 +269,13 @@ class AggJob(BaseJob):
                 for x, y in statepoint.items()
             }
             params = pd.Series(params).sort_index()
-            key = params.to_csv(lineterminator='_', sep='_', header=False)
+            key = params.to_csv(lineterminator=' ', sep=' ', header=False)
             series[key] = params
             jobs[key].append(job)
-        return zip(series.values(), jobs.values())
+        keys = sorted(series.keys())
+        for idx, key in enumerate(keys):
+            series[key].index.name = idx
+        return [tuple([series[x], jobs[x]]) for x in keys]
 
 
 class BaseTask:
@@ -490,7 +495,6 @@ class LmpPostJob(Job):
     """
 
     READ_DATA = lammpsin.In.READ_DATA
-    DATA_EXT = lammpsin.In.DATA_EXT
 
     def getDatafile(self):
         """
@@ -499,7 +503,7 @@ class LmpPostJob(Job):
         :return list: the list of arguments to add the data file
         """
         data_cmd = sh.grep(self.READ_DATA, self.args[0]).split()
-        files = [x for x in data_cmd if x.endswith(self.DATA_EXT)]
+        files = [x for x in data_cmd if x.endswith(lammpsin.In.DATA_EXT)]
         return [self.driver.FLAG_DATA_FILE, files[0]] if files else []
 
 
@@ -518,10 +522,81 @@ class DumpJob(LmpPostJob):
         self.args = [dump_file] + self.getDatafile() + self.args[1:]
 
 
+class TaskAnalyzer(AggJob):
+
+    def __init__(self, *args, task=None, agg=None, **kwargs):
+        """
+        :param task: the task name to analyze
+        """
+        super().__init__(*args, **kwargs)
+        self.task = task
+        self.agg = agg
+        self.logger = logger
+        self.Anlz = None
+        self.result = pd.DataFrame()
+
+    def run(self):
+        """
+        Main method to aggregate the analyzer output files over all parameters.
+        """
+        self.setAnalyzer()
+        self.setResults()
+        self.save()
+        self.plot()
+
+    def setAnalyzer(self):
+        """
+        Set the analyzer class for the given task.
+        """
+        self.Anlz = analyzer.ANALYZER.get(self.task)
+        if self.Anlz in analyzer.NO_COMBINE:
+            self.Anlz = None
+
+    def setResults(self):
+        """
+        Set results for the given task over grouped jobs.
+        """
+        if self.Anlz is None:
+            return
+        self.log(f"Aggregation Task: {self.task}")
+        for params, jobs in self.groupJobs():
+            if not params.empty:
+                pstr = params.to_csv(lineterminator=' ', sep='=', header=False)
+                self.log(f"Aggregation Parameters (num={len(jobs)}): {pstr}")
+            agg = copy.deepcopy(self.agg)
+            agg.id = params.index.name
+            agg.jobs = jobs
+            anlz = self.Anlz(options=agg, logger=self.logger)
+            anlz.run()
+            if anlz.result is None:
+                continue
+            self.result = pd.concat([self.result, anlz.result])
+
+    def save(self):
+        """
+        Save the results to a file.
+        """
+        if self.result.empty:
+            return
+        filename = f"{self.agg.jobname}_{self.task}{self.DATA_EXT}"
+        self.result.to_csv(filename)
+        self.log(
+            f"{self.task.capitalize()} of all parameters saved to {filename}")
+        jobutils.add_outfile(filename, jobname=self.agg.jobname)
+
+    def plot(self):
+        """
+        Plot the results.
+        """
+        if self.result.empty:
+            return
+
+
 class DumpAgg(AggJob):
 
     TASK = jobutils.FLAG_TASK.lower()[1:]
     FLAG_TASK = jobutils.FLAG_TASK
+    AnalyzerClass = TaskAnalyzer
 
     def __init__(self, *args, name=None, **kwargs):
         """
@@ -529,10 +604,15 @@ class DumpAgg(AggJob):
         """
         self.jobname, name = name.split(symbols.POUND_SEP)
         super().__init__(*args, name=name, **kwargs)
-        inav = jobutils.get_arg(self.args, jobutils.FLAG_INTERACTIVE)
-        self.options = SimpleNamespace(jobname=self.jobname, interactive=inav)
         self.tasks = jobutils.get_arg(self.args, self.FLAG_TASK, first=False)
-        self.wdir = os.path.relpath(self.project.workspace, self.project.path)
+        inav = jobutils.get_arg(self.args, jobutils.FLAG_INTERACTIVE)
+        wdir = os.path.relpath(self.project.workspace, self.project.path)
+        self.agg = SimpleNamespace(jobname=self.jobname,
+                                   interactive=inav,
+                                   id=None,
+                                   dir=wdir,
+                                   name=self.name,
+                                   jobs=None)
 
     def run(self):
         """
@@ -540,37 +620,9 @@ class DumpAgg(AggJob):
         """
         self.log(f"{len(self.jobs)} jobs found for aggregation.")
         for task in self.tasks:
-            self.analyze(task)
-        self.project.doc[self.name] = False
-
-    def analyze(self, task):
-        """
-        Analyze the output files of the given task.
-        :param task: the task name to analyze
-        """
-        Analyzer = self.getAnalyzer(task)
-        if Analyzer is None:
-            return
-        self.log(f"Aggregation Task: {task}")
-        for idx, (params, jobs) in enumerate(self.groupJobs()):
-            if not params.empty:
-                pstr = params.to_csv(lineterminator=' ', sep='=', header=False)
-                self.log(f"Aggregation Parameters (num={len(jobs)}): {pstr}")
-            agg = SimpleNamespace(id=idx, dir=self.wdir, name=self.name, jobs=jobs)
-            anlz = Analyzer(options=self.options, logger=self.logger, agg=agg)
+            anlz = self.AnalyzerClass(*self.jobs, task=task, agg=self.agg)
             anlz.run()
-
-    def getAnalyzer(self, task):
-        """
-        Get the dump analyzer class for the given task.
-
-        :param task `class`: the task class
-        :return: the analyzer class or None if combination is not supported.
-        """
-        Analyzer = analyzer.ANALYZER[task]
-        if Analyzer in analyzer.NO_COMBINE:
-            return
-        return Analyzer
+        self.project.doc[self.name] = False
 
 
 class Custom_Dump(BaseTask):
@@ -590,23 +642,21 @@ class LogJob(LmpPostJob):
         self.args = self.args[:1] + self.getDatafile() + self.args[1:]
 
 
+class ThermoAnalyzer(TaskAnalyzer):
+
+    def setAnalyzer(self):
+        """
+        Set the log analyzer class for the given task.
+        """
+        if self.task not in analyzer.Thermo.TASKS:
+            return
+        self.Anlz = functools.partial(analyzer.Thermo, task=self.task)
+
+
 class LogAgg(DumpAgg):
 
     TASK = jobutils.FLAG_TASK.lower()[1:]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.tasks = [x for x in analyzer.Thermo.TASKS if x in self.tasks]
-
-    def getAnalyzer(self, task):
-        """
-        Get the log analyzer class for the given task.
-
-        :param task `class`: the task class
-        :return: the analyzer class
-        """
-        Analyzer = functools.partial(analyzer.Thermo, task=task)
-        return Analyzer
+    AnalyzerClass = ThermoAnalyzer
 
 
 class Lmp_Log(BaseTask):
