@@ -41,7 +41,8 @@ class BaseJob:
         """
         :param job: the signac job instance
         :type job: 'signac.contrib.job.Job'
-        :param name: the jobname
+        :param name: the jobname of this subjob, which is usually different from
+            the workflow jobname
         :type name: str
         :param driver: imported driver module
         :type driver: 'module'
@@ -53,6 +54,7 @@ class BaseJob:
         self.driver = driver
         self.logger = logger
         self.doc = self.job.document
+        self.args = list(map(str, self.doc.get(self.ARGS, [])))
 
     def log(self, msg, timestamp=False):
         """
@@ -87,10 +89,6 @@ class Job(BaseJob):
     PREREQ = jobutils.PREREQ
     OUTFILE = jobutils.OUTFILE
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.args = None
-
     def run(self):
         """
         Main method to setup the job.
@@ -104,7 +102,6 @@ class Job(BaseJob):
         """
         Set arguments.
         """
-        self.args = list(map(str, self.doc.get(self.ARGS, [])))
         pre_jobs = self.doc[self.PREREQ].get(self.name)
         if pre_jobs is None:
             return
@@ -213,6 +210,10 @@ class AggJob(BaseJob):
     TIME_BREAKDOWN = 'Task timing breakdown:'
 
     def __init__(self, *jobs, **kwargs):
+        """
+        :param jobs: the signac job instances to aggregate
+        :type jobs: 'list' of 'signac.contrib.job.Job'
+        """
         super().__init__(jobs[0], **kwargs)
         self.jobs = jobs
         self.project = self.job.project
@@ -253,11 +254,11 @@ class AggJob(BaseJob):
         Group jobs by the statepoints so that the jobs within one group only
         differ by the FLAG_SEED.
 
-        return iterator of str, 'signac.job.Job' list, pd.DataFrame list:
-            hashable key, list of jobs, state point parameters
+        return iterator of pandas.Series list, 'signac.job.Job' list:
+            state point parameters, list of jobs
         """
         jobs = collections.defaultdict(list)
-        frames = {}
+        series = {}
         for job in self.jobs:
             statepoint = dict(job.statepoint)
             statepoint.pop(jobutils.FLAG_SEED, None)
@@ -265,11 +266,11 @@ class AggJob(BaseJob):
                 x[1:] if x.startswith('-') else x: y
                 for x, y in statepoint.items()
             }
-            key = '_'.join(sum([[x, y] for x, y in params.items()], []))
+            params = pd.Series(params).sort_index()
+            key = params.to_csv(lineterminator='_', sep='_', header=False)
+            series[key] = params
             jobs[key].append(job)
-            frames[key] = pd.DataFrame({x: [y] for x, y in params.items()})
-        sorted_frames = [frames[x] for x in jobs.keys()]
-        return zip(jobs.keys(), jobs.values(), sorted_frames)
+        return zip(series.values(), jobs.values())
 
 
 class BaseTask:
@@ -520,15 +521,18 @@ class DumpJob(LmpPostJob):
 class DumpAgg(AggJob):
 
     TASK = jobutils.FLAG_TASK.lower()[1:]
+    FLAG_TASK = jobutils.FLAG_TASK
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.jobname, self.subname = self.name.split(symbols.POUND_SEP)
-        inav = jobutils.get_arg(self.doc[self.ARGS], jobutils.FLAG_INTERACTIVE)
+    def __init__(self, *args, name=None, **kwargs):
+        """
+        :param name: e.g. 'cb_lmp_log_#_lmp_log' is parsed as {jobname}_#_{name}
+        """
+        self.jobname, name = name.split(symbols.POUND_SEP)
+        super().__init__(*args, name=name, **kwargs)
+        inav = jobutils.get_arg(self.args, jobutils.FLAG_INTERACTIVE)
         self.options = SimpleNamespace(jobname=self.jobname, interactive=inav)
-        self.tasks = jobutils.get_arg(self.doc[self.ARGS],
-                                      jobutils.FLAG_TASK,
-                                      first=False)
+        self.tasks = jobutils.get_arg(self.args, self.FLAG_TASK, first=False)
+        self.wdir = os.path.relpath(self.project.workspace, self.project.path)
 
     def run(self):
         """
@@ -536,20 +540,25 @@ class DumpAgg(AggJob):
         """
         self.log(f"{len(self.jobs)} jobs found for aggregation.")
         for task in self.tasks:
-            Analyzer = self.getAnalyzer(task)
-            if Analyzer is None:
-                continue
-            for key, jobs, params in self.groupJobs():
-                opts = SimpleNamespace(**vars(self.options))
-                if key:
-                    opts.jobname = f"{self.jobname}_{key}"
-                filename = Analyzer.getFilename(self.subname)
-                files = [x.fn(filename) for x in jobs]
-                anlz = Analyzer(options=opts, logger=self.logger, files=files)
-                anlz.outfile = os.path.join(self.project.workspace,
-                                            anlz.outfile)
-                anlz.run()
+            self.analyze(task)
         self.project.doc[self.name] = False
+
+    def analyze(self, task):
+        """
+        Analyze the output files of the given task.
+        :param task: the task name to analyze
+        """
+        Analyzer = self.getAnalyzer(task)
+        if Analyzer is None:
+            return
+        self.log(f"Aggregation Task: {task}")
+        for idx, (params, jobs) in enumerate(self.groupJobs()):
+            if not params.empty:
+                pstr = params.to_csv(lineterminator=' ', sep='=', header=False)
+                self.log(f"Aggregation Parameters (num={len(jobs)}): {pstr}")
+            agg = SimpleNamespace(id=idx, dir=self.wdir, name=self.name, jobs=jobs)
+            anlz = Analyzer(options=self.options, logger=self.logger, agg=agg)
+            anlz.run()
 
     def getAnalyzer(self, task):
         """
@@ -597,7 +606,6 @@ class LogAgg(DumpAgg):
         :return: the analyzer class
         """
         Analyzer = functools.partial(analyzer.Thermo, task=task)
-        Analyzer.getFilename = analyzer.Thermo.getFilename
         return Analyzer
 
 

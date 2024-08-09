@@ -28,7 +28,7 @@ class Base:
     LABEL_RE = re.compile('(.*) +\((.*)\)')
     RESULTS = 'Results for '
 
-    def __init__(self, df_reader=None, options=None, logger=None, files=None):
+    def __init__(self, df_reader=None, options=None, logger=None, agg=None):
         """
         :param df_reader: data file reader containing structural information
         :type df_reader: 'nemd.oplsua.DataFileReader'
@@ -36,28 +36,33 @@ class Base:
         :type options: 'argparse.Namespace'
         :param logger: the logger to log messages
         :type logger: 'logging.Logger'
-        :param files: the data are read from these files
-        :type files: list
+        :param agg: the data are read from the aggregation information
+        :type agg: SimpleNamespace
         """
         self.df_reader = df_reader
         self.options = options
         self.logger = logger
-        self.files = files
+        self.agg = agg
         self.data = None
         self.idx = 0
         self.sidx = None
         self.eidx = None
-        self.outfile = self.getFilename(self.options.jobname)
+        self.outfile = self.getFilename(self.options.jobname, agg=self.agg)
         jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
 
     @classmethod
-    def getFilename(cls, name):
+    def getFilename(cls, name, agg=None):
         """
         :param name: jobname
         :type name: str
+        :param agg: the data are read from the aggregation information
+        :type agg: SimpleNamespace
         :return str: the filename of the data file.
         """
-        return f"{name}_{cls.NAME}{cls.DATA_EXT}"
+        if agg is None:
+            return f"{name}_{cls.NAME}{cls.DATA_EXT}"
+        filename = f"{name}_{cls.NAME}_{agg.id}{cls.DATA_EXT}"
+        return os.path.join(agg.dir, filename)
 
     def run(self):
         """
@@ -73,9 +78,11 @@ class Base:
         """
         Read the output files from independent runs to set the data.
         """
-        if self.files is None:
+        if self.agg is None:
             return
-        datas = [pd.read_csv(x, index_col=0) for x in self.files]
+        filename = self.getFilename(self.agg.name)
+        files = [x.fn(filename) for x in self.agg.jobs]
+        datas = [pd.read_csv(x, index_col=0) for x in files]
         # 'Time (ps)': None; 'Time (ps) (0)': '0'; 'Time (ps) (0, 1)': '0, 1'
         names = [self.parseIndexName(x.index.name) for x in datas]
         if len(datas) == 1:
