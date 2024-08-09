@@ -1,10 +1,12 @@
 import re
+import os
 import sh
 import types
 import argparse
 import functools
 import collections
 import humanfriendly
+import pandas as pd
 from datetime import timedelta
 from types import SimpleNamespace
 from flow import FlowProject, aggregator
@@ -245,6 +247,29 @@ class AggJob(BaseJob):
         :return: True if the post-conditions are met.
         """
         return self.name in self.project.doc
+
+    def groupJobs(self):
+        """
+        Group jobs by the statepoints so that the jobs within one group only
+        differ by the FLAG_SEED.
+
+        return iterator of str, 'signac.job.Job' list, pd.DataFrame list:
+            hashable key, list of jobs, state point parameters
+        """
+        jobs = collections.defaultdict(list)
+        frames = {}
+        for job in self.jobs:
+            statepoint = dict(job.statepoint)
+            statepoint.pop(jobutils.FLAG_SEED, None)
+            params = {
+                x[1:] if x.startswith('-') else x: y
+                for x, y in statepoint.items()
+            }
+            key = '_'.join(sum([[x, y] for x, y in params.items()], []))
+            jobs[key].append(job)
+            frames[key] = pd.DataFrame({x: [y] for x, y in params.items()})
+        sorted_frames = [frames[x] for x in jobs.keys()]
+        return zip(jobs.keys(), jobs.values(), sorted_frames)
 
 
 class BaseTask:
@@ -498,9 +523,9 @@ class DumpAgg(AggJob):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        jobname, self.subname = self.name.split(symbols.POUND_SEP)
+        self.jobname, self.subname = self.name.split(symbols.POUND_SEP)
         inav = jobutils.get_arg(self.doc[self.ARGS], jobutils.FLAG_INTERACTIVE)
-        self.options = SimpleNamespace(jobname=jobname, interactive=inav)
+        self.options = SimpleNamespace(jobname=self.jobname, interactive=inav)
         self.tasks = jobutils.get_arg(self.doc[self.ARGS],
                                       jobutils.FLAG_TASK,
                                       first=False)
@@ -514,12 +539,16 @@ class DumpAgg(AggJob):
             Analyzer = self.getAnalyzer(task)
             if Analyzer is None:
                 continue
-            filename = Analyzer.getFilename(self.subname)
-            files = [x.fn(filename) for x in self.jobs]
-            anlz = Analyzer(options=self.options,
-                            logger=self.logger,
-                            files=files)
-            anlz.run()
+            for key, jobs, params in self.groupJobs():
+                opts = SimpleNamespace(**vars(self.options))
+                if key:
+                    opts.jobname = f"{self.jobname}_{key}"
+                filename = Analyzer.getFilename(self.subname)
+                files = [x.fn(filename) for x in jobs]
+                anlz = Analyzer(options=opts, logger=self.logger, files=files)
+                anlz.outfile = os.path.join(self.project.workspace,
+                                            anlz.outfile)
+                anlz.run()
         self.project.doc[self.name] = False
 
     def getAnalyzer(self, task):

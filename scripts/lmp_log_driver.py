@@ -99,7 +99,9 @@ class LmpLog(object):
         self.options = options
         self.lmp_log = None
         self.df_reader = None
-        self.tasks = [x for x in analyzer.Thermo.TASKS if x in self.options.task]
+        self.tasks = [
+            x for x in analyzer.Thermo.TASKS if x in self.options.task
+        ]
 
     def run(self):
         """
@@ -296,7 +298,7 @@ def get_parser(parser=None, jflags=None):
                         default=analyzer.Thermo.TOTENG,
                         nargs='+',
                         help=f'{analyzer.Thermo.NAME} searches, combines and '
-                             f'averages thermodynamic info. ')
+                        f'averages thermodynamic info. ')
     parser.add_argument(
         FLAG_LAST_PCT,
         metavar=FLAG_LAST_PCT.upper(),

@@ -1,4 +1,5 @@
 import re
+import os
 import math
 import numpy as np
 import pandas as pd
@@ -211,9 +212,10 @@ class Base:
             if use_column:
                 name = self.data.columns[0].split('(')[0].strip().lower()
                 fname = f"{self.options.jobname}_{name}_{self.NAME}{self.FIG_EXT}"
-            fig.savefig(fname)
-            jobutils.add_outfile(fname, jobname=self.options.jobname)
-        self.log(f'{self.DESCR.capitalize()} figure saved as {fname}')
+            file_path = os.path.join(os.path.dirname(self.outfile), fname)
+            fig.savefig(file_path)
+            jobutils.add_outfile(file_path, jobname=self.options.jobname)
+        self.log(f'{self.DESCR.capitalize()} figure saved as {file_path}')
 
     def log(self, msg):
         """

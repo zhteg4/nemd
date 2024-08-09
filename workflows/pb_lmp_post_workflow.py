@@ -21,6 +21,7 @@ JOBNAME = PATH.split('.')[0].replace('_workflow.py', '')
 
 FLAG_STATE_NUM = jobutils.FLAG_STATE_NUM
 
+
 def log_debug(msg):
     """
     Print this message into the log file in debug mode.
