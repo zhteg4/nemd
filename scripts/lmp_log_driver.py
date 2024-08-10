@@ -87,7 +87,6 @@ class LmpLog(object):
     DATA_EXT = '_%s.csv'
     AVE_DATA_EXT = '_ave' + DATA_EXT
     PNG_EXT = '_%s.png'
-    RESULTS = analyzer.Thermo.RESULTS
 
     def __init__(self, options):
         """

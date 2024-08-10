@@ -270,3 +270,46 @@ def get_time(filepath, dtype=DELTA):
         return dtime
     delta = dtime - stime
     return delta
+
+
+class Base(object):
+
+    def __init__(self, logger=None):
+        """
+        :param logger: the logger to log messages
+        :type logger: 'logging.Logger'
+        """
+        self.logger = logger
+
+    def log(self, msg, **kwargs):
+        """
+        Print this message into the log file as information.
+
+        :param msg str: the msg to be printed
+        """
+        if self.logger:
+            log(self.logger, msg, **kwargs)
+        else:
+            print(msg)
+
+    def log_debug(self, msg):
+        """
+        Print this message into the log file in debug mode.
+
+        :param msg str: the msg to be printed
+        """
+        if self.logger:
+            self.logger.debug(msg)
+        else:
+            print(msg)
+
+    def log_warning(self, msg):
+        """
+        Print this warning message into log file.
+
+        :param msg str: the msg to be printed
+        """
+        if self.logger:
+            self.logger.warning(msg)
+        else:
+            print(msg)

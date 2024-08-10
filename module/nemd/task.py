@@ -1,7 +1,6 @@
 import re
 import os
 import sh
-import copy
 import types
 import argparse
 import functools
@@ -17,21 +16,11 @@ from nemd import logutils
 from nemd import jobutils
 from nemd import lammpsin
 from nemd import analyzer
-from nemd import timeutils
 
 FILE = jobutils.FILE
 
-logger = logutils.createModuleLogger(file_path=__file__)
 
-
-def log_debug(msg):
-
-    if logger is None:
-        return
-    logger.debug(msg)
-
-
-class BaseJob:
+class BaseJob(logutils.Base):
 
     ARGS = jobutils.ARGS
     STATE_ID = jobutils.STATE_ID
@@ -51,30 +40,13 @@ class BaseJob:
         :param logger:  print to this logger
         :type logger: 'logging.Logger'
         """
+        super().__init__(logger=logger)
         self.job = job
         self.name = name
         self.driver = driver
         self.logger = logger
         self.doc = self.job.document
         self.args = list(map(str, self.doc.get(self.ARGS, [])))
-
-    def log(self, msg, timestamp=False):
-        """
-        Log message to the logger.
-
-        :param logger:  print to this logger
-        :type logger: 'logging.Logger'
-        :param msg: the message to be printed out
-        :type msg: str
-        :param timestamp: append time information after the message
-        :type timestamp: bool
-        """
-        if self.logger is None:
-            print(msg)
-            return
-        self.logger.info(msg)
-        if timestamp:
-            self.logger.info(timeutils.ctime())
 
 
 class Job(BaseJob):
@@ -252,12 +224,13 @@ class AggJob(BaseJob):
         """
         return self.name in self.project.doc
 
+    @functools.cache
     def groupJobs(self):
         """
         Group jobs by the statepoints so that the jobs within one group only
         differ by the FLAG_SEED.
 
-        return lsit of (pandas.Series, 'signac.job.Job') tuples: state point
+        return list of (pandas.Series, 'signac.job.Job') tuples: state point
             parameters, grouped jobs
         """
         jobs = collections.defaultdict(list)
@@ -417,7 +390,6 @@ class BaseTask:
             fp_pre = functools.partial(pre, name=name)
             fp_pre = functools.update_wrapper(fp_pre, pre)
             func = FlowProject.pre(lambda *x: fp_pre(*x))(func)
-        log_debug(f'Operator: {func.__name__}: {func}')
         return func
 
     @classmethod
@@ -486,16 +458,20 @@ class Lammps(BaseTask):
     import lammps_driver as DRIVER
 
 
-class LmpPostJob(Job):
-    """
-    The base class for post-processing LAMMPS jobs.
-    """
+class LogJob(Job):
 
     READ_DATA = lammpsin.In.READ_DATA
 
+    def setArgs(self):
+        """
+        Set arguments to analyze the log file.
+        """
+        super().setArgs()
+        self.args = self.args[:1] + self.getDatafile() + self.args[1:]
+
     def getDatafile(self):
         """
-        Get the data file from the input file.
+        Get the data file from the log file.
 
         :return list: the list of arguments to add the data file
         """
@@ -504,7 +480,47 @@ class LmpPostJob(Job):
         return [self.driver.FLAG_DATA_FILE, files[0]] if files else []
 
 
-class DumpJob(LmpPostJob):
+class LogJobAgg(AggJob):
+
+    FLAG_TASK = jobutils.FLAG_TASK
+
+    def __init__(self, *args, **kwargs):
+        """
+        :param name: e.g. 'cb_lmp_log_#_lmp_log' is parsed as {jobname}_#_{name}
+        """
+        super().__init__(*args, **kwargs)
+        self.tasks = jobutils.get_arg(self.args, self.FLAG_TASK, first=False)
+        inav = jobutils.get_arg(self.args, jobutils.FLAG_INTERACTIVE)
+        wdir = os.path.relpath(self.project.workspace, self.project.path)
+        self.options = SimpleNamespace(jobname=self.project.jobname,
+                                       interactive=inav,
+                                       id=None,
+                                       dir=wdir,
+                                       name=self.jobname,
+                                       jobs=None)
+
+    def run(self):
+        """
+        Main method to run the aggregator job.
+        """
+        self.log(f"{len(self.jobs)} jobs found for aggregation.")
+        for task in self.tasks:
+            anlz = analyzer.Agg(task=task,
+                                jobs=self.groupJobs(),
+                                options=self.options,
+                                logger=self.logger)
+            anlz.run()
+        self.project.doc[self.name] = False
+
+
+class Lmp_Log(BaseTask):
+
+    import lmp_log_driver as DRIVER
+    JobClass = LogJob
+    AggClass = LogJobAgg
+
+
+class DumpJob(LogJob):
 
     DUMP = lammpsin.In.DUMP
     CUSTOM_EXT = lammpsin.In.CUSTOM_EXT
@@ -516,129 +532,20 @@ class DumpJob(LmpPostJob):
         super().setArgs()
         dump_cmd = sh.grep(self.DUMP, self.args[0]).split()
         dump_file = [x for x in dump_cmd if x.endswith(self.CUSTOM_EXT)][0]
-        self.args = [dump_file] + self.getDatafile() + self.args[1:]
+        self.args[0] = [dump_file]
 
+    def getDumpfile(self):
+        """
+        Get the trajectory dump file from the log file.
 
-class TaskAgg(AggJob):
-
-    def __init__(self, *args, task=None, agg=None, **kwargs):
+        :return list: the list of arguments to add the data file
         """
-        :param task: the task name to analyze
-        """
-        super().__init__(*args, **kwargs)
-        self.task = task
-        self.agg = agg
-        self.logger = logger
-        self.Anlz = None
-        self.result = pd.DataFrame()
-
-    def run(self):
-        """
-        Main method to aggregate the analyzer output files over all parameters.
-        """
-        self.setAnalyzer()
-        self.setResults()
-        self.save()
-        self.plot()
-
-    def setAnalyzer(self):
-        """
-        Set the analyzer class for the given task.
-        """
-        self.Anlz = analyzer.ANALYZER.get(self.task.lower())
-        if self.Anlz is None:
-            self.log(f"Aggregator Analyzer not found for task {self.task}")
-
-    def setResults(self):
-        """
-        Set results for the given task over grouped jobs.
-        """
-        if self.Anlz is None:
-            return
-        self.log(f"Aggregation Task: {self.task}")
-        for params, jobs in self.groupJobs():
-            if not params.empty:
-                pstr = params.to_csv(lineterminator=' ', sep='=', header=False)
-                self.log(f"Aggregation Parameters (num={len(jobs)}): {pstr}")
-            agg = copy.deepcopy(self.agg)
-            agg.id = params.index.name
-            agg.jobs = jobs
-            anlz = self.Anlz(options=agg, logger=self.logger)
-            anlz.run()
-            if anlz.result is None:
-                continue
-            self.result = pd.concat([self.result, anlz.result])
-
-    def save(self):
-        """
-        Save the results to a file.
-        """
-        if self.result.empty:
-            return
-        filename = f"{self.agg.jobname}_{self.task}{self.DATA_EXT}"
-        self.result.to_csv(filename)
-        self.log(
-            f"{self.task.capitalize()} of all parameters saved to {filename}")
-        jobutils.add_outfile(filename, jobname=self.agg.jobname)
-
-    def plot(self):
-        """
-        Plot the results.
-        """
-        if self.result.empty:
-            return
-
-
-class DumpAgg(AggJob):
-
-    TASK = jobutils.FLAG_TASK.lower()[1:]
-    FLAG_TASK = jobutils.FLAG_TASK
-
-    def __init__(self, *args, **kwargs):
-        """
-        :param name: e.g. 'cb_lmp_log_#_lmp_log' is parsed as {jobname}_#_{name}
-        """
-        super().__init__(*args, **kwargs)
-        self.tasks = jobutils.get_arg(self.args, self.FLAG_TASK, first=False)
-        inav = jobutils.get_arg(self.args, jobutils.FLAG_INTERACTIVE)
-        wdir = os.path.relpath(self.project.workspace, self.project.path)
-        self.agg = SimpleNamespace(jobname=self.project.jobname,
-                                   interactive=inav,
-                                   id=None,
-                                   dir=wdir,
-                                   name=self.jobname,
-                                   jobs=None)
-
-    def run(self):
-        """
-        Main method to run the aggregator job.
-        """
-        self.log(f"{len(self.jobs)} jobs found for aggregation.")
-        for task in self.tasks:
-            anlz = TaskAgg(*self.jobs, task=task, agg=self.agg, name=self.name)
-            anlz.run()
-        self.project.doc[self.name] = False
+        dump_cmd = sh.grep(self.DUMP, self.args[0]).split()
+        dump_file = [x for x in dump_cmd if x.endswith(self.CUSTOM_EXT)][0]
+        return dump_file
 
 
 class Custom_Dump(BaseTask):
 
     import custom_dump_driver as DRIVER
     JobClass = DumpJob
-    AggClass = DumpAgg
-
-
-class LogJob(LmpPostJob):
-
-    def setArgs(self):
-        """
-        Set arguments to analyze the log file.
-        """
-        super().setArgs()
-        self.args = self.args[:1] + self.getDatafile() + self.args[1:]
-
-
-class Lmp_Log(BaseTask):
-
-    import lmp_log_driver as DRIVER
-    JobClass = LogJob
-    AggClass = DumpAgg

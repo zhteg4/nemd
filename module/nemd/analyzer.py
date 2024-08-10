@@ -1,6 +1,7 @@
 import re
 import os
 import math
+import copy
 import numpy as np
 import pandas as pd
 from scipy import constants
@@ -16,7 +17,7 @@ from nemd import lammpsin
 from nemd import plotutils
 
 
-class Base:
+class Base(logutils.Base):
     """
     The base class subclassed by analyzers.
     """
@@ -26,7 +27,6 @@ class Base:
     FIG_EXT = '.png'
     INDEX_LB = symbols.TIME_LB
     LABEL_RE = re.compile('(.*) +\((.*)\)')
-    RESULTS = 'Results for '
 
     def __init__(self, df_reader=None, options=None, logger=None):
         """
@@ -34,12 +34,10 @@ class Base:
         :type df_reader: 'nemd.oplsua.DataFileReader'
         :param options: the options from command line
         :type options: 'argparse.Namespace'
-        :param logger: the logger to log messages
-        :type logger: 'logging.Logger'
         """
+        super().__init__(logger=logger)
         self.df_reader = df_reader
         self.options = options
-        self.logger = logger
         self.data = None
         self.idx = 0
         self.sidx = None
@@ -226,39 +224,6 @@ class Base:
             fig.savefig(file_path)
             jobutils.add_outfile(file_path, jobname=self.options.jobname)
         self.log(f'{self.DESCR.capitalize()} figure saved as {file_path}')
-
-    def log(self, msg):
-        """
-        Print this message into the log file as information.
-
-        :param msg str: the msg to be printed
-        """
-        if self.logger:
-            logutils.log(self.logger, msg)
-        else:
-            print(msg)
-
-    def log_debug(self, msg):
-        """
-        Print this message into the log file in debug mode.
-
-        :param msg str: the msg to be printed
-        """
-        if self.logger:
-            self.logger.debug(msg)
-        else:
-            print(msg)
-
-    def log_warning(self, msg):
-        """
-        Print this warning message into log file.
-
-        :param msg str: the msg to be printed
-        """
-        if self.logger:
-            self.logger.warning(msg)
-        else:
-            print(msg)
 
 
 class TrajBase(Base):
@@ -583,3 +548,79 @@ for name in Thermo.TASKS:
             'DESCR': name.capitalize()
         }))
 ANALYZER = {getattr(x, 'NAME'): x for x in ANALYZER}
+
+
+class Agg(logutils.Base):
+
+    DATA_EXT = '.csv'
+
+    def __init__(self, task=None, jobs=None, options=None, logger=None):
+        """
+        :param task str: the task name to analyze
+        :param jobs: state point parameters, grouped jobs
+        :type jobs: list of (pandas.Series, 'signac.job.Job') tuples
+        :param options 'argparse.Namespace': the options from command line
+        :param logger 'logging.Logger': the logger to log messages
+        """
+        super().__init__(logger=logger)
+        self.task = task
+        self.jobs = jobs
+        self.options = options
+        self.Anlz = None
+        self.result = pd.DataFrame()
+
+    def run(self):
+        """
+        Main method to aggregate the analyzer output files over all parameters.
+        """
+        self.setAnalyzer()
+        self.setResults()
+        self.save()
+        self.plot()
+
+    def setAnalyzer(self):
+        """
+        Set the analyzer class for the given task.
+        """
+        self.Anlz = ANALYZER.get(self.task.lower())
+        if self.Anlz is None:
+            self.log(f"Aggregator Analyzer not found for task {self.task}")
+
+    def setResults(self):
+        """
+        Set results for the given task over grouped jobs.
+        """
+        if self.Anlz is None:
+            return
+        self.log(f"Aggregation Task: {self.task}")
+        for params, jobs in self.jobs:
+            if not params.empty:
+                pstr = params.to_csv(lineterminator=' ', sep='=', header=False)
+                self.log(f"Aggregation Parameters (num={len(jobs)}): {pstr}")
+            options = copy.deepcopy(self.options)
+            options.id = params.index.name
+            options.jobs = jobs
+            anlz = self.Anlz(options=options, logger=self.logger)
+            anlz.run()
+            if anlz.result is None:
+                continue
+            self.result = pd.concat([self.result, anlz.result])
+
+    def save(self):
+        """
+        Save the results to a file.
+        """
+        if self.result.empty:
+            return
+        filename = f"{self.options.jobname}_{self.task}{self.DATA_EXT}"
+        self.result.to_csv(filename)
+        self.log(
+            f"{self.task.capitalize()} of all parameters saved to {filename}")
+        jobutils.add_outfile(filename, jobname=self.options.jobname)
+
+    def plot(self):
+        """
+        Plot the results.
+        """
+        if self.result.empty:
+            return

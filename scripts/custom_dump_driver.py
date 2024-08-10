@@ -84,7 +84,6 @@ class CustomDump(object):
     TASK = FLAG_TASK[1:]
     DATA_EXT = '_%s.csv'
     PNG_EXT = '_%s.png'
-    RESULTS = analyzer.Base.RESULTS
 
     def __init__(self, options, timestep=1, unit=symbols.FS):
         """

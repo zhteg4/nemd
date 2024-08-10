@@ -4,13 +4,11 @@
 This workflow driver runs crystal builder, lammps, and log analyser.
 """
 import os
-import sh
 import sys
 import numpy as np
 import pandas as pd
 from flow import FlowProject
 
-from nemd import task
 from nemd import logutils
 from nemd import stillinger
 from nemd import jobutils
