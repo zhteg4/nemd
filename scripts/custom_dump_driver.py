@@ -5,8 +5,6 @@
 """
 This post molecular dynamics driver perform trajectory analysis.
 """
-import re
-import sh
 import os
 import sys
 import math

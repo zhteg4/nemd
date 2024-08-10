@@ -219,6 +219,7 @@ class AggJob(BaseJob):
         super().__init__(jobs[0], **kwargs)
         self.jobs = jobs
         self.project = self.job.project
+        self.jobname = self.name.split(symbols.POUND_SEP)[0]
 
     def run(self):
         """
@@ -426,7 +427,6 @@ class BaseTask:
                name=None,
                attr='aggregator',
                post=None,
-               tname=None,
                **kwargs):
         """
         Get and register an aggregator job task that collects task outputs.
@@ -441,15 +441,12 @@ class BaseTask:
         :type attr: str or types.FunctionType
         :param post: add post-condition for the aggregator if True
         :type post: bool
-        :param tname: aggregate the job tasks of this name
-        :type tname: str
         :return: the operation to execute
         :rtype: 'function'
         """
         if post is None:
             post = cls.postAgg
-        if tname:
-            name = f"{name}{symbols.POUND_SEP}{tname}"
+        name = f"{name}{symbols.POUND_SEP}agg"
         return cls.getOpr(aggregator=aggregator(),
                           cmd=cmd,
                           with_job=with_job,
@@ -522,7 +519,7 @@ class DumpJob(LmpPostJob):
         self.args = [dump_file] + self.getDatafile() + self.args[1:]
 
 
-class TaskAnalyzer(AggJob):
+class TaskAgg(AggJob):
 
     def __init__(self, *args, task=None, agg=None, **kwargs):
         """
@@ -548,9 +545,9 @@ class TaskAnalyzer(AggJob):
         """
         Set the analyzer class for the given task.
         """
-        self.Anlz = analyzer.ANALYZER.get(self.task)
-        if self.Anlz in analyzer.NO_COMBINE:
-            self.Anlz = None
+        self.Anlz = analyzer.ANALYZER.get(self.task.lower())
+        if self.Anlz is None:
+            self.log(f"Aggregator Analyzer not found for task {self.task}")
 
     def setResults(self):
         """
@@ -596,22 +593,20 @@ class DumpAgg(AggJob):
 
     TASK = jobutils.FLAG_TASK.lower()[1:]
     FLAG_TASK = jobutils.FLAG_TASK
-    AnalyzerClass = TaskAnalyzer
 
-    def __init__(self, *args, name=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         """
         :param name: e.g. 'cb_lmp_log_#_lmp_log' is parsed as {jobname}_#_{name}
         """
-        self.jobname, name = name.split(symbols.POUND_SEP)
-        super().__init__(*args, name=name, **kwargs)
+        super().__init__(*args, **kwargs)
         self.tasks = jobutils.get_arg(self.args, self.FLAG_TASK, first=False)
         inav = jobutils.get_arg(self.args, jobutils.FLAG_INTERACTIVE)
         wdir = os.path.relpath(self.project.workspace, self.project.path)
-        self.agg = SimpleNamespace(jobname=self.jobname,
+        self.agg = SimpleNamespace(jobname=self.project.jobname,
                                    interactive=inav,
                                    id=None,
                                    dir=wdir,
-                                   name=self.name,
+                                   name=self.jobname,
                                    jobs=None)
 
     def run(self):
@@ -620,7 +615,7 @@ class DumpAgg(AggJob):
         """
         self.log(f"{len(self.jobs)} jobs found for aggregation.")
         for task in self.tasks:
-            anlz = self.AnalyzerClass(*self.jobs, task=task, agg=self.agg)
+            anlz = TaskAgg(*self.jobs, task=task, agg=self.agg, name=self.name)
             anlz.run()
         self.project.doc[self.name] = False
 
@@ -642,60 +637,8 @@ class LogJob(LmpPostJob):
         self.args = self.args[:1] + self.getDatafile() + self.args[1:]
 
 
-class ThermoAnalyzer(TaskAnalyzer):
-
-    def setAnalyzer(self):
-        """
-        Set the log analyzer class for the given task.
-        """
-        if self.task not in analyzer.Thermo.TASKS:
-            return
-        self.Anlz = functools.partial(analyzer.Thermo, task=self.task)
-
-
-class LogAgg(DumpAgg):
-
-    TASK = jobutils.FLAG_TASK.lower()[1:]
-    AnalyzerClass = ThermoAnalyzer
-
-
 class Lmp_Log(BaseTask):
 
     import lmp_log_driver as DRIVER
     JobClass = LogJob
-    AggClass = LogAgg
-    RESULTS = DRIVER.LmpLog.RESULTS
-
-    # @classmethod
-    # def aggregator(cls, *jobs, log=None, name=None, tname=None, **kwargs):
-    #     """
-    #     The aggregator job task that combines the lammps log analysis.
-    #
-    #     :param jobs: the task jobs the aggregator collected
-    #     :type jobs: list of 'signac.contrib.job.Job'
-    #     :param log: the function to print user-facing information
-    #     :type log: 'function'
-    #     :param name: the jobname based on which output files are named
-    #     :type name: str
-    #     :param tname: aggregate the job tasks of this name
-    #     :type tname: str
-    #     """
-    #     log(f"{len(jobs)} jobs found for aggregation.")
-    #     job = jobs[0]
-    #     logfile = job.fn(job.document[jobutils.OUTFILE][tname])
-    #     outfiles = cls.DRIVER.LmpLog.getOutfiles(logfile)
-    #     if kwargs.get(jobutils.FLAG_CLEAN[1:]):
-    #         jname = name.split(BaseTask.SEP)[0]
-    #         for filename in outfiles.values():
-    #             try:
-    #                 os.remove(filename.replace(tname, jname))
-    #             except FileNotFoundError:
-    #                 pass
-    #     jobs = sorted(jobs, key=lambda x: x.statepoint[BaseTask.STATE_ID])
-    #     outfiles = {x: [z.fn(y) for z in jobs] for x, y in outfiles.items()}
-    #     jname = name.split(BaseTask.SEP)[0]
-    #     inav = environutils.is_interactive()
-    #     state_ids = [x.statepoint[BaseTask.STATE_ID] for x in jobs]
-    #     state_label = kwargs.get('state_label')
-    #     iname = pd.Index(state_ids, name=state_label) if state_label else None
-    #     cls.DRIVER.LmpLog.combine(outfiles, log, jname, inav=inav, iname=iname)
+    AggClass = DumpAgg

@@ -509,7 +509,6 @@ class XYZ(TrajBase):
         broken_bonds=False & glue=True is good for molecules droplets in vacuum
         Not all combination make physical senses.
         """
-
         with open(self.outfile, 'w') as self.out_fh:
             # XYZ analyzer may change the coordinates
             for frm in self.frms:
@@ -549,26 +548,21 @@ class Thermo(Base):
     NAME = 'thermo'
     DESCR = 'Thermodynamic information'
     THERMO = 'thermo'
-    TEMP = 'Temp'
-    EPAIR = 'E_pair'
-    E_MOL = 'E_mol'
-    TOTENG = 'TotEng'
-    PRESS = 'Press'
-    VOLUME = 'Volume'
+    TEMP = 'temp'
+    EPAIR = 'e_pair'
+    E_MOL = 'e_mol'
+    TOTENG = 'toteng'
+    PRESS = 'press'
+    VOLUME = 'volume'
     TASKS = [TEMP, EPAIR, E_MOL, TOTENG, PRESS, VOLUME]
 
-    def __init__(self, thermo=None, task=None, **kwargs):
+    def __init__(self, thermo=None, **kwargs):
         """
         :param thermo: the thermodynamic data
         :type thermo: 'pandas.core.frame.DataFrame'
-        :param task: the thermodynamic task name
-        :type task: str
         """
         super().__init__(**kwargs)
         self.thermo = thermo
-        self.task = task
-        self.NAME = self.task.lower()
-        self.DESCR = self.task.capitalize()
 
     def setData(self):
         """
@@ -576,11 +570,16 @@ class Thermo(Base):
         """
         if self.data is not None:
             return
-        column_re = re.compile(f"{self.task} +\((.*)\)")
+        column_re = re.compile(f"{self.NAME} +\((.*)\)", re.IGNORECASE)
         column = [x for x in self.thermo.columns if column_re.match(x)][0]
         self.data = self.thermo[column].to_frame()
 
 
 ANALYZER = [Density, RDF, MSD, Clash, View, XYZ]
+for name in Thermo.TASKS:
+    ANALYZER.append(
+        type(name, (Thermo, ), {
+            'NAME': name,
+            'DESCR': name.capitalize()
+        }))
 ANALYZER = {getattr(x, 'NAME'): x for x in ANALYZER}
-NO_COMBINE = [View, XYZ]

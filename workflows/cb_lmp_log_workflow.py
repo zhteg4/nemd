@@ -94,18 +94,8 @@ class Runner(jobcontrol.Runner):
         """
         Aggregate post analysis jobs.
         """
-        # super().setAggJobs()
-        combine_agg = Lmp_Log.getAgg(name=self.options.jobname,
-                                     tname='lmp_log',
-                                     logger=logger)
-        # fit_agg = Lmp_Log.getAgg(name=self.options.jobname,
-        #                          attr=self.minEneAgg,
-        #                          tname=Lmp_Log.DRIVER.TOTENG,
-        #                          post=self.minEnePost,
-        #                          log=log,
-        #                          clean=self.options.clean,
-        #                          state_label='Scale Factor')
-        # self.setPrereq(fit_agg, combine_agg)
+        super().setAggJobs()
+        Lmp_Log.getAgg(name='lmp_log', logger=logger)
 
     @staticmethod
     def minEneAgg(*jobs, log=None, name=None, tname=None, **kwargs):
@@ -137,29 +127,6 @@ class Runner(jobcontrol.Runner):
             if x.endswith(stillinger.Struct.DATA_EXT)
         ][0]
         log(f'The corresponding datafile is saved as in {datafile}')
-
-    @classmethod
-    def minEnePost(cls, *jobs, name=None):
-        """
-        Report the status of the aggregation for minimum energy.
-
-        Main driver log should report results found the csv saved on the success
-        of aggregation.
-
-        :param jobs: the task jobs the aggregator collected
-        :type jobs: list of 'signac.contrib.job.Job'
-        :param name: jobname based on which log file is found
-        :type name: str
-        :return: the label after job completion
-        :rtype: str
-        """
-        jname = name.split(cls.SEP)[0]
-        logfile = jname + logutils.DRIVER_LOG
-        try:
-            line = sh.grep(cls.MINIMUM_ENERGY, logfile)
-        except sh.ErrorReturnCode_1:
-            return False
-        return line.split(cls.MINIMUM_ENERGY)[0].strip()
 
 
 def get_parser():

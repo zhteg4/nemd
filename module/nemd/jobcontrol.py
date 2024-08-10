@@ -184,7 +184,8 @@ class Runner:
         """
         prj_path = self.project.path if self.project else self.options.prj_path
         try:
-            self.agg_project = FlowProject.get_project(prj_path)
+            self.agg_project = FlowProject.get_project(
+                prj_path, jobname=self.options.jobname)
         except LookupError as err:
             self.log_error(str(err))
 
