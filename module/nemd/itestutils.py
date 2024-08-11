@@ -56,8 +56,7 @@ class Job(task.Job):
             match = self.JOBNAME_RE.match(cmd)
             if not match:
                 continue
-            jobname = match.groups()[0]
-            cmd += f" {self.FLAG_JOBNAME} {jobname}"
+            cmd += f" {self.FLAG_JOBNAME} {match.groups()[0]}"
             self.args[idx] = cmd
 
     def addQuote(self):
@@ -160,42 +159,37 @@ class CMP:
             raise ValueError(f"{self.orignal} and {self.target} are different")
 
 
-class ResultJob(task.BaseJob):
-    """
-    The class to check the results for one cmd integration test.
-    """
+class Info:
 
     CMD_BRACKET_RE = '\s.*?\(.*?\)'
-    PAIRED_BRACKET_RE = '\(.*?\)'
-    CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
-    MSG = 'msg'
-    CHECK = 'check'
     AND_RE = r'and\s+'
+    NAME_BRACKET_RE = re.compile('(.*?)\([\'|"]?(.*?)[\'|"]?\)')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, pathname):
+        """
+        :param pathname str: the path to the file
+        """
+        self.pathname = pathname
         self.line = None
         self.operators = []
 
     def run(self):
         """
-        Main method to get the results.
+        Main method to parse one integration test file.
         """
         self.setLine()
-        self.parserLine()
-        self.executeOperators()
+        self.setOperators()
 
     def setLine(self):
         """
         Set the one line command by locating, reading, and cleaning the check file.
         """
-        with open(os.path.join(self.job.statepoint[FLAG_DIR],
-                               self.CHECK)) as fh:
+        with open(self.pathname) as fh:
             lines = [x.strip() for x in fh.readlines()]
         operators = [x for x in lines if not x.startswith(symbols.POUND)]
         self.line = ' ' + ' '.join(operators)
 
-    def parserLine(self):
+    def setOperators(self):
         """
         Parse the one line command to get the operators.
         """
@@ -204,7 +198,49 @@ class ResultJob(task.BaseJob):
             operator = re.sub(self.AND_RE, '', operator)
             self.operators.append(operator)
 
-    def executeOperators(self):
+    def items(self):
+        """
+        The generator to get the name and value of each operator.
+        :return generator: the name and value of each operator
+        """
+        return (self.NAME_BRACKET_RE.match(x).groups() for x in self.operators)
+
+    def get(self, key, default=None):
+        """
+        Get the value of a specific key.
+
+        :param key str: the key to be searched
+        :param default str: the default value if the key is not found
+        :return str: the value of the key
+        """
+        for name, value in self.items():
+            if name == key:
+                return value
+        return default
+
+
+class ResultJob(task.BaseJob, Info):
+    """
+    The class to check the results for one cmd integration test.
+    """
+
+    CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
+    MSG = 'msg'
+    CHECK = 'check'
+
+    def __init__(self, *args, **kwargs):
+        task.BaseJob.__init__(self, *args, **kwargs)
+        pathnaem = os.path.join(self.job.statepoint[FLAG_DIR], self.CHECK)
+        Info.__init__(self, pathnaem)
+
+    def run(self):
+        """
+        Main method to get the results.
+        """
+        super().run()
+        self.executeAll()
+
+    def executeAll(self):
         """
         Execute all operators. Raise errors during operation if one failed.
         """
@@ -212,24 +248,23 @@ class ResultJob(task.BaseJob):
         print(
             f"{self.job.statepoint[FLAG_DIR]}: {symbols.COMMA.join(self.operators)}"
         )
-        for operator in self.operators:
+        for name, value in self.items():
             try:
-                self.execute(operator)
+                self.execute(name, value)
             except (FileNotFoundError, KeyError, ValueError) as err:
                 self.doc[self.MSG] = str(err)
 
-    def execute(self, operator):
+    def execute(self, name, value):
         """
         Lookup the command class and execute.
         """
-        bracketed = re.findall(self.PAIRED_BRACKET_RE, operator)[0]
-        cmd = operator.replace(bracketed, '')
         try:
-            runner_class = self.CMD[cmd]
+            runner_class = self.CMD[name]
         except KeyError:
-            raise KeyError(f'{cmd} is one unknown command. Please select from '
-                           f'{self.CMD.keys()}')
-        runner = runner_class(*bracketed[1:-1].split(','), job=self.job)
+            raise KeyError(
+                f'{name} is one unknown command. Please select from '
+                f'{self.CMD.keys()}')
+        runner = runner_class(*value.split(','), job=self.job)
         runner.run()
 
     def post(self):

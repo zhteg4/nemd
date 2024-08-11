@@ -157,7 +157,6 @@ class Job(BaseJob):
         if write:
             with open(f"{self.name}_cmd", 'w') as fh:
                 fh.write(cmd)
-
         return cmd
 
     def post(self):

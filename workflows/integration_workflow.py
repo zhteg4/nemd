@@ -10,7 +10,6 @@ One test must contain one cmd file and a check file.
 Supported check commands are: cmd, exist, not_exist ..
 """
 import os
-import re
 import sys
 import glob
 import datetime
@@ -54,40 +53,43 @@ def log_error(msg):
     sys.exit(1)
 
 
-class Integration(jobcontrol.Runner):
-    """
-    The main class to run integration tests.
-    """
+class Tag(itestutils.Info):
 
-    WORKSPACE = 'workspace'
-    FLOW_PROJECT = 'flow.project'
     TAG = 'tag'
     SLOW = 'slow'
-    TAG_KEYS = [SLOW]
-    WILD_CARD = symbols.WILD_CARD
-    IS_BASENAME_DIGIT_FUNC = lambda x: os.path.basename(x).isdigit()
-    MSG = itestutils.ResultJob.MSG
+    TIME_FORMAT = '%H:%M:%S'
+    TIME_ZERO = datetime.datetime.strptime('00:00:00', TIME_FORMAT)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def isSlow(self, threshold):
+        """
+        Whether the test is slow.
+
+        :param threshold float: the threshold in seconds to be considered as slow
+        :return bool: Whether or not the test is slow.
+        """
+        value = self.get(self.SLOW)
+        if value is None:
+            return False
+        hms = datetime.datetime.strptime(value, self.TIME_FORMAT)
+        delta = hms - self.TIME_ZERO
+        return delta.total_seconds() > threshold
+
+
+class TestDir:
+
+    WILD_CARD = symbols.WILD_CARD
+
+    def __init__(self, options):
+        """
+        :param options: parsed commandline options
+        :type options: 'argparse.Namespace'
+        """
+        self.options = options
         self.dirs = None
 
-    def setJob(self):
-        """
-        Set operators. For example, operators to run cmd and check results.
-        """
-        if self.options.check_only:
-            itestutils.Result.getOpr(name='result')
-            return
-
-        cmd = itestutils.Cmd.getOpr(name='cmd')
-        result = itestutils.Result.getOpr(name='result')
-        self.setPrereq(result, cmd)
-
-    def setState(self):
+    def run(self):
         self.setTestDirs()
         self.skipTestDirs()
-        self.state = {FLAG_DIR: self.dirs}
 
     def setTestDirs(self):
         """
@@ -124,7 +126,7 @@ class Integration(jobcontrol.Runner):
         self.dirs = [x for x in self.dirs if not self.isSLow(x)]
         if not self.dirs:
             log_error(f'All tests in {self.options.dir} are skipped.')
-        log(f"{orig_num - len(self.dirs)} tests skipped.")
+        log(f"{orig_num - len(self.dirs)} / {orig_num} tests skipped.")
 
     def isSLow(self, test_dir):
         """
@@ -136,52 +138,49 @@ class Integration(jobcontrol.Runner):
         """
         if self.options.slow is None:
             return False
-        tags = self.getTags(test_dir, tag_keys=[self.SLOW])
-        return tags.get(self.SLOW, 0) > self.options.slow
-
-    def getTags(self, test_dir, tag_keys=None):
-        """
-        Get the tags in the test directory.
-
-        :param test_dir str: the test directory.
-        :param tag_keys list: tag keys to look for.
-        :return dict: tag keys and values
-
-        :raise ValueError: when the key is unknown.
-        """
-        if tag_keys is None:
-            tag_keys = self.TAG_KEYS
         tag_file = os.path.join(test_dir, self.TAG)
         if not os.path.isfile(tag_file):
-            return {}
-        with open(tag_file) as tfh:
-            lines = tfh.readlines()
-        line = symbols.SEMICOLON.join(lines)
-        tags = line.split(symbols.SEMICOLON)
-        key_vals = {}
-        for tag in tags:
-            for tag_key in tag_keys:
-                if tag.startswith(tag_key):
-                    break
-            else:
-                raise ValueError(f"Unknown {tag} found in {tag_file}. Only "
-                                 f"{self.TAG_KEYS} tags are supported.")
-            if tag_key == self.SLOW:
-                hms = re.search('\(.*?\)', tag).group()[2:-2]
-                hms = datetime.datetime.strptime(hms, '%H:%M:%S')
-                seconds = datetime.timedelta(
-                    hours=hms.hour, minutes=hms.minute,
-                    seconds=hms.second).total_seconds()
-                key_vals[tag_key] = seconds
-        return key_vals
+            return False
+        tag = Tag(tag_file)
+        tag.run()
+        return tag.isSlow(self.options.slow)
+
+
+class Integration(jobcontrol.Runner):
+    """
+    The main class to run integration tests.
+    """
+
+    MSG = itestutils.ResultJob.MSG
+
+    def setJob(self):
+        """
+        Set operators. For example, operators to run cmd and check results.
+        """
+        if self.options.check_only:
+            itestutils.Result.getOpr(name='result')
+            return
+
+        cmd = itestutils.Cmd.getOpr(name='cmd')
+        result = itestutils.Result.getOpr(name='result')
+        self.setPrereq(result, cmd)
+
+    def setState(self):
+        """
+        Set state with test dirs.
+        """
+        test_dir = TestDir(self.options)
+        test_dir.run()
+        self.state = {FLAG_DIR: test_dir.dirs}
 
     def addJobs(self):
         """
         Add jobs to the project.
         """
         super().addJobs()
-        for job, test_dir in zip(self.project.find_jobs(), self.dirs):
-            job.doc.pop(self.MSG)
+        for job in self.project.find_jobs():
+            if self.options.check_only:
+                job.doc.pop(self.MSG)
 
     def logStatus(self):
         """
@@ -189,14 +188,14 @@ class Integration(jobcontrol.Runner):
         """
         super().logStatus()
         jobs = self.project.find_jobs()
-        fjobs = [x for x in jobs if x.document.get(self.MSG)]
+        fjobs = [x for x in jobs if x.doc.get(self.MSG) is not False]
         log(f"{len(jobs) - len(fjobs)} / {len(jobs)} succeeded jobs.")
         if not fjobs:
             return
         ids = [x.id for x in fjobs]
-        msgs = [x.doc[self.MSG] for x in fjobs]
+        msgs = [x.doc.get(self.MSG, 'not run') for x in fjobs]
         dirs = [x.statepoint[FLAG_DIR] for x in fjobs]
-        info = pd.DataFrame({'msg': msgs, 'dir': dirs}, index=ids)
+        info = pd.DataFrame({'message': msgs, 'directory': dirs}, index=ids)
         log(info.to_markdown())
 
 
