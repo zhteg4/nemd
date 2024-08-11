@@ -213,7 +213,7 @@ class Base(logutils.Base):
                                 alpha=0.3)
                 ax.legend()
             if any([self.sidx, self.eidx]):
-                gdata = self.data.iloc[[self.sidx, self.eidx]]
+                gdata = self.data.iloc[self.sidx:self.eidx]
                 ax.plot(gdata.index, gdata.iloc[:, 0], '.-g')
             label, unit, _ = self.parseLabel(self.data.index.name)
             ax.set_xlabel(f"{label} ({unit})")
@@ -353,7 +353,8 @@ class RDF(TrajBase):
         raveled = np.ravel(self.data.iloc[:, 0])
         smoothed = savgol_filter(raveled, window_length=31, polyorder=2)
         row = self.data.iloc[smoothed.argmax()]
-        self.log(f'Peak position: {row.name}; peak value: {row.values[0]: .2f}')
+        self.log(
+            f'Peak position: {row.name}; peak value: {row.values[0]: .2f}')
 
 
 class MSD(TrajBase):
@@ -527,7 +528,8 @@ class Thermo(Base):
         super().__init__(**kwargs)
         self.thermo = thermo
         if self.thermo is not None:
-            self.idx = int(self.LABEL_RE.match(self.thermo.index.name).groups()[1])
+            self.idx = int(
+                self.LABEL_RE.match(self.thermo.index.name).groups()[1])
 
     def setData(self):
         """

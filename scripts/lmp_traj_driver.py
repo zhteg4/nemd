@@ -157,7 +157,8 @@ class Traj(object):
             return
 
         if self.sidx is None:
-            self.sidx = math.floor(len(self.frms) * (1 - self.options.last_pct))
+            self.sidx = math.floor(
+                len(self.frms) * (1 - self.options.last_pct))
         self.time = pd.Index([x.step * self.timestep for x in self.frms])
         # Convert time to ps and add starting index
         if self.unit == symbols.FS:
