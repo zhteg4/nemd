@@ -35,7 +35,7 @@ FLAG_PROD_TIME = '-prod_time'
 FLAG_PROD_ENS = '-prod_ens'
 FlAG_FORCE_FIELD = '-force_field'
 
-FLAG_CUSTOM_DUMP = 'custom_dump'
+FLAG_TRAJ = 'traj'
 FLAG_DATA_FILE = '-data_file'
 
 
@@ -68,21 +68,19 @@ def type_itest_dir(arg):
     """
     Return the dir of tests.
 
-    For example, $input_dir,  $NEMD_SRC/$input_dir, and $NEMD_SRC/0*?$input_dir
-
+    :param arg str: the test dir or a list of test ids. The following directories
+        are searched: {test dir}, $NEMD_SRC/test/integration/0*{test id}
     return str: the integration test dir
     """
     try:
         return type_dir(arg)
     except argparse.ArgumentTypeError:
-        dir = environutils.get_integration_test_dir()
-        args = arg.split(',')
-        nargs = [f"{x:0>4}" for x in args]
-        nargs = [os.path.join(dir, x) for x in set(args + nargs)]
-        dirs = [x for x in nargs if os.path.isdir(x)]
-        return dirs
-    raise argparse.ArgumentTypeError(
-        f"None of {', '.join([arg] + nargs)} exists.")
+        basedir = environutils.get_integration_test_dir()
+        if basedir is None or not arg.isdigit():
+            argparse.ArgumentTypeError(
+                f"{basedir} and {arg} doesn't locate a test dir.")
+        pathname = os.path.join(basedir, f"{arg:0>4}")
+        return type_dir(pathname)
 
 
 def type_float(arg):

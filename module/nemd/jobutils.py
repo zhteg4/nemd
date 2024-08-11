@@ -34,7 +34,6 @@ FILE = "$FILE"
 ARGS = 'args'
 TASK = 'task'
 AGGREGATOR = 'aggregator'
-STATE_ID = 'state_id'
 
 
 def get_arg(args, flag, val=None, first=True):

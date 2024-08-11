@@ -102,7 +102,7 @@ def get_integration_test_dir():
     """
     nemd_src = get_nemd_src()
     if not nemd_src:
-        raise ValueError(f'Please set {NEMD_SRC} pointing to the source code.')
+        return None
     return os.path.join(nemd_src, TEST, INTEGRATION)
 
 

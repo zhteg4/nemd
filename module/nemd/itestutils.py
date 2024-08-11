@@ -4,7 +4,7 @@ import filecmp
 from nemd import task
 from nemd import symbols
 
-DIR = 'dir'
+FLAG_DIR = '-dir'
 
 
 class Job(task.Job):
@@ -24,14 +24,15 @@ class Job(task.Job):
         :type job: 'signac.contrib.job.Job'
         """
         super().__init__(*args, **kwargs)
+        # each cmd job has a unique name based on the directory name
+        self.name = os.path.basename(self.job.statepoint[FLAG_DIR])
         self.comment = None
-        self.name = self.job.statepoint[self.STATE_ID]
 
     def setArgs(self):
         """
         Set arguments.
         """
-        with open(os.path.join(self.doc[DIR], self.CMD)) as fh:
+        with open(os.path.join(self.job.statepoint[FLAG_DIR], self.CMD)) as fh:
             self.args = [x.strip() for x in fh.readlines() if x.strip()]
 
     def removeUnkArgs(self):
@@ -74,29 +75,22 @@ class Job(task.Job):
         :param write bool: the msg to be printed
         :return str: the command as str
         """
-        dirname = os.path.basename(self.doc[DIR])
-        msg = f"{dirname}: {self.comment}" if self.comment else dirname
+        msg = f"{self.name}: {self.comment}" if self.comment else self.name
         pre_cmd = [f"echo \'# {msg}\'"]
         return super().getCmd(write=write, pre_cmd=pre_cmd)
 
-
-class Integration(task.BaseTask):
-
-    JobClass = Job
-
-    @classmethod
-    def post(cls, job, **kwargs):
+    def post(self):
         """
         The job is considered finished when the post-conditions return True.
 
-        :param job: the signac job instance
-        :type job: 'signac.contrib.job.Job'
-        :param name: the jobname
-        :type name: str
-        :return: True if the post-conditions are met
-        :rtype: bool
+        :return: True if the post-conditions are met.
         """
-        return super().post(job, name=None)
+        return bool(self.doc.get(self.OUTFILE))
+
+
+class Cmd(task.BaseTask):
+
+    JobClass = Job
 
 
 class EXIST:
@@ -155,7 +149,8 @@ class CMP:
         """
         The main method to compare files.
         """
-        self.orignal = os.path.join(self.job.document[DIR], self.orignal)
+        self.orignal = os.path.join(self.job.statepoint[FLAG_DIR],
+                                    self.orignal)
         if not os.path.isfile(self.orignal):
             raise FileNotFoundError(f"{self.orignal} not found")
         self.target = self.job.fn(self.target)
@@ -181,7 +176,6 @@ class ResultJob(task.BaseJob):
         super().__init__(*args, **kwargs)
         self.line = None
         self.operators = []
-        self.doc[self.MSG] = False
 
     def run(self):
         """
@@ -195,7 +189,8 @@ class ResultJob(task.BaseJob):
         """
         Set the one line command by locating, reading, and cleaning the check file.
         """
-        with open(os.path.join(self.doc[DIR], self.CHECK)) as fh:
+        with open(os.path.join(self.job.statepoint[FLAG_DIR],
+                               self.CHECK)) as fh:
             lines = [x.strip() for x in fh.readlines()]
         operators = [x for x in lines if not x.startswith(symbols.POUND)]
         self.line = ' ' + ' '.join(operators)
@@ -213,8 +208,10 @@ class ResultJob(task.BaseJob):
         """
         Execute all operators. Raise errors during operation if one failed.
         """
-        print(f"{self.job.statepoint[self.STATE_ID]}: "
-              f"Analyzing {symbols.COMMA.join(self.operators)}")
+        self.doc[self.MSG] = False
+        print(
+            f"{self.job.statepoint[FLAG_DIR]}: {symbols.COMMA.join(self.operators)}"
+        )
         for operator in self.operators:
             try:
                 self.execute(operator)
@@ -235,20 +232,18 @@ class ResultJob(task.BaseJob):
         runner = runner_class(*bracketed[1:-1].split(','), job=self.job)
         runner.run()
 
+    def post(self):
+        """
+        The job is considered finished when the post-conditions return True.
 
-class Results(task.BaseTask):
+        :return: True if the post-conditions are met.
+        """
+        return self.MSG in self.doc
+
+
+class Result(task.BaseTask):
     """
     Class to parse the check file and execute the inside operations.
     """
 
     JobClass = ResultJob
-
-    @classmethod
-    def post(cls, job, **kwargs):
-        """
-        The method to question whether the checking process has been performed.
-
-        :param job 'signac.contrib.job.Job': the job object
-        :return str: the shell command to execute
-        """
-        return ResultJob.MSG in job.document

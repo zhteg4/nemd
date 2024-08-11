@@ -11,9 +11,6 @@ from nemd import oplsua
 from nemd import molview
 from nemd import geometry
 
-FLAG_CUSTOM_DUMP = traj.FLAG_CUSTOM_DUMP
-FLAG_DATA_FILE = traj.FLAG_DATA_FILE
-
 POINT = collections.namedtuple('POINT',
                                ['idx', 'ele', 'x', 'y', 'z', 'cn', 'pn'])
 

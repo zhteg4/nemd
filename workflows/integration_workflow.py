@@ -7,15 +7,14 @@ This integration driver runs integration tests in one folder or all sub-folders.
 The (sub-)folder name must be one integer to define the job id.
 One test must contain one cmd file and a check file.
 
-Supported check commands are:
-cmd to compare two files;
-..(more to come)
+Supported check commands are: cmd, exist, not_exist ..
 """
 import os
 import re
 import sys
 import glob
 import datetime
+import pandas as pd
 
 from nemd import symbols
 from nemd import logutils
@@ -28,7 +27,7 @@ from nemd import environutils
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_workflow', '')
 
-FLAG_DIR = itestutils.DIR
+FLAG_DIR = itestutils.FLAG_DIR
 FLAG_SLOW = '-slow'
 FLAG_CHECK_ONLY = '-check_only'
 
@@ -65,48 +64,67 @@ class Integration(jobcontrol.Runner):
     TAG = 'tag'
     SLOW = 'slow'
     TAG_KEYS = [SLOW]
+    WILD_CARD = symbols.WILD_CARD
+    IS_BASENAME_DIGIT_FUNC = lambda x: os.path.basename(x).isdigit()
+    MSG = itestutils.ResultJob.MSG
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.test_dirs = None
+        self.dirs = None
 
-    def setTasks(self):
+    def setJob(self):
         """
-        Set integration tests as tasks.
+        Set operators. For example, operators to run cmd and check results.
         """
-        self.setTests()
-        self.skipTests()
-        self.setOperators()
+        if self.options.check_only:
+            itestutils.Result.getOpr(name='result')
+            return
 
-    def setTests(self):
+        cmd = itestutils.Cmd.getOpr(name='cmd')
+        result = itestutils.Result.getOpr(name='result')
+        self.setPrereq(result, cmd)
+
+    def setState(self):
+        self.setTestDirs()
+        self.skipTestDirs()
+        self.state = {FLAG_DIR: self.dirs}
+
+    def setTestDirs(self):
         """
         Set the test dirs by looking for the sub-folder tests or the input
         folder itself.
         """
-        self.test_dirs = [
-            x for x in self.options.dir if os.path.basename(x).isdigit()
-        ]
-        if not self.test_dirs:
-            self.test_dirs = [
-                y for x in self.options.dir
-                for y in glob.glob(os.path.join(x, symbols.WILD_CARD))
-                if os.path.isdir(y) and os.path.basename(y).isdigit()
-            ]
-        if not self.test_dirs:
+        self.dirs = self.filterTestDir(self.options.dir)
+        if not self.dirs:
+            # Search for test dirs inside the input folder
+            dirs = [os.path.join(x, self.WILD_CARD) for x in self.options.dir]
+            pathnames = [y for x in dirs for y in glob.glob(x)]
+            subdirs = filter(lambda x: os.path.isdir(x), pathnames)
+            self.dirs = self.filterTestDir(subdirs)
+        if not self.dirs:
             log_error(f'No tests found in {self.options.dir}.')
-        log(f"{len(self.test_dirs)} tests found.")
+        log(f"{len(self.dirs)} tests found.")
 
-    def skipTests(self):
+    def filterTestDir(self, pathnames):
+        """
+        Filter the test directories from the given pathnames.
+
+        :param pathnames list: the pathnames to filter.
+        :return list: the filtered pathnames.
+        """
+        return list(filter(lambda x: os.path.basename(x).isdigit(), pathnames))
+
+    def skipTestDirs(self):
         """
         Skip slow tests.
         """
         if self.options.slow is None:
             return
-        orig_num = len(self.test_dirs)
-        self.test_dirs = [x for x in self.test_dirs if not self.isSLow(x)]
-        if not self.test_dirs:
+        orig_num = len(self.dirs)
+        self.dirs = [x for x in self.dirs if not self.isSLow(x)]
+        if not self.dirs:
             log_error(f'All tests in {self.options.dir} are skipped.')
-        log(f"{orig_num - len(self.test_dirs)} tests skipped.")
+        log(f"{orig_num - len(self.dirs)} tests skipped.")
 
     def isSLow(self, test_dir):
         """
@@ -157,28 +175,13 @@ class Integration(jobcontrol.Runner):
                 key_vals[tag_key] = seconds
         return key_vals
 
-    def setOperators(self):
-        """
-        Set operators. For example, run cmd and check results.
-        """
-        if self.options.check_only:
-            itestutils.Results.getOpr(name='result')
-            return
-
-        cmd = itestutils.Integration.getOpr(name='cmd')
-        result = itestutils.Results.getOpr(name='result')
-        self.setPrereq(result, cmd)
-
     def addJobs(self):
         """
         Add jobs to the project.
         """
-        ids = [os.path.basename(x) for x in self.test_dirs]
-        super().addJobs(ids=ids)
-        for job, test_dir in zip(self.project.find_jobs(), self.test_dirs):
-            job.document[itestutils.DIR] = test_dir
-            if self.options.check_only:
-                job.doc.pop(self.MSG)
+        super().addJobs()
+        for job, test_dir in zip(self.project.find_jobs(), self.dirs):
+            job.doc.pop(self.MSG)
 
     def logStatus(self):
         """
@@ -186,14 +189,15 @@ class Integration(jobcontrol.Runner):
         """
         super().logStatus()
         jobs = self.project.find_jobs()
-        sjobs = [x for x in jobs if not x.document.get(self.MSG)]
         fjobs = [x for x in jobs if x.document.get(self.MSG)]
-        log(f"{len(sjobs)} succeed; {len(fjobs)} failed.")
-        for job in fjobs:
-            id = job.statepoint[self.STATE_ID]
-            dir = job.doc[itestutils.DIR]
-            log(f'id: {id}; dir: {dir}')
-            log(f'{job.document[self.MSG]}')
+        log(f"{len(jobs) - len(fjobs)} / {len(jobs)} succeeded jobs.")
+        if not fjobs:
+            return
+        ids = [x.id for x in fjobs]
+        msgs = [x.doc[self.MSG] for x in fjobs]
+        dirs = [x.statepoint[FLAG_DIR] for x in fjobs]
+        info = pd.DataFrame({'msg': msgs, 'dir': dirs}, index=ids)
+        log(info.to_markdown())
 
 
 def get_parser():
@@ -204,10 +208,12 @@ def get_parser():
         out of sys.argv.
     """
     parser = parserutils.get_parser(description=__doc__)
+    itest_dir = environutils.get_integration_test_dir()
     parser.add_argument(FLAG_DIR,
                         metavar=FLAG_DIR.upper(),
                         type=parserutils.type_itest_dir,
-                        nargs='?',
+                        default=[itest_dir] if itest_dir else None,
+                        nargs='+',
                         help='The directory to search for integration tests, '
                         f'or directories of the tests separated by '
                         f'\"{symbols.COMMA}\"')
@@ -218,7 +224,7 @@ def get_parser():
         help='Skip tests marked with time longer than this criteria.')
     parser.add_argument(FLAG_CHECK_ONLY,
                         action='store_true',
-                        help='Checking for results only (the cmd task)')
+                        help='Checking for results only (skip the cmd task)')
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
     parserutils.add_workflow_arguments(
@@ -236,15 +242,7 @@ def validate_options(argv):
     parser = get_parser()
     options = parser.parse_args(argv)
     if not options.dir:
-        try:
-            options.dir = environutils.get_integration_test_dir()
-        except ValueError as err:
-            parser.error(str(err))
-    if isinstance(options.dir, str):
-        options.dir = [options.dir]
-    options.dir = [
-        os.path.realpath(os.path.expanduser(x)) for x in options.dir
-    ]
+        parser.error(f'Please define the integration test dir via {FLAG_DIR}')
     return options
 
 

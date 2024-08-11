@@ -23,7 +23,6 @@ FILE = jobutils.FILE
 class BaseJob(logutils.Base):
 
     ARGS = jobutils.ARGS
-    STATE_ID = jobutils.STATE_ID
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
     DATA_EXT = '.csv'
     PRE_RUN = None
@@ -168,8 +167,6 @@ class Job(BaseJob):
         :return: True if the post-conditions are met.
         """
         outfiles = self.doc.get(self.OUTFILE, {})
-        if self.name is None:
-            return bool(outfiles)
         outfile = outfiles.get(self.name)
         return bool(outfile)
 
@@ -261,7 +258,6 @@ class BaseTask:
     AggClass = AggJob
     DRIVER = None
 
-    STATE_ID = jobutils.STATE_ID
     ARGS = jobutils.ARGS
     OUTFILE = jobutils.OUTFILE
     FINISHED = jobutils.FINISHED
@@ -475,9 +471,9 @@ class LogJob(Job):
 
         :return list: the list of arguments to add the data file
         """
-        data_cmd = sh.grep(self.READ_DATA, self.args[0]).split()
-        files = [x for x in data_cmd if x.endswith(lammpsin.In.DATA_EXT)]
-        return [self.driver.FLAG_DATA_FILE, files[0]] if files else []
+        cmd = sh.grep(self.READ_DATA, self.args[0]).split()
+        data_file = [x for x in cmd if x.endswith(lammpsin.In.DATA_EXT)][0]
+        return data_file
 
 
 class LogJobAgg(AggJob):
@@ -520,7 +516,7 @@ class Lmp_Log(BaseTask):
     AggClass = LogJobAgg
 
 
-class DumpJob(LogJob):
+class TrajJob(LogJob):
 
     DUMP = lammpsin.In.DUMP
     CUSTOM_EXT = lammpsin.In.CUSTOM_EXT
@@ -530,22 +526,21 @@ class DumpJob(LogJob):
         Set arguments to analyze the custom dump file.
         """
         super().setArgs()
-        dump_cmd = sh.grep(self.DUMP, self.args[0]).split()
-        dump_file = [x for x in dump_cmd if x.endswith(self.CUSTOM_EXT)][0]
-        self.args[0] = [dump_file]
+        self.args[0] = self.trajfile
 
-    def getDumpfile(self):
+    @property
+    def traj_file(self):
         """
-        Get the trajectory dump file from the log file.
+        Return the trajectory file from the log file.
 
-        :return list: the list of arguments to add the data file
+        :return str: the trajectory file.
         """
-        dump_cmd = sh.grep(self.DUMP, self.args[0]).split()
-        dump_file = [x for x in dump_cmd if x.endswith(self.CUSTOM_EXT)][0]
-        return dump_file
+        cmd = sh.grep(self.DUMP, self.args[0]).split()
+        traj_file = [x for x in cmd if x.endswith(self.CUSTOM_EXT)][0]
+        return traj_file
 
 
-class Custom_Dump(BaseTask):
+class Lmp_Traj(Lmp_Log):
 
-    import custom_dump_driver as DRIVER
-    JobClass = DumpJob
+    import lmp_traj_driver as DRIVER
+    JobClass = TrajJob

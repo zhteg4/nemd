@@ -8,6 +8,10 @@ Usage:
 
 #!/bin/bash
 
+if [ ${BASH_SOURCE[0]} ]; then RUN_NEMD=${BASH_SOURCE[0]}; else RUN_NEMD="$0"; fi
+RUN_NEMD_DIR="$(readlink -f ${RUN_NEMD} | xargs dirname)"
+[[ ":$PYTHONPATH:" != *":$RUN_NEMD_DIR:"* ]] && export PYTHONPATH="$RUN_NEMD_DIR${PYTHONPATH:+":$PYTHONPATH"}"
+
 for ((i=0; i<=$#; i++)); do
   arg=${!i}
   if [ "$arg" == '-JOBNAME' ]; then

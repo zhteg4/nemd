@@ -34,6 +34,7 @@ class Base(logutils.Base):
         :type df_reader: 'nemd.oplsua.DataFileReader'
         :param options: the options from command line
         :type options: 'argparse.Namespace'
+        :param logger 'logging.Logger': the logger to log messages
         """
         super().__init__(logger=logger)
         self.df_reader = df_reader
