@@ -93,6 +93,7 @@ class LmpLog(object):
         :param options 'argparse.ArgumentParser': Parsed command-line options
         """
         self.options = options
+        self.sidx = None
         self.lmp_log = None
         self.df_reader = None
         self.tasks = [

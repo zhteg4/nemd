@@ -131,6 +131,7 @@ class Base(logutils.Base):
         if self.data.empty:
             return
         if self.sidx is None:
+            # idx is the index set based on the last ptc and input data shape
             self.sidx = self.idx
         sel = self.data.iloc[self.sidx:self.eidx]
         data_lb = sel.columns[0]
@@ -245,6 +246,8 @@ class TrajBase(Base):
         self.time = time
         self.frms = frms
         self.gids = gids
+        if self.time is not None:
+            self.idx = int(self.LABEL_RE.match(self.time.name).groups()[1])
 
 
 class Density(TrajBase):
@@ -341,22 +344,16 @@ class RDF(TrajBase):
         index = pd.Index(data=mid, name=self.INDEX_LB)
         self.data = pd.DataFrame(data={self.LABEL: rdf}, index=index)
 
-    @classmethod
-    def fit(cls, data, log=None):
+    def fit(self):
         """
         Smooth the rdf data and report peaks.
-
-        :param data: distance vs count
-        :type data: 'pandas.core.frame.DataFrame'
-        :param log: the function to print user-facing information
-        :type log: 'function'
         """
-        if data.empty:
+        if self.data.empty:
             return
-        raveled = np.ravel(data[data.columns[0]])
+        raveled = np.ravel(self.data.iloc[:, 0])
         smoothed = savgol_filter(raveled, window_length=31, polyorder=2)
-        row = data.iloc[smoothed.argmax()]
-        log(f'Peak position: {row.name}; peak value: {row.values[0]: .2f}')
+        row = self.data.iloc[smoothed.argmax()]
+        self.log(f'Peak position: {row.name}; peak value: {row.values[0]: .2f}')
 
 
 class MSD(TrajBase):
@@ -529,6 +526,8 @@ class Thermo(Base):
         """
         super().__init__(**kwargs)
         self.thermo = thermo
+        if self.thermo is not None:
+            self.idx = int(self.LABEL_RE.match(self.thermo.index.name).groups()[1])
 
     def setData(self):
         """
