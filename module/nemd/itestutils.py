@@ -159,17 +159,18 @@ class CMP:
             raise ValueError(f"{self.orignal} and {self.target} are different")
 
 
-class Info:
+class FileParser:
 
     CMD_BRACKET_RE = '\s.*?\(.*?\)'
     AND_RE = r'and\s+'
     NAME_BRACKET_RE = re.compile('(.*?)\([\'|"]?(.*?)[\'|"]?\)')
+    NAME = 'check'
 
-    def __init__(self, pathname):
+    def __init__(self, path):
         """
-        :param pathname str: the path to the file
+        :param pathname str: the path containting the file
         """
-        self.pathname = pathname
+        self.path = os.path.join(path, self.NAME)
         self.line = None
         self.operators = []
 
@@ -184,6 +185,8 @@ class Info:
         """
         Set the one line command by locating, reading, and cleaning the check file.
         """
+        if not os.path.isfile(self.pathname):
+            return
         with open(self.pathname) as fh:
             lines = [x.strip() for x in fh.readlines()]
         operators = [x for x in lines if not x.startswith(symbols.POUND)]
@@ -219,7 +222,7 @@ class Info:
         return default
 
 
-class ResultJob(task.BaseJob, Info):
+class ResultJob(task.BaseJob, FileParser):
     """
     The class to check the results for one cmd integration test.
     """
@@ -230,8 +233,10 @@ class ResultJob(task.BaseJob, Info):
 
     def __init__(self, *args, **kwargs):
         task.BaseJob.__init__(self, *args, **kwargs)
-        pathnaem = os.path.join(self.job.statepoint[FLAG_DIR], self.CHECK)
-        Info.__init__(self, pathnaem)
+        FileParser.__init__(
+            self,
+            self.job.statepoint[FLAG_DIR],
+        )
 
     def run(self):
         """

@@ -53,9 +53,9 @@ def log_error(msg):
     sys.exit(1)
 
 
-class Tag(itestutils.Info):
+class Tag(itestutils.FileParser):
 
-    TAG = 'tag'
+    NAME = 'tag'
     SLOW = 'slow'
     TIME_FORMAT = '%H:%M:%S'
     TIME_ZERO = datetime.datetime.strptime('00:00:00', TIME_FORMAT)
@@ -138,10 +138,7 @@ class TestDir:
         """
         if self.options.slow is None:
             return False
-        tag_file = os.path.join(test_dir, self.TAG)
-        if not os.path.isfile(tag_file):
-            return False
-        tag = Tag(tag_file)
+        tag = Tag(test_dir)
         tag.run()
         return tag.isSlow(self.options.slow)
 
