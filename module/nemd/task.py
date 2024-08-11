@@ -476,7 +476,7 @@ class LogJob(Job):
         """
         cmd = sh.grep(self.READ_DATA, self.args[0]).split()
         data_file = [x for x in cmd if x.endswith(lammpsin.In.DATA_EXT)][0]
-        return data_file
+        return [self.driver.FLAG_DATA_FILE, data_file]
 
 
 class LogJobAgg(AggJob):
@@ -489,6 +489,7 @@ class LogJobAgg(AggJob):
         """
         super().__init__(*args, **kwargs)
         self.tasks = jobutils.get_arg(self.args, self.FLAG_TASK, first=False)
+        self.tasks = [x.lower() for x in self.tasks]
         inav = jobutils.get_arg(self.args, jobutils.FLAG_INTERACTIVE)
         wdir = os.path.relpath(self.project.workspace, self.project.path)
         self.options = SimpleNamespace(jobname=self.project.jobname,

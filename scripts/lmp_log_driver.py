@@ -189,6 +189,7 @@ def get_parser(parser=None, jflags=None):
                             type=parserutils.type_file,
                             help='Data file to get force field information')
     parser.add_argument(FLAG_TASK,
+                        type=str.lower,
                         choices=analyzer.Thermo.TASKS,
                         default=analyzer.Thermo.TOTENG,
                         nargs='+',

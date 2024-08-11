@@ -179,15 +179,13 @@ class Base(logutils.Base):
             (label, unit), other = match.groups(), unit
         return label, unit, other
 
-    def plot(self, marker_num=10, use_column=False):
+    def plot(self, marker_num=10,):
         """
         Plot and save the data (interactively).
 
         :param marker_num: add markers when the number of points equals or is
             less than this value
         :type marker_num: int
-        :param use_column: use column label in output filename
-        :type use_column: bool
         """
         if self.data.empty:
             return
@@ -218,14 +216,10 @@ class Base(logutils.Base):
             label, unit, _ = self.parseLabel(self.data.index.name)
             ax.set_xlabel(f"{label} ({unit})")
             ax.set_ylabel(self.data.columns.values.tolist()[0])
-            fname = f"{self.options.jobname}_{self.NAME}{self.FIG_EXT}"
-            if use_column:
-                name = self.data.columns[0].split('(')[0].strip().lower()
-                fname = f"{self.options.jobname}_{name}_{self.NAME}{self.FIG_EXT}"
-            file_path = os.path.join(os.path.dirname(self.outfile), fname)
-            fig.savefig(file_path)
-            jobutils.add_outfile(file_path, jobname=self.options.jobname)
-        self.log(f'{self.DESCR.capitalize()} figure saved as {file_path}')
+            pathname = self.outfile[:-len(self.DATA_EXT)]+self.FIG_EXT
+            fig.savefig(pathname)
+            jobutils.add_outfile(pathname, jobname=self.options.jobname)
+        self.log(f'{self.DESCR.capitalize()} figure saved as {pathname}')
 
 
 class TrajBase(Base):
@@ -606,7 +600,8 @@ class Agg(logutils.Base):
             anlz.run()
             if anlz.result is None:
                 continue
-            self.result = pd.concat([self.result, anlz.result])
+            result = pd.concat([params, anlz.result]).to_frame().T
+            self.result = pd.concat([self.result, result])
 
     def save(self):
         """
@@ -615,7 +610,7 @@ class Agg(logutils.Base):
         if self.result.empty:
             return
         filename = f"{self.options.jobname}_{self.task}{self.DATA_EXT}"
-        self.result.to_csv(filename)
+        self.result.to_csv(filename, index=False)
         self.log(
             f"{self.task.capitalize()} of all parameters saved to {filename}")
         jobutils.add_outfile(filename, jobname=self.options.jobname)
