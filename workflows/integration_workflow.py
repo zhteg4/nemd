@@ -12,7 +12,6 @@ Supported check commands are: cmd, exist, not_exist ..
 import os
 import sys
 import glob
-import datetime
 import pandas as pd
 
 from nemd import symbols
@@ -53,28 +52,6 @@ def log_error(msg):
     sys.exit(1)
 
 
-class Tag(itestutils.FileParser):
-
-    NAME = 'tag'
-    SLOW = 'slow'
-    TIME_FORMAT = '%H:%M:%S'
-    TIME_ZERO = datetime.datetime.strptime('00:00:00', TIME_FORMAT)
-
-    def isSlow(self, threshold):
-        """
-        Whether the test is slow.
-
-        :param threshold float: the threshold in seconds to be considered as slow
-        :return bool: Whether or not the test is slow.
-        """
-        value = self.get(self.SLOW)
-        if value is None:
-            return False
-        hms = datetime.datetime.strptime(value, self.TIME_FORMAT)
-        delta = hms - self.TIME_ZERO
-        return delta.total_seconds() > threshold
-
-
 class TestDir:
 
     WILD_CARD = symbols.WILD_CARD
@@ -88,6 +65,9 @@ class TestDir:
         self.dirs = None
 
     def run(self):
+        """
+        Main method to run.
+        """
         self.setTestDirs()
         self.skipTestDirs()
 
@@ -126,6 +106,8 @@ class TestDir:
         self.dirs = [x for x in self.dirs if not self.isSLow(x)]
         if not self.dirs:
             log_error(f'All tests in {self.options.dir} are skipped.')
+        if orig_num == len(self.dirs):
+            return
         log(f"{orig_num - len(self.dirs)} / {orig_num} tests skipped.")
 
     def isSLow(self, test_dir):
@@ -138,7 +120,7 @@ class TestDir:
         """
         if self.options.slow is None:
             return False
-        tag = Tag(test_dir)
+        tag = itestutils.Tag(test_dir)
         tag.run()
         return tag.isSlow(self.options.slow)
 
@@ -148,7 +130,7 @@ class Integration(jobcontrol.Runner):
     The main class to run integration tests.
     """
 
-    MSG = itestutils.ResultJob.MSG
+    MSG = itestutils.CheckJob.MSG
 
     def setJob(self):
         """

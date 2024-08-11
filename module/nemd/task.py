@@ -132,7 +132,7 @@ class Job(BaseJob):
             return f"'{arg}'"
         return arg
 
-    def getCmd(self, pre_cmd=None, extra_args=None, write=True):
+    def getCmd(self, pre_cmd=None, extra_args=None, write=True, name=None):
         """
         Get command line str.
 
@@ -152,11 +152,15 @@ class Job(BaseJob):
         if extra_args is None:
             extra_args = []
 
+        if name is None:
+            name = self.name
+
         cmd = self.SEP.join(map(str, pre_cmd + self.args + extra_args))
 
         if write:
-            with open(f"{self.name}_cmd", 'w') as fh:
+            with open(f"{name}_cmd", 'w') as fh:
                 fh.write(cmd)
+
         return cmd
 
     def post(self):

@@ -1,10 +1,123 @@
 import os
 import re
 import filecmp
+import datetime
 from nemd import task
 from nemd import symbols
 
 FLAG_DIR = '-dir'
+
+
+class CmdParser:
+    """
+    The class to parse a test file.
+    """
+
+    NAME = 'cmd'
+    POUND = symbols.POUND
+    CMD_BRACKET_RE = '.*?\(.*?\)'
+    AND_RE = r'and\s+'
+    NAME_BRACKET_RE = re.compile('(.*?)\([\'|"]?(.*?)[\'|"]?\)')
+
+    def __init__(self, path):
+        """
+        :param path str: the path containing the file
+        """
+        self.pathname = os.path.join(path, self.NAME)
+        self.comment = None
+        self.args = None
+
+    def run(self):
+        """
+        Main method to parse one integration test file.
+        """
+        self.setArgs()
+        self.removeUnkArgs()
+
+    def setArgs(self):
+        """
+        Set arguments by reading the file.
+        """
+        if not os.path.isfile(self.pathname):
+            return
+        with open(self.pathname) as fh:
+            self.args = [x.strip() for x in fh.readlines() if x.strip()]
+
+    def removeUnkArgs(self):
+        """
+        Remove unknown arguments.
+        """
+        if self.args is None:
+            return
+        comments = [x for x in self.args if x.startswith(self.POUND)]
+        comment = [x.strip(self.POUND).strip() for x in comments]
+        self.comment = symbols.SPACE.join(comment)
+        self.args = [x for x in self.args if not x.startswith(self.POUND)]
+
+
+class CheckParser(CmdParser):
+
+    NAME = 'check'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.operators = []
+
+    def run(self):
+        """
+        Parse the file and set the operators.
+        """
+        super().run()
+        self.setOperators()
+
+    def setOperators(self):
+        """
+        Parse the one line command to get the operators.
+        """
+        if self.args is None:
+            return
+        for match in re.finditer(self.NAME_BRACKET_RE, ' '.join(self.args)):
+            name, value = [x.strip("'\"") for x in match.groups()]
+            values = [x.strip(" '\"") for x in value.split(symbols.COMMA)]
+            self.operators.append([name] + values)
+
+    def get(self, key, default=None):
+        """
+        Get the value of a specific key.
+
+        :param key str: the key to be searched
+        :param default str: the default value if the key is not found
+        :return str: the value of the key
+        """
+        for name, value in self.operators:
+            if name == key:
+                return value
+        return default
+
+
+class Tag(CheckParser):
+    """
+    The class to parse the tag file.
+    """
+
+    NAME = 'tag'
+    SLOW = 'slow'
+    TIME_FORMAT = '%H:%M:%S'
+    TIME_ZERO = datetime.datetime.strptime('00:00:00', TIME_FORMAT)
+
+    def isSlow(self, threshold):
+        """
+        Whether the test is slow.
+
+        :param threshold float: the threshold in seconds to be considered as slow
+        :return bool: Whether or not the test is slow.
+        """
+        value = self.get(self.SLOW)
+        if value is None:
+            return False
+        hms = datetime.datetime.strptime(value, self.TIME_FORMAT)
+        delta = hms - self.TIME_ZERO
+        return delta.total_seconds() > threshold
 
 
 class Job(task.Job):
@@ -12,37 +125,31 @@ class Job(task.Job):
     The class to setup a job cmd for the integration test.
     """
 
+    NAME = 'cmd'
     JOBNAME_RE = re.compile('.* +(.*)_(driver|workflow).py( +.*)?$')
-    POUND = symbols.POUND
-    CMD = 'cmd'
-    PRE_RUN = None
     SEP = symbols.SEMICOLON
+    PRE_RUN = None
 
     def __init__(self, *args, **kwargs):
-        """
-        :param job: the signac job instance
-        :type job: 'signac.contrib.job.Job'
-        """
         super().__init__(*args, **kwargs)
-        # each cmd job has a unique name based on the directory name
-        self.name = os.path.basename(self.job.statepoint[FLAG_DIR])
+        self.fparser = None
         self.comment = None
 
     def setArgs(self):
         """
-        Set arguments.
+        Set arguments from the input file.
         """
-        with open(os.path.join(self.job.statepoint[FLAG_DIR], self.CMD)) as fh:
-            self.args = [x.strip() for x in fh.readlines() if x.strip()]
+        self.fparser = CmdParser(self.job.statepoint[FLAG_DIR])
+        self.fparser.setArgs()
+        self.args = self.fparser.args
 
     def removeUnkArgs(self):
         """
-        Remove unknown arguments.
+        Remove unknown arguments as the comment.
         """
-        comments = [x for x in self.args if x.startswith(self.POUND)]
-        comment = [x.strip(self.POUND).strip() for x in comments]
-        self.comment = symbols.SPACE.join(comment)
-        self.args = [x for x in self.args if not x.startswith(self.POUND)]
+        self.fparser.removeUnkArgs()
+        self.args = self.fparser.args
+        self.comment = self.fparser.comment
 
     def setName(self):
         """
@@ -74,9 +181,10 @@ class Job(task.Job):
         :param write bool: the msg to be printed
         :return str: the command as str
         """
-        msg = f"{self.name}: {self.comment}" if self.comment else self.name
+        name = os.path.basename(self.job.statepoint[FLAG_DIR])
+        msg = f"{name}: {self.comment}" if self.comment else name
         pre_cmd = [f"echo \'# {msg}\'"]
-        return super().getCmd(write=write, pre_cmd=pre_cmd)
+        return super().getCmd(write=write, pre_cmd=pre_cmd, name=name)
 
     def post(self):
         """
@@ -159,117 +267,62 @@ class CMP:
             raise ValueError(f"{self.orignal} and {self.target} are different")
 
 
-class FileParser:
-
-    CMD_BRACKET_RE = '\s.*?\(.*?\)'
-    AND_RE = r'and\s+'
-    NAME_BRACKET_RE = re.compile('(.*?)\([\'|"]?(.*?)[\'|"]?\)')
-    NAME = 'check'
-
-    def __init__(self, path):
-        """
-        :param pathname str: the path containting the file
-        """
-        self.path = os.path.join(path, self.NAME)
-        self.line = None
-        self.operators = []
-
-    def run(self):
-        """
-        Main method to parse one integration test file.
-        """
-        self.setLine()
-        self.setOperators()
-
-    def setLine(self):
-        """
-        Set the one line command by locating, reading, and cleaning the check file.
-        """
-        if not os.path.isfile(self.pathname):
-            return
-        with open(self.pathname) as fh:
-            lines = [x.strip() for x in fh.readlines()]
-        operators = [x for x in lines if not x.startswith(symbols.POUND)]
-        self.line = ' ' + ' '.join(operators)
-
-    def setOperators(self):
-        """
-        Parse the one line command to get the operators.
-        """
-        for operator in re.finditer(self.CMD_BRACKET_RE, self.line):
-            operator = operator.group().strip()
-            operator = re.sub(self.AND_RE, '', operator)
-            self.operators.append(operator)
-
-    def items(self):
-        """
-        The generator to get the name and value of each operator.
-        :return generator: the name and value of each operator
-        """
-        return (self.NAME_BRACKET_RE.match(x).groups() for x in self.operators)
-
-    def get(self, key, default=None):
-        """
-        Get the value of a specific key.
-
-        :param key str: the key to be searched
-        :param default str: the default value if the key is not found
-        :return str: the value of the key
-        """
-        for name, value in self.items():
-            if name == key:
-                return value
-        return default
-
-
-class ResultJob(task.BaseJob, FileParser):
+class CheckJob(task.BaseJob):
     """
     The class to check the results for one cmd integration test.
     """
 
     CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
     MSG = 'msg'
-    CHECK = 'check'
 
     def __init__(self, *args, **kwargs):
-        task.BaseJob.__init__(self, *args, **kwargs)
-        FileParser.__init__(
-            self,
-            self.job.statepoint[FLAG_DIR],
-        )
+        super().__init__(*args, **kwargs)
+        self.operators = []
 
     def run(self):
         """
         Main method to get the results.
         """
-        super().run()
-        self.executeAll()
+        self.setOperators()
+        self.exeOperators()
 
-    def executeAll(self):
+    def setOperators(self):
+        """
+        Set the operaters from the check file.
+        """
+        fparser = CheckParser(self.job.statepoint[FLAG_DIR])
+        fparser.run()
+        self.operators = fparser.operators
+
+    def exeOperators(self):
         """
         Execute all operators. Raise errors during operation if one failed.
         """
         self.doc[self.MSG] = False
-        print(
-            f"{self.job.statepoint[FLAG_DIR]}: {symbols.COMMA.join(self.operators)}"
-        )
-        for name, value in self.items():
+        ops = [symbols.SPACE.join(x) for x in self.operators]
+        name = os.path.basename(self.job.statepoint[FLAG_DIR])
+        print(f"# {name}: Checking {symbols.COMMA.join(ops)}")
+        for operator in self.operators:
             try:
-                self.execute(name, value)
+                self.execute(operator)
             except (FileNotFoundError, KeyError, ValueError) as err:
                 self.doc[self.MSG] = str(err)
 
-    def execute(self, name, value):
+    def execute(self, operator):
         """
         Lookup the command class and execute.
+
+        :param operator list of str: the operator to be executed.
+            For example, [name, arg1, arg2, ..]
         """
+        name = operator[0]
         try:
             runner_class = self.CMD[name]
         except KeyError:
             raise KeyError(
                 f'{name} is one unknown command. Please select from '
                 f'{self.CMD.keys()}')
-        runner = runner_class(*value.split(','), job=self.job)
+        runner = runner_class(*operator[1:], job=self.job)
         runner.run()
 
     def post(self):
@@ -286,4 +339,4 @@ class Result(task.BaseTask):
     Class to parse the check file and execute the inside operations.
     """
 
-    JobClass = ResultJob
+    JobClass = CheckJob
