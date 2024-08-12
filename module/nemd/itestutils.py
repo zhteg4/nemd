@@ -105,7 +105,13 @@ class Tag(CheckParser):
     TIME_FORMAT = '%H:%M:%S'
     TIME_ZERO = datetime.datetime.strptime('00:00:00', TIME_FORMAT)
 
-    def isSlow(self, threshold):
+    def __init__(self, *args, options=None, **kwargs):
+        """
+        :param options 'argparse.Namespace': parsed command line options.
+        """
+        self.options = options
+
+    def isSlow(self):
         """
         Whether the test is slow.
 
@@ -117,7 +123,7 @@ class Tag(CheckParser):
             return False
         hms = datetime.datetime.strptime(value, self.TIME_FORMAT)
         delta = hms - self.TIME_ZERO
-        return delta.total_seconds() > threshold
+        return delta.total_seconds() > self.options.slow
 
 
 class Job(task.Job):

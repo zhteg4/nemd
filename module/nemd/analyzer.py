@@ -179,7 +179,7 @@ class Base(logutils.Base):
             (label, unit), other = match.groups(), unit
         return label, unit, other
 
-    def plot(self, marker_num=10,):
+    def plot(self, marker_num=10):
         """
         Plot and save the data (interactively).
 
@@ -216,7 +216,7 @@ class Base(logutils.Base):
             label, unit, _ = self.parseLabel(self.data.index.name)
             ax.set_xlabel(f"{label} ({unit})")
             ax.set_ylabel(self.data.columns.values.tolist()[0])
-            pathname = self.outfile[:-len(self.DATA_EXT)]+self.FIG_EXT
+            pathname = self.outfile[:-len(self.DATA_EXT)] + self.FIG_EXT
             fig.savefig(pathname)
             jobutils.add_outfile(pathname, jobname=self.options.jobname)
         self.log(f'{self.DESCR.capitalize()} figure saved as {pathname}')

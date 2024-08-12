@@ -64,25 +64,6 @@ def type_dir(arg):
     raise argparse.ArgumentTypeError(f'{arg} is not an existing directory.')
 
 
-def type_itest_dir(arg):
-    """
-    Return the dir of tests.
-
-    :param arg str: the test dir or a list of test ids. The following directories
-        are searched: {test dir}, $NEMD_SRC/test/integration/0*{test id}
-    return str: the integration test dir
-    """
-    try:
-        return type_dir(arg)
-    except argparse.ArgumentTypeError:
-        basedir = environutils.get_integration_test_dir()
-        if basedir is None or not arg.isdigit():
-            argparse.ArgumentTypeError(
-                f"{basedir} and {arg} doesn't locate a test dir.")
-        pathname = os.path.join(basedir, f"{arg:0>4}")
-        return type_dir(pathname)
-
-
 def type_float(arg):
     try:
         value = float(arg)

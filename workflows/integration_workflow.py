@@ -25,6 +25,7 @@ from nemd import environutils
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_workflow', '')
 
+FLAG_ID = 'id'
 FLAG_DIR = itestutils.FLAG_DIR
 FLAG_SLOW = '-slow'
 FLAG_CHECK_ONLY = '-check_only'
@@ -52,79 +53,6 @@ def log_error(msg):
     sys.exit(1)
 
 
-class TestDir:
-
-    WILD_CARD = symbols.WILD_CARD
-
-    def __init__(self, options):
-        """
-        :param options: parsed commandline options
-        :type options: 'argparse.Namespace'
-        """
-        self.options = options
-        self.dirs = None
-
-    def run(self):
-        """
-        Main method to run.
-        """
-        self.setTestDirs()
-        self.skipTestDirs()
-
-    def setTestDirs(self):
-        """
-        Set the test dirs by looking for the sub-folder tests or the input
-        folder itself.
-        """
-        self.dirs = self.filterTestDir(self.options.dir)
-        if not self.dirs:
-            # Search for test dirs inside the input folder
-            dirs = [os.path.join(x, self.WILD_CARD) for x in self.options.dir]
-            pathnames = [y for x in dirs for y in glob.glob(x)]
-            subdirs = filter(lambda x: os.path.isdir(x), pathnames)
-            self.dirs = self.filterTestDir(subdirs)
-        if not self.dirs:
-            log_error(f'No tests found in {self.options.dir}.')
-        log(f"{len(self.dirs)} tests found.")
-
-    def filterTestDir(self, pathnames):
-        """
-        Filter the test directories from the given pathnames.
-
-        :param pathnames list: the pathnames to filter.
-        :return list: the filtered pathnames.
-        """
-        return list(filter(lambda x: os.path.basename(x).isdigit(), pathnames))
-
-    def skipTestDirs(self):
-        """
-        Skip slow tests.
-        """
-        if self.options.slow is None:
-            return
-        orig_num = len(self.dirs)
-        self.dirs = [x for x in self.dirs if not self.isSLow(x)]
-        if not self.dirs:
-            log_error(f'All tests in {self.options.dir} are skipped.')
-        if orig_num == len(self.dirs):
-            return
-        log(f"{orig_num - len(self.dirs)} / {orig_num} tests skipped.")
-
-    def isSLow(self, test_dir):
-        """
-        Whether the test is slow and gets skipped.
-
-        :param test_dir str: the directory of the test.
-        :return bool: True when the test is marked with a time longer than the
-            command line option requirement.
-        """
-        if self.options.slow is None:
-            return False
-        tag = itestutils.Tag(test_dir)
-        tag.run()
-        return tag.isSlow(self.options.slow)
-
-
 class Integration(jobcontrol.Runner):
     """
     The main class to run integration tests.
@@ -148,9 +76,7 @@ class Integration(jobcontrol.Runner):
         """
         Set state with test dirs.
         """
-        test_dir = TestDir(self.options)
-        test_dir.run()
-        self.state = {FLAG_DIR: test_dir.dirs}
+        self.state = {FLAG_DIR: self.options.dir}
 
     def addJobs(self):
         """
@@ -186,15 +112,17 @@ def get_parser():
         out of sys.argv.
     """
     parser = parserutils.get_parser(description=__doc__)
-    itest_dir = environutils.get_integration_test_dir()
-    parser.add_argument(FLAG_DIR,
-                        metavar=FLAG_DIR.upper(),
-                        type=parserutils.type_itest_dir,
-                        default=[itest_dir] if itest_dir else None,
+    parser.add_argument(FLAG_ID,
+                        metavar=FLAG_ID.upper(),
+                        type=parserutils.type_positive_int,
                         nargs='+',
-                        help='The directory to search for integration tests, '
-                        f'or directories of the tests separated by '
-                        f'\"{symbols.COMMA}\"')
+                        help='Select the sub-folders under the integration '
+                             'test directory according to these ids.')
+    parser.add_argument(FLAG_DIR,
+                        metavar=FLAG_DIR[1:].upper(),
+                        type=parserutils.type_dir,
+                        default=environutils.get_integration_test_dir(),
+                        help='The integration test directory.')
     parser.add_argument(
         FLAG_SLOW,
         type=parserutils.type_positive_float,
@@ -221,6 +149,21 @@ def validate_options(argv):
     options = parser.parse_args(argv)
     if not options.dir:
         parser.error(f'Please define the integration test dir via {FLAG_DIR}')
+
+    if options.id:
+        dirs = [os.path.join(options.dir, f"{x:0>4}") for x in options.id]
+    else:
+        dirs = glob.glob(os.path.join(options.dir, '[0-9]' * 4))
+
+    options.dir = [x for x in dirs if os.path.isdir(x)]
+    if not options.dir:
+        parser.error(f'No valid integration test dirs found in {options.dir}.')
+
+    if options.slow is None:
+        options.dir = [x for x in options.dir if not itestutils.Tag(x, options=options).isSlow()]
+    if not options.dir:
+        parser.error(f'All tests are marked as slow, skip running.')
+
     return options
 
 
