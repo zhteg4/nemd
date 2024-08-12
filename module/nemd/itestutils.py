@@ -4,13 +4,15 @@ import filecmp
 import datetime
 from nemd import task
 from nemd import symbols
+from nemd import logutils
+from nemd import jobutils
 
 FLAG_DIR = '-dir'
 
 
-class CmdParser:
+class Cmd:
     """
-    The class to parse a test file.
+    The class to parse a cmd test file.
     """
 
     NAME = 'cmd'
@@ -19,22 +21,26 @@ class CmdParser:
     AND_RE = r'and\s+'
     NAME_BRACKET_RE = re.compile('(.*?)\([\'|"]?(.*?)[\'|"]?\)')
 
-    def __init__(self, path):
+    def __init__(self, path=None, job=None):
         """
         :param path str: the path containing the file
+        :param job 'signac.contrib.job.Job': the signac job instance
         """
-        self.pathname = os.path.join(path, self.NAME)
-        self.comment = None
+        self.path = path
+        self.job = job
+        path_dir = self.path if path else self.job.statepoint[FLAG_DIR]
+        self.pathname = os.path.join(path_dir, self.NAME)
         self.args = None
+        self.comment = None
 
-    def run(self):
+    def parse(self):
         """
         Main method to parse one integration test file.
         """
-        self.setArgs()
-        self.removeUnkArgs()
+        self.read()
+        self.setComment()
 
-    def setArgs(self):
+    def read(self):
         """
         Set arguments by reading the file.
         """
@@ -43,9 +49,9 @@ class CmdParser:
         with open(self.pathname) as fh:
             self.args = [x.strip() for x in fh.readlines() if x.strip()]
 
-    def removeUnkArgs(self):
+    def setComment(self):
         """
-        Remove unknown arguments.
+        Grad the comment from the args.
         """
         if self.args is None:
             return
@@ -55,78 +61,7 @@ class CmdParser:
         self.args = [x for x in self.args if not x.startswith(self.POUND)]
 
 
-class CheckParser(CmdParser):
-
-    NAME = 'check'
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.operators = []
-
-    def run(self):
-        """
-        Parse the file and set the operators.
-        """
-        super().run()
-        self.setOperators()
-
-    def setOperators(self):
-        """
-        Parse the one line command to get the operators.
-        """
-        if self.args is None:
-            return
-        for match in re.finditer(self.NAME_BRACKET_RE, ' '.join(self.args)):
-            name, value = [x.strip("'\"") for x in match.groups()]
-            values = [x.strip(" '\"") for x in value.split(symbols.COMMA)]
-            self.operators.append([name] + values)
-
-    def get(self, key, default=None):
-        """
-        Get the value of a specific key.
-
-        :param key str: the key to be searched
-        :param default str: the default value if the key is not found
-        :return str: the value of the key
-        """
-        for name, value in self.operators:
-            if name == key:
-                return value
-        return default
-
-
-class Tag(CheckParser):
-    """
-    The class to parse the tag file.
-    """
-
-    NAME = 'tag'
-    SLOW = 'slow'
-    TIME_FORMAT = '%H:%M:%S'
-    TIME_ZERO = datetime.datetime.strptime('00:00:00', TIME_FORMAT)
-
-    def __init__(self, *args, options=None, **kwargs):
-        """
-        :param options 'argparse.Namespace': parsed command line options.
-        """
-        self.options = options
-
-    def isSlow(self):
-        """
-        Whether the test is slow.
-
-        :param threshold float: the threshold in seconds to be considered as slow
-        :return bool: Whether or not the test is slow.
-        """
-        value = self.get(self.SLOW)
-        if value is None:
-            return False
-        hms = datetime.datetime.strptime(value, self.TIME_FORMAT)
-        delta = hms - self.TIME_ZERO
-        return delta.total_seconds() > self.options.slow
-
-
-class Job(task.Job):
+class CmdJob(task.Job):
     """
     The class to setup a job cmd for the integration test.
     """
@@ -138,24 +73,24 @@ class Job(task.Job):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fparser = None
         self.comment = None
 
-    def setArgs(self):
+    def run(self):
+        """
+        Main method to setup the job.
+        """
+        self.parse()
+        self.setName()
+        self.addQuote()
+
+    def parse(self):
         """
         Set arguments from the input file.
         """
-        self.fparser = CmdParser(self.job.statepoint[FLAG_DIR])
-        self.fparser.setArgs()
-        self.args = self.fparser.args
-
-    def removeUnkArgs(self):
-        """
-        Remove unknown arguments as the comment.
-        """
-        self.fparser.removeUnkArgs()
-        self.args = self.fparser.args
-        self.comment = self.fparser.comment
+        parser = Cmd(job=self.job)
+        parser.parse()
+        self.args = parser.args
+        self.comment = parser.comment
 
     def setName(self):
         """
@@ -201,9 +136,9 @@ class Job(task.Job):
         return bool(self.doc.get(self.OUTFILE))
 
 
-class Cmd(task.BaseTask):
+class CmdTask(task.BaseTask):
 
-    JobClass = Job
+    JobClass = CmdJob
 
 
 class EXIST:
@@ -273,13 +208,9 @@ class CMP:
             raise ValueError(f"{self.orignal} and {self.target} are different")
 
 
-class CheckJob(task.BaseJob):
-    """
-    The class to check the results for one cmd integration test.
-    """
+class Opr(Cmd):
 
-    CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
-    MSG = 'msg'
+    NAME = 'opr'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -287,32 +218,45 @@ class CheckJob(task.BaseJob):
 
     def run(self):
         """
-        Main method to get the results.
+        Parse the file, set the operators, and execute the operators.
         """
+        self.parse()
         self.setOperators()
-        self.exeOperators()
 
     def setOperators(self):
         """
-        Set the operaters from the check file.
+        Parse the one line command to get the operators.
         """
-        fparser = CheckParser(self.job.statepoint[FLAG_DIR])
-        fparser.run()
-        self.operators = fparser.operators
+        if self.args is None:
+            return
+        for match in re.finditer(self.NAME_BRACKET_RE, ' '.join(self.args)):
+            name, value = [x.strip("'\"") for x in match.groups()]
+            values = [x.strip(" '\"") for x in value.split(symbols.COMMA)]
+            self.operators.append([name] + values)
 
-    def exeOperators(self):
+
+class Check(Opr):
+
+    NAME = 'check'
+    CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
+
+    def run(self):
         """
-        Execute all operators. Raise errors during operation if one failed.
+        Parse the file, set the operators, and execute the operators.
         """
-        self.doc[self.MSG] = False
+        self.parse()
+        self.setOperators()
+        self.check()
+
+    def check(self):
+        """
+        Check the results by execute all operators. Raise errors if any failed.
+        """
         ops = [symbols.SPACE.join(x) for x in self.operators]
-        name = os.path.basename(self.job.statepoint[FLAG_DIR])
+        name = os.path.basename(os.path.dirname(self.pathname))
         print(f"# {name}: Checking {symbols.COMMA.join(ops)}")
         for operator in self.operators:
-            try:
-                self.execute(operator)
-            except (FileNotFoundError, KeyError, ValueError) as err:
-                self.doc[self.MSG] = str(err)
+            self.execute(operator)
 
     def execute(self, operator):
         """
@@ -331,18 +275,140 @@ class CheckJob(task.BaseJob):
         runner = runner_class(*operator[1:], job=self.job)
         runner.run()
 
+
+class CheckJob(task.BaseJob):
+    """
+    The class to parse the file and set the operators.
+    """
+
+    def run(self):
+        """
+        Main method to run.
+        """
+        try:
+            Check(job=self.job).run()
+        except (FileNotFoundError, KeyError, ValueError) as err:
+            self.msg = str(err)
+        else:
+            self.msg = False
+        self.msg = 'wa'
+
     def post(self):
         """
         The job is considered finished when the post-conditions return True.
 
         :return: True if the post-conditions are met.
         """
-        return self.MSG in self.doc
+        return self.name in self.doc[self.MESSAGE]
 
 
-class Result(task.BaseTask):
+class CheckTask(task.BaseTask):
     """
     Class to parse the check file and execute the inside operations.
     """
 
     JobClass = CheckJob
+
+
+class Tag(Opr):
+    """
+    The class to parse the tag file.
+    """
+
+    NAME = 'tag'
+    SLOW = 'slow'
+    TIME_FORMAT = '%H:%M:%S'
+    TIME_ZERO = datetime.datetime.strptime('00:00:00', TIME_FORMAT)
+
+    def __init__(self, *args, options=None, **kwargs):
+        """
+        :param options 'argparse.Namespace': parsed command line options.
+        """
+        super().__init__(*args, **kwargs)
+        self.options = options
+
+    def run(self):
+        """
+
+        Returns:
+
+        """
+        super().run()
+        self.set(self.SLOW, self.total_time)
+        self.write()
+        self.status = False
+
+    @property
+    def slow(self):
+        """
+        Whether the test is slow.
+
+        :return bool: Whether the test is slow.
+        """
+        if self.options is None or self.options.slow is None:
+            return False
+        value = self.get(self.SLOW)
+        if value is None:
+            return False
+        hms = datetime.datetime.strptime(value, self.TIME_FORMAT)
+        delta = hms - self.TIME_ZERO
+        return delta.total_seconds() > self.options.slow
+
+    def total_time(self):
+        """
+        Get the total time from the driver log files.
+
+        :return str: the total time in the format of HH:MM:SS
+        """
+        total_time = datetime.timedelta()
+        for logfile in self.job.doc[jobutils.LOGFILE].values():
+            total_time += logutils.get_time(logfile)
+        return (self.TIME_ZERO + total_time).strftime(self.TIME_FORMAT)
+
+    def get(self, key, default=None):
+        """
+        Get the value of a specific key.
+
+        :param key str: the key to be searched
+        :param default str: the default value if the key is not found
+        :return str: the value of the key
+        """
+        for name, value in self.operators:
+            if name == key:
+                return value
+        return default
+
+    def set(self, key, value):
+        """
+        Set the value (and the key) of one operator.
+
+        :param key str: the key to be set
+        :param value str: the value to be set
+        """
+        for idx, name in enumerate(self.operators):
+            if name == key:
+                self.operators[idx][1] = value
+                return
+        self.operators.append([key, value])
+
+    def write(self):
+        """
+        Write the tag file.
+        """
+        with open(self.pathname, 'w') as fh:
+            for key, value in self.operators:
+                fh.write(f"{key}('{value}')\n")
+
+
+class TagJob(CheckJob):
+
+    def run(self):
+        """
+        Main method to run.
+        """
+        Tag(job=self.job).run()
+
+
+class TagTask(task.BaseTask):
+
+    JobClass = TagJob

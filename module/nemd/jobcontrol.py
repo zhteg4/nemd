@@ -25,6 +25,7 @@ class Runner:
     OPERATIONS = 'operations'
     JOB_ID = 'job_id'
     FLAG_SEED = jobutils.FLAG_SEED
+    MESSAGE = jobutils.MESSAGE
 
     def __init__(self, options, argv, logger=None):
         """
@@ -62,6 +63,7 @@ class Runner:
             self.addJobs()
             self.runJobs()
             self.logStatus()
+            self.logMessage()
         if jobutils.AGGREGATOR in self.options.jtype:
             self.setAggJobs()
             self.setAggProject()
@@ -172,6 +174,23 @@ class Runner:
         id_ops = pd.DataFrame(id_ops, columns=[self.JOB_ID, 'operations'])
         id_ops.set_index(self.JOB_ID, inplace=True)
         self.log(id_ops.to_markdown())
+
+    def logMessage(self):
+        """
+        Log the messages from the jobs.
+        """
+        jobs = self.project.find_jobs()
+        fjobs = [x for x in jobs if any(x.doc.get(self.MESSAGE, {}).values())]
+        self.log(f"{len(jobs) - len(fjobs)} / {len(jobs)} succeeded jobs.")
+        if not fjobs:
+            return
+        func = lambda x: '\n'.join(f"{k}: {v}" for k, v in x.items() if v)
+        data = {self.MESSAGE: [func(x.doc[self.MESSAGE]) for x in fjobs]}
+        fcn = lambda x: '\n'.join(f"{k.strip('-')}: {v}" for k, v in x.items())
+        data['parameters'] = [fcn(x.statepoint) for x in fjobs]
+        ids = pd.Index([x.id for x in fjobs], name=self.JOB_ID)
+        info = pd.DataFrame(data, index=ids)
+        self.log(info.to_markdown())
 
     def setAggJobs(self):
         """

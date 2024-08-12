@@ -14,7 +14,6 @@ import sys
 import glob
 import pandas as pd
 
-from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
 from nemd import itestutils
@@ -28,7 +27,10 @@ JOBNAME = PATH.split('.')[0].replace('_workflow', '')
 FLAG_ID = 'id'
 FLAG_DIR = itestutils.FLAG_DIR
 FLAG_SLOW = '-slow'
-FLAG_CHECK_ONLY = '-check_only'
+FLAG_TASK = jobutils.FLAG_TASK
+CMD = 'cmd'
+CHECK = 'check'
+TAG = 'tag'
 
 
 def log(msg, timestamp=False):
@@ -58,19 +60,20 @@ class Integration(jobcontrol.Runner):
     The main class to run integration tests.
     """
 
-    MSG = itestutils.CheckJob.MSG
-
     def setJob(self):
         """
         Set operators. For example, operators to run cmd and check results.
         """
-        if self.options.check_only:
-            itestutils.Result.getOpr(name='result')
-            return
-
-        cmd = itestutils.Cmd.getOpr(name='cmd')
-        result = itestutils.Result.getOpr(name='result')
-        self.setPrereq(result, cmd)
+        if CMD in self.options.task:
+            cmd = itestutils.CmdTask.getOpr(name='cmd')
+        if CHECK in self.options.task:
+            check = itestutils.CheckTask.getOpr(name='check')
+            if CMD in self.options.task:
+                self.setPrereq(check, cmd)
+        if TAG in self.options.task:
+            tag = itestutils.TagTask.getOpr(name='tag')
+            if CMD in self.options.task:
+                self.setPrereq(tag, cmd)
 
     def setState(self):
         """
@@ -83,25 +86,13 @@ class Integration(jobcontrol.Runner):
         Add jobs to the project.
         """
         super().addJobs()
-        for job in self.project.find_jobs():
-            if self.options.check_only:
-                job.doc.pop(self.MSG)
-
-    def logStatus(self):
-        """
-        Log message from the failed jobs in addition to the standard status log.
-        """
-        super().logStatus()
-        jobs = self.project.find_jobs()
-        fjobs = [x for x in jobs if x.doc.get(self.MSG) is not False]
-        log(f"{len(jobs) - len(fjobs)} / {len(jobs)} succeeded jobs.")
-        if not fjobs:
+        if not self.options.clean:
             return
-        ids = [x.id for x in fjobs]
-        msgs = [x.doc.get(self.MSG, 'not run') for x in fjobs]
-        dirs = [x.statepoint[FLAG_DIR] for x in fjobs]
-        info = pd.DataFrame({'message': msgs, 'directory': dirs}, index=ids)
-        log(info.to_markdown())
+        for job in self.project.find_jobs():
+            if CHECK in self.options.task:
+                job.doc.pop(CHECK)
+            if CHECK in self.options.task:
+                job.doc.pop(CHECK)
 
 
 def get_parser():
@@ -117,7 +108,7 @@ def get_parser():
                         type=parserutils.type_positive_int,
                         nargs='+',
                         help='Select the sub-folders under the integration '
-                             'test directory according to these ids.')
+                        'test directory according to these ids.')
     parser.add_argument(FLAG_DIR,
                         metavar=FLAG_DIR[1:].upper(),
                         type=parserutils.type_dir,
@@ -128,9 +119,13 @@ def get_parser():
         type=parserutils.type_positive_float,
         metavar='SECOND',
         help='Skip tests marked with time longer than this criteria.')
-    parser.add_argument(FLAG_CHECK_ONLY,
-                        action='store_true',
-                        help='Checking for results only (skip the cmd task)')
+    parser.add_argument(FLAG_TASK,
+                        nargs='+',
+                        choices=[CMD, CHECK, TAG],
+                        default=[CMD, CHECK],
+                        help='Select the tasks to run. cmd: run the cmd file; '
+                        'check: check the results based on the check file;'
+                        ' tag: update the tag file')
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
     parserutils.add_workflow_arguments(
@@ -157,10 +152,14 @@ def validate_options(argv):
 
     options.dir = [x for x in dirs if os.path.isdir(x)]
     if not options.dir:
-        parser.error(f'No valid integration test dirs found in {options.dir}.')
+        parser.error(f'No valid tests found in {options.dir}.')
 
-    if options.slow is None:
-        options.dir = [x for x in options.dir if not itestutils.Tag(x, options=options).isSlow()]
+    if options.slow is not None:
+        tags = [itestutils.TagParser(x, options=options) for x in options.dir]
+        for tag in tags:
+            tag.run()
+        selected = [not x.slow for x in tags]
+        options.dir = [x for x, y in zip(options.dir, selected) if y]
     if not options.dir:
         parser.error(f'All tests are marked as slow, skip running.')
 

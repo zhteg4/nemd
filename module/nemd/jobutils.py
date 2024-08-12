@@ -28,6 +28,7 @@ FLAG_PRJ_PATH = '-prj_path'
 PREREQ = 'prereq'
 FLAG_STATE_NUM = '-state_num'
 FLAG_TASK = '-task'
+MESSAGE = 'message'
 
 FINISHED = 'Finished.'
 FILE = "$FILE"

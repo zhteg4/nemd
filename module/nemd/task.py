@@ -24,6 +24,7 @@ class BaseJob(logutils.Base):
 
     ARGS = jobutils.ARGS
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
+    MESSAGE = jobutils.MESSAGE
     DATA_EXT = '.csv'
     PRE_RUN = None
 
@@ -46,6 +47,24 @@ class BaseJob(logutils.Base):
         self.logger = logger
         self.doc = self.job.document
         self.args = list(map(str, self.doc.get(self.ARGS, [])))
+
+    @property
+    def msg(self):
+        """
+        The message of the job.
+
+        :return str: the message of the job.
+        """
+        return self.doc[self.MESSAGE][self.name]
+
+    @msg.setter
+    def msg(self, value):
+        """
+        Set message of the job.
+
+        :value str: the message of the job.
+        """
+        self.doc[self.MESSAGE][self.name] = value
 
 
 class Job(BaseJob):
@@ -222,7 +241,7 @@ class AggJob(BaseJob):
 
         :return: True if the post-conditions are met.
         """
-        return self.name in self.project.doc
+        return self.name in self.project.doc[self.MESSAGE]
 
     @functools.cache
     def groupJobs(self):
