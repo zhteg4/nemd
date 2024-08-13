@@ -219,7 +219,7 @@ class AggJob(BaseJob):
         self.log(self.TIME_BREAKDOWN)
         info = collections.defaultdict(list)
         for job in self.jobs:
-            for tname, filename in job.doc[jobutils.LOGFILE].items():
+            for tname, filename in job.doc.get(jobutils.LOGFILE, {}).items():
                 delta = logutils.get_time(job.fn(filename))
                 info[tname].append(SimpleNamespace(delta=delta, id=job.id))
         for tname, tinfo in info.items():

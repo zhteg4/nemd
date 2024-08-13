@@ -331,9 +331,11 @@ class Tag(Opr):
         Main method to run.
         """
         super().run()
-        self.set(self.SLOW, self.total_time)
+        job_time = self.getJobTime()
+        if job_time is None:
+            return
+        self.set(self.SLOW, job_time)
         self.write()
-        self.status = False
 
     @property
     def slow(self):
@@ -351,15 +353,18 @@ class Tag(Opr):
         delta = hms - self.TIME_ZERO
         return delta.total_seconds() > self.options.slow
 
-    @property
-    def total_time(self):
+
+    def getJobTime(self):
         """
         Get the total time from the driver log files.
 
         :return str: the total time in the format of HH:MM:SS
         """
+        logfiles = self.job.doc.get(jobutils.LOGFILE)
+        if logfiles is None:
+            return
         total_time = datetime.timedelta()
-        for logfile in self.job.doc[jobutils.LOGFILE].values():
+        for logfile in logfiles.values():
             total_time += logutils.get_time(logfile)
         return (self.TIME_ZERO + total_time).strftime(self.TIME_FORMAT)
 
@@ -383,7 +388,7 @@ class Tag(Opr):
         :param key str: the key to be set
         :param value str: the value to be set
         """
-        for idx, name in enumerate(self.operators):
+        for idx, (name, _) in enumerate(self.operators):
             if name == key:
                 self.operators[idx][1] = value
                 return
@@ -405,6 +410,7 @@ class TagJob(CheckJob):
         Main method to run.
         """
         Tag(job=self.job).run()
+        self.msg = False
 
 
 class TagTask(task.BaseTask):

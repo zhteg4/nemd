@@ -157,7 +157,8 @@ def validate_options(argv):
     if options.slow is not None:
         tags = [itestutils.Tag(x, options=options) for x in options.dir]
         for tag in tags:
-            tag.run()
+            tag.parse()
+            tag.setOperators()
         selected = [not x.slow for x in tags]
         options.dir = [x for x, y in zip(options.dir, selected) if y]
     if not options.dir:

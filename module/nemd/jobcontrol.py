@@ -180,6 +180,11 @@ class Runner:
         Log the messages from the jobs.
         """
         jobs = self.project.find_jobs()
+        ops = [self.project.get_job_status(x)[self.OPERATIONS] for x in jobs]
+        completed = [all(y[self.COMPLETED] for y in x.values()) for x in ops]
+        if not any(completed):
+            return
+        jobs = [x for x, y in zip(jobs, completed) if y]
         fjobs = [x for x in jobs if any(x.doc.get(self.MESSAGE, {}).values())]
         self.log(f"{len(jobs) - len(fjobs)} / {len(jobs)} succeeded jobs.")
         if not fjobs:
