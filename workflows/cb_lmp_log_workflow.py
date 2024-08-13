@@ -172,8 +172,6 @@ def main(argv):
     logutils.logOptions(logger, options)
     runner = Runner(options, argv, logger=logger)
     runner.run()
-    log_file = os.path.basename(logger.handlers[0].baseFilename)
-    jobutils.add_outfile(log_file, options.jobname, set_file=True)
     log(jobutils.FINISHED, timestamp=True)
 
 

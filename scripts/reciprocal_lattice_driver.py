@@ -128,7 +128,9 @@ class Reciprocal:
             fig.tight_layout()
             fname = self.options.jobname + self.PNG_EXT
             fig.savefig(fname)
-            jobutils.add_outfile(fname, jobname=self.options.jobname)
+            jobutils.add_outfile(fname,
+                                 jobname=self.options.jobname,
+                                 set_file=True)
         log(f'Figure saved as {fname}')
 
 
@@ -181,13 +183,10 @@ def main(argv):
 
     global logger
     options = validate_options(argv)
-    logger = logutils.createDriverLogger(jobname=options.jobname,
-                                         log_file=True)
+    logger = logutils.createDriverLogger(jobname=options.jobname)
     logutils.logOptions(logger, options)
     reciprocal = Reciprocal(options)
     reciprocal.run()
-    log_file = os.path.basename(logger.handlers[0].baseFilename)
-    jobutils.add_outfile(log_file, options.jobname, set_file=True)
     log(jobutils.FINISHED, timestamp=True)
 
 

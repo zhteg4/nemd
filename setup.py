@@ -314,8 +314,8 @@ setup(name='nemd',
           'matplotlib', 'plotly', 'dash_bootstrap_components', 'pytest',
           'dash[testing]', 'pyqt5==5.15.4', 'pyqt5-sip==12.12.1',
           'webdriver-manager', 'flask', 'openpyxl', 'sh', 'humanfriendly',
-          'Pillow', 'pyvim', 'adjustText', 'crystals', 'spglib', 'numba',
-          'tbb', 'wurlitzer', 'tabulate'
+          'Pillow', 'pyvim', 'crystals', 'spglib', 'numba', 'tbb', 'wurlitzer',
+          'tabulate'
       ],
       extras_require={
           'dev': [

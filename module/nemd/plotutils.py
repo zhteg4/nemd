@@ -9,7 +9,6 @@ This module provides backend plotting for drivers.
 import sh
 import numpy as np
 import pandas as pd
-import adjustText
 from nemd import constants
 from nemd import environutils
 from contextlib import contextmanager
@@ -172,8 +171,9 @@ class LatticePlotter:
         self.max_x = None
         self.min_y = None
         self.max_y = None
+        self.xs = None
+        self.ys = None
         self.origin = np.array([0., 0.])
-        self.texts = []
 
     def run(self):
         """
@@ -215,8 +215,7 @@ class LatticePlotter:
                           arrowstyle=arrowstyle,
                           color=color)
         self.ax.annotate("", xy=vect, xytext=xytext, arrowprops=arrowprops)
-        text = self.ax.annotate(text, xy=(vect + xytext) / 2, color=color)
-        self.texts.append(text)
+        self.ax.annotate(text, xy=(vect + xytext) / 2, color=color)
 
     def setGrids(self, num=6):
         """
@@ -359,7 +358,6 @@ class LatticePlotter:
         """
         Set the style of the plot including axis, title and so on.
         """
-        adjustText.adjust_text(self.texts, ax=self.ax)
         self.ax.set_aspect('equal')
         self.ax.set_title('Real Space')
 
