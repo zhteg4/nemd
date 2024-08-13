@@ -19,7 +19,7 @@ class Cmd:
     POUND = symbols.POUND
     CMD_BRACKET_RE = '.*?\(.*?\)'
     AND_RE = r'and\s+'
-    NAME_BRACKET_RE = re.compile('(.*?)\([\'|"]?(.*?)[\'|"]?\)')
+    NAME_BRACKET_RE = re.compile('[\s+]?(.*?)\\((.*?)\\)')
 
     def __init__(self, path=None, job=None):
         """
@@ -232,7 +232,7 @@ class Opr(Cmd):
         for match in re.finditer(self.NAME_BRACKET_RE, ' '.join(self.args)):
             name, value = [x.strip("'\"") for x in match.groups()]
             values = [x.strip(" '\"") for x in value.split(symbols.COMMA)]
-            self.operators.append([name] + values)
+            self.operators.append([name] + [x for x in values if x])
 
 
 class Check(Opr):
@@ -380,7 +380,8 @@ class Tag(Opr):
         Set the label of the job.
         """
         label = self.get(self.LABEL)
-        breakpoint()
+        label = [*label, *self.job.doc.get(jobutils.LOGFILE, {}).keys()]
+        self.set(self.LABEL, *set(label))
 
     def get(self, key, default=None):
         """
@@ -388,33 +389,35 @@ class Tag(Opr):
 
         :param key str: the key to be searched
         :param default str: the default value if the key is not found
-        :return str: the value of the key
+        :return tuple of str: the value(s)
         """
-        for name, value in self.operators:
+        for name, *value in self.operators:
             if name == key:
                 return value
-        return default
+        return tuple() if default is None else default
 
-    def set(self, key, value):
+    def set(self, key, *value):
         """
         Set the value (and the key) of one operator.
 
         :param key str: the key to be set
-        :param value str: the value to be set
+        :param value tuple of str: the value(s) to be set
         """
-        for idx, (name, _) in enumerate(self.operators):
+        key_values = [key, *value]
+        for idx, (name, *_) in enumerate(self.operators):
             if name == key:
-                self.operators[idx][1] = value
+                self.operators[idx] = key_values
                 return
-        self.operators.append([key, value])
+        self.operators.append(key_values)
 
     def write(self):
         """
         Write the tag file.
         """
         with open(self.pathname, 'w') as fh:
-            for key, value in self.operators:
-                fh.write(f"{key}('{value}')\n")
+            for key, *value in self.operators:
+                values = symbols.COMMA.join(value)
+                fh.write(f"{key}({values})\n")
 
 
 class TagJob(CheckJob):
