@@ -330,7 +330,7 @@ class Tag(Opr):
         Main method to run.
         """
         self.parse()
-        self.setJobTime()
+        self.setSlow()
         self.write()
 
     @property
@@ -349,11 +349,9 @@ class Tag(Opr):
         delta = hms - self.TIME_ZERO
         return delta.total_seconds() > self.options.slow
 
-    def setJobTime(self):
+    def setSlow(self):
         """
-        Get the total time from the driver log files.
-
-        :return str: the total time in the format of HH:MM:SS
+        Set the slow tag with the total job time from the driver log files.
         """
         logfiles = self.job.doc.get(jobutils.LOGFILE)
         if logfiles is None:
