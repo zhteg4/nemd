@@ -81,6 +81,18 @@ class Integration(jobcontrol.Runner):
         """
         self.state = {FLAG_DIR: self.options.dir}
 
+    def cleanJobs(self):
+        """
+        Clean jobs.
+        """
+        super().cleanJobs()
+        if not self.options.clean or CMD not in self.options.task:
+            return
+        # The cmd job names may differ from the 'cmd' str.
+        for job in self.project.find_jobs():
+            job.doc[jobutils.OUTFILE] = {}
+            job.doc[jobutils.OUTFILES] = {}
+
 
 def get_parser():
     """

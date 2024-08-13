@@ -19,7 +19,7 @@ class Cmd:
     POUND = symbols.POUND
     CMD_BRACKET_RE = '.*?\(.*?\)'
     AND_RE = r'and\s+'
-    NAME_BRACKET_RE = re.compile('[\s+]?(.*?)\\((.*?)\\)')
+    NAME_BRACKET_RE = re.compile('(?:(?:^(?:\s+)?)|(?:\s+))(.*?)\\((.*?)\\)')
 
     def __init__(self, path=None, job=None):
         """
@@ -94,17 +94,19 @@ class CmdJob(task.Job):
 
     def setName(self):
         """
-        Set the jobname of the known args.
+        Set the cmd job names.
         """
         for idx, cmd in enumerate(self.args):
-            if cmd.startswith('#'):
-                continue
-            if self.FLAG_JOBNAME in cmd:
-                continue
             match = self.JOBNAME_RE.match(cmd)
             if not match:
                 continue
-            cmd += f" {self.FLAG_JOBNAME} {match.groups()[0]}"
+            jobname = match.groups()[0]
+            names = self.job.doc.get(self.NAME, [])
+            names.append(jobname)
+            self.job.doc.update({self.NAME: names})
+            if self.FLAG_JOBNAME in cmd:
+                continue
+            cmd += f" {self.FLAG_JOBNAME} {jobname}"
             self.args[idx] = cmd
 
     def addQuote(self):
@@ -380,7 +382,7 @@ class Tag(Opr):
         Set the label of the job.
         """
         label = self.get(self.LABEL)
-        label = [*label, *self.job.doc.get(jobutils.LOGFILE, {}).keys()]
+        label = [*label, *self.job.doc.get(CmdJob.NAME, [])]
         self.set(self.LABEL, *set(label))
 
     def get(self, key, default=None):
