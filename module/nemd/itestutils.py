@@ -216,11 +216,11 @@ class Opr(Cmd):
         super().__init__(*args, **kwargs)
         self.operators = []
 
-    def run(self):
+    def parse(self):
         """
         Parse the file, set the operators, and execute the operators.
         """
-        self.parse()
+        super().parse()
         self.setOperators()
 
     def setOperators(self):
@@ -245,7 +245,6 @@ class Check(Opr):
         Parse the file, set the operators, and execute the operators.
         """
         self.parse()
-        self.setOperators()
         self.check()
 
     def check(self):
@@ -330,11 +329,8 @@ class Tag(Opr):
         """
         Main method to run.
         """
-        super().run()
-        job_time = self.getJobTime()
-        if job_time is None:
-            return
-        self.set(self.SLOW, job_time)
+        self.parse()
+        self.setJobTime()
         self.write()
 
     @property
@@ -353,8 +349,7 @@ class Tag(Opr):
         delta = hms - self.TIME_ZERO
         return delta.total_seconds() > self.options.slow
 
-
-    def getJobTime(self):
+    def setJobTime(self):
         """
         Get the total time from the driver log files.
 
@@ -366,7 +361,8 @@ class Tag(Opr):
         total_time = datetime.timedelta()
         for logfile in logfiles.values():
             total_time += logutils.get_time(logfile)
-        return (self.TIME_ZERO + total_time).strftime(self.TIME_FORMAT)
+        job_time = (self.TIME_ZERO + total_time).strftime(self.TIME_FORMAT)
+        self.set(self.SLOW, job_time)
 
     def get(self, key, default=None):
         """
