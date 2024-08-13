@@ -18,8 +18,8 @@ class Cmd:
     NAME = 'cmd'
     POUND = symbols.POUND
     CMD_BRACKET_RE = '.*?\(.*?\)'
-    AND_RE = r'and\s+'
     NAME_BRACKET_RE = re.compile('(?:(?:^(?:\s+)?)|(?:\s+))(.*?)\\((.*?)\\)')
+    AND_NAME_RE = re.compile('^and\s+(.*)')
 
     def __init__(self, path=None, job=None):
         """
@@ -233,6 +233,9 @@ class Opr(Cmd):
             return
         for match in re.finditer(self.NAME_BRACKET_RE, ' '.join(self.args)):
             name, value = [x.strip("'\"") for x in match.groups()]
+            match = self.AND_NAME_RE.match(name)
+            if match:
+                name = match.groups()[0]
             values = [x.strip(" '\"") for x in value.split(symbols.COMMA)]
             self.operators.append([name] + [x for x in values if x])
 
