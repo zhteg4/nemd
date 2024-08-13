@@ -40,6 +40,7 @@ class Runner:
         self.argv = argv
         self.logger = logger
         self.state = {}
+        self.jobs = []
         self.project = None
         self.agg_project = None
         self.prereq = collections.defaultdict(list)
@@ -106,6 +107,7 @@ class Runner:
             job = self.project.open_job(dict(tuple(x) for x in argv))
             job.document[self.ARGS] = self.argv[:] + sum(argv, [])
             job.document.update({self.PREREQ: self.prereq})
+            self.jobs.append(job)
 
     def cleanJobs(self):
         """

@@ -12,7 +12,6 @@ Supported check commands are: cmd, exist, not_exist ..
 import os
 import sys
 import glob
-import pandas as pd
 
 from nemd import logutils
 from nemd import jobutils
@@ -89,7 +88,7 @@ class Integration(jobcontrol.Runner):
         if not self.options.clean or CMD not in self.options.task:
             return
         # The cmd job names may differ from the 'cmd' str.
-        for job in self.project.find_jobs():
+        for job in self.jobs():
             job.doc[jobutils.OUTFILE] = {}
             job.doc[jobutils.OUTFILES] = {}
 
