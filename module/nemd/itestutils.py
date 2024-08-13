@@ -386,7 +386,8 @@ class Tag(Opr):
         """
         label = self.get(self.LABEL)
         label = [*label, *self.job.doc.get(CmdJob.NAME, [])]
-        self.set(self.LABEL, *set(label))
+        if label:
+            self.set(self.LABEL, *set(label))
 
     def get(self, key, default=None):
         """

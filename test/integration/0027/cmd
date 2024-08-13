@@ -1,2 +1,2 @@
 # RDF on hexane trajectory
-run_nemd custom_dump_driver.py $NEMD_SRC/test/test_files/hexane_liquid/dump.custom.gz -data_file $NEMD_SRC/test/test_files/hexane_liquid/polymer_builder.data -task rdf xyz clash density msd -last_pct 0.05 -sel O -slice :150
+run_nemd lmp_traj_driver.py $NEMD_SRC/test/test_files/hexane_liquid/dump.custom.gz -data_file $NEMD_SRC/test/test_files/hexane_liquid/polymer_builder.data -task rdf xyz clash density msd -last_pct 0.05 -sel O -slice :150
