@@ -56,11 +56,11 @@ class Runner:
         3) run a project with aggregator jobs
         """
         if jobutils.TASK in self.options.jtype:
-            self.cleanJobs()
             self.setJob()
             self.setProject()
             self.setState()
             self.addJobs()
+            self.cleanJobs()
             self.runJobs()
             self.logStatus()
             self.logMessage()
@@ -69,19 +69,6 @@ class Runner:
             self.setAggProject()
             self.cleanAggJobs()
             self.runAggJobs()
-
-    def cleanJobs(self):
-        """
-        Remove the previous task results on request.
-        """
-        if not self.options.clean:
-            return
-        if jobutils.TASK in self.options.jtype:
-            try:
-                shutil.rmtree(self.WORKSPACE)
-            except FileNotFoundError:
-                pass
-            return
 
     def setJob(self):
         """
@@ -119,6 +106,19 @@ class Runner:
             job = self.project.open_job(dict(tuple(x) for x in argv))
             job.document[self.ARGS] = self.argv[:] + sum(argv, [])
             job.document.update({self.PREREQ: self.prereq})
+
+    def cleanJobs(self):
+        """
+        The post functions of the pre-job return False after the clean so that
+        the job can run again on request.
+        """
+        if not self.options.clean:
+            return
+        for job in self.project.find_jobs():
+            for name in self.project.operations.keys():
+                job.doc[self.MESSAGE].pop(name)
+                job.doc[jobutils.OUTFILE].pop(name)
+                job.doc[jobutils.OUTFILES].pop(name)
 
     def runJobs(self):
         """
@@ -220,7 +220,7 @@ class Runner:
         """
         if not self.options.clean:
             return
-        if not jobutils.AGGREGATOR in self.options.jtype:
+        if jobutils.AGGREGATOR not in self.options.jtype:
             return
         for name in self.agg_project.operations.keys():
             self.agg_project.doc.pop(name)

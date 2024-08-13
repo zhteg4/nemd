@@ -315,6 +315,7 @@ class Tag(Opr):
 
     NAME = 'tag'
     SLOW = 'slow'
+    LABEL = 'label'
     TIME_FORMAT = '%H:%M:%S'
     TIME_ZERO = datetime.datetime.strptime('00:00:00', TIME_FORMAT)
 
@@ -331,7 +332,19 @@ class Tag(Opr):
         """
         self.parse()
         self.setSlow()
+        self.setLabel()
         self.write()
+
+    def selected(self):
+        """
+        Select the operators by the options.
+
+        :return bool: Whether the test is selected.
+        """
+        if self.options is None or self.options.slow is None:
+            return True
+        self.parse()
+        return not self.slow
 
     @property
     def slow(self):
@@ -361,6 +374,13 @@ class Tag(Opr):
             total_time += logutils.get_time(logfile)
         job_time = (self.TIME_ZERO + total_time).strftime(self.TIME_FORMAT)
         self.set(self.SLOW, job_time)
+
+    def setLabel(self):
+        """
+        Set the label of the job.
+        """
+        label = self.get(self.LABEL)
+        breakpoint()
 
     def get(self, key, default=None):
         """

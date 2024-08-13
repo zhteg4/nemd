@@ -81,19 +81,6 @@ class Integration(jobcontrol.Runner):
         """
         self.state = {FLAG_DIR: self.options.dir}
 
-    def addJobs(self):
-        """
-        Add jobs to the project.
-        """
-        super().addJobs()
-        if not self.options.clean:
-            return
-        for job in self.project.find_jobs():
-            if CHECK in self.options.task:
-                job.doc.pop(CHECK)
-            if CHECK in self.options.task:
-                job.doc.pop(CHECK)
-
 
 def get_parser():
     """
@@ -154,13 +141,8 @@ def validate_options(argv):
     if not options.dir:
         parser.error(f'No valid tests found in {options.dir}.')
 
-    if options.slow is not None:
-        tags = [itestutils.Tag(x, options=options) for x in options.dir]
-        for tag in tags:
-            tag.parse()
-            tag.setOperators()
-        selected = [not x.slow for x in tags]
-        options.dir = [x for x, y in zip(options.dir, selected) if y]
+    func = lambda x: itestutils.Tag(x, options=options).selected()
+    options.dir = list(filter(func, options.dir))
     if not options.dir:
         parser.error(f'All tests are marked as slow, skip running.')
 
