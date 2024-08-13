@@ -1,1 +1,1 @@
-not_exist('custom_dump_rdf.csv','custom_dump_clash.csv','custom_dump_msd.csv') and cmp('custom_dump_density.csv','custom_dump_density.csv') and cmp('custom_dump_xyz.xyz','custom_dump_xyz.xyz')
+not_exist('lmp_traj_rdf.csv','lmp_traj_clash.csv','lmp_traj_msd.csv') and cmp('custom_dump_density.csv','lmp_traj_density.csv') and cmp('custom_dump_xyz.xyz','lmp_traj_xyz.xyz')
