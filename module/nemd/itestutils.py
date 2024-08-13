@@ -51,7 +51,7 @@ class Cmd:
 
     def setComment(self):
         """
-        Grad the comment from the args.
+        Take the comment out of the args, and set the comment attribute.
         """
         if self.args is None:
             return
@@ -291,7 +291,6 @@ class CheckJob(task.BaseJob):
             self.msg = str(err)
         else:
             self.msg = False
-        self.msg = 'wa'
 
     def post(self):
         """
@@ -329,9 +328,7 @@ class Tag(Opr):
 
     def run(self):
         """
-
-        Returns:
-
+        Main method to run.
         """
         super().run()
         self.set(self.SLOW, self.total_time)
@@ -354,6 +351,7 @@ class Tag(Opr):
         delta = hms - self.TIME_ZERO
         return delta.total_seconds() > self.options.slow
 
+    @property
     def total_time(self):
         """
         Get the total time from the driver log files.

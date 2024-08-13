@@ -155,7 +155,7 @@ def validate_options(argv):
         parser.error(f'No valid tests found in {options.dir}.')
 
     if options.slow is not None:
-        tags = [itestutils.TagParser(x, options=options) for x in options.dir]
+        tags = [itestutils.Tag(x, options=options) for x in options.dir]
         for tag in tags:
             tag.run()
         selected = [not x.slow for x in tags]
