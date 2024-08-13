@@ -116,7 +116,7 @@ class Runner:
         """
         if not self.options.clean:
             return
-        for job in self.project.find_jobs():
+        for job in self.jobs:
             for name in self.project.operations.keys():
                 job.doc[self.MESSAGE].pop(name)
                 job.doc[jobutils.OUTFILE].pop(name)

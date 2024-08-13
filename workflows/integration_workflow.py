@@ -88,7 +88,7 @@ class Integration(jobcontrol.Runner):
         if not self.options.clean or CMD not in self.options.task:
             return
         # The cmd job names may differ from the 'cmd' str.
-        for job in self.jobs():
+        for job in self.jobs:
             job.doc[jobutils.OUTFILE] = {}
             job.doc[jobutils.OUTFILES] = {}
 
