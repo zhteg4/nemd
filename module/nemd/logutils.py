@@ -55,7 +55,11 @@ class FileHandler(logging.FileHandler):
         return fmt.format(record)
 
 
-def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):
+def createLogger(basename,
+                 verbose=None,
+                 file_ext=DRIVER_LOG,
+                 log_file=False,
+                 set_file=False):
     """
     Create a logger.
 
@@ -68,6 +72,8 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):
     :return: the logger
     :param log_file: sets as the log file if True
     :type log_file: bool
+    :param set_file: set this file as the single output file
+    :type set_file: bool
     :rtype: 'logging.Logger'
     """
     if verbose is None:
@@ -81,7 +87,10 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):
         except FileNotFoundError:
             pass
     if log_file:
-        jobutils.add_outfile(log_filename, jobname=basename, log_file=log_file)
+        jobutils.add_outfile(log_filename,
+                             jobname=basename,
+                             log_file=log_file,
+                             set_file=set_file)
     hdlr = FileHandler(log_filename)
     fmt = '%(asctime)s %(levelname)s %(message)s' if verbose else '%(message)s'
     hdlr.setFormatter(logging.Formatter(fmt))
@@ -91,7 +100,7 @@ def createLogger(basename, verbose=None, file_ext=DRIVER_LOG, log_file=False):
     return logger
 
 
-def createDriverLogger(jobname, verbose=None, log_file=True):
+def createDriverLogger(jobname, verbose=None, log_file=True, set_file=False):
     """
     Create a driver logger.
 
@@ -101,10 +110,15 @@ def createDriverLogger(jobname, verbose=None, log_file=True):
     :type verbose: bool
     :param log_file: sets as the log file if True
     :type log_file: bool
+    :param set_file: set this file as the single output file
+    :type set_file: bool
     :return: the logger
     :rtype: 'logging.Logger'
     """
-    return createLogger(jobname, verbose=verbose, log_file=log_file)
+    return createLogger(jobname,
+                        verbose=verbose,
+                        log_file=log_file,
+                        set_file=set_file)
 
 
 def createModuleLogger(basename=None,

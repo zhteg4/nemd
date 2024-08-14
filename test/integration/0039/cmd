@@ -1,2 +1,2 @@
-# Hexane log file
+# Hexane volume from the log file
 run_nemd lmp_log_driver.py $NEMD_SRC/test/test_files/hexane_liquid/lammps_runner_lammps.log -data_file $NEMD_SRC/test/test_files/hexane_liquid/polymer_builder.data -task Volume  -last_pct 0.9

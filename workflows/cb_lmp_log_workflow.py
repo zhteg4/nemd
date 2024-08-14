@@ -168,7 +168,8 @@ logger = None
 def main(argv):
     global logger
     options = validate_options(argv)
-    logger = logutils.createDriverLogger(jobname=options.jobname)
+    logger = logutils.createDriverLogger(jobname=options.jobname,
+                                         set_file=True)
     logutils.logOptions(logger, options)
     runner = Runner(options, argv, logger=logger)
     runner.run()

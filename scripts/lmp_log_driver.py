@@ -238,12 +238,10 @@ def main(argv):
     global logger
     options = validate_options(argv)
     logger = logutils.createDriverLogger(jobname=options.jobname,
-                                         log_file=True)
+                                         set_file=True)
     logutils.logOptions(logger, options)
     lmp_log = LmpLog(options)
     lmp_log.run()
-    log_file = os.path.basename(logger.handlers[0].baseFilename)
-    jobutils.add_outfile(log_file, options.jobname, set_file=True)
     log(jobutils.FINISHED, timestamp=True)
 
 

@@ -411,8 +411,8 @@ class MSD(TrajBase):
         slope, intercept, rvalue, p_value, std_err = linregress(xvals, yvals)
         # MSD=2nDt https://en.wikipedia.org/wiki/Mean_squared_displacement
         self.log(f'{slope/6:.4g} {symbols.PLUS_MIN} {std_err/6:.4g} cm^2/s'
-            f' (R-squared: {rvalue**2:.4f}) linear fit of'
-            f' [{sel.index[0]:.4f} {sel.index[-1]:.4f}] ps')
+                 f' (R-squared: {rvalue**2:.4f}) linear fit of'
+                 f' [{sel.index[0]:.4f} {sel.index[-1]:.4f}] ps')
 
 
 class Clash(TrajBase):
