@@ -111,7 +111,7 @@ class Base(logutils.Base):
         """
         pass
 
-    def saveData(self, float_format='%.4g'):
+    def saveData(self, float_format='%.8g'):
         """
         Save the data.
 
