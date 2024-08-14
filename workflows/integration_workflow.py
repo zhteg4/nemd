@@ -8,6 +8,7 @@ The (sub-)folder name must be one integer to define the job id.
 One test must contain one cmd file and a check file.
 
 Supported check commands are: cmd, exist, not_exist ..
+Supported tag commands are: slow, label
 """
 import os
 import sys
