@@ -25,6 +25,7 @@ class Base(logutils.Base):
     NAME = 'base'
     DATA_EXT = '.csv'
     FIG_EXT = '.png'
+    FLOAT_FMT = '%.4g'
     INDEX_LB = symbols.TIME_LB
     LABEL_RE = re.compile('(.*) +\((.*)\)')
 
@@ -111,15 +112,13 @@ class Base(logutils.Base):
         """
         pass
 
-    def saveData(self, float_format='%.8g'):
+    def saveData(self):
         """
         Save the data.
-
-        :param float_format str: the format to save float
         """
         if self.data.empty:
             return
-        self.data.to_csv(self.outfile, float_format=float_format)
+        self.data.to_csv(self.outfile, float_format=self.FLOAT_FMT)
         self.log(f'{self.DESCR.capitalize()} data written into {self.outfile}')
 
     def fit(self):
@@ -504,6 +503,7 @@ class Thermo(Base):
 
     NAME = 'thermo'
     DESCR = 'Thermodynamic information'
+    FLOAT_FMT = '%.8g'
     THERMO = 'thermo'
     TEMP = 'temp'
     EPAIR = 'e_pair'
@@ -588,18 +588,19 @@ class Agg(logutils.Base):
         if self.Anlz is None:
             return
         self.log(f"Aggregation Task: {self.task}")
-        for params, jobs in self.jobs:
-            if not params.empty:
-                pstr = params.to_csv(lineterminator=' ', sep='=', header=False)
+        for parm, jobs in self.jobs:
+            if not parm.empty:
+                pstr = parm.to_csv(lineterminator=' ', sep='=', header=False)
                 self.log(f"Aggregation Parameters (num={len(jobs)}): {pstr}")
             options = copy.deepcopy(self.options)
-            options.id = params.index.name
+            options.id = parm.index.name
             options.jobs = jobs
             anlz = self.Anlz(options=options, logger=self.logger)
             anlz.run()
             if anlz.result is None:
                 continue
-            result = pd.concat([params, anlz.result]).to_frame().T
+            result = [anlz.result] if parm.empty else [parm, anlz.result]
+            result = pd.concat(result).to_frame().transpose()
             self.result = pd.concat([self.result, result])
 
     def save(self):

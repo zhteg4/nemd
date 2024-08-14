@@ -549,7 +549,7 @@ class TrajJob(LogJob):
         Set arguments to analyze the custom dump file.
         """
         super().setArgs()
-        self.args[0] = self.trajfile
+        self.args[0] = self.traj_file
 
     @property
     def traj_file(self):
@@ -559,8 +559,7 @@ class TrajJob(LogJob):
         :return str: the trajectory file.
         """
         cmd = sh.grep(self.DUMP, self.args[0]).split()
-        traj_file = [x for x in cmd if x.endswith(self.CUSTOM_EXT)][0]
-        return traj_file
+        return [x for x in cmd if x.endswith(self.CUSTOM_EXT)][0]
 
 
 class Lmp_Traj(Lmp_Log):

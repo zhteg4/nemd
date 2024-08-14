@@ -14,7 +14,7 @@ from nemd import jobutils
 from nemd import parserutils
 from nemd import environutils
 from nemd import jobcontrol
-from nemd.task import Polymer_Builder, Lammps, Custom_Dump
+from nemd.task import Polymer_Builder, Lammps, Lmp_Traj
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_workflow.py', '')
@@ -98,24 +98,15 @@ class Runner(jobcontrol.Runner):
         polymer_builder = Polymer_Builder.getOpr(name='polymer_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
         self.setPrereq(lammps_runner, polymer_builder)
-        custom_dump = Custom_Dump.getOpr(name=self.CUSTOM_DUMP)
-        self.setPrereq(custom_dump, lammps_runner)
-
-    def setStateIds(self):
-        """
-        Set the state ids for all jobs.
-        """
-        self.project.doc[self.STATE_FLAG] = FLAG_STATE_NUM
-        self.state_ids = range(self.options.state_num)
+        lmp_traj = Lmp_Traj.getOpr(name='lmp_traj')
+        self.setPrereq(lmp_traj, lammps_runner)
 
     def setAggJobs(self):
         """
         Aggregate post analysis jobs.
         """
         super().setAggJobs()
-        Custom_Dump.getAgg(name=self.options.jobname,
-                           tname=self.CUSTOM_DUMP,
-                           logger=logger)
+        Lmp_Traj.getAgg(name='lmp_traj', logger=logger)
 
 
 def get_parser():
@@ -127,7 +118,7 @@ def get_parser():
     """
     parser = parserutils.get_parser(description=__doc__)
     parser = Polymer_Builder.DRIVER.get_parser(parser)
-    parser = Custom_Dump.DRIVER.get_parser(parser)
+    parser = Lmp_Traj.DRIVER.get_parser(parser)
     parserutils.add_job_arguments(parser,
                                   jobname=environutils.get_jobname(JOBNAME))
     parserutils.add_workflow_arguments(parser)

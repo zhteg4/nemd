@@ -105,7 +105,7 @@ def get_parser():
     parser.add_argument(FLAG_ID,
                         metavar=FLAG_ID.upper(),
                         type=parserutils.type_positive_int,
-                        nargs='+',
+                        nargs='*',
                         help='Select the sub-folders under the integration '
                         'test directory according to these ids.')
     parser.add_argument(FLAG_DIR,
