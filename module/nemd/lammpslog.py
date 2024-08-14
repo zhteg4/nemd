@@ -108,6 +108,8 @@ class Log(lammpsin.In):
         Finalize the extracted data by unit conversion, time conversion,
         column renaming, index setting, and etc.
         """
+        if self.thermo.empty:
+            return
         self.thermo[self.STEP] = self.thermo[self.STEP] * float(self.timestep)
         self.thermo.set_index(self.STEP, inplace=True)
         time_unit = self.TIME_UNITS[self.unit]

@@ -1,1 +1,1 @@
-cmp('lmp_log_thermo.csv', 'lmp_log_thermo.csv')
+cmp('lmp_log_thermo.csv', 'lmp_log_toteng.csv')

@@ -81,8 +81,10 @@ class Lammps:
         info = sh.grep(lammpsin.In.READ_DATA, self.options.inscript)
         if not info:
             return
+
         inscript = os.path.basename(self.options.inscript)
-        if os.path.isfile(inscript):
+        data_file = Lammps.READ_DATA.match(info).groups()[0]
+        if os.path.isfile(inscript) and os.path.exists(data_file):
             return
         with open(self.options.inscript, 'r') as fh:
             original_contents = fh.read()
