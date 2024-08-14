@@ -389,14 +389,13 @@ class MSD(TrajBase):
         tau_idx = pd.Index(data=ps_time - ps_time[0], name=self.INDEX_LB)
         self.data = pd.DataFrame({self.LABEL: msd}, index=tau_idx)
 
-    def fit(self, spct=0.1, epct=0.2, log=None):
+    def fit(self, spct=0.1, epct=0.2):
         """
         Select and fit the mean squared displacement to calculate the diffusion
         coefficient.
 
         :param spct float: exclude the frames of this percentage at head
         :param epct float: exclude the frames of this percentage at tail
-        :param log 'function': the function to print user-facing information
         :return int, int: the start and end index for the selected data
         """
         if self.data.empty:
@@ -411,7 +410,7 @@ class MSD(TrajBase):
         yvals = sel.iloc[:, 0] * (constants.angstrom / constants.centi)**2
         slope, intercept, rvalue, p_value, std_err = linregress(xvals, yvals)
         # MSD=2nDt https://en.wikipedia.org/wiki/Mean_squared_displacement
-        log(f'{slope/6:.4g} {symbols.PLUS_MIN} {std_err/6:.4g} cm^2/s'
+        self.log(f'{slope/6:.4g} {symbols.PLUS_MIN} {std_err/6:.4g} cm^2/s'
             f' (R-squared: {rvalue**2:.4f}) linear fit of'
             f' [{sel.index[0]:.4f} {sel.index[-1]:.4f}] ps')
 
