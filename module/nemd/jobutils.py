@@ -174,3 +174,22 @@ def add_outfile(outfile,
         return
     with open(document, 'w') as fh:
         json.dump(data, fh)
+
+
+def get_sidx(data, options, delta=1):
+    """
+    Get the start index from last_pct.
+
+    :param data: the input data on which the length is determined
+    :type data: list, tuple, or numpy.ndarray
+    :param options: the percentage of the last frames
+    :type options: 'argparse.ArgumentParser'
+    :param delta: the minimum number of frames to include in the selection
+    :type delta: int
+    :return: the start index
+    :rtype: int
+    """
+    num = len(data)
+    sidx = round(num * (1 - options.last_pct))
+    max_sidx = num - delta if num - delta > 0 else 0
+    return min(sidx, max_sidx)

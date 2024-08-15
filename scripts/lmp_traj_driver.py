@@ -7,19 +7,17 @@ This post molecular dynamics driver perform trajectory analysis.
 """
 import os
 import sys
-import math
 import functools
 import pandas as pd
-from scipy import constants
 
 from nemd import traj
 from nemd import symbols
-from nemd import lammpsdata
 from nemd import jobutils
 from nemd import logutils
 from nemd import analyzer
+from nemd import lammpsdata
 from nemd import parserutils
-from nemd import environutils
+from nemd import constants as nconstants
 
 FLAG_TRAJ = parserutils.FLAG_TRAJ
 FLAG_DATA_FILE = parserutils.FLAG_DATA_FILE
@@ -99,7 +97,6 @@ class Traj(object):
         self.frms = None
         self.gids = None
         self.df_reader = None
-        self.radii = None
 
     def run(self):
         """
@@ -140,14 +137,12 @@ class Traj(object):
         """
         af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
         if not af_tasks:
+            # No all-frame tasks, fully read the last frames only
             steps = traj.frame_steps(self.options.traj)
-            if len(steps) == 0:
-                return
-            self.sidx = math.floor(len(steps) * (1 - self.options.last_pct))
-            if self.sidx == len(steps) - 1 and self.sidx:
-                # From the second to the last frame in case of a broken last one
-                self.sidx -= 1
+            # From the 2nd to the last frame in case of a broken last one.
+            self.sidx = jobutils.get_sidx(steps, self.options, delta=2)
             start = int(steps[self.sidx])
+
         # Step are always saved but frames are only fully read with all tasks
         frms = traj.slice_frames(self.options.traj,
                                  slices=self.options.slices,
@@ -156,13 +151,10 @@ class Traj(object):
         if len(self.frms) == 0:
             return
 
-        if self.sidx is None:
-            self.sidx = math.floor(
-                len(self.frms) * (1 - self.options.last_pct))
-        self.time = pd.Index([x.step * self.timestep for x in self.frms])
+        self.sidx = jobutils.get_sidx(self.frms, self.options)
         # Convert time to ps and add starting index
-        if self.unit == symbols.FS:
-            self.time *= constants.femto / constants.pico
+        fac = nconstants.FS_TO_PS if self.unit == symbols.FS else 1
+        self.time = pd.Index([x.step * self.timestep * fac for x in self.frms])
         self.time.name = symbols.TIME_ID.format(unit=symbols.PS, id=self.sidx)
         # Report the number of frames, (starting time), and ending time
         log(f"{len(self.frms)} trajectory frames found.")

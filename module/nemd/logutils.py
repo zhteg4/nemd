@@ -292,7 +292,6 @@ class LogReader:
 
 
 class Base(object):
-
     """
     A base class with a logger to print logging messages.
     """

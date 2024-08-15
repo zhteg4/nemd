@@ -5,7 +5,6 @@ This post molecular dynamics driver perform log analysis.
 """
 import os
 import sys
-import math
 import functools
 
 from nemd import symbols
@@ -15,7 +14,6 @@ from nemd import jobutils
 from nemd import logutils
 from nemd import analyzer
 from nemd import parserutils
-from nemd import environutils
 
 FlAG_LMP_LOG = 'lmp_log'
 FLAG_DATA_FILE = parserutils.FLAG_DATA_FILE
@@ -126,10 +124,8 @@ class LmpLog(object):
 
         self.lmp_log = lammpslog.Log(self.options.lmp_log)
         self.lmp_log.run()
-        self.sidx = math.floor(self.lmp_log.thermo.shape[0] *
-                               (1 - self.options.last_pct))
+        self.sidx = jobutils.get_sidx(self.lmp_log.thermo, self.options)
         self.lmp_log.thermo.index.name += f" ({self.sidx})"
-
         log(f"{self.lmp_log.thermo.shape[0]} steps of thermo data found.")
         af_tasks = [x for x in self.options.task if x in ALL_FRM_TASKS]
         if af_tasks:

@@ -79,7 +79,26 @@ class Integration(jobcontrol.Runner):
         """
         Set state with test dirs.
         """
-        self.state = {FLAG_DIR: self.options.dir}
+
+        if self.options.id:
+            dirs = [
+                os.path.join(self.options.dir, f"{x:0>4}")
+                for x in self.options.id
+            ]
+        else:
+            dirs = glob.glob(os.path.join(self.options.dir, '[0-9]' * 4))
+
+        dirs = [x for x in dirs if os.path.isdir(x)]
+        if not dirs:
+            log_error(f'No valid tests found in {self.options.dir}.')
+
+        dirs = [
+            x for x in dirs
+            if itestutils.Tag(x, options=self.options).selected()
+        ]
+        if not dirs:
+            log_error(f'All tests are marked as slow, skip running.')
+        self.state = {FLAG_DIR: dirs}
 
     def cleanJobs(self):
         """
@@ -142,21 +161,6 @@ def validate_options(argv):
     options = parser.parse_args(argv)
     if not options.dir:
         parser.error(f'Please define the integration test dir via {FLAG_DIR}')
-
-    if options.id:
-        dirs = [os.path.join(options.dir, f"{x:0>4}") for x in options.id]
-    else:
-        dirs = glob.glob(os.path.join(options.dir, '[0-9]' * 4))
-
-    options.dir = [x for x in dirs if os.path.isdir(x)]
-    if not options.dir:
-        parser.error(f'No valid tests found in {options.dir}.')
-
-    func = lambda x: itestutils.Tag(x, options=options).selected()
-    options.dir = list(filter(func, options.dir))
-    if not options.dir:
-        parser.error(f'All tests are marked as slow, skip running.')
-
     return options
 
 
