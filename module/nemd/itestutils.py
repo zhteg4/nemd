@@ -368,7 +368,9 @@ class Tag(Opr):
             return
         total_time = datetime.timedelta()
         for logfile in logfiles.values():
-            total_time += logutils.get_time(logfile)
+            log = logutils.LogReader(self.job.fn(logfile))
+            log.run()
+            total_time += log.time
         job_time = timeutils.delta2str(total_time)
         self.set(self.SLOW, job_time)
 

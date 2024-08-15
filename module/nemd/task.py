@@ -224,12 +224,10 @@ class AggJob(BaseJob):
         self.log(self.TIME_BREAKDOWN)
         info = []
         for job in self.jobs:
-            for tname, filename in job.doc.get(jobutils.LOGFILE, {}).items():
-                delta_time = logutils.get_time(job.fn(filename))
-                log_reader = logutils.LogReader(job.fn(filename))
-                log_reader.run()
-                name = log_reader.options[jobutils.DEFAULT_NAME]
-                info.append([name, delta_time, f"({job.id[:3]})"])
+            for filename in job.doc.get(jobutils.LOGFILE, {}).values():
+                log = logutils.LogReader(job.fn(filename))
+                log.run()
+                info.append([log.options.default_name, log.time, job.id])
         info = pd.DataFrame(info, columns=[self.MANE, self.TIME, self.ID])
         # Group the jobs by the labels
         data, grouped = {}, info.groupby(self.MANE)
@@ -237,10 +235,10 @@ class AggJob(BaseJob):
             val = dat.drop(columns=self.MANE)
             val.sort_values(self.TIME, ascending=False, inplace=True)
             ave = val.time.mean()
-            ave = pd.DataFrame([[ave, '(ave)']], columns=[self.TIME, self.ID])
-            val = pd.concat([ave, val])
-            val.time = val.time.apply(self.delta2str)
-            val = val.reset_index(drop=True).apply(' '.join, axis=1)
+            ave = pd.DataFrame([[ave, 'ave']], columns=[self.TIME, self.ID])
+            val = pd.concat([ave, val]).reset_index(drop=True)
+            val = val.apply(lambda x: f'{self.delta2str(x.time)} ({x.id[:3]})',
+                            axis=1)
             data[key[:10]] = val
         data = pd.DataFrame(data)
         self.log(data.fillna('').to_markdown(index=False))

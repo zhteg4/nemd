@@ -1,6 +1,6 @@
 import os
-import sh
 import io
+import types
 import logging
 import pathlib
 import wurlitzer
@@ -219,24 +219,39 @@ class LogReader:
     """
     A class to read the log file.
     """
+
     JOBNAME = jobutils.FLAG_JOBNAME.lower()[1:]
     TASK = jobutils.FLAG_TASK.lower()[1:]
 
     def __init__(self, filepath):
+        """
+        Initialize the LogReader object.
+
+        :param filepath: the log filepath
+        """
         self.filepath = filepath
-        self.lines = []
-        self.options = {}
+        self.lines = None
+        self.options = None
         self.sidx = None
 
     def run(self):
+        """
+        Run the log reader.
+        """
         self.read()
         self.setOptions()
 
     def read(self):
+        """
+        Read the log file.
+        """
         with open(self.filepath, 'r') as fh:
             self.lines = [x.strip() for x in fh.readlines()]
 
     def setOptions(self):
+        """
+        Set the options from the log file.
+        """
         block = None
         for idx, line in enumerate(self.lines):
             if line.endswith(COMMAND_OPTIONS_END):
@@ -246,48 +261,41 @@ class LogReader:
                 block.append(line)
             if line.endswith(COMMAND_OPTIONS_START):
                 block = []
+        options = {}
         for line in block:
             key, val = line.split(COLON_SEP)
             key = key.split()[-1]
             vals = val.split(COMMA_SEP)
-            self.options[key] = val if len(vals) == 1 else vals
+            options[key] = val if len(vals) == 1 else vals
+        self.options = types.SimpleNamespace(**options)
 
-    def getOptions(self, key=JOBNAME):
-        return self.options.get(key)
+    @property
+    def time(self, dtype=DELTA):
+        """
+        Get the time information from log file.
 
-    def getTasks(self):
-        tasks = self.getOptions(key=self.TASK)
-        return tasks if isinstance(tasks, list) else [tasks]
-
-
-def get_time(filepath, dtype=DELTA):
-    """
-    Get the time information from log file.
-
-    :param filepath: the log filepath
-    :type filepath: str
-    :param dtype: START gets the starting time, END get the finishing time,
-        and DELTA gets the time span.
-    :type dtype: str
-    :return: the time information
-    :rtype: 'datetime.datetime' on START & END; 'datetime.timedelta' on DELTA
-    """
-    stime = sh.grep(JOBSTART, filepath).split(JOBSTART)[-1].strip()
-    stime = timeutils.dtime(stime)
-    if dtype == START:
-        return stime
-    try:
-        dtime = sh.grep('-A', '1', FINISHED, filepath).split(FINISHED)[-1]
-    except sh.ErrorReturnCode_1:
-        return
-    dtime = timeutils.dtime(' '.join(dtime.split()[-2:]))
-    if dtype == END:
-        return dtime
-    delta = dtime - stime
-    return delta
+        :param dtype: START gets the starting time, END get the finishing time,
+            and DELTA gets the time span.
+        :type dtype: str
+        :return: the time information
+        :rtype: 'datetime.datetime' on START & END; 'datetime.timedelta' on DELTA
+        """
+        stime = timeutils.dtime(self.options.JobStart)
+        if dtype == START:
+            return stime
+        # len('12:54:16 08/15/24') == 17
+        dtime = timeutils.dtime(self.lines[-1][-17:])
+        if dtype == END:
+            return dtime
+        delta = dtime - stime
+        return delta
 
 
 class Base(object):
+
+    """
+    A base class with a logger to print logging messages.
+    """
 
     def __init__(self, logger=None):
         """
