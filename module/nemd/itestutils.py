@@ -6,6 +6,7 @@ from nemd import task
 from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
+from nemd import timeutils
 
 FLAG_DIR = '-dir'
 
@@ -321,8 +322,6 @@ class Tag(Opr):
     NAME = 'tag'
     SLOW = 'slow'
     LABEL = 'label'
-    TIME_FORMAT = '%H:%M:%S'
-    TIME_ZERO = datetime.datetime.strptime('00:00:00', TIME_FORMAT)
 
     def __init__(self, *args, options=None, **kwargs):
         """
@@ -363,8 +362,7 @@ class Tag(Opr):
         value = self.get(self.SLOW)
         if value is None:
             return False
-        hms = datetime.datetime.strptime(value, self.TIME_FORMAT)
-        delta = hms - self.TIME_ZERO
+        delta = timeutils.str2timedelta(value)
         return delta.total_seconds() > self.options.slow
 
     def setSlow(self):
@@ -377,7 +375,7 @@ class Tag(Opr):
         total_time = datetime.timedelta()
         for logfile in logfiles.values():
             total_time += logutils.get_time(logfile)
-        job_time = (self.TIME_ZERO + total_time).strftime(self.TIME_FORMAT)
+        job_time = timeutils.delta2str(total_time)
         self.set(self.SLOW, job_time)
 
     def setLabel(self):

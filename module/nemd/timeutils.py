@@ -1,6 +1,8 @@
 from datetime import datetime
 
 Xx_FMT = '%X %x'
+HMS_FMT = '%H:%M:%S'
+HMS_ZERO = datetime.strptime('00:00:00', HMS_FMT)
 
 
 def ctime(fmt=Xx_FMT):
@@ -29,3 +31,32 @@ def dtime(strftime, fmt=Xx_FMT):
     """
 
     return datetime.strptime(strftime, fmt)
+
+
+def delta2str(delta, fmt=HMS_FMT):
+    """
+    Convert a timedelta object to a string representation.
+
+    :param delta: the timedelta object to convert
+    :type delta: 'datetime.timedelta'
+    :param fmt: the format to print the time
+    :type fmt: str
+    :return: the string representation of the timedelta object
+    :rtype: str
+    """
+    return (HMS_ZERO + delta).strftime(fmt)
+
+
+def str2delta(value, fmt=HMS_FMT):
+    """
+    Convert a string representation of time to a timedelta object.
+
+    :param value: the string representation of time
+    :type value: str
+    :param fmt: the format to parse the input string
+    :type fmt: str
+    :return: the timedelta object based on input string
+    :rtype: 'datetime.timedelta'
+    """
+    hms = dtime(value, fmt=fmt)
+    return hms - HMS_ZERO

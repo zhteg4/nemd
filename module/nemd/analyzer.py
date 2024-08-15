@@ -26,7 +26,6 @@ class Base(logutils.Base):
     DATA_EXT = '.csv'
     FIG_EXT = '.png'
     FLOAT_FMT = '%.4g'
-    INDEX_LB = symbols.TIME_LB
     LABEL_RE = re.compile('(.*) +\((.*)\)')
 
     def __init__(self, df_reader=None, options=None, logger=None):

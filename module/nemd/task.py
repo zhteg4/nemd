@@ -5,9 +5,7 @@ import types
 import argparse
 import functools
 import collections
-import humanfriendly
 import pandas as pd
-from datetime import timedelta
 from types import SimpleNamespace
 from flow import FlowProject, aggregator
 
@@ -16,6 +14,7 @@ from nemd import logutils
 from nemd import jobutils
 from nemd import lammpsin
 from nemd import analyzer
+from nemd import timeutils
 
 FILE = jobutils.FILE
 
@@ -201,6 +200,12 @@ class AggJob(BaseJob):
     """
 
     TIME_BREAKDOWN = 'Task timing breakdown:'
+    MS_FMT = '%M:%S'
+    MS_LMT = '59:59'
+    DELTA_LMT = timeutils.str2delta(MS_LMT, fmt=MS_FMT)
+    MANE = symbols.NAME
+    TIME = symbols.TIME.lower()
+    ID = symbols.ID
 
     def __init__(self, *jobs, **kwargs):
         """
@@ -217,23 +222,38 @@ class AggJob(BaseJob):
         Main method to run the aggregator job.
         """
         self.log(self.TIME_BREAKDOWN)
-        info = collections.defaultdict(list)
+        info = []
         for job in self.jobs:
             for tname, filename in job.doc.get(jobutils.LOGFILE, {}).items():
-                delta = logutils.get_time(job.fn(filename))
-                info[tname].append(SimpleNamespace(delta=delta, id=job.id))
-        for tname, tinfo in info.items():
-            tinfo = [x for x in tinfo if x.delta is not None]
-            if not tinfo:
-                continue
-            total = sum([x.delta for x in tinfo], start=timedelta(0))
-            ave = humanfriendly.format_timespan(total / len(tinfo))
-            deltas = [
-                f"{humanfriendly.format_timespan(x.delta)} ({x.id[:4]})"
-                for x in tinfo
-            ]
-            self.log(f"{tname}: {', '.join(deltas)}; {ave} (ave)")
+                delta_time = logutils.get_time(job.fn(filename))
+                info.append([tname, delta_time, f"({job.id[:3]})"])
+        info = pd.DataFrame(info, columns=[self.MANE, self.TIME, self.ID])
+        # Group the jobs by the labels
+        data, grouped = {}, info.groupby(self.MANE)
+        for key, dat in sorted(grouped, key=lambda x: x[1].size, reverse=True):
+            val = dat.drop(columns=self.MANE)
+            val.sort_values(self.TIME, ascending=False, inplace=True)
+            ave = val.time.mean()
+            ave = pd.DataFrame([[ave, '(ave)']], columns=[self.TIME, self.ID])
+            val = pd.concat([ave, val])
+            val.time = val.time.apply(self.delta2str)
+            val = val.reset_index(drop=True).apply(' '.join, axis=1)
+            data[key[:10]] = val
+        data = pd.DataFrame(data)
+        self.log(data.fillna('').to_markdown(index=False))
         self.project.doc[self.name] = False
+
+    def delta2str(self, delta):
+        """
+        Delta time to string with upper limit.
+
+        :param delta: the time delta object
+        :type delta: 'datetime.timedelta'
+        :return str: the string representation of the time delta with upper limit
+        """
+        if delta > self.DELTA_LMT:
+            return self.MS_LMT
+        return timeutils.delta2str(delta, fmt=self.MS_FMT)
 
     def post(self):
         """
