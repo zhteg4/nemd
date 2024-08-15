@@ -99,15 +99,9 @@ class CmdJob(task.Job):
         """
         for idx, cmd in enumerate(self.args):
             match = self.JOBNAME_RE.match(cmd)
-            if not match:
+            if not match or self.FLAG_JOBNAME in cmd:
                 continue
-            jobname = match.groups()[0]
-            names = self.job.doc.get(self.NAME, [])
-            names.append(jobname)
-            self.job.doc.update({self.NAME: names})
-            if self.FLAG_JOBNAME in cmd:
-                continue
-            cmd += f" {self.FLAG_JOBNAME} {jobname}"
+            cmd += f" {self.FLAG_JOBNAME} {match.groups()[0]}"
             self.args[idx] = cmd
 
     def addQuote(self):
@@ -383,7 +377,10 @@ class Tag(Opr):
         Set the label of the job.
         """
         label = self.get(self.LABEL)
-        label = [*label, *self.job.doc.get(CmdJob.NAME, [])]
+        for logfile in self.job.doc.get(jobutils.LOGFILE, {}).values():
+            log_reader = logutils.LogReader(self.job.fn(logfile))
+            log_reader.run()
+            label.append(log_reader.options[jobutils.DEFAULT_NAME])
         if label:
             self.set(self.LABEL, *set(label))
 

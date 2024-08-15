@@ -27,7 +27,6 @@ from nemd import structure
 from nemd import rdkitutils
 from nemd import structutils
 from nemd import parserutils
-from nemd import environutils
 
 FLAG_CRU = 'cru'
 FLAG_CRU_NUM = '-cru_num'
@@ -664,8 +663,7 @@ def get_parser(parser=None):
         type=parserutils.type_positive_float,
         help='The buffer distance between molecules in the grid cell.')
     parserutils.add_md_arguments(parser)
-    parserutils.add_job_arguments(parser,
-                                  jobname=environutils.get_jobname(JOBNAME))
+    parserutils.add_job_arguments(parser, jobname=JOBNAME)
     return parser
 
 

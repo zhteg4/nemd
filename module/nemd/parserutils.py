@@ -22,6 +22,11 @@ FLAG_PYTHON = jobutils.FLAG_PYTHON
 FLAG_CPU = jobutils.FLAG_CPU
 FLAG_PRJ_PATH = jobutils.FLAG_PRJ_PATH
 
+DEFAULT_JOB_FLAGS = [
+    FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG, FLAG_PYTHON, FLAG_CPU
+]
+DEFAULT_WORKFLOW_FLAGS = [FLAG_STATE_NUM, FLAG_CLEAN, FLAG_JTYPE, FLAG_CPU]
+
 FLAG_TIMESTEP = '-timestep'
 FLAG_STEMP = '-stemp'
 FLAG_TEMP = '-temp'
@@ -274,45 +279,44 @@ def add_md_arguments(parser):
         help='The force field type (and water model separated with comma).')
 
 
-def add_job_arguments(parser, arg_flags=None, jobname=None):
+def add_job_arguments(parser, flags=None, jobname=None):
     """
     Add job control related flags.
 
     :param parser: the parser to add arguments
     :type parser: 'argparse.ArgumentParser'
-    :param arg_flags: specific job control related flags to add
-    :type arg_flags: list
+    :param flags: specific job control related flags to add
+    :type flags: list
     :param jobname: the default jobname
     :type jobname: str
     """
-    if arg_flags is None:
-        arg_flags = [
-            FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG, FLAG_PYTHON, FLAG_CPU
-        ]
+    if flags is None:
+        flags = DEFAULT_JOB_FLAGS
     # Workflow drivers may add the job control options a few times
-    if FLAG_JOBNAME in arg_flags and FLAG_JOBNAME in parser._option_string_actions:
-        parser.set_defaults(jobname=jobname)
-    arg_flags = [
-        x for x in arg_flags if x not in parser._option_string_actions
-    ]
-    if FLAG_INTERACTIVE in arg_flags:
+    if FLAG_JOBNAME in flags and FLAG_JOBNAME in parser._option_string_actions:
+        parser.set_defaults(jobname=environutils.get_jobname(jobname))
+    flags = [x for x in flags if x not in parser._option_string_actions]
+    if FLAG_INTERACTIVE in flags:
         parser.add_argument(FLAG_INTERACTIVE,
                             dest=FLAG_INTERACTIVE[1:].lower(),
                             action='store_true',
                             help='Enable interactive mode')
-    if FLAG_JOBNAME in arg_flags:
+    if FLAG_JOBNAME in flags:
         parser.add_argument(
             FLAG_JOBNAME,
             dest=FLAG_JOBNAME[1:].lower(),
-            default=jobname,
+            default=environutils.get_jobname(jobname),
             help='The jobname based on which filenames are created.')
-    if FLAG_DEBUG in arg_flags:
+        parser.add_argument(f"-{jobutils.DEFAULT_NAME}",
+                            default=jobname,
+                            help=argparse.SUPPRESS)
+    if FLAG_DEBUG in flags:
         parser.add_argument(
             FLAG_DEBUG,
             action='store_true',
             dest=FLAG_DEBUG[1:].lower(),
             help='Enable debug mode (e.g. extra printing and files)')
-    if FLAG_PYTHON in arg_flags:
+    if FLAG_PYTHON in flags:
         parser.add_argument(
             FLAG_PYTHON,
             default=environutils.CACHE_MODE,
@@ -320,7 +324,7 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
             choices=environutils.PYTHON_MODES,
             help='0: pure native python; 1: compile supported python code to '
             'improve performance; 2: run previous compiled python.')
-    if FLAG_CPU in arg_flags:
+    if FLAG_CPU in flags:
         parser.add_argument(FLAG_CPU,
                             type=type_positive_int,
                             dest=FLAG_CPU[1:].lower(),
@@ -328,30 +332,30 @@ def add_job_arguments(parser, arg_flags=None, jobname=None):
                             help='Number of CPU processors.')
 
 
-def add_workflow_arguments(parser, arg_flags=None):
+def add_workflow_arguments(parser, flags=None):
     """
     Add workflow related flags.
 
     :param parser: the parser to add arguments
     :type parser: 'argparse.ArgumentParser'
-    :param arg_flags: specific workflow related flags to add
-    :type arg_flags: list
+    :param flags: specific workflow related flags to add
+    :type flags: list
     """
-    if arg_flags is None:
-        arg_flags = [FLAG_STATE_NUM, FLAG_CLEAN, FLAG_JTYPE, FLAG_CPU]
-    if FLAG_STATE_NUM in arg_flags:
+    if flags is None:
+        flags = DEFAULT_WORKFLOW_FLAGS
+    if FLAG_STATE_NUM in flags:
         parser.add_argument(
             FLAG_STATE_NUM,
             default=1,
             metavar=FLAG_STATE_NUM[1:].upper(),
             type=type_positive_int,
             help='Number of states for the dynamical system via random seed')
-    if FLAG_CLEAN in arg_flags:
+    if FLAG_CLEAN in flags:
         parser.add_argument(
             FLAG_CLEAN,
             action='store_true',
             help='Clean previous workflow results (if any) and run new ones.')
-    if FLAG_JTYPE in arg_flags:
+    if FLAG_JTYPE in flags:
         parser.add_argument(
             FLAG_JTYPE,
             choices=[jobutils.TASK, jobutils.AGGREGATOR],

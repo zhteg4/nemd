@@ -239,15 +239,16 @@ class LogReader:
     def setOptions(self):
         block = None
         for idx, line in enumerate(self.lines):
-            if line == COMMAND_OPTIONS_END:
+            if line.endswith(COMMAND_OPTIONS_END):
                 self.sidx = idx + 1
                 break
             if block is not None:
                 block.append(line)
-            if line == COMMAND_OPTIONS_START:
+            if line.endswith(COMMAND_OPTIONS_START):
                 block = []
         for line in block:
             key, val = line.split(COLON_SEP)
+            key = key.split()[-1]
             vals = val.split(COMMA_SEP)
             self.options[key] = val if len(vals) == 1 else vals
 

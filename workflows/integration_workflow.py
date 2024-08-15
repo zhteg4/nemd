@@ -125,10 +125,9 @@ def get_parser():
                         help='Select the tasks to run. cmd: run the cmd file; '
                         'check: check the results based on the check file;'
                         ' tag: update the tag file')
-    parserutils.add_job_arguments(parser,
-                                  jobname=environutils.get_jobname(JOBNAME))
+    parserutils.add_job_arguments(parser, jobname=JOBNAME)
     parserutils.add_workflow_arguments(
-        parser, arg_flags=[parserutils.FLAG_CLEAN, parserutils.FLAG_JTYPE])
+        parser, flags=[parserutils.FLAG_CLEAN, parserutils.FLAG_JTYPE])
     return parser
 
 
@@ -168,8 +167,7 @@ def main(argv):
     global logger
 
     options = validate_options(argv)
-    jobname = environutils.get_jobname(JOBNAME)
-    logger = logutils.createDriverLogger(jobname=jobname)
+    logger = logutils.createDriverLogger(jobname=JOBNAME)
     logutils.logOptions(logger, options)
     integration = Integration(options, argv, logger=logger)
     integration.run()

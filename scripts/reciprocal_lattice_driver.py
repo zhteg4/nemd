@@ -134,20 +134,15 @@ class Reciprocal:
         log(f'Figure saved as {fname}')
 
 
-def get_parser(parser=None, jflags=None):
+def get_parser(parser=None):
     """
     The user-friendly command-line parser.
 
     :param parser ArgumentParser: the parse to add arguments
-    :param jflags list: specific job control related flags to add
-    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
-        out of sys.argv.
     """
     if parser is None:
         parser = parserutils.get_parser(description=__doc__)
-    parserutils.add_job_arguments(parser,
-                                  arg_flags=jflags,
-                                  jobname=environutils.get_jobname(JOBNAME))
+    parserutils.add_job_arguments(parser, jobname=JOBNAME)
     parser.add_argument(FLAG_MILLER_INDICES,
                         metavar=FLAG_MILLER_INDICES[1:].upper(),
                         default=[0.5, 2],
@@ -183,7 +178,7 @@ def main(argv):
 
     global logger
     options = validate_options(argv)
-    logger = logutils.createDriverLogger(jobname=options.jobname)
+    logger = logutils.createDriverLogger(jobname=JOBNAME)
     logutils.logOptions(logger, options)
     reciprocal = Reciprocal(options)
     reciprocal.run()

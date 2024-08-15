@@ -14,7 +14,6 @@ from nemd import stillinger
 from nemd import jobutils
 from nemd import jobcontrol
 from nemd import parserutils
-from nemd import environutils
 from nemd.task import Crystal_Builder, Lammps, Lmp_Log
 
 PATH = os.path.basename(__file__)
@@ -144,8 +143,7 @@ def get_parser():
         help='The range of scale factors on the crystal lattice parameters.')
     parser = Crystal_Builder.DRIVER.get_parser(parser)
     parser = Lmp_Log.DRIVER.get_parser(parser)
-    parserutils.add_job_arguments(parser,
-                                  jobname=environutils.get_jobname(JOBNAME))
+    parserutils.add_job_arguments(parser, jobname=JOBNAME)
     parserutils.add_workflow_arguments(parser)
     return parser
 

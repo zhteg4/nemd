@@ -157,8 +157,7 @@ def get_parser(parser=None):
                         metavar=FLAG_DATA_FILE[1:].upper(),
                         type=parserutils.type_file,
                         help='Data file to get force field information')
-    parserutils.add_job_arguments(parser,
-                                  jobname=environutils.get_jobname(JOBNAME))
+    parserutils.add_job_arguments(parser, jobname=JOBNAME)
     return parser
 
 
@@ -226,7 +225,7 @@ def main(argv):
     global logger
 
     options = validate_options(argv)
-    logger = logutils.createDriverLogger(jobname=options.jobname)
+    logger = logutils.createDriverLogger(jobname=JOBNAME)
     logutils.logOptions(logger, options)
     lmp = Lammps(options)
     lmp.run()

@@ -121,8 +121,7 @@ def get_parser(parser=None):
         metavar=FLAG_SCALED_FACTOR.upper()[1:],
         type=parserutils.type_positive_float,
         help='Each lattice vector is scaled by the cor factor.')
-    parserutils.add_job_arguments(parser,
-                                  jobname=environutils.get_jobname(JOBNAME))
+    parserutils.add_job_arguments(parser, jobname=JOBNAME)
     return parser
 
 
@@ -151,13 +150,10 @@ def main(argv):
 
     global logger
     options = validate_options(argv)
-    logger = logutils.createDriverLogger(jobname=options.jobname,
-                                         log_file=True)
+    logger = logutils.createDriverLogger(jobname=JOBNAME)
     logutils.logOptions(logger, options)
     xtal_builder = CrystalBuilder(options)
     xtal_builder.run()
-    log_file = os.path.basename(logger.handlers[0].baseFilename)
-    jobutils.add_outfile(log_file, options.jobname, set_file=True)
     log(jobutils.FINISHED, timestamp=True)
 
 

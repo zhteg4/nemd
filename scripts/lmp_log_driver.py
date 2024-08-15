@@ -169,14 +169,11 @@ class LmpLog(object):
             anl.run()
 
 
-def get_parser(parser=None, jflags=None):
+def get_parser(parser=None):
     """
     The user-friendly command-line parser.
 
     :param parser ArgumentParser: the parse to add arguments
-    :param jflags list: specific job control related flags to add
-    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
-        out of sys.argv.
     """
     if parser is None:
         parser = parserutils.get_parser(description=__doc__)
@@ -208,9 +205,7 @@ def get_parser(parser=None, jflags=None):
                         metavar='START:END:INTERVAL',
                         type=parserutils.type_slice,
                         help=f"Slice the thermo output for analysis.")
-    parserutils.add_job_arguments(parser,
-                                  arg_flags=jflags,
-                                  jobname=environutils.get_jobname(JOBNAME))
+    parserutils.add_job_arguments(parser, jobname=JOBNAME)
     return parser
 
 

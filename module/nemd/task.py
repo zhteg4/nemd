@@ -226,7 +226,10 @@ class AggJob(BaseJob):
         for job in self.jobs:
             for tname, filename in job.doc.get(jobutils.LOGFILE, {}).items():
                 delta_time = logutils.get_time(job.fn(filename))
-                info.append([tname, delta_time, f"({job.id[:3]})"])
+                log_reader = logutils.LogReader(job.fn(filename))
+                log_reader.run()
+                name = log_reader.options[jobutils.DEFAULT_NAME]
+                info.append([name, delta_time, f"({job.id[:3]})"])
         info = pd.DataFrame(info, columns=[self.MANE, self.TIME, self.ID])
         # Group the jobs by the labels
         data, grouped = {}, info.groupby(self.MANE)

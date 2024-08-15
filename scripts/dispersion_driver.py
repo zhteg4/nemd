@@ -195,14 +195,11 @@ class Dispersion(object):
         log(f'Figure of phonon dispersion saved as {fname}')
 
 
-def get_parser(parser=None, jflags=None):
+def get_parser(parser=None):
     """
     The user-friendly command-line parser.
 
     :param parser ArgumentParser: the parse to add arguments
-    :param jflags list: specific job control related flags to add
-    :return 'argparse.ArgumentParser':  argparse figures out how to parse those
-        out of sys.argv.
     """
     if parser is None:
         parser = parserutils.get_parser(description=__doc__)
@@ -228,9 +225,7 @@ def get_parser(parser=None, jflags=None):
         metavar=FLAG_SCALED_FACTOR.upper()[1:],
         type=parserutils.type_positive_float,
         help='Each lattice vector is scaled by the cor factor.')
-    parserutils.add_job_arguments(parser,
-                                  arg_flags=jflags,
-                                  jobname=environutils.get_jobname(JOBNAME))
+    parserutils.add_job_arguments(parser, jobname=JOBNAME)
     return parser
 
 
@@ -259,13 +254,10 @@ def main(argv):
 
     global logger
     options = validate_options(argv)
-    logger = logutils.createDriverLogger(jobname=options.jobname,
-                                         log_file=True)
+    logger = logutils.createDriverLogger(jobname=JOBNAME, set_file=True)
     logutils.logOptions(logger, options)
     dispersio = Dispersion(options)
     dispersio.run()
-    log_file = os.path.basename(logger.handlers[0].baseFilename)
-    jobutils.add_outfile(log_file, options.jobname, set_file=True)
     log(jobutils.FINISHED, timestamp=True)
 
 
