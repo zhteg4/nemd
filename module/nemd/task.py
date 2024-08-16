@@ -467,21 +467,6 @@ class BaseTask:
                           post=post,
                           **kwargs)
 
-    @staticmethod
-    def suppress(parser, to_supress=None):
-        """
-        Suppress certain command line arguments.
-
-        :param parser 'argparse.ArgumentParser': the argument parser object
-        :param to_supress list: the list of arguments to suppress
-        """
-        if to_supress is None:
-            return
-        to_supress = set(to_supress)
-        for action in parser._actions:
-            if to_supress.intersection(action.option_strings):
-                action.help = argparse.SUPPRESS
-
 
 class Polymer_Builder(BaseTask):
 

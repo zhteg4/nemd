@@ -16,7 +16,6 @@ from nemd import jobutils
 from nemd import lammpsin
 from nemd import jobcontrol
 from nemd import parserutils
-from nemd import environutils
 from nemd.task import Polymer_Builder, Lammps, Lmp_Log
 
 PATH = os.path.basename(__file__)
@@ -69,6 +68,8 @@ def label(job):
 
 
 class Polymer_Builder(Polymer_Builder):
+
+    import polymer_builder_driver as DRIVER
 
     def run(self):
         """
@@ -265,8 +266,8 @@ def get_parser():
     parser = Lmp_Log.DRIVER.get_parser(parser)
     parserutils.add_job_arguments(parser, jobname=JOBNAME)
     parserutils.add_workflow_arguments(parser)
-    Polymer_Builder.suppress(parser)
-    Lmp_Log.suppress(parser)
+    # Polymer_Builder.suppress(parser)
+    # Lmp_Log.suppress(parser)
     return parser
 
 
@@ -279,10 +280,6 @@ def validate_options(argv):
     """
     parser = get_parser()
     options = parser.parse_args(argv)
-    if Lmp_Log.DRIVER.TOTENG not in options.task:
-        options.task += [Lmp_Log.DRIVER.TOTENG]
-        index = argv.index(Lmp_Log.DRIVER.FLAG_TASK)
-        argv.insert(index + 1, Lmp_Log.DRIVER.TOTENG)
     return options
 
 
@@ -291,8 +288,8 @@ logger = None
 
 def main(argv):
     global logger
-    argv = Polymer_Builder.getArgv(argv)
-    argv = Lmp_Log.getArgv(argv)
+    # argv = Polymer_Builder.getArgv(argv)
+    # argv = Lmp_Log.getArgv(argv)
     options = validate_options(argv)
     logger = logutils.createDriverLogger(jobname=JOBNAME, set_file=True)
     logutils.logOptions(logger, options)

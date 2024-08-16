@@ -370,3 +370,18 @@ def add_workflow_arguments(parser, flags=None):
             type=type_dir,
             help=
             f'Project path if only {jobutils.AGGREGATOR} jobs are requested.')
+
+
+def supress_arguments(parser, to_supress):
+    """
+    Supress the help messages of specified arguments.
+
+    :param parser: the parser to add arguments
+    :type parser: 'argparse.ArgumentParser'
+    :param to_supress: the arguments to be suppressed
+    :type to_supress: set
+    """
+    to_supress = set(to_supress)
+    for action in parser._actions:
+        if to_supress.intersection(action.option_strings):
+            action.help = argparse.SUPPRESS
