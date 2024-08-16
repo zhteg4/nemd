@@ -94,37 +94,6 @@ class Runner(jobcontrol.Runner):
         super().setAggJobs()
         Lmp_Log.getAgg(name='lmp_log', logger=logger)
 
-    @staticmethod
-    def minEneAgg(*jobs, log=None, name=None, tname=None, **kwargs):
-        """
-        The aggregator job task that combines the output files of a custom dump
-        task.
-
-        :param jobs: the task jobs the aggregator collected
-        :type jobs: list of 'signac.contrib.job.Job'
-        :param log: the function to print user-facing information
-        :type log: 'function'
-        :param name: the jobname based on which output files are named
-        :type name: str
-        :param tname: aggregate the job tasks of this name
-        :type tname: str
-        """
-        jname = name.split(Runner.SEP)[0]
-        filename = jname + Lmp_Log.DRIVER.LmpLog.AVE_DATA_EXT % Lmp_Log.DRIVER.THERMO
-        data = pd.read_csv(filename, index_col=0)
-        columns = [x for x in data.columns if x.split('(')[0].strip() == tname]
-        index = data[columns[0]].argmin()
-        factor = str(data.iloc[index].name)
-        val = data.iloc[index][columns[0]]
-        unit = columns[0].split('(')[-1].split(')')[0]
-        log(f"A scale factor of {factor} {Runner.MINIMUM_ENERGY} {val} {unit}")
-        job = [x for x in jobs if x.statepoint[jobutils.STATE_ID] == factor][0]
-        datafile = [
-            x for x in job.doc[jobutils.OUTFILES]['crystal_builder']
-            if x.endswith(stillinger.Struct.DATA_EXT)
-        ][0]
-        log(f'The corresponding datafile is saved as in {datafile}')
-
 
 def get_parser():
     """

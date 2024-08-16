@@ -263,8 +263,7 @@ def get_parser():
         help='The range of the torsion degree to scan in degrees. ')
     parser = Polymer_Builder.DRIVER.get_parser(parser)
     parser = Lmp_Log.DRIVER.get_parser(parser)
-    parserutils.add_job_arguments(parser,
-                                  jobname=environutils.get_jobname(JOBNAME))
+    parserutils.add_job_arguments(parser, jobname=JOBNAME)
     parserutils.add_workflow_arguments(parser)
     Polymer_Builder.suppress(parser)
     Lmp_Log.suppress(parser)
@@ -295,12 +294,10 @@ def main(argv):
     argv = Polymer_Builder.getArgv(argv)
     argv = Lmp_Log.getArgv(argv)
     options = validate_options(argv)
-    logger = logutils.createDriverLogger(jobname=options.jobname)
+    logger = logutils.createDriverLogger(jobname=JOBNAME, set_file=True)
     logutils.logOptions(logger, options)
     runner = Runner(options, argv, logger=logger)
     runner.run()
-    log_file = os.path.basename(logger.handlers[0].baseFilename)
-    jobutils.add_outfile(log_file, options.jobname, set_file=True)
     log(jobutils.FINISHED, timestamp=True)
 
 

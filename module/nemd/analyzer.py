@@ -547,6 +547,7 @@ ANALYZER = {getattr(x, 'NAME'): x for x in ANALYZER}
 class Agg(logutils.Base):
 
     DATA_EXT = '.csv'
+    FIG_EXT = '.png'
 
     def __init__(self, task=None, jobs=None, options=None, logger=None):
         """
@@ -562,6 +563,10 @@ class Agg(logutils.Base):
         self.options = options
         self.Anlz = None
         self.result = pd.DataFrame()
+        self.yvals = None
+        self.ydevs = None
+        self.xvals = None
+        self.outfile = f"{self.options.jobname}_{self.task}{self.DATA_EXT}"
 
     def run(self):
         """
@@ -570,6 +575,8 @@ class Agg(logutils.Base):
         self.setAnalyzer()
         self.setResults()
         self.save()
+        self.setVals()
+        self.fit()
         self.plot()
 
     def setAnalyzer(self):
@@ -608,11 +615,35 @@ class Agg(logutils.Base):
         """
         if self.result.empty:
             return
-        filename = f"{self.options.jobname}_{self.task}{self.DATA_EXT}"
-        self.result.to_csv(filename, index=False)
-        self.log(
-            f"{self.task.capitalize()} of all parameters saved to {filename}")
-        jobutils.add_outfile(filename, jobname=self.options.jobname)
+
+        self.result.to_csv(self.outfile, index=False)
+        task = self.task.capitalize()
+        self.log(f"{task} of all parameters saved to {self.outfile}")
+        jobutils.add_outfile(self.outfile, jobname=self.options.jobname)
+
+    def setVals(self):
+        """
+        Set the x, y, and y standard deviation from the results.
+        """
+        y_lb_re = re.compile(f"{self.task} +\((.*)\)", re.IGNORECASE)
+        y_sd_lb_re = f"{symbols.SD_PREFIX}{self.task} +\((.*)\)"
+        y_sd_lb_re = re.compile(y_sd_lb_re, re.IGNORECASE)
+        y_lb = [x for x in self.result.columns if y_lb_re.match(x)]
+        self.yvals = self.result[y_lb].iloc[:, 0]
+        ysd_lb = [x for x in self.result.columns if y_sd_lb_re.match(x)]
+        self.ydevs = self.result[ysd_lb].iloc[:, 0]
+        x_lbs = list(set(self.result.columns).difference(y_lb + ysd_lb))
+        self.xvals = self.result[x_lbs]
+
+    def fit(self):
+        """
+        Fit the data and report.
+        """
+        index = self.yvals.argmin()
+        val = self.xvals.iloc[1, 0]
+        self.log(f"The minimum {self.yvals.name} of {self.yvals.iloc[index]} "
+                 f"is found with the {self.xvals.columns[0].replace('_',' ')} "
+                 f"being {val}")
 
     def plot(self):
         """
@@ -620,3 +651,24 @@ class Agg(logutils.Base):
         """
         if self.result.empty:
             return
+        with plotutils.get_pyplot(inav=self.options.interactive,
+                                  name=self.task.upper()) as plt:
+            fig = plt.figure(figsize=(10, 6))
+            ax = fig.add_axes([0.13, 0.1, 0.8, 0.8])
+            ax.plot(self.xvals.iloc[:, 0], self.yvals, '--*', label='average')
+            if not self.ydevs.isnull().any():
+                # Data has non-zero standard deviation column
+                ax.fill_between(self.xvals,
+                                self.yvals - self.ydevs,
+                                self.yvals + self.ydevs,
+                                color='y',
+                                label='stdev',
+                                alpha=0.3)
+                ax.legend()
+            xlabel = self.xvals.columns[0].split('_')
+            ax.set_xlabel(' '.join(x.capitalize() for x in xlabel))
+            ax.set_ylabel(self.yvals.name)
+            pathname = self.outfile[:-len(self.DATA_EXT)] + self.FIG_EXT
+            fig.savefig(pathname)
+            jobutils.add_outfile(pathname, jobname=self.options.jobname)
+        self.log(f'{self.task.upper()} figure saved as {pathname}')

@@ -26,6 +26,7 @@ LAST_FRM_TASKS = ALL_FRM_TASKS
 AVE_FRM_TASKS = LAST_FRM_TASKS
 DATA_RQD_TASKS = []
 NO_COMBINE = []
+DEFAULT_TASKS = [analyzer.Thermo.TOTENG]
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
@@ -184,7 +185,7 @@ def get_parser(parser=None):
     parser.add_argument(FLAG_TASK,
                         type=str.lower,
                         choices=analyzer.Thermo.TASKS,
-                        default=analyzer.Thermo.TOTENG,
+                        default=DEFAULT_TASKS,
                         nargs='+',
                         help=f'{analyzer.Thermo.NAME} searches, combines and '
                         f'averages thermodynamic info. ')

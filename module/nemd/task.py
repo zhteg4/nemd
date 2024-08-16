@@ -530,6 +530,8 @@ class LogJobAgg(AggJob):
         """
         super().__init__(*args, **kwargs)
         self.tasks = jobutils.get_arg(self.args, self.FLAG_TASK, first=False)
+        if self.tasks is None:
+            self.tasks = self.driver.DEFAULT_TASKS
         self.tasks = [x.lower() for x in self.tasks]
         inav = jobutils.get_arg(self.args, jobutils.FLAG_INTERACTIVE)
         wdir = os.path.relpath(self.project.workspace, self.project.path)
