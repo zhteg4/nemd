@@ -42,6 +42,8 @@ FlAG_FORCE_FIELD = '-force_field'
 
 FLAG_TRAJ = 'traj'
 FLAG_DATA_FILE = '-data_file'
+FLAG_LAST_PCT = '-last_pct'
+FLAG_SLICE = '-slice'
 
 
 class ArgumentDefaultsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):

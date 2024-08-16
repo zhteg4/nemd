@@ -23,8 +23,8 @@ FLAG_TRAJ = parserutils.FLAG_TRAJ
 FLAG_DATA_FILE = parserutils.FLAG_DATA_FILE
 FLAG_TASK = jobutils.FLAG_TASK
 FLAG_SEL = '-sel'
-FLAG_LAST_PCT = '-last_pct'
-FLAG_SLICES = '-slices'
+FLAG_LAST_PCT = parserutils.FLAG_LAST_PCT
+FLAG_SLICE = parserutils.FLAG_SLICE
 
 CLASH = analyzer.Clash.NAME
 VIEW = analyzer.View.NAME
@@ -222,7 +222,7 @@ def get_parser(parser=None):
         default=0.2,
         help=f"{', '.join(LAST_FRM_TASKS)} average results from "
         f"last frames of this percentage.")
-    parser.add_argument(FLAG_SLICES,
+    parser.add_argument(FLAG_SLICE,
                         metavar='START:END:INTERVAL',
                         type=parserutils.type_slice,
                         help=f"Slice the trajectory frames for analysis.")

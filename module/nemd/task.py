@@ -473,6 +473,11 @@ class Polymer_Builder(BaseTask):
     import polymer_builder_driver as DRIVER
 
 
+class Conformer_Builder(Polymer_Builder):
+
+    import conformer_builder_driver as DRIVER
+
+
 class Crystal_Builder(BaseTask):
 
     import crystal_builder_driver as DRIVER

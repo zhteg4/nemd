@@ -18,8 +18,8 @@ from nemd import parserutils
 FlAG_LMP_LOG = 'lmp_log'
 FLAG_DATA_FILE = parserutils.FLAG_DATA_FILE
 FLAG_TASK = jobutils.FLAG_TASK
-FLAG_LAST_PCT = '-last_pct'
-FLAG_SLICE = '-slice'
+FLAG_LAST_PCT = parserutils.FLAG_LAST_PCT
+FLAG_SLICE = parserutils.FLAG_SLICE
 
 ALL_FRM_TASKS = analyzer.Thermo.TASKS
 LAST_FRM_TASKS = ALL_FRM_TASKS
