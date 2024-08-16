@@ -1,5 +1,4 @@
 import sys
-import shutil
 import itertools
 import collections
 import numpy as np

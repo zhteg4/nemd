@@ -583,7 +583,7 @@ class Agg(logutils.Base):
         """
         Set the analyzer class for the given task.
         """
-        self.Anlz = ANALYZER.get(self.task.lower())
+        self.Anlz = ANALYZER.get(self.task)
         if self.Anlz is None:
             self.log(f"Aggregator Analyzer not found for task {self.task}")
 
@@ -639,6 +639,8 @@ class Agg(logutils.Base):
         """
         Fit the data and report.
         """
+        if self.xvals.empty:
+            return
         index = self.yvals.argmin()
         val = self.xvals.iloc[1, 0]
         self.log(f"The minimum {self.yvals.name} of {self.yvals.iloc[index]} "
@@ -649,7 +651,7 @@ class Agg(logutils.Base):
         """
         Plot the results.
         """
-        if self.result.empty:
+        if self.xvals.empty:
             return
         with plotutils.get_pyplot(inav=self.options.interactive,
                                   name=self.task.upper()) as plt:

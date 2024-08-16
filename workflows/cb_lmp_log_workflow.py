@@ -6,11 +6,9 @@ This workflow driver runs crystal builder, lammps, and log analyser.
 import os
 import sys
 import numpy as np
-import pandas as pd
 from flow import FlowProject
 
 from nemd import logutils
-from nemd import stillinger
 from nemd import jobutils
 from nemd import jobcontrol
 from nemd import parserutils
@@ -91,8 +89,8 @@ class Runner(jobcontrol.Runner):
         """
         Aggregate post analysis jobs.
         """
-        super().setAggJobs()
         Lmp_Log.getAgg(name='lmp_log', logger=logger)
+        super().setAggJobs()
 
 
 def get_parser():

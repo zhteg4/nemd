@@ -65,31 +65,7 @@ def label(job):
     return str(job.statepoint())
 
 
-class Polymer_Builder(Polymer_Builder):
-
-    def run(self):
-        """
-        The main method to run.
-        """
-        super().run()
-        self.setSeed()
-
-    def setSeed(self):
-        """
-        Set the random seed based on state id so that each task starts from a
-        different state in phase space and the task collection can better
-        approach the ergodicity.
-        """
-        seed = jobutils.get_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_SEED,
-                                0)
-        state = self.job.statepoint()
-        seed = int(seed) + int(state.get(self.STATE_ID, state.get(self.ID)))
-        jobutils.set_arg(self.doc[self.KNOWN_ARGS], jobutils.FLAG_SEED, seed)
-
-
 class Runner(jobcontrol.Runner):
-
-    CUSTOM_DUMP = 'custom_dump'
 
     def setJob(self):
         """
@@ -105,8 +81,8 @@ class Runner(jobcontrol.Runner):
         """
         Aggregate post analysis jobs.
         """
-        super().setAggJobs()
         Lmp_Traj.getAgg(name='lmp_traj', logger=logger)
+        super().setAggJobs()
 
 
 def get_parser():
