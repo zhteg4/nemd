@@ -221,13 +221,12 @@ class AggJob(BaseJob):
         """
         Main method to run the aggregator job.
         """
-        self.log(self.TIME_BREAKDOWN)
         info = []
         for job in self.jobs:
             for filename in job.doc.get(jobutils.LOGFILE, {}).values():
                 log = logutils.LogReader(job.fn(filename))
                 log.run()
-                info.append([log.options.default_name, log.time, job.id])
+                info.append([log.options.default_name, log.task_time, job.id])
         info = pd.DataFrame(info, columns=[self.MANE, self.TIME, self.ID])
         # Group the jobs by the labels
         data, grouped = {}, info.groupby(self.MANE)
@@ -241,6 +240,8 @@ class AggJob(BaseJob):
                             axis=1)
             data[key[:10]] = val
         data = pd.DataFrame(data)
+        total_time = timeutils.delta2str(info.time.sum())
+        self.log(logutils.LogReader.TOTOAL_TIME + total_time)
         self.log(data.fillna('').to_markdown(index=False))
         self.project.doc[self.name] = False
 

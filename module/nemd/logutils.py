@@ -220,6 +220,8 @@ class LogReader:
     A class to read the log file.
     """
 
+    INFO_SEP = ' INFO '
+    TOTOAL_TIME = 'Task Total Timing: '
     JOBNAME = jobutils.FLAG_JOBNAME.lower()[1:]
     TASK = jobutils.FLAG_TASK.lower()[1:]
 
@@ -246,7 +248,9 @@ class LogReader:
         Read the log file.
         """
         with open(self.filepath, 'r') as fh:
-            self.lines = [x.strip() for x in fh.readlines()]
+            self.lines = [
+                x.split(self.INFO_SEP)[-1].strip() for x in fh.readlines()
+            ]
 
     def setOptions(self):
         """
@@ -268,6 +272,21 @@ class LogReader:
             vals = val.split(COMMA_SEP)
             options[key] = val if len(vals) == 1 else vals
         self.options = types.SimpleNamespace(**options)
+
+    @property
+    def task_time(self):
+        """
+        Get the task time from log file.
+
+        :return: the task time
+        :rtype: 'datetime.timedelta'
+        """
+        for line in self.lines[self.sidx:]:
+            if not line.startswith(self.TOTOAL_TIME):
+                continue
+            task_time = line.split(self.TOTOAL_TIME)[-1].strip()
+            return timeutils.str2delta(task_time)
+        return self.time
 
     @property
     def time(self, dtype=DELTA):
