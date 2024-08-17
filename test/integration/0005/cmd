@@ -1,2 +1,2 @@
 # polymer builder on Acetone CC(=O)C
-run_nemd polymer_builder_driver.py 'CC(=O)C' -mol_num 1 -force_field OPLSUA,SPC -seed 4321 -DEBUG
+run_nemd amorphous_driver.py 'CC(=O)C' -mol_num 1 -force_field OPLSUA,SPC -seed 4321 -DEBUG

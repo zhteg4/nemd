@@ -1,2 +1,2 @@
 # polymers are built the same
-cmp('polymer_builder.data', 'polymer_builder.data')
+cmp('polymer_builder.data', 'amorphous.data')

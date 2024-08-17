@@ -1,2 +1,2 @@
 # polymer builder on Isopropanol via grid
-run_nemd polymer_builder_driver.py 'CC(C)O' -mol_num 1 -force_field OPLSUA,TIP3P -cell grid -seed 4321 -DEBUG
+run_nemd amorphous_driver.py 'CC(C)O' -mol_num 1 -force_field OPLSUA,TIP3P -cell grid -seed 4321 -DEBUG

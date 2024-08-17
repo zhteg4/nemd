@@ -1,2 +1,2 @@
 # polymer builder on Methanol
-run_nemd polymer_builder_driver.py 'CO' -mol_num 1 -force_field OPLSUA,TIP3P -seed 4321 -DEBUG
+run_nemd amorphous_driver.py 'CO' -mol_num 1 -force_field OPLSUA,TIP3P -seed 4321 -DEBUG

@@ -382,7 +382,7 @@ class Tag(Opr):
         for logfile in self.job.doc.get(jobutils.LOGFILE, {}).values():
             log_reader = logutils.LogReader(self.job.fn(logfile))
             log_reader.run()
-            label.append(log_reader.options[jobutils.DEFAULT_NAME])
+            label.append(log_reader.options.default_name)
         if label:
             self.set(self.LABEL, *set(label))
 

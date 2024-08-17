@@ -1,2 +1,2 @@
 # polymer builder on '[Br-].[Mg+2].[Br-]'
-run_nemd polymer_builder_driver.py '[Br-].[Mg+2].[Br-]' -mol_num 5 -force_field OPLSUA,TIP3P -seed 1234 -DEBUG
+run_nemd amorphous_driver.py '[Br-].[Mg+2].[Br-]' -mol_num 5 -force_field OPLSUA,TIP3P -seed 1234 -DEBUG

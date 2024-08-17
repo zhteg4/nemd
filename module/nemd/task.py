@@ -470,19 +470,19 @@ class BaseTask:
                           **kwargs)
 
 
-class Polymer_Builder(BaseTask):
+class Mol_Builder(BaseTask):
 
-    import polymer_builder_driver as DRIVER
+    import mol_driver as DRIVER
 
 
-class Mol_Builder(Polymer_Builder):
+class Amorphous_Builder(BaseTask):
 
-    import mol_builder_driver as DRIVER
+    import amorphous_driver as DRIVER
 
 
 class Crystal_Builder(BaseTask):
 
-    import crystal_builder_driver as DRIVER
+    import crystal_driver as DRIVER
 
 
 class Lammps(BaseTask):

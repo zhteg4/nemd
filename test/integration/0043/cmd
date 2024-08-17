@@ -1,1 +1,1 @@
-run_nemd pb_lmp_post_workflow.py [Ar] -mol_num 100 -density 0.00164 -task density -relax_time 0.1 -prod_time 0.01 -prod_ens NPT -state_num 2
+run_nemd ab_lmp_post_workflow.py [Ar] -mol_num 100 -density 0.00164 -task density -relax_time 0.1 -prod_time 0.01 -prod_ens NPT -state_num 2

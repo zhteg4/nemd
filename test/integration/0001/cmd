@@ -1,2 +1,2 @@
-# polymer builder on C
-run_nemd polymer_builder_driver.py C -cru_num 10 -mol_num 10 -seed 5678
+# amorphous builder on C
+run_nemd amorphous_driver.py C -cru_num 10 -mol_num 10 -seed 5678
