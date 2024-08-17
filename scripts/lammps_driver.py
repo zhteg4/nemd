@@ -1,5 +1,8 @@
 """
 This runs lammps executable with the given input file and output file.
+
+'mpirun -np 4 lmp_mpi -in polymer_builder.in' runs with 4 processors
+'lmp_serial -in polymer_builder.in' runs with 1 processor
 """
 import os
 import re
@@ -12,7 +15,6 @@ from nemd import jobutils
 from nemd import logutils
 from nemd import lammpsin
 from nemd import parserutils
-from nemd import environutils
 
 FLAG_INSCRIPT = 'inscript'
 FLAG_SCREEN = '-screen'

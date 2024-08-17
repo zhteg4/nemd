@@ -67,7 +67,9 @@ class Runner(jobcontrol.Runner):
         """
         super().setState()
         if self.options.substruct_range[1] is None:
-            self.state[polymutils.FLAG_SUBSTRUCT] = [self.options.substruct_range[0]]
+            self.state[polymutils.FLAG_SUBSTRUCT] = [
+                self.options.substruct_range[0]
+            ]
             return
         range_values = map(str, np.arange(*self.options.substruct_range[1]))
         substruct = self.options.substruct[0]
