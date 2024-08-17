@@ -127,6 +127,8 @@ class Job(BaseJob):
             sidx = unknown.index(flag)
             eidx = unknown.index(nfrag) if nfrag else len(unknown)
             index = self.args.index(flag)
+            if flag == '-torsion_range':
+                breakpoint()
             self.args = self.args[:index] + self.args[index + eidx - sidx:]
 
     def setName(self):
@@ -473,9 +475,9 @@ class Polymer_Builder(BaseTask):
     import polymer_builder_driver as DRIVER
 
 
-class Conformer_Builder(Polymer_Builder):
+class Mol_Builder(Polymer_Builder):
 
-    import conformer_builder_driver as DRIVER
+    import mol_builder_driver as DRIVER
 
 
 class Crystal_Builder(BaseTask):

@@ -378,20 +378,21 @@ class Mol(lammpsdata.Mol):
         """
         Set substructure.
         """
-        if self.struct.options.substruct is None:
+        substruct = self.struct.options.substruct
+        if substruct is None or substruct[1] is None:
             return
-        substruct = rdkit.Chem.MolFromSmiles(self.struct.options.substruct[0])
-        if not self.HasSubstructMatch(substruct):
+        struct = rdkit.Chem.MolFromSmiles(substruct[0])
+        if not self.HasSubstructMatch(struct):
             return
         tpl = self.GetConformer()
-        ids = self.GetSubstructMatch(substruct)
+        ids = self.GetSubstructMatch(struct)
         match len(ids):
             case 2:
-                tpl.setBondLength(ids, self.struct.options.substruct[1])
+                tpl.setBondLength(ids, substruct[1])
             case 3:
-                tpl.setAngleDeg(ids, self.struct.options.substruct[1])
+                tpl.setAngleDeg(ids, substruct[1])
             case 4:
-                tpl.setDihedralDeg(ids, self.struct.options.substruct[1])
+                tpl.setDihedralDeg(ids, substruct[1])
 
     def updateAll(self):
         """

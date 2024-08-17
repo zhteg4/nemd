@@ -8,8 +8,8 @@ from nemd import symbols
 from nemd import lammpsin
 from nemd import lammpsfix
 from nemd import constants
-from nemd import environutils
 from nemd import jobutils
+from nemd import environutils
 
 FLAG_STATE_NUM = jobutils.FLAG_STATE_NUM
 FLAG_CLEAN = jobutils.FLAG_CLEAN
@@ -54,9 +54,26 @@ class ArgumentDefaultsHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
         return super().add_usage(usage, actions, groups, prefix)
 
 
+class ArgumentParser(argparse.ArgumentParser):
+
+    def supress_arguments(self, to_supress):
+        """
+        Supress the help messages of specified arguments.
+
+        :param parser: the parser to add arguments
+        :type parser: 'argparse.ArgumentParser'
+        :param to_supress: the arguments to be suppressed
+        :type to_supress: set
+        """
+        to_supress = set(to_supress)
+        for action in self._actions:
+            if to_supress.intersection(action.option_strings):
+                action.help = argparse.SUPPRESS
+
+
 def get_parser(**kwargs):
-    return argparse.ArgumentParser(
-        formatter_class=ArgumentDefaultsHelpFormatter, **kwargs)
+    return ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter,
+                          **kwargs)
 
 
 def type_file(arg):
@@ -148,11 +165,24 @@ def type_smiles(arg):
     return value
 
 
-def type_substruct(arg):
-    args = arg.split(':')
-    smiles = args[0]
-    type_smiles(smiles)
-    return [smiles, 180] if len(args) == 1 else [smiles, float(args[1])]
+def type_substruct(arg, is_range=False):
+    args = arg.split(symbols.COLON)
+    type_smiles(args[0])
+    match len(args):
+        case 1:
+            return args[0], None
+        case 2:
+            if not is_range:
+                return args[0], type_float(args[1])
+            range_args = args[1].split(symbols.COMMA)
+            if len(range_args) == 3:
+                return args[0], *[type_float(x) for x in range_args]
+            raise argparse.ArgumentTypeError(
+                f"{args[1]} should be three numbers separated by comma.")
+        case _:
+            raise argparse.ArgumentTypeError(
+                f"{args} should be smiles and value (or range) separated by colon."
+            )
 
 
 def type_monomer_smiles(arg, allow_mol=False, canonize=True):
@@ -372,18 +402,3 @@ def add_workflow_arguments(parser, flags=None):
             type=type_dir,
             help=
             f'Project path if only {jobutils.AGGREGATOR} jobs are requested.')
-
-
-def supress_arguments(parser, to_supress):
-    """
-    Supress the help messages of specified arguments.
-
-    :param parser: the parser to add arguments
-    :type parser: 'argparse.ArgumentParser'
-    :param to_supress: the arguments to be suppressed
-    :type to_supress: set
-    """
-    to_supress = set(to_supress)
-    for action in parser._actions:
-        if to_supress.intersection(action.option_strings):
-            action.help = argparse.SUPPRESS

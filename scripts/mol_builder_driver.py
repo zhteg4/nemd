@@ -1,21 +1,27 @@
-# Copyright (c) 2023 The Regents of the Huazhong University of Science and Technology
-# All rights reserved.
-# This software is licensed under the BSD 3-Clause License.
-# Authors: Teng Zhang (2022010236@hust.edu.cn)
-"""
-This polymer driver builds polymers from constitutional repeat units and pack
-molecules into condensed phase amorphous cell.
-
-'mpirun -np 4 lmp_mpi -in polymer_builder.in' runs with 4 processors
-'lmp_serial -in polymer_builder.in' runs with 1 processor
-"""
 import os
 import sys
 
 from nemd import jobutils
 from nemd import logutils
+from nemd import lammpsin
+from nemd import lammpsfix
 from nemd import polymutils
 from nemd import parserutils
+
+FLAG_DEFAULTS = {
+    polymutils.FLAG_NO_MINIMIZE: True,
+    polymutils.FLAG_CELL: polymutils.GRID,
+    polymutils.FLAG_BUFFER: f"{lammpsin.In.DEFAULT_CUT * 4}",
+    polymutils.FLAG_DENSITY: 1,
+    polymutils.FLAG_MOL_NUM: [1],
+    parserutils.FLAG_TEMP: 0,
+    parserutils.FLAG_TIMESTEP: 1,
+    parserutils.FLAG_PRESS: 1,
+    parserutils.FLAG_RELAX_TIME: 0,
+    parserutils.FLAG_PROD_TIME: 0,
+    parserutils.FLAG_PROD_ENS: lammpsfix.NVE,
+    jobutils.FLAG_SEED: 0
+}
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
@@ -43,8 +49,9 @@ def get_parser(parser=None):
     """
 
     parser = polymutils.get_parser(parser=parser)
-    parser.supress_arguments([polymutils.FLAG_SUBSTRUCT])
     parserutils.add_job_arguments(parser, jobname=JOBNAME)
+    parser.set_defaults(**{x[1:]: y for x, y in FLAG_DEFAULTS.items()})
+    parser.supress_arguments(FLAG_DEFAULTS.keys())
     return parser
 
 

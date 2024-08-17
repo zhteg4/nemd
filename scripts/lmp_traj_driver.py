@@ -145,7 +145,7 @@ class Traj(object):
 
         # Step are always saved but frames are only fully read with all tasks
         frms = traj.slice_frames(self.options.traj,
-                                 slices=self.options.slices,
+                                 slices=self.options.slice,
                                  start=start)
         self.frms = [x for x in frms]
         if len(self.frms) == 0:

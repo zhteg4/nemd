@@ -594,6 +594,7 @@ def get_parser(parser=None):
     """
     if parser is None:
         parser = parserutils.get_parser(description=__doc__)
+
     parser.add_argument(
         FLAG_CRU,
         metavar=FLAG_CRU.upper(),
