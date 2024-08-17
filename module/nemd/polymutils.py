@@ -30,8 +30,6 @@ class Mol(structure.Mol, logutils.Base):
     Class to hold a regular molecule or a polymer built from monomers.
     """
 
-    TYPE_ID = oplsua.TYPE_ID
-    RES_NUM = oplsua.RES_NUM
     IMPLICIT_H = oplsua.IMPLICIT_H
     MONO_ATOM_IDX = 'mono_atom_idx'
     CAP = 'cap'
@@ -164,7 +162,8 @@ class Mol(structure.Mol, logutils.Base):
                 # Mg+2 triggers
                 # WARNING UFFTYPER: Warning: hybridization set to SP3 for atom 0
                 # ERROR UFFTYPER: Unrecognized charge state for atom: 0
-                self.EmbedMolecule(useRandomCoords=True)
+                self.EmbedMolecule(useRandomCoords=True,
+                                   randomSeed=self.options.seed)
                 [self.log_debug(f'{x} {y}') for x, y in logs.items()]
             Chem.GetSymmSSSR(self)
             return
@@ -190,7 +189,6 @@ class Conformer(object):
     CAP = Mol.CAP
     MONO_ATOM_IDX = Mol.MONO_ATOM_IDX
     MONO_ID = Mol.MONO_ID
-    OUT_EXTN = '.sdf'
 
     def __init__(self, polym, original_cru_mol, options=None):
         """
@@ -453,7 +451,7 @@ class Validator:
                          f'{len(self.options.mol_num)} molecules found.')
 
 
-def get_parser(parser=None):
+def add_arguments(parser):
     """
     The user-friendly command-line parser.
 
@@ -461,8 +459,6 @@ def get_parser(parser=None):
     :return 'argparse.ArgumentParser':  argparse figures out how to parse those
         out of sys.argv.
     """
-    if parser is None:
-        parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(
         FLAG_CRU,
         metavar=FLAG_CRU.upper(),

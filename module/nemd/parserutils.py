@@ -21,6 +21,7 @@ FLAG_DEBUG = jobutils.FLAG_DEBUG
 FLAG_PYTHON = jobutils.FLAG_PYTHON
 FLAG_CPU = jobutils.FLAG_CPU
 FLAG_PRJ_PATH = jobutils.FLAG_PRJ_PATH
+FLAG_SEED = jobutils.FLAG_SEED
 
 DEFAULT_JOB_FLAGS = [
     FLAG_INTERACTIVE, FLAG_JOBNAME, FLAG_DEBUG, FLAG_PYTHON, FLAG_CPU
@@ -237,6 +238,11 @@ def type_slice(arg):
 
 
 def add_md_arguments(parser):
+    parser.add_argument(FLAG_SEED,
+                        metavar=FLAG_SEED[1:].upper(),
+                        type=type_random_seed,
+                        default=12345,
+                        help='Set random state using this seed.')
     parser.add_argument(FLAG_TIMESTEP,
                         metavar='fs',
                         type=type_positive_float,

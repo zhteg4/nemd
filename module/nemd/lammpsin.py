@@ -277,9 +277,9 @@ class FixWriter:
         """
         if not self.options.temp:
             return
-        seed = np.random.randint(0, high=constants.LARGE_NUM)
         self.fh.write(
-            f"{self.VELOCITY} all create {self.options.stemp} {seed}\n")
+            f"{self.VELOCITY} all create {self.options.stemp} {self.options.seed}\n"
+        )
 
     def test(self, nstep=1E3):
         """

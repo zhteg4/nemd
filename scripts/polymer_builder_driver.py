@@ -19,7 +19,6 @@ from nemd import parserutils
 
 FLAG_DENSITY = '-density'
 FLAG_CELL = '-cell'
-FLAG_SEED = jobutils.FLAG_SEED
 
 GRID = 'grid'
 PACK = 'pack'
@@ -173,12 +172,8 @@ def get_parser(parser=None):
     """
     if parser is None:
         parser = parserutils.get_parser(description=__doc__)
-    parser = polymutils.get_parser(parser=parser)
+    parser = polymutils.add_arguments(parser)
     parser.supress_arguments([polymutils.FLAG_SUBSTRUCT])
-    parser.add_argument(FLAG_SEED,
-                        metavar=FLAG_SEED[1:].upper(),
-                        type=parserutils.type_random_seed,
-                        help='Set random state using this seed.')
     parser.add_argument(
         FLAG_CELL,
         metavar=FLAG_CELL[1:].upper(),

@@ -109,7 +109,7 @@ def get_parser(parser=None):
     if parser is None:
         parser = parserutils.get_parser(description=__doc__)
     parser.set_defaults(**{x[1:]: y for x, y in FLAG_DEFAULTS.items()})
-    parser = polymutils.get_parser(parser=parser)
+    parser = polymutils.add_arguments(parser)
     parserutils.add_job_arguments(parser, jobname=JOBNAME)
     parser.supress_arguments(FLAG_DEFAULTS.keys())
     return parser
