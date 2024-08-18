@@ -417,6 +417,9 @@ class Tag(Opr):
         """
         Write the tag file.
         """
+        ops = [f"{x[0]}({symbols.COMMA.join(x[1:])})" for x in self.operators]
+        name = os.path.basename(os.path.dirname(self.pathname))
+        print(f"# {name}: Tagging {symbols.COMMA.join(ops)}")
         with open(self.pathname, 'w') as fh:
             for key, *value in self.operators:
                 values = symbols.COMMA.join(value)

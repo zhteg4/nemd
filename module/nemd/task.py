@@ -2,7 +2,6 @@ import re
 import os
 import sh
 import types
-import argparse
 import functools
 import collections
 import pandas as pd
@@ -127,8 +126,6 @@ class Job(BaseJob):
             sidx = unknown.index(flag)
             eidx = unknown.index(nfrag) if nfrag else len(unknown)
             index = self.args.index(flag)
-            if flag == '-torsion_range':
-                breakpoint()
             self.args = self.args[:index] + self.args[index + eidx - sidx:]
 
     def setName(self):
@@ -201,7 +198,6 @@ class AggJob(BaseJob):
     NOTE: this base one is a non-cmd job.
     """
 
-    TIME_BREAKDOWN = 'Task timing breakdown:'
     MS_FMT = '%M:%S'
     MS_LMT = '59:59'
     DELTA_LMT = timeutils.str2delta(MS_LMT, fmt=MS_FMT)

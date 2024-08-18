@@ -27,6 +27,11 @@ class FlowProject(FlowProject):
         return self.doc.get(jobutils.FLAG_JOBNAME, None)
 
     def open_job(self, *args, **kwargs):
+        """
+        This method is used to open a new job or retrieve an existing job.
+
+        :return 'signac.job.Job': a new job object.
+        """
         job = super().open_job(*args, **kwargs)
         job.doc[self.OUTFILE] = job.doc.get(self.OUTFILE, {})
         job.doc[self.OUTFILES] = job.doc.get(self.OUTFILES, {})

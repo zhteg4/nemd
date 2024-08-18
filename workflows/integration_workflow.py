@@ -75,6 +75,8 @@ class Integration(jobcontrol.Runner):
             if CMD in self.options.task:
                 self.setPrereq(tag, cmd)
             if CHECK in self.options.task:
+                # cmd and check cannot be paralleled as they dump into the same
+                # job json file.
                 self.setPrereq(tag, check)
 
     def setState(self):

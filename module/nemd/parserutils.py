@@ -333,6 +333,7 @@ def add_job_arguments(parser, flags=None, jobname=None):
     # Workflow drivers may add the job control options a few times
     if FLAG_JOBNAME in flags and FLAG_JOBNAME in parser._option_string_actions:
         parser.set_defaults(jobname=environutils.get_jobname(jobname))
+        parser.set_defaults(default_name=jobname)
     flags = [x for x in flags if x not in parser._option_string_actions]
     if FLAG_INTERACTIVE in flags:
         parser.add_argument(FLAG_INTERACTIVE,

@@ -12,7 +12,6 @@ from flow import FlowProject
 from nemd import logutils
 from nemd import jobutils
 from nemd import parserutils
-from nemd import environutils
 from nemd import jobcontrol
 from nemd.task import Amorphous_Builder, Lammps, Lmp_Traj
 
