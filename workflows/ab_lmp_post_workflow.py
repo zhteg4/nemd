@@ -3,7 +3,7 @@
 # This software is licensed under the BSD 3-Clause License.
 # Authors: Teng Zhang (2022010236@hust.edu.cn)
 """
-This workflow driver runs polymer builder, lammps, and custom dump jobs.
+This workflow driver runs amorphous builder, lammps, and lmp_traj jobs.
 """
 import os
 import sys

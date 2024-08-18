@@ -1,2 +1,2 @@
-slow(00:00:00)
-label(lammps,lmp_log)
+slow(00:00:02)
+label(lmp_log,lammps)

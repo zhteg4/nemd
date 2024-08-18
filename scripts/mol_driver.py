@@ -19,8 +19,7 @@ FLAG_DEFAULTS = {
     parserutils.FLAG_PRESS: 1,
     parserutils.FLAG_RELAX_TIME: 0,
     parserutils.FLAG_PROD_TIME: 0,
-    parserutils.FLAG_PROD_ENS: lammpsfix.NVE,
-    jobutils.FLAG_SEED: 0
+    parserutils.FLAG_PROD_ENS: lammpsfix.NVE
 }
 
 PATH = os.path.basename(__file__)

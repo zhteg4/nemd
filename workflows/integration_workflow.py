@@ -74,6 +74,8 @@ class Integration(jobcontrol.Runner):
             tag = itestutils.TagTask.getOpr(name='tag')
             if CMD in self.options.task:
                 self.setPrereq(tag, cmd)
+            if CHECK in self.options.task:
+                self.setPrereq(tag, check)
 
     def setState(self):
         """

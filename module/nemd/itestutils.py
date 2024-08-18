@@ -378,7 +378,7 @@ class Tag(Opr):
         """
         Set the label of the job.
         """
-        label = self.get(self.LABEL)
+        label = self.get(self.LABEL, [])
         for logfile in self.job.doc.get(jobutils.LOGFILE, {}).values():
             log_reader = logutils.LogReader(self.job.fn(logfile))
             log_reader.run()
