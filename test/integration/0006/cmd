@@ -1,2 +1,2 @@
-# polymer builder on Diethyl Ketone CCC(=O)CC
-run_nemd amorphous_driver.py 'CCC(=O)CC' -mol_num 1 -force_field OPLSUA,SPC -seed 4321 -DEBUG
+# Amorphous builder on Diethyl Ketone CCC(=O)CC
+run_nemd amorp_bldr_driver.py 'CCC(=O)CC' -mol_num 1 -force_field OPLSUA,SPC -seed 4321 -DEBUG

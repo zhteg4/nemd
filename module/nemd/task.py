@@ -466,17 +466,17 @@ class BaseTask:
                           **kwargs)
 
 
-class Mol_Builder(BaseTask):
+class Mol_Bldr(BaseTask):
 
     import mol_bldr_driver as DRIVER
 
 
-class Amorphous_Builder(BaseTask):
+class Amorp_Bldr(BaseTask):
 
     import amorp_bldr_driver as DRIVER
 
 
-class Crystal_Builder(BaseTask):
+class Xtal_Bldr(BaseTask):
 
     import xtal_bldr_driver as DRIVER
 

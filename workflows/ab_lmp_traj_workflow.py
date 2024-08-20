@@ -13,10 +13,10 @@ from nemd import logutils
 from nemd import jobutils
 from nemd import parserutils
 from nemd import jobcontrol
-from nemd.task import Amorphous_Builder, Lammps, Lmp_Traj
+from nemd.task import Amorp_Bldr, Lammps, Lmp_Traj
 
 PATH = os.path.basename(__file__)
-JOBNAME = PATH.split('.')[0].replace('_workflow.py', '')
+JOBNAME = PATH.split('.')[0].replace('_workflow', '')
 
 FLAG_STATE_NUM = jobutils.FLAG_STATE_NUM
 
@@ -70,7 +70,7 @@ class Runner(jobcontrol.Runner):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
         """
-        amorphous_builder = Amorphous_Builder.getOpr(name='amorphous_builder')
+        amorphous_builder = Amorp_Bldr.getOpr(name='amorphous_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
         self.setPrereq(lammps_runner, amorphous_builder)
         lmp_traj = Lmp_Traj.getOpr(name='lmp_traj')
@@ -92,7 +92,7 @@ def get_parser():
         out of sys.argv.
     """
     parser = parserutils.get_parser(description=__doc__)
-    parser = Amorphous_Builder.DRIVER.get_parser(parser)
+    parser = Amorp_Bldr.DRIVER.get_parser(parser)
     parser = Lmp_Traj.DRIVER.get_parser(parser)
     parserutils.add_job_arguments(parser, jobname=JOBNAME)
     parserutils.add_workflow_arguments(parser)

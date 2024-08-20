@@ -1,2 +1,2 @@
-# polymer builder on short *CC(*)C(=O)O and CN(C)C=O mixture
-run_nemd amorphous_driver.py '*CC(*)C(=O)O' 'CN(C)C=O' -cru_num 3 1 -mol_num 5 15 -seed 5
+# Amorphous builder on short *CC(*)C(=O)O and CN(C)C=O mixture
+run_nemd amorp_bldr_driver.py '*CC(*)C(=O)O' 'CN(C)C=O' -cru_num 3 1 -mol_num 5 15 -seed 5

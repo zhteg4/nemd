@@ -1,2 +1,2 @@
-# amorphous builder on C
-run_nemd amorphous_driver.py C -cru_num 10 -mol_num 10 -seed 5678
+# Amorphous builder on C
+run_nemd amorp_bldr_driver.py C -cru_num 10 -mol_num 10 -seed 5678

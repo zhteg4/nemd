@@ -20,7 +20,6 @@ JOBNAME = PATH.split('.')[0].replace('_driver', '')
 FlAG_NAME = '-name'
 FlAG_DIMENSION = '-dimension'
 FlAG_DELTA = '-delta'
-FlAG_NAME = '-name'
 FLAG_SCALED_FACTOR = '-scale_factor'
 
 

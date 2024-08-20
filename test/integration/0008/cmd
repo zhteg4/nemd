@@ -1,2 +1,2 @@
 # polymer builder on TIP3P water
-run_nemd amorphous_driver.py 'O' -mol_num 1 -force_field OPLSUA,TIP3P -seed 4321 -DEBUG
+run_nemd amorp_bldr_driver.py 'O' -mol_num 1 -force_field OPLSUA,TIP3P -seed 4321 -DEBUG

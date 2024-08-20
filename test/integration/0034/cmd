@@ -1,2 +1,2 @@
 # Density is reduced for grow amorphous builder
-run_nemd amorphous_driver.py "*CC*" -cru_num 4 -mol_num 7 -density 2.65 -cell grow -seed 1234 -DEBUG
+run_nemd amorp_bldr_driver.py "*CC*" -cru_num 4 -mol_num 7 -density 2.65 -cell grow -seed 1234 -DEBUG
