@@ -358,7 +358,7 @@ class Tag(Opr):
         value = self.get(self.SLOW)
         if value is None:
             return False
-        delta = timeutils.str2timedelta(value)
+        delta = timeutils.str2delta(value[0])
         return delta.total_seconds() > self.options.slow
 
     def setLogs(self):
@@ -375,22 +375,19 @@ class Tag(Opr):
         """
         Set the slow tag with the total job time from the driver log files.
         """
-        total_time = datetime.timedelta()
-        # The cmd may run multiple jobs, and workflow job may be included.
-        for log in self.logs:
-            total_time += log.task_time
-        job_time = timeutils.delta2str(total_time)
+        total = sum([x.task_time for x in self.logs], datetime.timedelta())
+        job_time = timeutils.delta2str(total)
         self.set(self.SLOW, job_time)
 
     def setLabel(self):
         """
         Set the label of the job.
         """
-        label = self.get(self.LABEL, [])
-        for log in self.logs:
-            label.append(log.options.default_name)
-        if label:
-            self.set(self.LABEL, *set(label))
+        labels = self.get(self.LABEL, [])
+        labels += [x.options.default_name for x in self.logs]
+        if not labels:
+            return
+        self.set(self.LABEL, *set(labels))
 
     def get(self, key, default=None):
         """
