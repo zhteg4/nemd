@@ -287,9 +287,9 @@ class CheckJob(task.BaseJob):
         try:
             Check(job=self.job).run()
         except (FileNotFoundError, KeyError, ValueError) as err:
-            self.msg = str(err)
+            self.message = str(err)
         else:
-            self.msg = False
+            self.message = False
 
     def post(self):
         """
@@ -323,12 +323,14 @@ class Tag(Opr):
         """
         super().__init__(*args, **kwargs)
         self.options = options
+        self.logs = []
 
     def run(self):
         """
         Main method to run.
         """
         self.parse()
+        self.setLogs()
         self.setSlow()
         self.setLabel()
         self.write()
@@ -359,18 +361,23 @@ class Tag(Opr):
         delta = timeutils.str2timedelta(value)
         return delta.total_seconds() > self.options.slow
 
-    def setSlow(self):
+    def setLogs(self):
         """
-        Set the slow tag with the total job time from the driver log files.
+        Set the log files for the job.
         """
         logfiles = self.job.doc.get(jobutils.LOGFILE)
         if logfiles is None:
             return
+        for logfile in logfiles.values():
+            self.logs.append(logutils.LogReader(self.job.fn(logfile)))
+
+    def setSlow(self):
+        """
+        Set the slow tag with the total job time from the driver log files.
+        """
         total_time = datetime.timedelta()
         # The cmd may run multiple jobs, and workflow job may be included.
-        for logfile in logfiles.values():
-            log = logutils.LogReader(self.job.fn(logfile))
-            log.run()
+        for log in self.logs:
             total_time += log.task_time
         job_time = timeutils.delta2str(total_time)
         self.set(self.SLOW, job_time)
@@ -380,10 +387,8 @@ class Tag(Opr):
         Set the label of the job.
         """
         label = self.get(self.LABEL, [])
-        for logfile in self.job.doc.get(jobutils.LOGFILE, {}).values():
-            log_reader = logutils.LogReader(self.job.fn(logfile))
-            log_reader.run()
-            label.append(log_reader.options.default_name)
+        for log in self.logs:
+            label.append(log.options.default_name)
         if label:
             self.set(self.LABEL, *set(label))
 
@@ -434,7 +439,7 @@ class TagJob(CheckJob):
         Main method to run.
         """
         Tag(job=self.job).run()
-        self.msg = False
+        self.message = False
 
 
 class TagTask(task.BaseTask):

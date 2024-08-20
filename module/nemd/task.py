@@ -47,7 +47,7 @@ class BaseJob(logutils.Base):
         self.args = list(map(str, self.doc.get(self.ARGS, [])))
 
     @property
-    def msg(self):
+    def message(self):
         """
         The message of the job.
 
@@ -55,8 +55,8 @@ class BaseJob(logutils.Base):
         """
         return self.doc[self.MESSAGE][self.name]
 
-    @msg.setter
-    def msg(self, value):
+    @message.setter
+    def message(self, value):
         """
         Set message of the job.
 

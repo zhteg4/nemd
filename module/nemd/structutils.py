@@ -50,9 +50,9 @@ class GriddedConf(lammpsdata.Conformer):
             bv.SetBitsFromList(aids)
             weights = rdkit.rdBase._vectd()
             weights.extend(bv.ToList())
-        return rdkit.Chem.rdMolTransforms.ComputeCentroid(self,
-                                                          weights=weights,
-                                                          ignoreHs=ignoreHs)
+        centroid = rdkit.Chem.rdMolTransforms.ComputeCentroid(
+            self, weights=weights, ignoreHs=ignoreHs)
+        return np.array([centroid.x, centroid.y, centroid.z])
 
     def translate(self, vect):
         """
@@ -117,11 +117,12 @@ class PackedConf(GriddedConf):
             atoms in the cell after the maximum trial.
         """
         for _ in range(max_trial):
-            self.translate(-np.array(self.centroid()))
+            centroid = self.centroid()
+            self.translate(-centroid)
             self.rotateRandomly()
             pnt = self.mol.struct.dcell.box.getPoint()
             self.translate(pnt)
-            self.mol.struct.dcell.xyz[self.gids, :] = self.GetPositions()
+            self.mol.struct.dcell.xyz[self.gids, :] = self.getPositions()
             if self.hasClashes():
                 continue
             self.mol.struct.dcell.add(self.gids)

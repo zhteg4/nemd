@@ -222,19 +222,24 @@ class LogReader:
 
     INFO_SEP = ' INFO '
     TOTOAL_TIME = 'Task Total Timing: '
-    JOBNAME = jobutils.FLAG_JOBNAME.lower()[1:]
-    TASK = jobutils.FLAG_TASK.lower()[1:]
 
-    def __init__(self, filepath):
+    def __init__(self, filepath, delay=False):
         """
         Initialize the LogReader object.
 
         :param filepath: the log filepath
+        :type filepath: str
+        :param delay: if True, delay the reading of the log file
+        :type delay: bool
         """
         self.filepath = filepath
         self.lines = None
         self.options = None
         self.sidx = None
+        self.delay = delay
+        if self.delay:
+            return
+        self.run()
 
     def run(self):
         """
