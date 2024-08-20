@@ -3,8 +3,8 @@
 # This software is licensed under the BSD 3-Clause License.
 # Authors: Teng Zhang (2022010236@hust.edu.cn)
 """
-This amorphous driver builds polymers from constitutional repeat units and pack
-molecules into condensed phase amorphous cell.
+This amorphous builder driver builds polymers from constitutional repeat units
+and pack molecules into condensed phase amorphous cell.
 """
 import os
 import sys
