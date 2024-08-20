@@ -19,6 +19,12 @@ FILE = jobutils.FILE
 
 
 class BaseJob(logutils.Base):
+    """
+    The base class for all jobs in the workflow. This class can be subclassed
+    to create cmd and non-cmd jobs depending on whether the job returns a cmd
+    to run in the shell or not. In terms of the workflow, the subclassed jobs
+    can be used as normal task jobs or aggregate jobs.
+    """
 
     ARGS = jobutils.ARGS
     FLAG_JOBNAME = jobutils.FLAG_JOBNAME
@@ -67,9 +73,9 @@ class BaseJob(logutils.Base):
 
 class Job(BaseJob):
     """
-    The class to setup a run_nemd driver job in a workflow.
+    The class to set up a run_nemd driver job in a workflow.
 
-    NOTE: this base one is a cmd job.
+    NOTE: this is a cmd job.
     """
 
     SPECIAL_CHAR_RE = re.compile("[@!#%^&*()<>?|}{:]")
@@ -195,7 +201,7 @@ class AggJob(BaseJob):
     """
     The class to run an aggregator job in a workflow.
 
-    NOTE: this base one is a non-cmd job.
+    NOTE: this is a non-cmd job.
     """
 
     MS_FMT = '%M:%S'
@@ -293,17 +299,20 @@ class AggJob(BaseJob):
 
 class BaseTask:
     """
-    The task base class.
+    The task base class holding task job, aggregator job, and driver module.
+
+    The post method is used to check if the job is finished, and a True return
+    tasks the job out of the queue without executing it.
+    The pre method is used to check if the job is eligible for submission. The
+    current job is submitted only when its pre method returns the True and the
+    post methods of all its prerequisite jobs return True as well.
+    The operator method is used to execute the job, and is called on execution.
+    The aggregator method is used to aggregate the results of the task jobs.
     """
 
     JobClass = Job
     AggClass = AggJob
     DRIVER = None
-
-    ARGS = jobutils.ARGS
-    OUTFILE = jobutils.OUTFILE
-    FINISHED = jobutils.FINISHED
-    DRIVER_LOG = logutils.DRIVER_LOG
 
     @classmethod
     def pre(cls, *args, **kwargs):
@@ -324,8 +333,9 @@ class BaseTask:
         """
         obj = cls.JobClass(*args, driver=cls.DRIVER, **kwargs)
         obj.run()
-        if hasattr(obj, 'getCmd'):
-            return obj.getCmd()
+        if not hasattr(obj, 'getCmd'):
+            return
+        return obj.getCmd()
 
     @classmethod
     def post(cls, *args, **kwargs):

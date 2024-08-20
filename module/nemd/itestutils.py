@@ -22,17 +22,18 @@ class Cmd:
     NAME_BRACKET_RE = re.compile('(?:(?:^(?:\s+)?)|(?:\s+))(.*?)\\((.*?)\\)')
     AND_NAME_RE = re.compile('^and\s+(.*)')
 
-    def __init__(self, path=None, job=None):
+    def __init__(self, dir=None, job=None):
         """
-        :param path str: the path containing the file
+        :param dir str: the path containing the file
         :param job 'signac.contrib.job.Job': the signac job instance
         """
-        self.path = path
+        self.dir = dir
         self.job = job
-        path_dir = self.path if path else self.job.statepoint[FLAG_DIR]
-        self.pathname = os.path.join(path_dir, self.NAME)
         self.args = None
         self.comment = None
+        if self.dir is None:
+            self.dir = self.job.statepoint[FLAG_DIR]
+        self.pathname = os.path.join(self.dir, self.NAME)
 
     def parse(self):
         """
@@ -64,7 +65,8 @@ class Cmd:
 
 class CmdJob(task.Job):
     """
-    The class to setup a job cmd for the integration test.
+    The class to set up a job cmd so that the integration test can run normal
+    nemd jobs from the cmd line.
     """
 
     NAME = 'cmd'
@@ -206,6 +208,9 @@ class CMP:
 
 
 class Opr(Cmd):
+    """
+    The class sets the operators in addition to the parsing a file.
+    """
 
     NAME = 'opr'
 
@@ -236,6 +241,9 @@ class Opr(Cmd):
 
 
 class Check(Opr):
+    """
+    The class to execute the operators in addition to the parsing a file.
+    """
 
     NAME = 'check'
     CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
@@ -277,7 +285,8 @@ class Check(Opr):
 
 class CheckJob(task.BaseJob):
     """
-    The class to parse the file and set the operators.
+    The job class to parse the check file, run the operators, and set the job
+    message.
     """
 
     def run(self):
@@ -301,16 +310,14 @@ class CheckJob(task.BaseJob):
 
 
 class CheckTask(task.BaseTask):
-    """
-    Class to parse the check file and execute the inside operations.
-    """
 
     JobClass = CheckJob
 
 
 class Tag(Opr):
     """
-    The class to parse the tag file.
+    The class parses and interprets the tag file. The class also generates new
+    tag file (or updates the existing one).
     """
 
     NAME = 'tag'
@@ -363,7 +370,7 @@ class Tag(Opr):
 
     def setLogs(self):
         """
-        Set the log files for the job.
+        Set the log readers.
         """
         logfiles = self.job.doc.get(jobutils.LOGFILE)
         if logfiles is None:
@@ -430,6 +437,9 @@ class Tag(Opr):
 
 
 class TagJob(CheckJob):
+    """
+    This job class generates a new tag file (or updates the existing one).
+    """
 
     def run(self):
         """
