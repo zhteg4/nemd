@@ -367,10 +367,11 @@ class Tag(Opr):
         if logfiles is None:
             return
         total_time = datetime.timedelta()
+        # The cmd may run multiple jobs, and workflow job may be included.
         for logfile in logfiles.values():
             log = logutils.LogReader(self.job.fn(logfile))
             log.run()
-            total_time += log.time
+            total_time += log.task_time
         job_time = timeutils.delta2str(total_time)
         self.set(self.SLOW, job_time)
 

@@ -234,9 +234,9 @@ class AggJob(BaseJob):
             ave = val.time.mean()
             ave = pd.DataFrame([[ave, 'ave']], columns=[self.TIME, self.ID])
             val = pd.concat([ave, val]).reset_index(drop=True)
-            val = val.apply(lambda x: f'{self.delta2str(x.time)} ({x.id[:3]})',
+            val = val.apply(lambda x: f'{self.delta2str(x.time)} {x.id[:3]}',
                             axis=1)
-            data[key[:10]] = val
+            data[key[:8]] = val
         data = pd.DataFrame(data)
         total_time = timeutils.delta2str(info.time.sum())
         self.log(logutils.LogReader.TOTOAL_TIME + total_time)

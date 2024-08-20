@@ -286,9 +286,8 @@ class LogReader:
                 continue
             task_time = line.split(self.TOTOAL_TIME)[-1].strip()
             return timeutils.str2delta(task_time)
-        return self.time
+        return self.time()
 
-    @property
     def time(self, dtype=DELTA):
         """
         Get the time information from log file.
