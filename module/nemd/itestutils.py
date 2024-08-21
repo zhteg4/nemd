@@ -18,22 +18,27 @@ class Cmd:
 
     NAME = 'cmd'
     POUND = symbols.POUND
-    CMD_BRACKET_RE = '.*?\(.*?\)'
-    NAME_BRACKET_RE = re.compile('(?:(?:^(?:\s+)?)|(?:\s+))(.*?)\\((.*?)\\)')
-    AND_NAME_RE = re.compile('^and\s+(.*)')
+    CMD_BRACKET_RE = r'.*?\(.*?\)'
+    NAME_BRACKET_RE = re.compile(r'(?:(?:^(?:\s+)?)|(?:\s+))(.*?)\\((.*?)\\)')
+    AND_NAME_RE = re.compile(r'^and\s+(.*)')
 
-    def __init__(self, dir=None, job=None):
+    def __init__(self, dir=None, job=None, delay=False):
         """
         :param dir str: the path containing the file
         :param job 'signac.contrib.job.Job': the signac job instance
+        :param delay 'bool': read, parse, and set the operators if False
         """
         self.dir = dir
         self.job = job
+        self.delay = delay
         self.args = None
         self.comment = None
         if self.dir is None:
             self.dir = self.job.statepoint[FLAG_DIR]
         self.pathname = os.path.join(self.dir, self.NAME)
+        if self.delay:
+            return
+        self.parse()
 
     def parse(self):
         """
@@ -80,7 +85,7 @@ class CmdJob(task.Job):
 
     def run(self):
         """
-        Main method to setup the job.
+        Main method to set up the job.
         """
         self.parse()
         self.setName()
@@ -91,7 +96,6 @@ class CmdJob(task.Job):
         Set arguments from the input file.
         """
         parser = Cmd(job=self.job)
-        parser.parse()
         self.args = parser.args
         self.comment = parser.comment
 
@@ -248,13 +252,6 @@ class Check(Opr):
     NAME = 'check'
     CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
 
-    def run(self):
-        """
-        Parse the file, set the operators, and execute the operators.
-        """
-        self.parse()
-        self.check()
-
     def check(self):
         """
         Check the results by execute all operators. Raise errors if any failed.
@@ -294,7 +291,7 @@ class CheckJob(task.BaseJob):
         Main method to run.
         """
         try:
-            Check(job=self.job).run()
+            Check(job=self.job).check()
         except (FileNotFoundError, KeyError, ValueError) as err:
             self.message = str(err)
         else:
@@ -336,7 +333,6 @@ class Tag(Opr):
         """
         Main method to run.
         """
-        self.parse()
         self.setLogs()
         self.setSlow()
         self.setLabel()
@@ -348,7 +344,6 @@ class Tag(Opr):
 
         :return bool: Whether the test is selected.
         """
-        self.parse()
         not_slow = self.options.slow is None or not self.slow
         has_label = self.options.label is None or set(
             self.options.label).intersection(self.get(self.LABEL, []))
