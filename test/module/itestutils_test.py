@@ -1,6 +1,8 @@
 import os
 import sys
 import pytest
+import contextlib
+import collections
 
 from nemd import itestutils
 from nemd import environutils
@@ -9,6 +11,23 @@ TEST_DIR = environutils.get_test_dir()
 if TEST_DIR is None:
     sys.exit("Error: test directory cannot be found.")
 BASE_DIR = os.path.join(TEST_DIR, 'test_files', 'itest')
+
+
+class Job:
+
+    def __init__(self, tid=1, document=None, tdir=os.curdir):
+        self.statepoint = {
+            itestutils.FLAG_DIR: os.path.join(BASE_DIR, f"{tid:0>4}")
+        }
+        self.document = document if document else collections.defaultdict(dict)
+        self.dir = tdir
+
+    def fn(self, x):
+        return os.path.join(self.dir, x) if self.dir else self.dir
+
+
+def get_job(basename='ea8c25e09124635e93178c1725ae8ee7'):
+    return Job(tdir=os.path.join(BASE_DIR, basename))
 
 
 class TestCmd:
@@ -27,27 +46,11 @@ class TestCmd:
         assert cmd.comment == 'Amorphous builder on C'
 
 
-class Job:
-
-    def __init__(self, tid=1, document=None, tdir=os.curdir):
-        self.statepoint = {
-            itestutils.FLAG_DIR: os.path.join(BASE_DIR, f"{tid:0>4}")
-        }
-        self.document = document if document else {}
-        self.dir = tdir
-
-    def fn(self, x):
-        return os.path.join(self.dir, x) if self.dir else self.dir
-
-
-JOB = Job(tdir=os.path.join(BASE_DIR, 'ea8c25e09124635e93178c1725ae8ee7'))
-
-
 class TestCmdJob:
 
     @pytest.fixture
     def job(self):
-        return itestutils.CmdJob(JOB, delay=True)
+        return itestutils.CmdJob(get_job(), delay=True)
 
     def testParse(self, job):
         job.parse()
@@ -63,7 +66,7 @@ class TestCmdJob:
         job.addQuote()
         assert job.args[0] == "run_nemd amorp_bldr_driver.py 'C(C)'"
 
-    def testGetCmd(self, job):
+    def testGetCmd(self, job, tmp_dir):
         job.run()
         cmd = job.getCmd()
         assert cmd
@@ -78,7 +81,7 @@ class TestExist:
 
     @pytest.fixture
     def exist(self):
-        return itestutils.Exist('amorp_bldr.data', job=JOB)
+        return itestutils.Exist('amorp_bldr.data', job=get_job())
 
     def testRun(self, exist):
         try:
@@ -94,7 +97,7 @@ class TestNot_Exist:
 
     @pytest.fixture
     def not_exist(self):
-        return itestutils.Not_Exist('amorp_bldr.data', job=JOB)
+        return itestutils.Not_Exist('amorp_bldr.data', job=get_job())
 
     def testRun(self, not_exist):
         with pytest.raises(FileNotFoundError):
@@ -110,16 +113,55 @@ class TestCmp:
 
     @pytest.fixture
     def cmp(self):
-        original = os.path.join(BASE_DIR, '0001', 'polymer_builder.data')
-        return itestutils.Cmp(original, 'amorp_bldr.data', job=JOB)
+        return itestutils.Cmp('polymer_builder.data',
+                              'amorp_bldr.data',
+                              job=get_job())
 
     def testRun(self, cmp):
         try:
             cmp.run()
         except FileNotFoundError:
             assert False, "FileNotFoundError should not be raised"
-        cmp.job = Job()
-        try:
+        cmp.targets[0] = cmp.targets[0].replace('polymer_builder.data', 'cmd')
+        with pytest.raises(ValueError):
             cmp.run()
-        except FileNotFoundError:
-            assert False, "FileNotFoundError should not be raised"
+
+
+class TestCheck:
+
+    @pytest.fixture
+    def check(self):
+        return itestutils.Check(job=get_job(), delay=True)
+
+    def testSetOperators(self, check):
+        check.parse()
+        check.setOperators()
+        assert len(check.operators) == 1
+
+    def testExecute(self, check):
+        check.parse()
+        check.setOperators()
+        try:
+            check.execute(check.operators[0])
+        except KeyError:
+            assert False, "KeyError should not be raised"
+        with pytest.raises(KeyError):
+            check.execute(['wa', 'polymer_builder.data', 'amorp_bldr.data'])
+
+
+class TestCheckJob:
+
+    @pytest.fixture
+    def job(self):
+        return itestutils.CheckJob(get_job())
+
+    def testRun(self, job):
+        with contextlib.redirect_stdout(None):
+            job.run()
+        assert job.message is False
+
+    def testPost(self, job):
+        assert job.post() is False
+        with contextlib.redirect_stdout(None):
+            job.run()
+        assert job.post() is True

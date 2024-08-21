@@ -156,6 +156,8 @@ class Exist:
         """
         self.args = args
         self.job = job
+        if self.job is None:
+            return
         self.targets = [self.job.fn(x) for x in self.args]
 
     def run(self):
@@ -194,6 +196,8 @@ class Cmp(Exist):
         """
         super().__init__(target, job=job)
         self.original = original
+        if self.job is None:
+            return
         pathname = os.path.join(self.job.statepoint[FLAG_DIR], self.original)
         self.targets.insert(0, pathname)
 
