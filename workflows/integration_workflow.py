@@ -27,6 +27,7 @@ JOBNAME = PATH.split('.')[0].replace('_workflow', '')
 FLAG_ID = 'id'
 FLAG_DIR = itestutils.FLAG_DIR
 FLAG_SLOW = '-slow'
+FLAG_LABEL = '-label'
 FLAG_TASK = jobutils.FLAG_TASK
 CMD = 'cmd'
 CHECK = 'check'
@@ -141,6 +142,10 @@ def get_parser():
         type=parserutils.type_positive_float,
         metavar='SECOND',
         help='Skip tests marked with time longer than this criteria.')
+    parser.add_argument(FLAG_LABEL,
+                        nargs='+',
+                        metavar='LABEL',
+                        help='Select the tests marked with the given label.')
     parser.add_argument(FLAG_TASK,
                         nargs='+',
                         choices=[CMD, CHECK, TAG],

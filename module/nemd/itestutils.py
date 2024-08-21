@@ -348,10 +348,11 @@ class Tag(Opr):
 
         :return bool: Whether the test is selected.
         """
-        if self.options is None or self.options.slow is None:
-            return True
         self.parse()
-        return not self.slow
+        not_slow = self.options.slow is None or not self.slow
+        has_label = self.options.label is None or set(
+            self.options.label).intersection(self.get(self.LABEL, []))
+        return all([not_slow, has_label])
 
     @property
     def slow(self):
