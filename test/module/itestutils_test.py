@@ -1,12 +1,19 @@
 import os
-import types
 import pytest
+from unittest import mock
 
 from nemd import testutils
 from nemd import itestutils
-from nemd import environutils
 
 BASE_DIR = os.path.join(testutils.TEST_FILE_DIR, 'itest')
+
+
+def get_job(tid=1, document=None, tdir=os.curdir):
+    if document is None:
+        document = {}
+    statepoint = {itestutils.FLAG_DIR: os.path.join(BASE_DIR, f"{tid:0>4}")}
+    fn = lambda x: os.path.join(tdir, x) if x else tdir
+    return mock.Mock(statepoint=statepoint, document=document, fn=fn)
 
 
 class TestCmd:
@@ -29,10 +36,7 @@ class TestCmdJob:
 
     @pytest.fixture
     def job(self):
-        document={}
-        statepoint = {itestutils.FLAG_DIR: os.path.join(BASE_DIR, '0001')}
-        job = types.SimpleNamespace(statepoint=statepoint, document=document)
-        return itestutils.CmdJob(job, delay=True)
+        return itestutils.CmdJob(get_job(), delay=True)
 
     def testParse(self, job):
         job.parse()
@@ -57,3 +61,17 @@ class TestCmdJob:
         assert not job.post()
         job.doc['outfile'] = {'amorp_bldr': 'amorp_bldr.data'}
         assert job.post()
+
+
+class TestExist:
+
+    @pytest.fixture
+    def exist(self):
+        tdir = os.path.join(BASE_DIR, 'ea8c25e09124635e93178c1725ae8ee7')
+        return itestutils.Exist('amorp_bldr.data', job=get_job(tdir=tdir))
+
+    def testRun(self, exist):
+        exist.run()
+        exist.job = get_job()
+        with pytest.raises(FileNotFoundError):
+            exist.run()

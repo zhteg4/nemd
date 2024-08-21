@@ -1,0 +1,37 @@
+..........Command Options..........
+cru: C
+cru_num: 10
+mol_num: 10
+no_minimize: False
+rigid_bond: None
+rigid_angle: None
+buffer: None
+substruct: None
+seed: 5678
+timestep: 1
+stemp: 10
+temp: 300
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 1
+prod_time: 1
+prod_ens: NVE
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+cell: grow
+density: 0.5
+interactive: False
+jobname: amorp_bldr
+default_name: amorp_bldr
+debug: False
+python: 2
+cpu: 6
+JobStart: 10:59:49 08/21/24
+...................................
+The minimum box span (8.11 Å) is smaller than 22.00 Å (Lennard-Jones Cutoff x 2) 
+Data file written into amorp_bldr.data
+In script written into amorp_bldr.in
+Finished.
+10:59:50 08/21/24

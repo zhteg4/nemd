@@ -144,7 +144,7 @@ class CmdTask(task.BaseTask):
     JobClass = CmdJob
 
 
-class EXIST:
+class Exist:
     """
     The class to perform file existence check.
     """
@@ -155,7 +155,7 @@ class EXIST:
         :param args str: the target filenames
         :param job 'signac.contrib.job.Job': the signac job instance
         """
-        self.targets = [x.strip().strip('\'"') for x in args]
+        self.targets = args
         self.job = job
 
     def run(self):
@@ -167,7 +167,7 @@ class EXIST:
                 raise FileNotFoundError(f"{self.job.fn(target)} not found")
 
 
-class NOT_EXIST(EXIST):
+class Not_Exist(Exist):
     """
     The class to perform file non-existence check.
     """
@@ -181,7 +181,7 @@ class NOT_EXIST(EXIST):
                 raise FileNotFoundError(f"{self.job.fn(target)} found")
 
 
-class CMP:
+class Cmp:
     """
     The class to perform file comparison.
     """
@@ -250,7 +250,7 @@ class Check(Opr):
     """
 
     NAME = 'check'
-    CMD = {'cmp': CMP, 'exist': EXIST, 'not_exist': NOT_EXIST}
+    CMD = {'cmp': Cmp, 'exist': Exist, 'not_exist': Not_Exist}
 
     def check(self):
         """
