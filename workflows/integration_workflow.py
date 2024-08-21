@@ -135,7 +135,7 @@ def get_parser():
     parser.add_argument(FLAG_DIR,
                         metavar=FLAG_DIR[1:].upper(),
                         type=parserutils.type_dir,
-                        default=environutils.get_integration_test_dir(),
+                        default=environutils.get_itest_dir(),
                         help='The integration test directory.')
     parser.add_argument(
         FLAG_SLOW,

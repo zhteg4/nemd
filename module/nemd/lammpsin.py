@@ -553,4 +553,4 @@ class FixWriter:
             ids += [x for x in reversed(ids)]
             cmd = cmd % tuple(ids) if ids else cmd
             self.fh.write(cmd + '\n')
-        self.fh.write('quit 0 \n')
+        self.fh.write('quit 0\n')

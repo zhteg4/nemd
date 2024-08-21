@@ -1,16 +1,24 @@
 import os
+import sys
 import pytest
-from nemd import testutils
+
 from nemd import fileutils
-from nemd.testutils import SINGLE_NEMD, CRYSTAL_NEMD
+from nemd import environutils
+
+SINGLE_NEMD = 'lammps_22Aug18/polyacetylene/single_chain/nemd'
+CRYSTAL_NEMD = 'lammps_22Aug18/polyacetylene/crystal_cell/nemd'
+
+TEST_DIR = environutils.get_test_dir()
+if TEST_DIR is None:
+    sys.exit('Error: cannot find test directory')
+FILES_DIR = os.path.join(TEST_DIR, 'test_files')
 
 
 class TestTempReader(object):
 
     @pytest.fixture
     def temp_reader(self):
-        temp_file = testutils.test_file(
-            os.path.join(SINGLE_NEMD, 'temp.profile'))
+        temp_file = os.path.join(FILES_DIR, SINGLE_NEMD, 'temp.profile')
         temp_reader = fileutils.TempReader(temp_file)
         return temp_reader
 
@@ -23,7 +31,7 @@ class TestEnergyReader(object):
 
     @pytest.fixture
     def energy_reader(self):
-        ene_file = testutils.test_file(os.path.join(SINGLE_NEMD, 'en_ex.log'))
+        ene_file = os.path.join(FILES_DIR, SINGLE_NEMD, 'en_ex.log')
         return fileutils.EnergyReader(ene_file, 0.25)
 
     def testSetStartEnd(self, energy_reader):
@@ -37,8 +45,7 @@ class TestLammpsInput(object):
 
     @pytest.fixture
     def inscriptput_reader(self):
-        input_file = testutils.test_file(
-            os.path.join(SINGLE_NEMD, 'in.nemd_cff91'))
+        input_file = os.path.join(FILES_DIR, SINGLE_NEMD, 'in.nemd_cff91')
         inscript = fileutils.LammpsInput(input_file)
         return inscript
 
@@ -54,8 +61,7 @@ class TestLammpsLogReader(object):
 
     @pytest.fixture
     def lammps_log_reader(self):
-        log_file = testutils.test_file(os.path.join(CRYSTAL_NEMD,
-                                                    'log.lammps'))
+        log_file = os.path.join(FILES_DIR, CRYSTAL_NEMD, 'log.lammps')
         lammps_log = fileutils.LammpsLogReader(log_file)
         return lammps_log
 

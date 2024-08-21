@@ -18,9 +18,8 @@ class Cmd:
 
     NAME = 'cmd'
     POUND = symbols.POUND
-    CMD_BRACKET_RE = r'.*?\(.*?\)'
-    NAME_BRACKET_RE = re.compile(r'(?:(?:^(?:\s+)?)|(?:\s+))(.*?)\\((.*?)\\)')
-    AND_NAME_RE = re.compile(r'^and\s+(.*)')
+    NAME_BRACKET_RE = '(?:(?:^(?: +)?)|(?: +))(.*?)\\((.*?)\\)'
+    AND_NAME_RE = re.compile('^and +(.*)')
 
     def __init__(self, dir=None, job=None, delay=False):
         """
@@ -155,15 +154,16 @@ class Exist:
         :param args str: the target filenames
         :param job 'signac.contrib.job.Job': the signac job instance
         """
-        self.targets = args
+        self.args = args
         self.job = job
+        self.targets = [self.job.fn(x) for x in self.args]
 
     def run(self):
         """
         The main method to check the existence of files.
         """
         for target in self.targets:
-            if not os.path.isfile(self.job.fn(target)):
+            if not os.path.isfile(target):
                 raise FileNotFoundError(f"{self.job.fn(target)} not found")
 
 
@@ -177,11 +177,11 @@ class Not_Exist(Exist):
         The main method to check the existence of a file.
         """
         for target in self.targets:
-            if os.path.isfile(self.job.fn(target)):
+            if os.path.isfile(target):
                 raise FileNotFoundError(f"{self.job.fn(target)} found")
 
 
-class Cmp:
+class Cmp(Exist):
     """
     The class to perform file comparison.
     """
@@ -192,23 +192,18 @@ class Cmp:
         :param target str: the target filename
         :param job 'signac.contrib.job.Job': the signac job instance
         """
-        self.orignal = original.strip().strip('\'"')
-        self.target = target.strip().strip('\'"')
-        self.job = job
+        super().__init__(target, job=job)
+        self.original = original
+        pathname = os.path.join(self.job.statepoint[FLAG_DIR], self.original)
+        self.targets.insert(0, pathname)
 
     def run(self):
         """
         The main method to compare files.
         """
-        self.orignal = os.path.join(self.job.statepoint[FLAG_DIR],
-                                    self.orignal)
-        if not os.path.isfile(self.orignal):
-            raise FileNotFoundError(f"{self.orignal} not found")
-        self.target = self.job.fn(self.target)
-        if not os.path.isfile(self.target):
-            raise FileNotFoundError(f"{self.target} not found")
-        if not filecmp.cmp(self.orignal, self.target):
-            raise ValueError(f"{self.orignal} and {self.target} are different")
+        super().run()
+        if not filecmp.cmp(*self.targets):
+            raise ValueError(f"{' and '.join(self.targets)} are different")
 
 
 class Opr(Cmd):
@@ -221,12 +216,8 @@ class Opr(Cmd):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.operators = []
-
-    def parse(self):
-        """
-        Parse the file, set the operators, and execute the operators.
-        """
-        super().parse()
+        if self.delay:
+            return
         self.setOperators()
 
     def setOperators(self):

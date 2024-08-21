@@ -1,19 +1,14 @@
 import os
+import sys
 import pytest
-from unittest import mock
 
-from nemd import testutils
 from nemd import itestutils
+from nemd import environutils
 
-BASE_DIR = os.path.join(testutils.TEST_FILE_DIR, 'itest')
-
-
-def get_job(tid=1, document=None, tdir=os.curdir):
-    if document is None:
-        document = {}
-    statepoint = {itestutils.FLAG_DIR: os.path.join(BASE_DIR, f"{tid:0>4}")}
-    fn = lambda x: os.path.join(tdir, x) if x else tdir
-    return mock.Mock(statepoint=statepoint, document=document, fn=fn)
+TEST_DIR = environutils.get_test_dir()
+if TEST_DIR is None:
+    sys.exit("Error: test directory cannot be found.")
+BASE_DIR = os.path.join(TEST_DIR, 'test_files', 'itest')
 
 
 class TestCmd:
@@ -32,11 +27,27 @@ class TestCmd:
         assert cmd.comment == 'Amorphous builder on C'
 
 
+class Job:
+
+    def __init__(self, tid=1, document=None, tdir=os.curdir):
+        self.statepoint = {
+            itestutils.FLAG_DIR: os.path.join(BASE_DIR, f"{tid:0>4}")
+        }
+        self.document = document if document else {}
+        self.dir = tdir
+
+    def fn(self, x):
+        return os.path.join(self.dir, x) if self.dir else self.dir
+
+
+JOB = Job(tdir=os.path.join(BASE_DIR, 'ea8c25e09124635e93178c1725ae8ee7'))
+
+
 class TestCmdJob:
 
     @pytest.fixture
     def job(self):
-        return itestutils.CmdJob(get_job(), delay=True)
+        return itestutils.CmdJob(JOB, delay=True)
 
     def testParse(self, job):
         job.parse()
@@ -67,11 +78,48 @@ class TestExist:
 
     @pytest.fixture
     def exist(self):
-        tdir = os.path.join(BASE_DIR, 'ea8c25e09124635e93178c1725ae8ee7')
-        return itestutils.Exist('amorp_bldr.data', job=get_job(tdir=tdir))
+        return itestutils.Exist('amorp_bldr.data', job=JOB)
 
     def testRun(self, exist):
-        exist.run()
-        exist.job = get_job()
+        try:
+            exist.run()
+        except FileNotFoundError:
+            assert False, "FileNotFoundError should not be raised"
+        exist.targets[0] = os.path.join(BASE_DIR, 'amorp_bldr.data')
         with pytest.raises(FileNotFoundError):
             exist.run()
+
+
+class TestNot_Exist:
+
+    @pytest.fixture
+    def not_exist(self):
+        return itestutils.Not_Exist('amorp_bldr.data', job=JOB)
+
+    def testRun(self, not_exist):
+        with pytest.raises(FileNotFoundError):
+            not_exist.run()
+        not_exist.targets[0] = os.path.join(BASE_DIR, 'amorp_bldr.data')
+        try:
+            not_exist.run()
+        except FileNotFoundError:
+            assert False, "FileNotFoundError should not be raised"
+
+
+class TestCmp:
+
+    @pytest.fixture
+    def cmp(self):
+        original = os.path.join(BASE_DIR, '0001', 'polymer_builder.data')
+        return itestutils.Cmp(original, 'amorp_bldr.data', job=JOB)
+
+    def testRun(self, cmp):
+        try:
+            cmp.run()
+        except FileNotFoundError:
+            assert False, "FileNotFoundError should not be raised"
+        cmp.job = Job()
+        try:
+            cmp.run()
+        except FileNotFoundError:
+            assert False, "FileNotFoundError should not be raised"

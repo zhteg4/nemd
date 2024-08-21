@@ -91,19 +91,28 @@ def get_submodule_path():
     return os.path.join(nemd_src, SUBMODULE)
 
 
-def get_integration_test_dir():
+def get_test_dir():
     """
-    Get the module path.
-
-    NOTE: If installed, all modules are assumed to sit together. In dev mode,
-    the module is search
+    Get the unittest test dir.
 
     :return str: the module path
     """
     nemd_src = get_nemd_src()
     if not nemd_src:
         return None
-    return os.path.join(nemd_src, TEST, INTEGRATION)
+    return os.path.join(nemd_src, TEST)
+
+
+def get_itest_dir():
+    """
+    Get the integration test dir.
+
+    :return str: the module path
+    """
+    test_dir = get_test_dir()
+    if not test_dir:
+        return None
+    return os.path.join(test_dir, INTEGRATION)
 
 
 def get_jobname(default_jobname):
