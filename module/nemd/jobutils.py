@@ -5,7 +5,9 @@
 """
 This module adds jobcontrol related command line flags and job utilities.
 """
+import os
 import json
+import collections
 from signac import job
 
 from nemd import environutils
@@ -193,3 +195,37 @@ def get_sidx(data, options, delta=1):
     sidx = round(num * (1 - options.last_pct))
     max_sidx = num - delta if num - delta > 0 else 0
     return min(sidx, max_sidx)
+
+
+class Job:
+    """
+    A class to mimic a signac.job.Job.
+    """
+
+    def __init__(self, job_dir=os.curdir):
+        """
+        Initialize a Job object.
+
+        :param job_dir: the directory of the job
+        :type job_dir: str
+        """
+        self.dir = job_dir
+        self.statepoint = {}
+        self.doc = collections.defaultdict(dict)
+        self.document = self.doc
+        if self.dir is None:
+            return
+        job_doc = os.path.join(self.dir, 'signac_job_document.json')
+        if not os.path.isfile(job_doc):
+            return
+        with open(job_doc, 'r') as fh:
+            self.doc.update(json.load(fh))
+
+    def fn(self, filename):
+        """
+        Return the full path of the file in the job directory.
+
+        :param filename str: the file name
+        :return str: the full path of the file
+        """
+        return os.path.join(self.dir, filename) if self.dir else filename

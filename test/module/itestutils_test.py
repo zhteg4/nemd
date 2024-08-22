@@ -1,11 +1,10 @@
 import os
 import sys
-import json
 import types
 import pytest
 import contextlib
-import collections
 
+from nemd import jobutils
 from nemd import itestutils
 from nemd import environutils
 
@@ -13,35 +12,17 @@ TEST_DIR = environutils.get_test_dir()
 if TEST_DIR is None:
     sys.exit("Error: test directory cannot be found.")
 BASE_DIR = os.path.join(TEST_DIR, 'test_files', 'itest')
+JOB_DIR = os.path.join(BASE_DIR, 'ea8c25e09124635e93178c1725ae8ee7')
 
 
-class Job:
+class Job(jobutils.Job):
 
-    def __init__(self, tid=1, idir=BASE_DIR, tdir=os.curdir):
+    def __init__(self, tid=1, idir=BASE_DIR, job_dir=JOB_DIR):
+        super().__init__(job_dir)
         self.tid = tid
         self.idir = idir
-        self.dir = tdir
         flag_dir = os.path.join(self.idir, f"{self.tid:0>4}")
-        self.statepoint = {itestutils.FLAG_DIR: flag_dir}
-        self.doc = collections.defaultdict(dict)
-        self.document = self.doc
-        if self.dir is None:
-            return
-        job_doc = os.path.join(self.dir, 'signac_job_document.json')
-        if not os.path.isfile(job_doc):
-            return
-        with open(job_doc, 'r') as fh:
-            self.doc = json.load(fh).copy()
-        self.document = self.doc
-
-    def fn(self, x):
-        return os.path.join(self.dir, x) if self.dir else self.dir
-
-
-def get_job(tid=1, idir=BASE_DIR, basename='ea8c25e09124635e93178c1725ae8ee7'):
-    if basename is None:
-        return Job(tid=tid, idir=idir)
-    return Job(tid=tid, idir=idir, tdir=os.path.join(BASE_DIR, basename))
+        self.statepoint[itestutils.FLAG_DIR] = flag_dir
 
 
 class TestCmd:
@@ -64,7 +45,7 @@ class TestCmdJob:
 
     @pytest.fixture
     def job(self):
-        return itestutils.CmdJob(get_job(basename=None), delay=True)
+        return itestutils.CmdJob(Job(job_dir=os.curdir), delay=True)
 
     def testParse(self, job):
         job.parse()
@@ -95,7 +76,7 @@ class TestExist:
 
     @pytest.fixture
     def exist(self):
-        return itestutils.Exist('amorp_bldr.data', job=get_job())
+        return itestutils.Exist('amorp_bldr.data', job=Job())
 
     def testRun(self, exist):
         try:
@@ -111,7 +92,7 @@ class TestNot_Exist:
 
     @pytest.fixture
     def not_exist(self):
-        return itestutils.Not_Exist('amorp_bldr.data', job=get_job())
+        return itestutils.Not_Exist('amorp_bldr.data', job=Job())
 
     def testRun(self, not_exist):
         with pytest.raises(FileNotFoundError):
@@ -129,7 +110,7 @@ class TestCmp:
     def cmp(self):
         return itestutils.Cmp('polymer_builder.data',
                               'amorp_bldr.data',
-                              job=get_job())
+                              job=Job())
 
     def testRun(self, cmp):
         try:
@@ -145,7 +126,7 @@ class TestCheck:
 
     @pytest.fixture
     def check(self):
-        return itestutils.Check(job=get_job(), delay=True)
+        return itestutils.Check(job=Job(), delay=True)
 
     def testSetOperators(self, check):
         check.parse()
@@ -167,7 +148,7 @@ class TestCheckJob:
 
     @pytest.fixture
     def job(self):
-        return itestutils.CheckJob(get_job())
+        return itestutils.CheckJob(Job())
 
     def testRun(self, job):
         with contextlib.redirect_stdout(None):
@@ -185,7 +166,7 @@ class TestTag:
 
     @pytest.fixture
     def tag(self):
-        return itestutils.Tag(job=get_job())
+        return itestutils.Tag(job=Job())
 
     def testSetLogs(self, tag):
         tag.setLogs()
@@ -228,7 +209,7 @@ class TestTagJob:
 
     @pytest.fixture
     def tag(self):
-        return itestutils.TagJob(job=get_job(idir=os.curdir))
+        return itestutils.TagJob(job=Job(idir=os.curdir))
 
     def testRun(self, tag, tmp_dir):
         os.mkdir('0001')
