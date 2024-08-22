@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import pytest
 import contextlib
 import collections
@@ -15,18 +16,31 @@ BASE_DIR = os.path.join(TEST_DIR, 'test_files', 'itest')
 
 class Job:
 
-    def __init__(self, tid=1, document=None, tdir=os.curdir):
-        self.statepoint = {
-            itestutils.FLAG_DIR: os.path.join(BASE_DIR, f"{tid:0>4}")
-        }
-        self.document = document if document else collections.defaultdict(dict)
+    def __init__(self, tid=1, doc=None, tdir=os.curdir):
+        self.tid = tid
+        self.doc = doc
         self.dir = tdir
+        flag_dir = os.path.join(BASE_DIR, f"{self.tid:0>4}")
+        self.statepoint = {itestutils.FLAG_DIR: flag_dir}
+        if self.doc is None:
+            self.doc = collections.defaultdict(dict)
+        self.document = self.doc
+        if self.dir is None:
+            return
+        job_doc = os.path.join(self.dir, 'signac_job_document.json')
+        if not os.path.isfile(job_doc):
+            return
+        with open(job_doc, 'r') as fh:
+            self.doc = json.load(fh).copy()
+        self.document = self.doc
 
     def fn(self, x):
         return os.path.join(self.dir, x) if self.dir else self.dir
 
 
 def get_job(basename='ea8c25e09124635e93178c1725ae8ee7'):
+    if basename is None:
+        return Job()
     return Job(tdir=os.path.join(BASE_DIR, basename))
 
 
@@ -50,7 +64,7 @@ class TestCmdJob:
 
     @pytest.fixture
     def job(self):
-        return itestutils.CmdJob(get_job(), delay=True)
+        return itestutils.CmdJob(get_job(basename=None), delay=True)
 
     def testParse(self, job):
         job.parse()
@@ -165,3 +179,14 @@ class TestCheckJob:
         with contextlib.redirect_stdout(None):
             job.run()
         assert job.post() is True
+
+
+class TestTag:
+
+    @pytest.fixture
+    def tag(self):
+        return itestutils.Tag(job=get_job())
+
+    def testSetLogs(self, tag):
+        tag.setLogs()
+        assert len(tag.logs) == 1

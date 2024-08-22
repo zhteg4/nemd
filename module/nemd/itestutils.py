@@ -298,7 +298,7 @@ class CheckJob(task.BaseJob):
 
         :return: True if the post-conditions are met.
         """
-        return self.name in self.doc[self.MESSAGE]
+        return self.MESSAGE in self.doc and self.name in self.doc[self.MESSAGE]
 
 
 class CheckTask(task.BaseTask):
@@ -332,32 +332,6 @@ class Tag(Opr):
         self.setSlow()
         self.setLabel()
         self.write()
-
-    def selected(self):
-        """
-        Select the operators by the options.
-
-        :return bool: Whether the test is selected.
-        """
-        not_slow = self.options.slow is None or not self.slow
-        has_label = self.options.label is None or set(
-            self.options.label).intersection(self.get(self.LABEL, []))
-        return all([not_slow, has_label])
-
-    @property
-    def slow(self):
-        """
-        Whether the test is slow.
-
-        :return bool: Whether the test is slow.
-        """
-        if self.options is None or self.options.slow is None:
-            return False
-        value = self.get(self.SLOW)
-        if value is None:
-            return False
-        delta = timeutils.str2delta(value[0])
-        return delta.total_seconds() > self.options.slow
 
     def setLogs(self):
         """
@@ -425,6 +399,28 @@ class Tag(Opr):
             for key, *value in self.operators:
                 values = symbols.COMMA.join(value)
                 fh.write(f"{key}({values})\n")
+
+    def selected(self):
+        """
+        Select the operators by the options.
+
+        :return bool: Whether the test is selected.
+        """
+        not_slow = self.options.slow is None or not self.slow
+        has_label = self.options.label is None or set(
+            self.options.label).intersection(self.get(self.LABEL, []))
+        return all([not_slow, has_label])
+
+    @property
+    def slow(self):
+        """
+        Whether the test is slow.
+
+        :return bool: Whether the test is slow.
+        """
+        value = self.get(self.SLOW, '00:00')
+        delta = timeutils.str2delta(value[0])
+        return delta.total_seconds() > self.options.slow
 
 
 class TagJob(CheckJob):

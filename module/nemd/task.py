@@ -32,7 +32,7 @@ class BaseJob(logutils.Base):
     DATA_EXT = '.csv'
     PRE_RUN = None
 
-    def __init__(self, job, name=None, driver=None, logger=None, **kwargs):
+    def __init__(self, job, name='base', driver=None, logger=None, **kwargs):
         """
         :param job: the signac job instance
         :type job: 'signac.contrib.job.Job'
@@ -59,7 +59,7 @@ class BaseJob(logutils.Base):
 
         :return str: the message of the job.
         """
-        return self.doc[self.MESSAGE][self.name]
+        return self.doc.get(self.MESSAGE, {}).get(self.name)
 
     @message.setter
     def message(self, value):
@@ -68,7 +68,10 @@ class BaseJob(logutils.Base):
 
         :value str: the message of the job.
         """
-        self.doc[self.MESSAGE][self.name] = value
+        if self.MESSAGE not in self.doc:
+            self.doc[self.MESSAGE] = {}
+
+        self.doc[self.MESSAGE].update({self.name: value})
 
 
 class Job(BaseJob):
