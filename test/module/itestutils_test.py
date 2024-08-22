@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import types
 import pytest
 import contextlib
 import collections
@@ -16,14 +17,13 @@ BASE_DIR = os.path.join(TEST_DIR, 'test_files', 'itest')
 
 class Job:
 
-    def __init__(self, tid=1, doc=None, tdir=os.curdir):
+    def __init__(self, tid=1, idir=BASE_DIR, tdir=os.curdir):
         self.tid = tid
-        self.doc = doc
+        self.idir = idir
         self.dir = tdir
-        flag_dir = os.path.join(BASE_DIR, f"{self.tid:0>4}")
+        flag_dir = os.path.join(self.idir, f"{self.tid:0>4}")
         self.statepoint = {itestutils.FLAG_DIR: flag_dir}
-        if self.doc is None:
-            self.doc = collections.defaultdict(dict)
+        self.doc = collections.defaultdict(dict)
         self.document = self.doc
         if self.dir is None:
             return
@@ -38,10 +38,10 @@ class Job:
         return os.path.join(self.dir, x) if self.dir else self.dir
 
 
-def get_job(basename='ea8c25e09124635e93178c1725ae8ee7'):
+def get_job(tid=1, idir=BASE_DIR, basename='ea8c25e09124635e93178c1725ae8ee7'):
     if basename is None:
-        return Job()
-    return Job(tdir=os.path.join(BASE_DIR, basename))
+        return Job(tid=tid, idir=idir)
+    return Job(tid=tid, idir=idir, tdir=os.path.join(BASE_DIR, basename))
 
 
 class TestCmd:
@@ -190,3 +190,48 @@ class TestTag:
     def testSetLogs(self, tag):
         tag.setLogs()
         assert len(tag.logs) == 1
+
+    def testSetSlow(self, tag):
+        tag.operators = []
+        tag.setLogs()
+        tag.setSlow()
+        assert tag.operators[0][0] == 'slow'
+
+    def testSetLabel(self, tag):
+        tag.operators = []
+        tag.setLogs()
+        tag.setLabel()
+        assert tag.operators[0][0] == 'label'
+
+    def testWrite(self, tag, tmp_dir):
+        tag.pathname = os.path.basename(tag.pathname)
+        with contextlib.redirect_stdout(None):
+            tag.write()
+        assert os.path.exists('tag')
+
+    def testSlow(self, tag):
+        tag.options = types.SimpleNamespace(slow=None)
+        assert tag.slow() is False
+        tag.options = types.SimpleNamespace(slow=2.)
+        assert tag.slow() is True
+
+    def testLabeled(self, tag):
+        tag.options = types.SimpleNamespace(label=None)
+        assert tag.labeled() is True
+        tag.options = types.SimpleNamespace(label=['wa'])
+        assert tag.labeled() is False
+        tag.options = types.SimpleNamespace(label=['wa', 'amorp_bldr'])
+        assert tag.labeled() is True
+
+
+class TestTagJob:
+
+    @pytest.fixture
+    def tag(self):
+        return itestutils.TagJob(job=get_job(idir=os.curdir))
+
+    def testRun(self, tag, tmp_dir):
+        os.mkdir('0001')
+        with contextlib.redirect_stdout(None):
+            tag.run()
+        assert tag.message is False

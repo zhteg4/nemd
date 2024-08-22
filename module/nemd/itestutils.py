@@ -351,6 +351,20 @@ class Tag(Opr):
         job_time = timeutils.delta2str(total)
         self.set(self.SLOW, job_time)
 
+    def set(self, key, *value):
+        """
+        Set the value (and the key) of one operator.
+
+        :param key str: the key to be set
+        :param value tuple of str: the value(s) to be set
+        """
+        key_values = [key, *value]
+        for idx, (name, *_) in enumerate(self.operators):
+            if name == key:
+                self.operators[idx] = key_values
+                return
+        self.operators.append(key_values)
+
     def setLabel(self):
         """
         Set the label of the job.
@@ -374,20 +388,6 @@ class Tag(Opr):
                 return value
         return tuple() if default is None else default
 
-    def set(self, key, *value):
-        """
-        Set the value (and the key) of one operator.
-
-        :param key str: the key to be set
-        :param value tuple of str: the value(s) to be set
-        """
-        key_values = [key, *value]
-        for idx, (name, *_) in enumerate(self.operators):
-            if name == key:
-                self.operators[idx] = key_values
-                return
-        self.operators.append(key_values)
-
     def write(self):
         """
         Write the tag file.
@@ -406,21 +406,30 @@ class Tag(Opr):
 
         :return bool: Whether the test is selected.
         """
-        not_slow = self.options.slow is None or not self.slow
-        has_label = self.options.label is None or set(
-            self.options.label).intersection(self.get(self.LABEL, []))
-        return all([not_slow, has_label])
+        return all([self.slow(), self.labeled()])
 
-    @property
     def slow(self):
         """
         Whether the test is slow.
 
         :return bool: Whether the test is slow.
         """
+        if self.options.slow is None:
+            return False
         value = self.get(self.SLOW, '00:00')
         delta = timeutils.str2delta(value[0])
         return delta.total_seconds() > self.options.slow
+
+    def labeled(self):
+        """
+        Whether the test is labeled with the specified labels.
+
+        :return bool: Whether the test is labeled.
+        """
+        if self.options.label is None:
+            return True
+        labels = self.get(self.LABEL, [])
+        return bool(set(self.options.label).intersection(labels))
 
 
 class TagJob(CheckJob):
