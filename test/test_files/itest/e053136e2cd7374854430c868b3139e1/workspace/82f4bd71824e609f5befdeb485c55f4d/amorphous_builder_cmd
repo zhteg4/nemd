@@ -1,0 +1,1 @@
+run_nemd amorp_bldr_driver.py [Ar] -mol_num 100 -density 0.00164 -relax_time 0.1 -prod_time 0.01 -prod_ens NPT -JOBNAME amorphous_builder -seed 1

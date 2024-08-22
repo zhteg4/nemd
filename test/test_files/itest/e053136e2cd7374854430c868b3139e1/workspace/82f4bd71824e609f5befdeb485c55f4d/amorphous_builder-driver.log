@@ -1,0 +1,36 @@
+..........Command Options..........
+cru: [Ar]
+cru_num: 1
+mol_num: 100
+no_minimize: False
+rigid_bond: None
+rigid_angle: None
+buffer: None
+substruct: None
+seed: 1
+timestep: 1
+stemp: 10
+temp: 300
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 0.1
+prod_time: 0.01
+prod_ens: NPT
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+cell: grow
+density: 0.00164
+interactive: False
+jobname: amorphous_builder
+default_name: amorp_bldr
+debug: False
+python: 2
+cpu: 6
+JobStart: 18:26:05 08/22/24
+...................................
+Data file written into amorphous_builder.data
+In script written into amorphous_builder.in
+Finished.
+18:26:08 08/22/24

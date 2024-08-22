@@ -1,0 +1,95 @@
+LAMMPS (7 Feb 2024 - Development - patch_7Feb2024-18-gc6a8f1fe58)
+units real
+atom_style full
+bond_style harmonic
+angle_style harmonic
+dihedral_style opls
+improper_style cvff
+pair_style lj/cut 11.0
+pair_modify mix geometric
+special_bonds lj/coul 0 0 0.5
+read_data amorphous_builder.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (159.3309 159.3309 159.3309)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  100 atoms
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0.5     
+  special bond factors coul:  0        0        0.5     
+     0 = max # of 1-2 neighbors
+     0 = max # of 1-3 neighbors
+     0 = max # of 1-4 neighbors
+     1 = max # of special neighbors
+  special bonds CPU = 0.000 seconds
+  read_data CPU = 0.005 seconds
+
+timestep 1
+thermo_modify flush yes
+thermo 1000
+dump 1 all custom 1000 dump.custom.gz id xu yu zu
+dump_modify 1 sort id
+min_style fire
+minimize 1.0e-6 1.0e-8 1000000 10000000
+Generated 0 of 0 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 13
+  ghost atom cutoff = 13
+  binsize = 6.5, bins = 25 25 25
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair lj/cut, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+  Parameters for fire:
+    dmax  delaystep dtgrow dtshrink alpha0 alphashrink tmax tmin   integrator   halfstepback   abcfire  
+     0.1     20      1.1     0.5     0.25     0.99      10  0.02 eulerimplicit      yes          no     
+Per MPI rank memory allocation (min/avg/max) = 6.102 | 6.102 | 6.102 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -0.037683462    0             -0.037683462   -0.0012698334 
+      1000   0.013333994   -0.50586018     0             -0.50192531    -0.0012282409 
+      2000   0.029908126   -0.96333304     0             -0.95450715    -0.00082008035
+      2993   1.1857715e-05 -1.418904       0             -1.4189005     -0.00041477169
+Loop time of 0.0118148 on 1 procs for 2993 steps with 100 atoms
+
+95.4% CPU use with 1 MPI tasks x no OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+    -0.0376834620964974  -1.41890360303838  -1.41890404397019
+  Force two-norm initial, final = 0.015973999 0.0093402913
+  Force max component initial, final = 0.0080507623 0.0040790708
+  Final line search alpha, max atom move = 0 0
+  Iterations, force evaluations = 2993 3000
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0021273  | 0.0021273  | 0.0021273  |   0.0 | 18.01
+Bond    | 0.00035789 | 0.00035789 | 0.00035789 |   0.0 |  3.03
+Neigh   | 0.00021339 | 0.00021339 | 0.00021339 |   0.0 |  1.81
+Comm    | 0.0012437  | 0.0012437  | 0.0012437  |   0.0 | 10.53
+Output  | 0.00025711 | 0.00025711 | 0.00025711 |   0.0 |  2.18
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.007615   |            |       | 64.46
+
+Nlocal:            100 ave         100 max         100 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:             47 ave          47 max          47 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:             22 ave          22 max          22 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 22
+Ave neighs/atom = 0.22
+Ave special neighs/atom = 0
+Neighbor list builds = 7
+Dangerous builds = 0
+
+velocity all create 10 0
+ERROR: Illegal velocity create seed argument: 0 (src/velocity.cpp:165)
+Last command: velocity all create 10 0

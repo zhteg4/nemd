@@ -70,7 +70,6 @@ class BaseJob(logutils.Base):
         """
         if self.MESSAGE not in self.doc:
             self.doc[self.MESSAGE] = {}
-
         self.doc[self.MESSAGE].update({self.name: value})
 
 
@@ -250,9 +249,30 @@ class AggJob(BaseJob):
         total_time = timeutils.delta2str(info.time.sum())
         self.log(logutils.LogReader.TOTOAL_TIME + total_time)
         self.log(data.fillna('').to_markdown(index=False))
-        self.project.doc[self.name] = False
+        self.message = False
 
-    def delta2str(self, delta):
+    @property
+    def message(self):
+        """
+        The message of the agg job.
+
+        :return str: the message of the job.
+        """
+        return self.project.doc.get(self.MESSAGE, {}).get(self.name)
+
+    @message.setter
+    def message(self, value):
+        """
+        Set message of the agg job.
+
+        :value str: the message of the job.
+        """
+        if self.MESSAGE not in self.doc:
+            self.project.doc[self.MESSAGE] = {}
+        self.project.doc[self.MESSAGE].update({self.name: value})
+
+    @classmethod
+    def delta2str(cls, delta):
         """
         Delta time to string with upper limit.
 
@@ -260,9 +280,9 @@ class AggJob(BaseJob):
         :type delta: 'datetime.timedelta'
         :return str: the string representation of the time delta with upper limit
         """
-        if delta > self.DELTA_LMT:
-            return self.MS_LMT
-        return timeutils.delta2str(delta, fmt=self.MS_FMT)
+        if delta > cls.DELTA_LMT:
+            return cls.MS_LMT
+        return timeutils.delta2str(delta, fmt=cls.MS_FMT)
 
     def post(self):
         """
@@ -554,7 +574,7 @@ class LogJobAgg(AggJob):
                                 options=self.options,
                                 logger=self.logger)
             anlz.run()
-        self.project.doc[self.name] = False
+        self.message = False
 
 
 class Lmp_Log(BaseTask):

@@ -1,0 +1,1 @@
+run_nemd lammps_driver.py amorphous_builder.in -JOBNAME lammps_runner

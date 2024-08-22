@@ -1,0 +1,1 @@
+run_nemd lmp_traj_driver.py dump.custom.gz -data_file amorphous_builder.data -task density -JOBNAME lmp_traj

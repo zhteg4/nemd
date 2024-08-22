@@ -1,0 +1,18 @@
+..........Command Options..........
+inscript: amorphous_builder.in
+screen: none
+log: None
+data_file: amorphous_builder.data
+interactive: False
+jobname: lammps_runner
+default_name: lammps
+debug: False
+python: 2
+cpu: 6
+JobStart: 18:26:23 08/22/24
+...................................
+Running lammps simulations...
+WARNING:[Tengs-MacBook-Pro-2.local:12434] shmem: mmap: an error occurred while determining whether or not /var/folders/tp/n45kcc4x4c9447_ctyqmh3lr0000gn/T//ompi.Tengs-MacBook-Pro-2.501/jf.0/2928476160/sm_segment.Tengs-MacBook-Pro-2.501.ae8d0000.0 could be created.
+
+Finished.
+18:26:24 08/22/24

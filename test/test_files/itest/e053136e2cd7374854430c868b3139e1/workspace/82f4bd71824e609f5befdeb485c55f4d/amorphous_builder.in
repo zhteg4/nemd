@@ -1,0 +1,134 @@
+units real
+atom_style full
+bond_style harmonic
+angle_style harmonic
+dihedral_style opls
+improper_style cvff
+pair_style lj/cut 11.0
+pair_modify mix geometric
+special_bonds lj/coul 0 0 0.5
+read_data amorphous_builder.data
+
+timestep 1
+thermo_modify flush yes
+thermo 1000
+dump 1 all custom 1000 dump.custom.gz id xu yu zu
+dump_modify 1 sort id
+min_style fire
+minimize 1.0e-6 1.0e-8 1000000 10000000
+
+velocity all create 10 1
+fix 1a all temp/berendsen 10 10 100
+fix 1b all nve
+run 100
+unfix 1b
+unfix 1a
+
+fix 2a all temp/berendsen 10 300 100
+fix 2b all nve
+run 5000
+unfix 2b
+unfix 2a
+
+fix 3a all temp/berendsen 300 300 100
+fix 3b all nve
+run 5000
+unfix 3b
+unfix 3a
+
+dump_modify 1 every 4000
+
+variable vol equal vol
+variable amp equal 0.01*v_vol^(1/3)
+variable immed_press python getPress
+python getPress input 1 press_vol.data return v_immed_press format sf here "from nemd.pyfunc import getPress"
+
+variable immed_modulus python getModulus
+python getModulus input 2 press_vol.data 100 return v_immed_modulus format sif here "from nemd.pyfunc import getModulus"
+
+variable factor python getBdryFactor
+python getBdryFactor input 2 1 press_vol.data return v_factor format fsf here "from nemd.pyfunc import getBdryFactor"
+
+variable defm_id loop 0 999 pad
+label defm_start
+print "defm_id = ${defm_id}"
+shell mkdir defm_${defm_id}
+shell cd defm_${defm_id}
+
+fix 16a all ave/time 1 10 10 c_thermo_press v_vol file press_vol.data
+fix 16b all deform 100 x wiggle ${amp} 1000 y wiggle ${amp} 1000 z wiggle ${amp} 1000
+fix 16c all temp/berendsen 300 300 100
+fix 16d all nve
+run 3000
+unfix 16d
+unfix 16c
+unfix 16b
+unfix 16a
+
+print "immed_press = ${immed_press}"
+print "immed_modulus = ${immed_modulus}"
+print "factor = ${factor}"
+if "${defm_id} == 999 || ${factor} == 1" then "jump SELF defm_break"
+
+fix 22a all deform 100 x scale ${factor} y scale ${factor} z scale ${factor} remap v
+fix 22b all temp/berendsen 300 300 100
+fix 22c all nve
+run 500
+unfix 22c
+unfix 22b
+unfix 22a
+
+fix 23a all temp/berendsen 300 300 100
+fix 23b all nve
+run 500
+unfix 23b
+unfix 23a
+
+shell cd ..
+next defm_id
+jump SELF defm_start
+
+label defm_break
+variable modulus equal ${immed_modulus}
+variable press equal ${immed_press}
+shell cd ..
+variable vol delete
+variable amp delete
+variable immed_press delete
+variable immed_modulus delete
+variable factor delete
+variable defm_id delete
+
+dump_modify 1 every 1000
+
+fix 39a all temp/berendsen 300 300 100
+fix 39b all nve
+run 10000
+unfix 39b
+unfix 39a
+
+fix 40a all press/berendsen iso ${press} 1 1000 modulus ${modulus}
+fix 40b all temp/berendsen 300 300 100
+fix 40c all nve
+run 10000
+unfix 40c
+unfix 40b
+unfix 40a
+
+fix 41a all press/berendsen iso 1.0 1 1000 modulus ${modulus}
+fix 41b all temp/berendsen 300 300 100
+fix 41c all nve
+run 100000
+unfix 41c
+unfix 41b
+unfix 41a
+
+fix 42a all press/berendsen iso 1.0 1 1000 modulus ${modulus}
+fix 42b all temp/berendsen 300 300 100
+fix 42c all nve
+run 10000
+unfix 42c
+unfix 42b
+unfix 42a
+
+quit 0

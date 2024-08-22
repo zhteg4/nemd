@@ -1,0 +1,24 @@
+..........Command Options..........
+traj: dump.custom.gz
+data_file: amorphous_builder.data
+task: density
+sel: None
+last_pct: 0.2
+slice: None
+interactive: False
+jobname: lmp_traj
+default_name: lmp_traj
+debug: False
+python: 2
+cpu: 6
+JobStart: 18:26:45 08/22/24
+...................................
+100 atoms selected.
+4 trajectory frames found.
+density analyze all frames and save per frame results ∈ [0.000, 2.993] ps
+density average results from last 20.0% frames ∈ [ 2.993,  2.993] ps
+Density data written into lmp_traj_density.csv
+Density: 0.00164 ± nan g/cm^3 ∈ [2.9930, 2.9930] ps
+Density figure saved as lmp_traj_density.png
+Finished.
+18:26:45 08/22/24

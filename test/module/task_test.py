@@ -2,9 +2,13 @@ import os
 import sys
 import shutil
 import pytest
+import datetime
+from unittest import mock
+
 from nemd import task
 from nemd import jobutils
 from nemd import environutils
+from nemd.nproject import FlowProject
 
 TEST_DIR = environutils.get_test_dir()
 if TEST_DIR is None:
@@ -27,8 +31,11 @@ class TestBaseJob:
 
 class TestJob:
 
+    INFILE = 'amorphous_builder.in'
+
     @pytest.fixture
-    def job(self):
+    def job(self, tmp_dir):
+        shutil.copyfile(os.path.join(JOB_DIR, self.INFILE), self.INFILE)
         job = jobutils.Job(job_dir=JOB_DIR)
         import lammps_driver as DRIVER
         return task.Job(job, name='lammps_runner', driver=DRIVER)
@@ -37,9 +44,7 @@ class TestJob:
         job.setArgs()
         assert job.args == ['amorphous_builder.in', '[Ar]', '-seed', '0']
 
-    def testRemoveUnkArgs(self, job, tmp_dir):
-        infile = 'amorphous_builder.in'
-        shutil.copyfile(os.path.join(JOB_DIR, infile), infile)
+    def testRemoveUnkArgs(self, job):
         job.setArgs()
         job.removeUnkArgs()
         assert job.args == ['amorphous_builder.in']
@@ -53,7 +58,7 @@ class TestJob:
         job.addQuote()
         assert job.args[0] == "'*'"
 
-    def testGetCmd(self, job, tmp_dir):
+    def testGetCmd(self, job):
         job.args = ['amorphous_builder.in']
         cmd = job.getCmd()
         assert cmd == 'run_nemd lammps_driver.py amorphous_builder.in'
@@ -62,3 +67,38 @@ class TestJob:
         assert job.post() is False
         job.doc[jobutils.OUTFILE][job.name] = 'output.log'
         assert job.post() is True
+
+
+class TestAggJob:
+
+    PROJ_DIR = os.path.join(BASE_DIR, 'e053136e2cd7374854430c868b3139e1')
+
+    @pytest.fixture
+    def agg(self, tmp_dir):
+        basename = os.path.basename(self.PROJ_DIR)
+        shutil.copytree(self.PROJ_DIR, basename)
+        proj = FlowProject.get_project(basename, jobname='ab_lmp_traj')
+        import lmp_traj_driver as DRIVER
+        jobs = proj.find_jobs()
+        agg = task.AggJob(*jobs, driver=DRIVER, logger=mock.Mock())
+        return agg
+
+    def testPost(self, agg):
+        assert agg.post() is False
+        agg.message = False
+        assert agg.post() is True
+
+    def testGroupJobs(self, agg):
+        jobs = agg.groupJobs()
+        assert len(jobs) == 1
+        assert len(jobs[0]) == 2
+
+    def testRun(self, agg):
+        agg.run()
+        assert agg.logger.info.called
+
+    @pytest.mark.parametrize("delta, expected",
+                             [(datetime.timedelta(hours=3), '59:59'),
+                              (datetime.timedelta(minutes=3), '03:00')])
+    def testDelta2str(self, delta, expected):
+        assert expected == task.AggJob.delta2str(delta)

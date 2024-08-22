@@ -1,0 +1,56 @@
+..........Command Options..........
+cru: [Ar]
+cru_num: None
+mol_num: 100
+no_minimize: False
+rigid_bond: None
+rigid_angle: None
+buffer: None
+substruct: None
+seed: 12345
+timestep: 1
+stemp: 10
+temp: 300
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 0.1
+prod_time: 0.01
+prod_ens: NPT
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+cell: grow
+density: 0.00164
+interactive: False
+jobname: ab_lmp_traj
+default_name: ab_lmp_traj
+debug: False
+python: 2
+cpu: 6
+task: density
+sel: None
+last_pct: 0.2
+slice: None
+state_num: 2
+clean: False
+jtype: task, aggregator
+prj_path: .
+JobStart: 18:25:49 08/22/24
+...................................
+2 / 2 completed jobs.
+2 / 2 succeeded jobs.
+2 jobs found for aggregation.
+Aggregation Task: density
+Density data written into workspace/ab_lmp_traj_density_0.csv
+Density: 0.001641 ± 5e-07 g/cm^3 ∈ [73.9965, 73.9965] ps
+Density figure saved as workspace/ab_lmp_traj_density_0.png
+Density of all parameters saved to ab_lmp_traj_density.csv
+Task Total Timing: 00:00:11
+| amorp_bl   | lammps    | lmp_traj   |
+|:-----------|:----------|:-----------|
+| 00:03 ave  | 00:02 ave | 00:00 ave  |
+| 00:03 6e4  | 00:04 82f | 00:00 6e4  |
+| 00:03 82f  | 00:01 6e4 | 00:00 82f  |
+Finished.
+18:26:46 08/22/24
