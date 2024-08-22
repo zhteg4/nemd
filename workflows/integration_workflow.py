@@ -102,7 +102,7 @@ class Integration(jobcontrol.Runner):
             if itestutils.Tag(x, options=self.options).selected()
         ]
         if not dirs:
-            log_error(f'All tests are marked as slow, skip running.')
+            log_error(f'All tests are skipped according to the tag file.')
         self.state = {FLAG_DIR: dirs}
 
     def cleanJobs(self):

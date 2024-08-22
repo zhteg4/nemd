@@ -406,7 +406,7 @@ class Tag(Opr):
 
         :return bool: Whether the test is selected.
         """
-        return all([self.slow(), self.labeled()])
+        return all([not self.slow(), self.labeled()])
 
     def slow(self):
         """
@@ -416,7 +416,7 @@ class Tag(Opr):
         """
         if self.options.slow is None:
             return False
-        value = self.get(self.SLOW, '00:00')
+        value = self.get(self.SLOW, ['00:00'])
         delta = timeutils.str2delta(value[0])
         return delta.total_seconds() > self.options.slow
 
