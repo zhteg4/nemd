@@ -1,0 +1,30 @@
+LAMMPS Description # full
+
+1 atoms
+0 bonds
+0 angles
+0 dihedrals
+0 impropers
+
+1 atom types
+0 bond types
+0 angle types
+0 dihedral types
+0 improper types
+
+0 5.1002 xlo xhi
+0 5.1002 ylo yhi
+0 5.1002 zlo zhi
+
+Masses
+
+1 39.9480 # Argon Atom Ar 211 #
+
+Pair Coeffs
+
+1 0.2340 3.4010
+
+Atoms
+
+1 1 1 0.0000 4.0397 1.2077 3.9342
+

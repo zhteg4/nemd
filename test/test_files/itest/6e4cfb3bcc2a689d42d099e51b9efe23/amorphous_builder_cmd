@@ -1,0 +1,1 @@
+run_nemd amorp_bldr_driver.py [Ar] -seed 0 -JOBNAME amorphous_builder
