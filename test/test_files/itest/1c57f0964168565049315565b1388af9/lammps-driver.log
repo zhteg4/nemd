@@ -1,0 +1,18 @@
+..........Command Options..........
+inscript: crystal_builder.in
+screen: none
+log: None
+data_file: crystal_builder.data
+interactive: False
+jobname: lammps_runner
+default_name: lammps
+debug: False
+python: 2
+cpu: 1
+JobStart: 15:19:27 08/23/24
+...................................
+Running lammps simulations...
+WARNING:[Tengs-MacBook-Pro-2.local:68557] shmem: mmap: an error occurred while determining whether or not /var/folders/tp/n45kcc4x4c9447_ctyqmh3lr0000gn/T//ompi.Tengs-MacBook-Pro-2.501/jf.0/3648782336/sm_segment.Tengs-MacBook-Pro-2.501.d97c0000.0 could be created.
+
+Finished.
+15:19:28 08/23/24

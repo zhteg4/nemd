@@ -13,7 +13,7 @@ from nemd import logutils
 from nemd import jobutils
 from nemd import parserutils
 from nemd import jobcontrol
-from nemd.task import Amorp_Bldr, Lammps, Lmp_Traj
+from nemd.task import AmorpBldr, Lammps, LmpTraj
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_workflow', '')
@@ -70,17 +70,17 @@ class Runner(jobcontrol.Runner):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
         """
-        amorphous_builder = Amorp_Bldr.getOpr(name='amorphous_builder')
+        amorphous_builder = AmorpBldr.getOpr(name='amorphous_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
         self.setPrereq(lammps_runner, amorphous_builder)
-        lmp_traj = Lmp_Traj.getOpr(name='lmp_traj')
+        lmp_traj = LmpTraj.getOpr(name='lmp_traj')
         self.setPrereq(lmp_traj, lammps_runner)
 
     def setAggJobs(self):
         """
         Aggregate post analysis jobs.
         """
-        Lmp_Traj.getAgg(name='lmp_traj', logger=logger)
+        LmpTraj.getAgg(name='lmp_traj', logger=logger)
         super().setAggJobs()
 
 
@@ -92,8 +92,8 @@ def get_parser():
         out of sys.argv.
     """
     parser = parserutils.get_parser(description=__doc__)
-    parser = Amorp_Bldr.DRIVER.get_parser(parser)
-    parser = Lmp_Traj.DRIVER.get_parser(parser)
+    parser = AmorpBldr.DRIVER.get_parser(parser)
+    parser = LmpTraj.DRIVER.get_parser(parser)
     parserutils.add_job_arguments(parser, jobname=JOBNAME)
     parserutils.add_workflow_arguments(parser)
     return parser

@@ -14,7 +14,7 @@ from nemd import jobutils
 from nemd import polymutils
 from nemd import jobcontrol
 from nemd import parserutils
-from nemd.task import Mol_Bldr, Lammps, Lmp_Log
+from nemd.task import MolBldr, Lammps, LmpLog
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_workflow', '')
@@ -55,10 +55,10 @@ class Runner(jobcontrol.Runner):
         """
         Set crystal builder, lammps runner, and log analyzer tasks.
         """
-        conformer_builder = Mol_Bldr.getOpr(name='conformer_builder')
+        conformer_builder = MolBldr.getOpr(name='conformer_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
         self.setPrereq(lammps_runner, conformer_builder)
-        lmp_log = Lmp_Log.getOpr(name='lmp_log')
+        lmp_log = LmpLog.getOpr(name='lmp_log')
         self.setPrereq(lmp_log, lammps_runner)
 
     def setState(self):
@@ -82,19 +82,19 @@ class Runner(jobcontrol.Runner):
         """
         super().setAggregation()
         name = f"{self.options.jobname}{self.SEP}{self.LMP_LOG}"
-        combine_agg = Lmp_Log.getAgg(name=name,
-                                     tname=self.LMP_LOG,
-                                     log=log,
-                                     clean=self.options.clean,
-                                     state_label='Scale Factor')
+        combine_agg = LmpLog.getAgg(name=name,
+                                    tname=self.LMP_LOG,
+                                    log=log,
+                                    clean=self.options.clean,
+                                    state_label='Scale Factor')
         name = f"{self.options.jobname}{self.SEP}fitting"
-        fit_agg = Lmp_Log.getAgg(name=name,
-                                 attr=self.minEneAgg,
-                                 tname=Lmp_Log.DRIVER.TOTENG,
-                                 post=self.minEnePost,
-                                 log=log,
-                                 clean=self.options.clean,
-                                 state_label='Scale Factor')
+        fit_agg = LmpLog.getAgg(name=name,
+                                attr=self.minEneAgg,
+                                tname=LmpLog.DRIVER.TOTENG,
+                                post=self.minEnePost,
+                                log=log,
+                                clean=self.options.clean,
+                                state_label='Scale Factor')
         self.setPrereq(fit_agg, combine_agg)
 
 
@@ -111,8 +111,8 @@ def get_parser():
         metavar='SMILES:START,END,STEP',
         type=lambda x: parserutils.type_substruct(x, is_range=True),
         help='The range of the degree to scan in degrees. ')
-    parser = Mol_Bldr.DRIVER.get_parser(parser)
-    parser = Lmp_Log.DRIVER.get_parser(parser)
+    parser = MolBldr.DRIVER.get_parser(parser)
+    parser = LmpLog.DRIVER.get_parser(parser)
     parser.supress_arguments([
         parserutils.FLAG_LAST_PCT, parserutils.FLAG_SLICE,
         parserutils.FLAG_STATE_NUM

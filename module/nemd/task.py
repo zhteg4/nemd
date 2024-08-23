@@ -529,17 +529,17 @@ class BaseTask:
                           **kwargs)
 
 
-class Mol_Bldr(BaseTask):
+class MolBldr(BaseTask):
 
     import mol_bldr_driver as DRIVER
 
 
-class Amorp_Bldr(BaseTask):
+class AmorpBldr(BaseTask):
 
     import amorp_bldr_driver as DRIVER
 
 
-class Xtal_Bldr(BaseTask):
+class XtalBldr(BaseTask):
 
     import xtal_bldr_driver as DRIVER
 
@@ -558,9 +558,9 @@ class LogJob(Job):
         Set arguments to analyze the log file.
         """
         super().setArgs()
-        self.args = self.args[:1] + self.getDatafile() + self.args[1:]
+        self.args = self.args[:1] + self.getDataFile() + self.args[1:]
 
-    def getDatafile(self):
+    def getDataFile(self):
         """
         Get the data file from the log file.
 
@@ -606,7 +606,7 @@ class LogJobAgg(AggJob):
         self.message = False
 
 
-class Lmp_Log(BaseTask):
+class LmpLog(BaseTask):
 
     import lmp_log_driver as DRIVER
     JobClass = LogJob
@@ -623,10 +623,9 @@ class TrajJob(LogJob):
         Set arguments to analyze the custom dump file.
         """
         super().setArgs()
-        self.args[0] = self.traj_file
+        self.args[0] = self.getTrajFile()
 
-    @property
-    def traj_file(self):
+    def getTrajFile(self):
         """
         Return the trajectory file from the log file.
 
@@ -636,7 +635,7 @@ class TrajJob(LogJob):
         return [x for x in cmd if x.endswith(self.CUSTOM_EXT)][0]
 
 
-class Lmp_Traj(Lmp_Log):
+class LmpTraj(LmpLog):
 
     import lmp_traj_driver as DRIVER
     JobClass = TrajJob

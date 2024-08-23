@@ -12,7 +12,7 @@ from nemd import logutils
 from nemd import jobutils
 from nemd import jobcontrol
 from nemd import parserutils
-from nemd.task import Xtal_Bldr, Lammps, Lmp_Log
+from nemd.task import XtalBldr, Lammps, LmpLog
 
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_workflow', '')
@@ -71,10 +71,10 @@ class Runner(jobcontrol.Runner):
         """
         Set crystal builder, lammps runner, and log analyzer tasks.
         """
-        crystal_builder = Xtal_Bldr.getOpr(name='crystal_builder')
+        crystal_builder = XtalBldr.getOpr(name='crystal_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
         self.setPrereq(lammps_runner, crystal_builder)
-        lmp_log = Lmp_Log.getOpr(name='lmp_log')
+        lmp_log = LmpLog.getOpr(name='lmp_log')
         self.setPrereq(lmp_log, lammps_runner)
 
     def setState(self):
@@ -83,13 +83,13 @@ class Runner(jobcontrol.Runner):
         """
         super().setState()
         scaled_range = list(map(str, np.arange(*self.options.scaled_range)))
-        self.state[Xtal_Bldr.DRIVER.FLAG_SCALED_FACTOR] = scaled_range
+        self.state[XtalBldr.DRIVER.FLAG_SCALED_FACTOR] = scaled_range
 
     def setAggJobs(self):
         """
         Aggregate post analysis jobs.
         """
-        Lmp_Log.getAgg(name='lmp_log', logger=logger)
+        LmpLog.getAgg(name='lmp_log', logger=logger)
         super().setAggJobs()
 
 
@@ -108,8 +108,8 @@ def get_parser():
         metavar=FLAG_SCALED_RANGE.upper()[1:],
         type=parserutils.type_positive_float,
         help='The range of scale factors on the crystal lattice parameters.')
-    parser = Xtal_Bldr.DRIVER.get_parser(parser)
-    parser = Lmp_Log.DRIVER.get_parser(parser)
+    parser = XtalBldr.DRIVER.get_parser(parser)
+    parser = LmpLog.DRIVER.get_parser(parser)
     parserutils.add_job_arguments(parser, jobname=JOBNAME)
     parserutils.add_workflow_arguments(parser)
     return parser

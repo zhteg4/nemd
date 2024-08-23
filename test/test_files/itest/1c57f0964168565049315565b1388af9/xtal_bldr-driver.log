@@ -1,0 +1,16 @@
+..........Command Options..........
+name: Si
+dimension: (1, 1, 1)
+scale_factor: 0.95, 0.95, 0.95
+interactive: False
+jobname: crystal_builder
+default_name: xtal_bldr
+debug: False
+python: 2
+cpu: 1
+JobStart: 15:19:25 08/23/24
+...................................
+LAMMPS data file written as crystal_builder.data
+LAMMPS input script written as crystal_builder.in
+Finished.
+15:19:25 08/23/24

@@ -104,7 +104,7 @@ class TestAggJob:
         assert expected == task.AggJob.delta2str(delta)
 
 
-class TestMol_Bldr:
+class TestMolBldr:
 
     @pytest.fixture
     def job(self):
@@ -114,7 +114,7 @@ class TestMol_Bldr:
 
     @pytest.fixture
     def task(self):
-        return task.Mol_Bldr()
+        return task.MolBldr()
 
     def testPre(self, task):
         assert task.pre() is True
@@ -137,27 +137,48 @@ class TestLogJob:
 
     @pytest.fixture
     def job(self, tmp_dir):
-        dirname, fname = '1c57f0964168565049315565b1388af9', 'lammps_runner.log'
-        job_dir = os.path.join(BASE_DIR, dirname)
+        job_dir = os.path.join(BASE_DIR, '1c57f0964168565049315565b1388af9')
+        fname = 'lammps_runner.log'
         shutil.copyfile(os.path.join(job_dir, fname), fname)
         job = jobutils.Job(job_dir=job_dir)
-        return task.LogJob(job, name='lmp_log', driver=task.Lmp_Log.DRIVER)
+        return task.LogJob(job, name='lmp_log', driver=task.LmpLog.DRIVER)
 
     def testSetArgs(self, job):
         job.setArgs()
         assert job.args[1:3] == ['-data_file', 'crystal_builder.data']
 
-    def testGetCmd(self, job):
+    def testGetDatafile(self, job):
         job.args[0] = 'lammps_runner.log'
-        data_file = job.getDatafile()
+        data_file = job.getDataFile()
         assert data_file == ['-data_file', 'crystal_builder.data']
 
 
-class TestLmp_Traj:
+class TestTrajJob:
+
+    @pytest.fixture
+    def job(self, tmp_dir):
+        job_dir = os.path.join(PROJ_DIR, 'workspace',
+                               '6e4cfb3bcc2a689d42d099e51b9efe23')
+        fname = 'lammps_runner.log'
+        shutil.copyfile(os.path.join(job_dir, fname), fname)
+        job = jobutils.Job(job_dir=job_dir)
+        return task.TrajJob(job, name='lmp_traj', driver=task.LmpTraj.DRIVER)
+
+    def testSetArgs(self, job):
+        job.setArgs()
+        assert job.args[1:3] == ['-data_file', 'amorphous_builder.data']
+
+    def testGetTrajfile(self, job):
+        job.args[0] = 'lammps_runner.log'
+        traj_file = job.getTrajFile()
+        assert traj_file == 'dump.custom.gz'
+
+
+class TestLmpLog:
 
     @pytest.fixture
     def task(self):
-        return task.Lmp_Log()
+        return task.LmpLog()
 
     def testAggPost(self, task):
         job = jobutils.Job()

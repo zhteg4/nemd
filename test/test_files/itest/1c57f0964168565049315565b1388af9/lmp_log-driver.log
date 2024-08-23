@@ -1,0 +1,22 @@
+..........Command Options..........
+lmp_log: lammps_runner.log
+data_file: crystal_builder.data
+task: toteng
+last_pct: 0.2
+slice: None
+interactive: False
+jobname: lmp_log
+default_name: lmp_log
+debug: False
+python: 2
+cpu: 1
+JobStart: 15:09:21 08/23/24
+...................................
+1 steps of thermo data found.
+toteng collects and saves results ∈ [0.000, 0.000] ps
+toteng averages results from last 20.0% frames ∈ [0.000, 0.000] ps
+Toteng data written into lmp_log_toteng.csv
+TotEng: -33.43 ± nan eV ∈ [0.0000, 0.0000] ps
+Toteng figure saved as lmp_log_toteng.png
+Finished.
+15:09:21 08/23/24
