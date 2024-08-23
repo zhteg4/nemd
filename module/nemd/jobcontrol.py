@@ -116,10 +116,11 @@ class Runner:
         if not self.options.clean:
             return
         for job in self.jobs:
-            for name in self.project.operations.keys():
-                job.doc[self.MESSAGE].pop(name)
-                job.doc[jobutils.OUTFILE].pop(name)
-                job.doc[jobutils.OUTFILES].pop(name)
+            for key in [self.MESSAGE, jobutils.OUTFILE, jobutils.OUTFILES]:
+                if key not in job.doc:
+                    continue
+                for name in self.project.operations.keys():
+                    job.doc[key].pop(name, None)
 
     def runJobs(self):
         """

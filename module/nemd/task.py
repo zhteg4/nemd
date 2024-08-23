@@ -87,8 +87,7 @@ class BaseJob(logutils.Base):
 
         :value str: the message of the job.
         """
-        if self.MESSAGE not in self.doc:
-            self.doc[self.MESSAGE] = {}
+        self.doc.setdefault(self.MESSAGE, {})
         self.doc[self.MESSAGE].update({self.name: value})
 
 
@@ -232,9 +231,8 @@ class Job(BaseJob):
 
         :value str: the message of the job.
         """
-        if self.OUTFILE not in self.doc:
-            self.doc[self.OUTFILE] = {}
-        self.doc[self.OUTFILE].update({self.name: value})
+        self.doc.setdefault(self.OUTFILE, {})
+        self.doc[self.OUTFILE][self.name] = value
 
 
 class AggJob(BaseJob):
@@ -304,9 +302,8 @@ class AggJob(BaseJob):
 
         :value str: the message of the job.
         """
-        if self.MESSAGE not in self.project.doc:
-            self.project.doc[self.MESSAGE] = {}
-        self.project.doc[self.MESSAGE].update({self.name: value})
+        self.project.doc.setdefault(self.MESSAGE, {})
+        self.project.doc[self.MESSAGE][self.name] = value
 
     @classmethod
     def delta2str(cls, delta):

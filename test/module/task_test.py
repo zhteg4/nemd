@@ -39,14 +39,12 @@ class TestBaseJob:
 
 class TestJob:
 
-    INFILE = 'amorphous_builder.in'
-    import lammps_driver as DRIVER
-
     @pytest.fixture
     def job(self, tmp_dir):
-        shutil.copyfile(os.path.join(JOB_DIR, self.INFILE), self.INFILE)
+        infile = 'amorphous_builder.in'
+        shutil.copyfile(os.path.join(JOB_DIR, infile), infile)
         job = jobutils.Job(job_dir=JOB_DIR)
-        return task.Job(job, name='lammps_runner', driver=self.DRIVER)
+        return task.Job(job, name='lammps_runner', driver=task.Lammps.DRIVER)
 
     def testSetArgs(self, job):
         job.setArgs()
@@ -133,6 +131,26 @@ class TestMol_Bldr:
     def testGetOpr(self, task, job):
         opr = task.getOpr(name='mol')
         assert opr._flow_cmd is True
+
+
+class TestLogJob:
+
+    @pytest.fixture
+    def job(self, tmp_dir):
+        dirname, fname = '1c57f0964168565049315565b1388af9', 'lammps_runner.log'
+        job_dir = os.path.join(BASE_DIR, dirname)
+        shutil.copyfile(os.path.join(job_dir, fname), fname)
+        job = jobutils.Job(job_dir=job_dir)
+        return task.LogJob(job, name='lmp_log', driver=task.Lmp_Log.DRIVER)
+
+    def testSetArgs(self, job):
+        job.setArgs()
+        assert job.args[1:3] == ['-data_file', 'crystal_builder.data']
+
+    def testGetCmd(self, job):
+        job.args[0] = 'lammps_runner.log'
+        data_file = job.getDatafile()
+        assert data_file == ['-data_file', 'crystal_builder.data']
 
 
 class TestLmp_Traj:
