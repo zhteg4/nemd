@@ -75,6 +75,47 @@ class TestJob:
         assert job.post() is True
 
 
+class TestLogJob:
+
+    @pytest.fixture
+    def job(self, tmp_dir):
+        job_dir = os.path.join(BASE_DIR, '1c57f0964168565049315565b1388af9')
+        fname = 'lammps_runner.log'
+        shutil.copyfile(os.path.join(job_dir, fname), fname)
+        job = jobutils.Job(job_dir=job_dir)
+        return task.LogJob(job, name='lmp_log', driver=task.LmpLog.DRIVER)
+
+    def testSetArgs(self, job):
+        job.setArgs()
+        assert job.args[1:3] == ['-data_file', 'crystal_builder.data']
+
+    def testGetDatafile(self, job):
+        job.args[0] = 'lammps_runner.log'
+        data_file = job.getDataFile()
+        assert data_file == ['-data_file', 'crystal_builder.data']
+
+
+class TestTrajJob:
+
+    @pytest.fixture
+    def job(self, tmp_dir):
+        job_dir = os.path.join(PROJ_DIR, 'workspace',
+                               '6e4cfb3bcc2a689d42d099e51b9efe23')
+        fname = 'lammps_runner.log'
+        shutil.copyfile(os.path.join(job_dir, fname), fname)
+        job = jobutils.Job(job_dir=job_dir)
+        return task.TrajJob(job, name='lmp_traj', driver=task.LmpTraj.DRIVER)
+
+    def testSetArgs(self, job):
+        job.setArgs()
+        assert job.args[1:3] == ['-data_file', 'amorphous_builder.data']
+
+    def testGetTrajfile(self, job):
+        job.args[0] = 'lammps_runner.log'
+        traj_file = job.getTrajFile()
+        assert traj_file == 'dump.custom.gz'
+
+
 class TestAggJob:
 
     @pytest.fixture
@@ -131,47 +172,6 @@ class TestMolBldr:
     def testGetOpr(self, task, job):
         opr = task.getOpr(name='mol')
         assert opr._flow_cmd is True
-
-
-class TestLogJob:
-
-    @pytest.fixture
-    def job(self, tmp_dir):
-        job_dir = os.path.join(BASE_DIR, '1c57f0964168565049315565b1388af9')
-        fname = 'lammps_runner.log'
-        shutil.copyfile(os.path.join(job_dir, fname), fname)
-        job = jobutils.Job(job_dir=job_dir)
-        return task.LogJob(job, name='lmp_log', driver=task.LmpLog.DRIVER)
-
-    def testSetArgs(self, job):
-        job.setArgs()
-        assert job.args[1:3] == ['-data_file', 'crystal_builder.data']
-
-    def testGetDatafile(self, job):
-        job.args[0] = 'lammps_runner.log'
-        data_file = job.getDataFile()
-        assert data_file == ['-data_file', 'crystal_builder.data']
-
-
-class TestTrajJob:
-
-    @pytest.fixture
-    def job(self, tmp_dir):
-        job_dir = os.path.join(PROJ_DIR, 'workspace',
-                               '6e4cfb3bcc2a689d42d099e51b9efe23')
-        fname = 'lammps_runner.log'
-        shutil.copyfile(os.path.join(job_dir, fname), fname)
-        job = jobutils.Job(job_dir=job_dir)
-        return task.TrajJob(job, name='lmp_traj', driver=task.LmpTraj.DRIVER)
-
-    def testSetArgs(self, job):
-        job.setArgs()
-        assert job.args[1:3] == ['-data_file', 'amorphous_builder.data']
-
-    def testGetTrajfile(self, job):
-        job.args[0] = 'lammps_runner.log'
-        traj_file = job.getTrajFile()
-        assert traj_file == 'dump.custom.gz'
 
 
 class TestLmpLog:

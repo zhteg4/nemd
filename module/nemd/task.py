@@ -235,6 +235,50 @@ class Job(BaseJob):
         self.doc[self.OUTFILE][self.name] = value
 
 
+class LogJob(Job):
+
+    READ_DATA = lammpsin.In.READ_DATA
+
+    def setArgs(self):
+        """
+        Set arguments to analyze the log file.
+        """
+        super().setArgs()
+        self.args = self.args[:1] + self.getDataFile() + self.args[1:]
+
+    def getDataFile(self):
+        """
+        Get the data file from the log file.
+
+        :return list: the list of arguments to add the data file
+        """
+        cmd = sh.grep(self.READ_DATA, self.args[0]).split()
+        data_file = [x for x in cmd if x.endswith(lammpsin.In.DATA_EXT)][0]
+        return [self.driver.FLAG_DATA_FILE, data_file]
+
+
+class TrajJob(LogJob):
+
+    DUMP = lammpsin.In.DUMP
+    CUSTOM_EXT = lammpsin.In.CUSTOM_EXT
+
+    def setArgs(self):
+        """
+        Set arguments to analyze the custom dump file.
+        """
+        super().setArgs()
+        self.args[0] = self.getTrajFile()
+
+    def getTrajFile(self):
+        """
+        Return the trajectory file from the log file.
+
+        :return str: the trajectory file.
+        """
+        cmd = sh.grep(self.DUMP, self.args[0]).split()
+        return [x for x in cmd if x.endswith(self.CUSTOM_EXT)][0]
+
+
 class AggJob(BaseJob):
     """
     The class to run an aggregator job in a workflow.
@@ -344,6 +388,41 @@ class AggJob(BaseJob):
         for idx, key in enumerate(keys):
             series[key].index.name = idx
         return [tuple([series[x], jobs[x]]) for x in keys]
+
+
+class LogJobAgg(AggJob):
+
+    FLAG_TASK = jobutils.FLAG_TASK
+
+    def __init__(self, *args, **kwargs):
+        """
+        :param name: e.g. 'cb_lmp_log_#_lmp_log' is parsed as {jobname}_#_{name}
+        """
+        super().__init__(*args, **kwargs)
+        default = self.driver.DEFAULT_TASKS
+        self.tasks = self.getArg(self.FLAG_TASK, default=default, first=False)
+        self.tasks = [x.lower() for x in self.tasks]
+        self.options = SimpleNamespace(
+            jobname=self.getArg(self.FLAG_JOBNAME,
+                                default=self.driver.JOBNAME),
+            interactive=self.getArg(jobutils.FLAG_INTERACTIVE),
+            id=None,
+            dir=os.path.relpath(self.project.workspace, self.project.path),
+            name=self.name.split(symbols.POUND_SEP)[0],
+            jobs=None)
+
+    def run(self):
+        """
+        Main method to run the aggregator job.
+        """
+        self.log(f"{len(self.jobs)} jobs found for aggregation.")
+        for task in self.tasks:
+            anlz = analyzer.Agg(task=task,
+                                jobs=self.groupJobs(),
+                                options=self.options,
+                                logger=self.logger)
+            anlz.run()
+        self.message = False
 
 
 class BaseTask:
@@ -549,90 +628,11 @@ class Lammps(BaseTask):
     import lammps_driver as DRIVER
 
 
-class LogJob(Job):
-
-    READ_DATA = lammpsin.In.READ_DATA
-
-    def setArgs(self):
-        """
-        Set arguments to analyze the log file.
-        """
-        super().setArgs()
-        self.args = self.args[:1] + self.getDataFile() + self.args[1:]
-
-    def getDataFile(self):
-        """
-        Get the data file from the log file.
-
-        :return list: the list of arguments to add the data file
-        """
-        cmd = sh.grep(self.READ_DATA, self.args[0]).split()
-        data_file = [x for x in cmd if x.endswith(lammpsin.In.DATA_EXT)][0]
-        return [self.driver.FLAG_DATA_FILE, data_file]
-
-
-class LogJobAgg(AggJob):
-
-    FLAG_TASK = jobutils.FLAG_TASK
-
-    def __init__(self, *args, **kwargs):
-        """
-        :param name: e.g. 'cb_lmp_log_#_lmp_log' is parsed as {jobname}_#_{name}
-        """
-        super().__init__(*args, **kwargs)
-        default = self.driver.DEFAULT_TASKS
-        self.tasks = self.getArg(self.FLAG_TASK, default=default, first=False)
-        self.tasks = [x.lower() for x in self.tasks]
-        self.options = SimpleNamespace(
-            jobname=self.getArg(self.FLAG_JOBNAME,
-                                default=self.driver.JOBNAME),
-            interactive=self.getArg(jobutils.FLAG_INTERACTIVE),
-            id=None,
-            dir=os.path.relpath(self.project.workspace, self.project.path),
-            name=self.name.split(symbols.POUND_SEP)[0],
-            jobs=None)
-
-    def run(self):
-        """
-        Main method to run the aggregator job.
-        """
-        self.log(f"{len(self.jobs)} jobs found for aggregation.")
-        for task in self.tasks:
-            anlz = analyzer.Agg(task=task,
-                                jobs=self.groupJobs(),
-                                options=self.options,
-                                logger=self.logger)
-            anlz.run()
-        self.message = False
-
-
 class LmpLog(BaseTask):
 
     import lmp_log_driver as DRIVER
     JobClass = LogJob
     AggClass = LogJobAgg
-
-
-class TrajJob(LogJob):
-
-    DUMP = lammpsin.In.DUMP
-    CUSTOM_EXT = lammpsin.In.CUSTOM_EXT
-
-    def setArgs(self):
-        """
-        Set arguments to analyze the custom dump file.
-        """
-        super().setArgs()
-        self.args[0] = self.getTrajFile()
-
-    def getTrajFile(self):
-        """
-        Return the trajectory file from the log file.
-
-        :return str: the trajectory file.
-        """
-        cmd = sh.grep(self.DUMP, self.args[0]).split()
-        return [x for x in cmd if x.endswith(self.CUSTOM_EXT)][0]
 
 
 class LmpTraj(LmpLog):
