@@ -32,7 +32,7 @@ class BaseJob(logutils.Base):
     DATA_EXT = '.csv'
     PRE_RUN = None
 
-    def __init__(self, job, name='base', driver=None, logger=None, **kwargs):
+    def __init__(self, job, name=None, driver=None, logger=None, **kwargs):
         """
         :param job: the signac job instance
         :type job: 'signac.contrib.job.Job'
@@ -49,8 +49,27 @@ class BaseJob(logutils.Base):
         self.name = name
         self.driver = driver
         self.logger = logger
-        self.doc = self.job.document
+        self.doc = self.job.doc
+        if self.name is None:
+            self.name = self.__class__.__name__.lower()
         self.args = list(map(str, self.doc.get(self.ARGS, [])))
+
+    def getArg(self, *args, **kwargs):
+        """
+        Get the value after the flag in command arg list.
+
+        :return: the value(s) after the flag
+        :rtype: str or list
+        """
+        return jobutils.get_arg(self.args, *args, **kwargs)
+
+    def post(self):
+        """
+        The job is considered finished when the post-conditions return True.
+
+        :return: True if the post-conditions are met.
+        """
+        return self.message is False
 
     @property
     def message(self):
@@ -100,8 +119,9 @@ class Job(BaseJob):
         """
         Set arguments.
         """
-        pre_jobs = self.doc[self.PREREQ].get(self.name)
-        if pre_jobs is None:
+        try:
+            pre_jobs = self.doc[self.PREREQ][self.name]
+        except KeyError:
             return
         try:
             args = self.driver.ARGS_TMPL[:]
@@ -194,9 +214,27 @@ class Job(BaseJob):
 
         :return: True if the post-conditions are met.
         """
-        outfiles = self.doc.get(self.OUTFILE, {})
-        outfile = outfiles.get(self.name)
-        return bool(outfile)
+        return self.outfile is not None
+
+    @property
+    def outfile(self):
+        """
+        The outfile of the job.
+
+        :return str: the message of the job.
+        """
+        return self.doc.get(self.OUTFILE, {}).get(self.name)
+
+    @outfile.setter
+    def outfile(self, value):
+        """
+        Set outfile of the job.
+
+        :value str: the message of the job.
+        """
+        if self.OUTFILE not in self.doc:
+            self.doc[self.OUTFILE] = {}
+        self.doc[self.OUTFILE].update({self.name: value})
 
 
 class AggJob(BaseJob):
@@ -221,7 +259,6 @@ class AggJob(BaseJob):
         super().__init__(jobs[0], **kwargs)
         self.jobs = jobs
         self.project = self.job.project
-        self.jobname = self.name.split(symbols.POUND_SEP)[0]
 
     def run(self):
         """
@@ -267,7 +304,7 @@ class AggJob(BaseJob):
 
         :value str: the message of the job.
         """
-        if self.MESSAGE not in self.doc:
+        if self.MESSAGE not in self.project.doc:
             self.project.doc[self.MESSAGE] = {}
         self.project.doc[self.MESSAGE].update({self.name: value})
 
@@ -283,14 +320,6 @@ class AggJob(BaseJob):
         if delta > cls.DELTA_LMT:
             return cls.MS_LMT
         return timeutils.delta2str(delta, fmt=cls.MS_FMT)
-
-    def post(self):
-        """
-        The job is considered finished when the post-conditions return True.
-
-        :return: True if the post-conditions are met.
-        """
-        return self.name in self.project.doc[self.MESSAGE]
 
     @functools.cache
     def groupJobs(self):
@@ -379,7 +408,7 @@ class BaseTask:
         obj.run()
 
     @classmethod
-    def postAgg(cls, *args, **kwargs):
+    def aggPost(cls, *args, **kwargs):
         """
         Post-condition for aggregator task.
 
@@ -427,6 +456,8 @@ class BaseTask:
         :rtype: 'function'
         :raise ValueError: the function cannot be found
         """
+        if name is None:
+            name = cls.__class__.__name__.lower()
         if cmd is None:
             cmd = hasattr(cls.JobClass, 'getCmd')
         if post is None:
@@ -487,8 +518,10 @@ class BaseTask:
         :return: the operation to execute
         :rtype: 'function'
         """
+        if name is None:
+            name = cls.__class__.__name__.lower()
         if post is None:
-            post = cls.postAgg
+            post = cls.aggPost
         name = f"{name}{symbols.POUND_SEP}agg"
         return cls.getOpr(aggregator=aggregator(),
                           cmd=cmd,
@@ -550,18 +583,17 @@ class LogJobAgg(AggJob):
         :param name: e.g. 'cb_lmp_log_#_lmp_log' is parsed as {jobname}_#_{name}
         """
         super().__init__(*args, **kwargs)
-        self.tasks = jobutils.get_arg(self.args, self.FLAG_TASK, first=False)
-        if self.tasks is None:
-            self.tasks = self.driver.DEFAULT_TASKS
+        default = self.driver.DEFAULT_TASKS
+        self.tasks = self.getArg(self.FLAG_TASK, default=default, first=False)
         self.tasks = [x.lower() for x in self.tasks]
-        inav = jobutils.get_arg(self.args, jobutils.FLAG_INTERACTIVE)
-        wdir = os.path.relpath(self.project.workspace, self.project.path)
-        self.options = SimpleNamespace(jobname=self.project.jobname,
-                                       interactive=inav,
-                                       id=None,
-                                       dir=wdir,
-                                       name=self.jobname,
-                                       jobs=None)
+        self.options = SimpleNamespace(
+            jobname=self.getArg(self.FLAG_JOBNAME,
+                                default=self.driver.JOBNAME),
+            interactive=self.getArg(jobutils.FLAG_INTERACTIVE),
+            id=None,
+            dir=os.path.relpath(self.project.workspace, self.project.path),
+            name=self.name.split(symbols.POUND_SEP)[0],
+            jobs=None)
 
     def run(self):
         """

@@ -4,12 +4,12 @@ import collections
 import numpy as np
 import pandas as pd
 import networkx as nx
+from flow.project import FlowProject
 
 from nemd import logutils
 from nemd import jobutils
 from nemd import fileutils
 from nemd.task import BaseTask
-from nemd.nproject import FlowProject
 
 
 class Runner:
@@ -210,8 +210,7 @@ class Runner:
         """
         prj_path = self.project.path if self.project else self.options.prj_path
         try:
-            self.agg_project = FlowProject.get_project(
-                prj_path, jobname=self.options.jobname)
+            self.agg_project = FlowProject.get_project(prj_path)
         except LookupError as err:
             self.log_error(str(err))
 

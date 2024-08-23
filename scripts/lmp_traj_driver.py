@@ -41,6 +41,7 @@ PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_driver', '')
 # Positional command-argument holders to take task input under jobcontrol
 ARGS_TMPL = [jobutils.FILE]
+DEFAULT_TASKS = [DENSITY]
 
 
 def log_debug(msg):
@@ -204,7 +205,7 @@ def get_parser(parser=None):
                             help='Data file to get force field information')
     parser.add_argument(FLAG_TASK,
                         choices=[XYZ, CLASH, VIEW, DENSITY, MSD, RDF],
-                        default=[DENSITY],
+                        default=DEFAULT_TASKS,
                         nargs='+',
                         help=f'{XYZ} writes out .xyz for VMD visualization;'
                         f' {CLASH} checks clashes for each frame; {VIEW} '

@@ -7,7 +7,7 @@ This module adds jobcontrol related command line flags and job utilities.
 """
 import os
 import json
-import collections
+import types
 from signac import job
 
 from nemd import environutils
@@ -40,7 +40,7 @@ TASK = 'task'
 AGGREGATOR = 'aggregator'
 
 
-def get_arg(args, flag, val=None, first=True):
+def get_arg(args, flag, default=None, first=True):
     """
     Get the value after the flag in command arg list.
 
@@ -48,8 +48,8 @@ def get_arg(args, flag, val=None, first=True):
     :type args: list
     :param flag: set the value after this flag
     :type flag: str
-    :param val: the default if the flag doesn't exist or not followed by value(s)
-    :type val: str
+    :param default: the default if the flag doesn't exist or not followed by value(s)
+    :type default: str
     :param first: only return the first value after the flag
     :type first: bool
     :return: the value(s) after the flag
@@ -59,7 +59,7 @@ def get_arg(args, flag, val=None, first=True):
         idx = args.index(flag)
     except ValueError:
         # Flag not found
-        return val
+        return default
 
     val = args[idx + 1]
     if val.startswith('-'):
@@ -211,15 +211,19 @@ class Job:
         """
         self.dir = job_dir
         self.statepoint = {}
-        self.doc = collections.defaultdict(dict)
+        self.doc = {}
         self.document = self.doc
-        if self.dir is None:
-            return
-        job_doc = os.path.join(self.dir, 'signac_job_document.json')
-        if not os.path.isfile(job_doc):
-            return
-        with open(job_doc, 'r') as fh:
-            self.doc.update(json.load(fh))
+        self.project = types.SimpleNamespace(doc={},
+                                             workspace='workspace',
+                                             path=os.curdir)
+        doc = os.path.join(self.dir, job.Job.FN_DOCUMENT)
+        if os.path.isfile(doc):
+            with open(doc, 'r') as dfh:
+                self.doc.update(json.load(dfh))
+        statepoint = os.path.join(self.dir, job.Job.FN_STATE_POINT)
+        if os.path.isfile(statepoint):
+            with open(statepoint, 'r') as sfh:
+                self.statepoint.update(json.load(sfh))
 
     def fn(self, filename):
         """
