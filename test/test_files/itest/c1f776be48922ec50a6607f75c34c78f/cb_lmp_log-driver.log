@@ -1,0 +1,43 @@
+..........Command Options..........
+scaled_range: 0.95, 1.0, 0.05
+name: Si
+dimension: (1, 1, 1)
+scale_factor: (1, 1, 1)
+interactive: False
+jobname: cb_lmp_log
+default_name: cb_lmp_log
+debug: False
+python: 2
+cpu: 1
+task: toteng
+last_pct: 0.2
+slice: None
+state_num: 1
+clean: False
+jtype: task, aggregator
+prj_path: .
+JobStart: 16:10:48 08/23/24
+...................................
+2 / 2 completed jobs.
+2 / 2 succeeded jobs.
+Task Total Timing: 00:00:03
+| lammps    | lmp_log   | xtal_bld   |
+|:----------|:----------|:-----------|
+| 00:00 ave | 00:00 ave | 00:00 ave  |
+| 00:01 1c5 | 00:01 9d4 | 00:01 1c5  |
+| 00:00 9d4 | 00:00 1c5 | 00:00 9d4  |
+2 jobs found for aggregation.
+Aggregation Task: toteng
+Aggregation Parameters (num=1): scale_factor=0.95 
+Toteng data written into workspace/cb_lmp_log_toteng_0.csv
+TotEng: -33.43 ± nan eV ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/cb_lmp_log_toteng_0.png
+Aggregation Parameters (num=1): scale_factor=1.0 
+Toteng data written into workspace/cb_lmp_log_toteng_1.csv
+TotEng: -34.69 ± nan eV ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/cb_lmp_log_toteng_1.png
+Toteng of all parameters saved to cb_lmp_log_toteng.csv
+The minimum TotEng (eV) of -34.69278 is found with the scale factor being 1.0
+TOTENG figure saved as cb_lmp_log_toteng.png
+Finished.
+16:11:58 08/23/24

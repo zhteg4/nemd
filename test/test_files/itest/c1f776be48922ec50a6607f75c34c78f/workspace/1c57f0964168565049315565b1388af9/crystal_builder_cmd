@@ -1,0 +1,1 @@
+run_nemd xtal_bldr_driver.py -cpu 1 -JOBNAME crystal_builder -scale_factor 0.95

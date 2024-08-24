@@ -15,13 +15,12 @@ if TEST_DIR is None:
     sys.exit("Error: test directory cannot be found.")
 BASE_DIR = os.path.join(TEST_DIR, 'test_files', 'itest')
 JOB_DIR = os.path.join(BASE_DIR, '6e4cfb3bcc2a689d42d099e51b9efe23')
-PROJ_DIR = os.path.join(BASE_DIR, 'e053136e2cd7374854430c868b3139e1')
 
 
-def get_jobs(proj_dir=PROJ_DIR):
-    basename = os.path.basename(proj_dir)
-    shutil.copytree(proj_dir, basename)
-    proj = FlowProject.get_project(basename)
+def get_jobs(basename='e053136e2cd7374854430c868b3139e1'):
+    proj_dir = os.path.join(BASE_DIR, basename)
+    shutil.copytree(proj_dir, os.curdir, dirs_exist_ok=True)
+    proj = FlowProject.get_project(os.curdir)
     return proj.find_jobs()
 
 
@@ -99,8 +98,8 @@ class TestTrajJob:
 
     @pytest.fixture
     def job(self, tmp_dir):
-        job_dir = os.path.join(PROJ_DIR, 'workspace',
-                               '6e4cfb3bcc2a689d42d099e51b9efe23')
+        job_dir = os.path.join(BASE_DIR, 'e053136e2cd7374854430c868b3139e1',
+                               'workspace', '6e4cfb3bcc2a689d42d099e51b9efe23')
         fname = 'lammps_runner.log'
         shutil.copyfile(os.path.join(job_dir, fname), fname)
         job = jobutils.Job(job_dir=job_dir)
@@ -143,6 +142,22 @@ class TestAggJob:
                               (datetime.timedelta(minutes=3), '03:00')])
     def testDelta2str(self, delta, expected):
         assert expected == task.AggJob.delta2str(delta)
+
+
+class TestLogJobAgg:
+
+    @pytest.fixture
+    def agg(self, tmp_dir):
+        jobs = get_jobs(basename='c1f776be48922ec50a6607f75c34c78f')
+        return task.LogJobAgg(*jobs,
+                              logger=mock.Mock(),
+                              name='lmp_log_#_agg',
+                              driver=task.LmpLog.DRIVER)
+
+    def testRun(self, agg):
+        assert agg.post() is False
+        agg.run()
+        assert agg.post() is True
 
 
 class TestMolBldr:

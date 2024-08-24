@@ -1,0 +1,24 @@
+Fetching status:   0%|          | 0/6 [00:00<?, ?it/s]Fetching status: 100%|██████████| 6/6 [00:00<00:00, 831.52it/s]
+Fetching labels:   0%|          | 0/2 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 2/2 [00:00<00:00, 4064.25it/s]
+
+Overview: 2 jobs/aggregates, 0 jobs/aggregates with eligible operations.
+
+label                                    ratio
+---------------------------------------  -------------------------------------------------------
+{'-seed': '0', '-scale_factor': '0.95'}  |████████████████████                    | 1/2 (50.00%)
+{'-seed': '0', '-scale_factor': '1.0'}   |████████████████████                    | 1/2 (50.00%)
+
+operation/group
+-----------------
+
+
+Detailed View:
+
+job id                            operation/group    labels
+--------------------------------  -----------------  ---------------------------------------
+1c57f0964168565049315565b1388af9  [ ]                {'-seed': '0', '-scale_factor': '0.95'}
+9d4c0313787a820c1e3cdc5519becbd1  [ ]                {'-seed': '0', '-scale_factor': '1.0'}
+
+[U]:unknown [R]:registered [I]:inactive [S]:submitted [H]:held [Q]:queued [A]:active [E]:error [GR]:group_registered [GI]:group_inactive [GS]:group_submitted [GH]:group_held [GQ]:group_queued [GA]:group_active [GE]:group_error
+
+

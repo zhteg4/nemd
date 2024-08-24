@@ -1,0 +1,1 @@
+echo '# 0040: Si crystal total energy over different cell params';run_nemd cb_lmp_log_workflow.py -task TotEng -scaled_range 0.95 1.00 0.05 -cpu 1 -JOBNAME cb_lmp_log
