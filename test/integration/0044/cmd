@@ -1,0 +1,1 @@
+run_nemd mol_bldr_driver.py *CC* -cru_num 2 -substruct CCCC:120

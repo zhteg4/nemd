@@ -1,0 +1,2 @@
+cmp('mol_bldr.data', 'mol_bldr.data')
+cmp('mol_bldr.in', 'mol_bldr.in')
