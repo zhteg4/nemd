@@ -236,7 +236,7 @@ def validate_options(argv):
     Parse and validate the command args
 
     :param argv list: list of command input.
-    :return: 'argparse.ArgumentParser':  Parsed command-line options out of sys.argv
+    :return: 'argparse.ArgumentParser': Parsed command-line options
     """
     parser = get_parser()
     options = parser.parse_args(argv)

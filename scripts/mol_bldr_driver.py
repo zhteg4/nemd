@@ -103,10 +103,10 @@ class GridCell:
                 log(f'{substruct[0]} bond length: {val:.2f} Å')
             case 3:
                 val = rdkit.Chem.rdMolTransforms.GetAngleDeg(conf, *ids)
-                log(f'{substruct[0]} angle degree: {val:.2f} deg')
+                log(f'{substruct[0]} angle: {val:.2f} deg')
             case 4:
                 val = rdkit.Chem.rdMolTransforms.GetDihedralDeg(conf, *ids)
-                log(f'{substruct[0]} dihedral angle degree: {val:.2f} deg')
+                log(f'{substruct[0]} dihedral angle: {val:.2f} deg')
 
     def write(self):
         """
@@ -135,8 +135,7 @@ def get_parser(parser=None):
         parser = parserutils.get_parser(description=__doc__)
     parser = polymutils.add_arguments(parser)
     parserutils.add_job_arguments(parser, jobname=JOBNAME)
-    parser.set_defaults(**{x[1:]: y for x, y in FLAG_DEFAULTS.items()})
-    parser.supress_arguments(FLAG_DEFAULTS.keys())
+    parser.supress_arguments(FLAG_DEFAULTS)
     return parser
 
 

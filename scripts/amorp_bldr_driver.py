@@ -184,14 +184,13 @@ def get_parser(parser=None):
         f'rotates and translates molecules; \'{GROW}\' grows '
         f'molecules from the smallest rigid fragments.')
     parser.add_argument(FLAG_DENSITY,
-                        metavar=FLAG_DENSITY[1:].upper(),
+                        metavar='g/cm^3',
                         type=functools.partial(parserutils.type_ranged_float,
                                                bottom=0,
                                                included_bottom=False,
                                                top=30),
                         default=0.5,
-                        help=f'The density used for {PACK} and {GROW} '
-                        f'amorphous cell. (g/cm^3)')
+                        help=f'The density used for {PACK} and {GROW} cells.')
     parserutils.add_job_arguments(parser, jobname=JOBNAME)
     return parser
 

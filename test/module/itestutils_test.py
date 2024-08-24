@@ -88,11 +88,11 @@ class TestExist:
             exist.run()
 
 
-class TestNot_Exist:
+class TestNotExist:
 
     @pytest.fixture
     def not_exist(self):
-        return itestutils.Not_Exist('amorp_bldr.data', job=Job())
+        return itestutils.NotExist('amorp_bldr.data', job=Job())
 
     def testRun(self, not_exist):
         with pytest.raises(FileNotFoundError):
@@ -102,6 +102,21 @@ class TestNot_Exist:
             not_exist.run()
         except FileNotFoundError:
             assert False, "FileNotFoundError should not be raised"
+
+class TestIn:
+
+    @pytest.fixture
+    def in_obj(self):
+        return itestutils.In('Finished.', 'amorp_bldr-driver.log', job=Job())
+
+    def testRun(self, in_obj):
+        try:
+            in_obj.run()
+        except ValueError:
+            assert False, "ValueError should not be raised"
+        in_obj.strs = ['Aborted..']
+        with pytest.raises(ValueError):
+            in_obj.run()
 
 
 class TestCmp:

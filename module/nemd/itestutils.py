@@ -169,7 +169,7 @@ class Exist:
                 raise FileNotFoundError(f"{self.job.fn(target)} not found")
 
 
-class Not_Exist(Exist):
+class NotExist(Exist):
     """
     The class to perform file non-existence check.
     """
@@ -181,6 +181,26 @@ class Not_Exist(Exist):
         for target in self.targets:
             if os.path.isfile(target):
                 raise FileNotFoundError(f"{self.job.fn(target)} found")
+
+
+class In(Exist):
+    """
+    The class to check the containing file strings.
+    """
+    def __init__(self, *args, job=None):
+        super().__init__(args[-1], job=job)
+        self.strs = args[:-1]
+
+    def run(self):
+        """
+        The main method to check the containing file strings.
+        """
+        super().run()
+        with open(self.targets[0]) as fh:
+            file_str = fh.read()
+        for content in self.strs:
+            if content not in file_str:
+                raise ValueError(f"{content} not found in {self.targets[0]}")
 
 
 class Cmp(Exist):
@@ -245,7 +265,7 @@ class Check(Opr):
     """
 
     NAME = 'check'
-    CMD = {'cmp': Cmp, 'exist': Exist, 'not_exist': Not_Exist}
+    CMD = {'cmp': Cmp, 'exist': Exist, 'not_exist': NotExist, 'in': In}
 
     def check(self):
         """

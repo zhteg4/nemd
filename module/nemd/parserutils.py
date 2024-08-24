@@ -63,9 +63,14 @@ class ArgumentParser(argparse.ArgumentParser):
 
         :param parser: the parser to add arguments
         :type parser: 'argparse.ArgumentParser'
-        :param to_supress: the arguments to be suppressed
-        :type to_supress: set
+        :param to_supress: the arguments to be suppressed. For dict, the keys
+            are the arguments to be suppressed, and the values are the default
+            values to be used.
+        :type to_supress: list, tuple, set or dict
         """
+        if isinstance(to_supress, dict):
+            self.set_defaults(**{x[1:]: y for x, y in to_supress.items()})
+            to_supress = to_supress.keys()
         to_supress = set(to_supress)
         for action in self._actions:
             if to_supress.intersection(action.option_strings):
