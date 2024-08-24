@@ -236,6 +236,9 @@ class Job(BaseJob):
 
 
 class LogJob(Job):
+    """
+    Class to run lammps log driver.
+    """
 
     READ_DATA = lammpsin.In.READ_DATA
 
@@ -258,6 +261,9 @@ class LogJob(Job):
 
 
 class TrajJob(LogJob):
+    """
+    Class to run lammps traj driver.
+    """
 
     DUMP = lammpsin.In.DUMP
     CUSTOM_EXT = lammpsin.In.CUSTOM_EXT
@@ -391,6 +397,9 @@ class AggJob(BaseJob):
 
 
 class LogJobAgg(AggJob):
+    """
+    The aggregator job for analyzers.
+    """
 
     FLAG_TASK = jobutils.FLAG_TASK
 
@@ -402,9 +411,9 @@ class LogJobAgg(AggJob):
         default = self.driver.DEFAULT_TASKS
         self.tasks = self.getArg(self.FLAG_TASK, default=default, first=False)
         self.tasks = [x.lower() for x in self.tasks]
+        jobname = self.getArg(self.FLAG_JOBNAME, default=self.driver.JOBNAME)
         self.options = SimpleNamespace(
-            jobname=self.getArg(self.FLAG_JOBNAME,
-                                default=self.driver.JOBNAME),
+            jobname=jobname,
             interactive=self.getArg(jobutils.FLAG_INTERACTIVE),
             id=None,
             dir=os.path.relpath(self.project.workspace, self.project.path),
