@@ -65,13 +65,13 @@ class AmorphousCell(logutils.Base):
         """
         Main method to build the cell.
         """
-        self.setPolymers()
+        self.setMols()
         self.setGriddedCell()
         self.setPackedCell()
         self.setGrowedCell()
         self.write()
 
-    def setPolymers(self):
+    def setMols(self):
         """
         Build polymer from monomers if provided.
         """

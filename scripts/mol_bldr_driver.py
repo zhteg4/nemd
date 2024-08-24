@@ -1,5 +1,6 @@
 import os
 import sys
+import rdkit
 
 from nemd import oplsua
 from nemd import jobutils
@@ -59,11 +60,12 @@ class GridCell:
         """
         Main method to build the cell.
         """
-        self.setPolymer()
-        self.setCell()
+        self.setMol()
+        self.setStruct()
+        self.logSubstruct()
         self.write()
 
-    def setPolymer(self):
+    def setMol(self):
         """
         Build polymer from monomers if provided.
         """
@@ -73,7 +75,7 @@ class GridCell:
                                   options=self.options,
                                   logger=logger)
 
-    def setCell(self):
+    def setStruct(self):
         """
         Build gridded cell.
         """
@@ -81,6 +83,30 @@ class GridCell:
                                                          ff=self.ff,
                                                          options=self.options)
         self.struct.run()
+
+    def logSubstruct(self):
+        """
+        Log substructure information.
+        """
+        substruct = self.options.substruct
+        if substruct is None or substruct[1] is not None:
+            return
+        struct = rdkit.Chem.MolFromSmiles(substruct[0])
+        mol = self.struct.molecules[0]
+        if not mol.HasSubstructMatch(struct):
+            return
+        conf = mol.GetConformer()
+        ids = mol.GetSubstructMatch(struct)
+        match len(ids):
+            case 2:
+                val = rdkit.Chem.rdMolTransforms.GetBondLength(conf, *ids)
+                log(f'{substruct[0]} bond length: {val:.2f} Å')
+            case 3:
+                val = rdkit.Chem.rdMolTransforms.GetAngleDeg(conf, *ids)
+                log(f'{substruct[0]} angle degree: {val:.2f} deg')
+            case 4:
+                val = rdkit.Chem.rdMolTransforms.GetDihedralDeg(conf, *ids)
+                log(f'{substruct[0]} dihedral angle degree: {val:.2f} deg')
 
     def write(self):
         """
