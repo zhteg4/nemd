@@ -402,6 +402,7 @@ def add_workflow_arguments(parser, flags=None):
     if FLAG_JTYPE in flags:
         parser.add_argument(
             FLAG_JTYPE,
+            nargs='+',
             choices=[jobutils.TASK, jobutils.AGGREGATOR],
             default=[jobutils.TASK, jobutils.AGGREGATOR],
             help=f'{jobutils.TASK} jobs run tasks and each task has to register '

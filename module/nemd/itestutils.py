@@ -187,6 +187,7 @@ class In(Exist):
     """
     The class to check the containing file strings.
     """
+
     def __init__(self, *args, job=None):
         super().__init__(args[-1], job=job)
         self.strs = args[:-1]

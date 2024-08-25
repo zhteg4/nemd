@@ -634,18 +634,22 @@ class Agg(logutils.Base):
         self.ydevs = self.result[ysd_lb].iloc[:, 0]
         x_lbs = list(set(self.result.columns).difference(y_lb + ysd_lb))
         self.xvals = self.result[x_lbs]
+        rename = {
+            x: ' '.join([y.capitalize() for y in x.split('_')])
+            for x in self.xvals.columns
+        }
+        self.xvals = self.xvals.rename(columns=rename)
 
     def fit(self):
         """
         Fit the data and report.
         """
-        if self.xvals.empty:
+        if self.xvals.empty or self.xvals.size == 1:
             return
         index = self.yvals.argmin()
-        val = self.xvals.iloc[1, 0]
         self.log(f"The minimum {self.yvals.name} of {self.yvals.iloc[index]} "
                  f"is found with the {self.xvals.columns[0].replace('_',' ')} "
-                 f"being {val}")
+                 f"being {self.xvals.iloc[index, 0]}")
 
     def plot(self):
         """
@@ -667,8 +671,7 @@ class Agg(logutils.Base):
                                 label='stdev',
                                 alpha=0.3)
                 ax.legend()
-            xlabel = self.xvals.columns[0].split('_')
-            ax.set_xlabel(' '.join(x.capitalize() for x in xlabel))
+            ax.set_xlabel(self.xvals.columns[0])
             ax.set_ylabel(self.yvals.name)
             pathname = self.outfile[:-len(self.DATA_EXT)] + self.FIG_EXT
             fig.savefig(pathname)

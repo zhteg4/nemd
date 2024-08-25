@@ -103,6 +103,7 @@ class TestNotExist:
         except FileNotFoundError:
             assert False, "FileNotFoundError should not be raised"
 
+
 class TestIn:
 
     @pytest.fixture

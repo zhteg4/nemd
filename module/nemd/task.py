@@ -90,6 +90,18 @@ class BaseJob(logutils.Base):
         self.doc.setdefault(self.MESSAGE, {})
         self.doc[self.MESSAGE].update({self.name: value})
 
+    @classmethod
+    def clean(cls, job, name):
+        """
+        Clean the previous job including the post criteria.
+
+        :param job 'signac.contrib.job.Job': the job to be cleaned
+        :param name str: the operation name to be cleaned
+        """
+        if cls.MESSAGE not in job.doc:
+            return
+        job.doc[cls.MESSAGE].pop(name, None)
+
 
 class Job(BaseJob):
     """
@@ -233,6 +245,19 @@ class Job(BaseJob):
         """
         self.doc.setdefault(self.OUTFILE, {})
         self.doc[self.OUTFILE][self.name] = value
+
+    @classmethod
+    def clean(cls, job, name):
+        """
+        Clean the previous job including the post criteria.
+
+        :param job 'signac.contrib.job.Job': the job to be cleaned
+        :param name str: the operation name to be cleaned
+        """
+        for key in [cls.OUTFILE, jobutils.OUTFILES]:
+            if key not in job.doc:
+                continue
+            job.doc[key].pop(name, None)
 
 
 class LogJob(Job):
@@ -402,6 +427,7 @@ class LogJobAgg(AggJob):
     """
 
     FLAG_TASK = jobutils.FLAG_TASK
+    AnalyzerAgg = analyzer.Agg
 
     def __init__(self, *args, **kwargs):
         """
@@ -426,10 +452,10 @@ class LogJobAgg(AggJob):
         """
         self.log(f"{len(self.jobs)} jobs found for aggregation.")
         for task in self.tasks:
-            anlz = analyzer.Agg(task=task,
-                                jobs=self.groupJobs(),
-                                options=self.options,
-                                logger=self.logger)
+            anlz = self.AnalyzerAgg(task=task,
+                                    jobs=self.groupJobs(),
+                                    options=self.options,
+                                    logger=self.logger)
             anlz.run()
         self.message = False
 

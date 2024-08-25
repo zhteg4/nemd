@@ -1,15 +1,15 @@
 import sys
+import flow
 import itertools
 import collections
 import numpy as np
 import pandas as pd
 import networkx as nx
-from flow.project import FlowProject
 
+from nemd import task
 from nemd import logutils
 from nemd import jobutils
 from nemd import fileutils
-from nemd.task import BaseTask
 
 
 class Runner:
@@ -80,7 +80,7 @@ class Runner:
         """
         Initiate the project.
         """
-        self.project = FlowProject.init_project()
+        self.project = flow.project.FlowProject.init_project()
 
     def setState(self):
         """
@@ -116,11 +116,11 @@ class Runner:
         if not self.options.clean:
             return
         for job in self.jobs:
-            for key in [self.MESSAGE, jobutils.OUTFILE, jobutils.OUTFILES]:
-                if key not in job.doc:
-                    continue
-                for name in self.project.operations.keys():
-                    job.doc[key].pop(name, None)
+            for name, opr in self.project.operations.items():
+                if isinstance(opr, flow.project.FlowCmdOperation):
+                    task.Job(job, name)
+                elif isinstance(opr, flow.project.FlowOperation):
+                    task.BaseJob.clean(job, name)
 
     def runJobs(self):
         """
@@ -203,7 +203,7 @@ class Runner:
         """
         Collect jobs and analyze for statics, chemical space, and states.
         """
-        BaseTask.getAgg(logger=self.logger, name=self.options.jobname)
+        task.BaseTask.getAgg(logger=self.logger, name=self.options.jobname)
 
     def setAggProject(self):
         """
@@ -211,7 +211,7 @@ class Runner:
         """
         prj_path = self.project.path if self.project else self.options.prj_path
         try:
-            self.agg_project = FlowProject.get_project(prj_path)
+            self.agg_project = flow.project.FlowProject.get_project(prj_path)
         except LookupError as err:
             self.log_error(str(err))
 
@@ -223,8 +223,10 @@ class Runner:
             return
         if jobutils.AGGREGATOR not in self.options.jtype:
             return
+        if self.MESSAGE not in self.agg_project.doc:
+            return
         for name in self.agg_project.operations.keys():
-            self.agg_project.doc.pop(name)
+            self.agg_project.doc[self.MESSAGE].pop(name, None)
 
     def runAggJobs(self):
         """
@@ -241,7 +243,7 @@ class Runner:
         :param pre: the operation (function) runs first
         :type pre: 'function'
         """
-        FlowProject.pre.after(pre)(cur)
+        flow.project.FlowProject.pre.after(pre)(cur)
         self.prereq[cur.__name__].append(pre.__name__)
 
     def log(self, msg, timestamp=False):

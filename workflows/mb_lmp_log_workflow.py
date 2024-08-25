@@ -1,16 +1,19 @@
 # This software is licensed under the BSD 3-Clause License.
 # Authors: Teng Zhang (zhteg4@gmail.com)
 """
-This workflow driver runs polymer builder, lammps, and log analyser.
+This workflow driver runs molecule builder, lammps, and log analyzer.
 """
 import os
 import sys
 import numpy as np
 from flow import FlowProject
 
+import rdkit
+from nemd import task
 from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
+from nemd import analyzer
 from nemd import polymutils
 from nemd import jobcontrol
 from nemd import parserutils
@@ -19,7 +22,7 @@ from nemd.task import MolBldr, Lammps, LmpLog
 PATH = os.path.basename(__file__)
 JOBNAME = PATH.split('.')[0].replace('_workflow', '')
 
-FLAG_SUBSTRUCT_RANGE = '-substruct_range'
+FLAG_STRUCT_RG = '-struct_rg'
 
 
 def log(msg, timestamp=False):
@@ -46,6 +49,38 @@ def label(job):
     return str(job.statepoint())
 
 
+class AnalyzerAgg(analyzer.Agg):
+
+    COL_NAME = polymutils.FLAG_SUBSTRUCT[1:].capitalize()
+
+    def setVals(self):
+        """
+        Set the xvals name in addition to the default behavior.
+        """
+        super().setVals()
+        frame = self.xvals[self.COL_NAME].str.split(symbols.COLON, expand=True)
+        self.xvals.loc[:, self.COL_NAME] = frame[1]
+        smiles = frame.iloc[0, 0]
+        match rdkit.Chem.MolFromSmiles(smiles).GetNumAtoms():
+            case 2:
+                name = f"{smiles} Bond (Angstrom)"
+            case 3:
+                name = f"{smiles} Angle (Degree)"
+            case 4:
+                name = f"{smiles} Dihedral Angle (Degree)"
+        self.xvals = self.xvals.rename(columns={self.COL_NAME: name})
+
+
+class LogJobAgg(task.LogJobAgg):
+
+    AnalyzerAgg = AnalyzerAgg
+
+
+class LmpLog(LmpLog):
+
+    AggClass = LogJobAgg
+
+
 class Runner(jobcontrol.Runner):
 
     MINIMUM_ENERGY = "yields the minimum energy of"
@@ -55,9 +90,9 @@ class Runner(jobcontrol.Runner):
         """
         Set crystal builder, lammps runner, and log analyzer tasks.
         """
-        conformer_builder = MolBldr.getOpr(name='conformer_builder')
+        mol_builder = MolBldr.getOpr(name='mol_builder')
         lammps_runner = Lammps.getOpr(name='lammps_runner')
-        self.setPrereq(lammps_runner, conformer_builder)
+        self.setPrereq(lammps_runner, mol_builder)
         lmp_log = LmpLog.getOpr(name='lmp_log')
         self.setPrereq(lmp_log, lammps_runner)
 
@@ -66,36 +101,20 @@ class Runner(jobcontrol.Runner):
         Set the state keys and values.
         """
         super().setState()
-        if self.options.substruct_range[1] is None:
-            self.state[polymutils.FLAG_SUBSTRUCT] = [
-                self.options.substruct_range[0]
-            ]
+        if self.options.struct_rg[1] is None:
+            self.state[polymutils.FLAG_SUBSTRUCT] = [self.options.struct_rg[0]]
             return
-        range_values = map(str, np.arange(*self.options.substruct_range[1]))
-        substruct = self.options.substruct[0]
+        range_values = map(str, np.arange(*self.options.struct_rg[1:]))
+        substruct = self.options.struct_rg[0]
         structs = [symbols.COLON.join([substruct, x]) for x in range_values]
         self.state[polymutils.FLAG_SUBSTRUCT] = structs
 
-    def setAggregation(self):
+    def setAggJobs(self):
         """
         Aggregate post analysis jobs.
         """
-        super().setAggregation()
-        name = f"{self.options.jobname}{self.SEP}{self.LMP_LOG}"
-        combine_agg = LmpLog.getAgg(name=name,
-                                    tname=self.LMP_LOG,
-                                    log=log,
-                                    clean=self.options.clean,
-                                    state_label='Scale Factor')
-        name = f"{self.options.jobname}{self.SEP}fitting"
-        fit_agg = LmpLog.getAgg(name=name,
-                                attr=self.minEneAgg,
-                                tname=LmpLog.DRIVER.TOTENG,
-                                post=self.minEnePost,
-                                log=log,
-                                clean=self.options.clean,
-                                state_label='Scale Factor')
-        self.setPrereq(fit_agg, combine_agg)
+        LmpLog.getAgg(name='lmp_log', logger=logger)
+        super().setAggJobs()
 
 
 def get_parser():
@@ -107,7 +126,7 @@ def get_parser():
     """
     parser = parserutils.get_parser(description=__doc__)
     parser.add_argument(
-        FLAG_SUBSTRUCT_RANGE,
+        FLAG_STRUCT_RG,
         metavar='SMILES:START,END,STEP',
         type=lambda x: parserutils.type_substruct(x, is_range=True),
         help='The range of the degree to scan in degrees. ')
@@ -132,9 +151,9 @@ def validate_options(argv):
     """
     parser = get_parser()
     options = parser.parse_args(argv)
-    if options.substruct_range is None:
+    if options.struct_rg is None:
         parser.error(f"Please specify the substructure and scanning range "
-                     f"using {FLAG_SUBSTRUCT_RANGE} option.")
+                     f"using {FLAG_STRUCT_RG} option.")
     return options
 
 
