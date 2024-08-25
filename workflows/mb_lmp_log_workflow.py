@@ -5,10 +5,10 @@ This workflow driver runs molecule builder, lammps, and log analyzer.
 """
 import os
 import sys
+import rdkit
 import numpy as np
 from flow import FlowProject
 
-import rdkit
 from nemd import task
 from nemd import symbols
 from nemd import logutils
@@ -49,18 +49,33 @@ def label(job):
     return str(job.statepoint())
 
 
+class LogReader(logutils.LogReader):
+
+    def getSubstruct(self, smiles):
+        """
+        Get the value of a substructure from the log file.
+
+        :param smiles str: the substructure smiles
+        :return str: the value of the substructure
+        """
+        for line in self.lines[self.sidx:]:
+            if not line.startswith(smiles):
+                continue
+            # e.g. 'CCCC dihedral angle: 73.50 deg'
+            return line.split(symbols.COLON)[-1].split()[0]
+
+
 class AnalyzerAgg(analyzer.Agg):
 
-    COL_NAME = polymutils.FLAG_SUBSTRUCT[1:].capitalize()
+    SUBSTRUCT = polymutils.FLAG_SUBSTRUCT[1:].capitalize()
 
     def setVals(self):
         """
         Set the xvals name in addition to the default behavior.
         """
         super().setVals()
-        frame = self.xvals[self.COL_NAME].str.split(symbols.COLON, expand=True)
-        self.xvals.loc[:, self.COL_NAME] = frame[1]
-        smiles = frame.iloc[0, 0]
+        vals = self.xvals[self.SUBSTRUCT].str.split(symbols.COLON, expand=True)
+        smiles = vals.iloc[0, 0]
         match rdkit.Chem.MolFromSmiles(smiles).GetNumAtoms():
             case 2:
                 name = f"{smiles} Bond (Angstrom)"
@@ -68,7 +83,23 @@ class AnalyzerAgg(analyzer.Agg):
                 name = f"{smiles} Angle (Degree)"
             case 4:
                 name = f"{smiles} Dihedral Angle (Degree)"
-        self.xvals = self.xvals.rename(columns={self.COL_NAME: name})
+        self.xvals = self.xvals.rename(columns={self.SUBSTRUCT: name})
+        xvals = vals[1] if vals.shape[1] > 1 else self.getSubstruct(smiles)
+        self.xvals.loc[:, name] = xvals
+
+    def getSubstruct(self, smiles):
+        """
+        Get the value of a substructure from the log file.
+
+        :param smiles str: the substructure smiles
+        :return str: the value of the substructure
+        """
+        job = self.jobs[0][-1][0]
+        for logfile in job.doc[jobutils.LOGFILE].values():
+            reader = LogReader(job.fn(logfile))
+            if reader.options.default_name != MolBldr.DRIVER.JOBNAME:
+                continue
+            return reader.getSubstruct(smiles)
 
 
 class LogJobAgg(task.LogJobAgg):
