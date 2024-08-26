@@ -1,3 +1,4 @@
+import re
 import sys
 import flow
 import itertools
@@ -40,6 +41,7 @@ class Runner:
         self.logger = logger
         self.state = {}
         self.jobs = []
+        self.oprs = {}
         self.project = None
         self.agg_project = None
         self.prereq = collections.defaultdict(list)
@@ -75,6 +77,35 @@ class Runner:
         Set the tasks for the job.
         """
         raise NotImplementedError('This method adds operators as job tasks. ')
+
+    def setOpr(self, TaskCLass, name=None, agg=False, **kwargs):
+        """
+        Set one operations for the job.
+
+        :param TaskCLass: the task class
+        :type TaskCLass: 'task.Task' (sub)-class
+        :param name: the name of the operation
+        :type name: str
+        :return: the name of the operation
+        """
+        if name is None:
+            words = re.findall('[A-Z][^A-Z]*', TaskCLass.__name__)
+            name = '_'.join([x.lower() for x in words])
+        if agg:
+            self.oprs[name] = TaskCLass.getAgg(name=name, **kwargs)
+        else:
+            self.oprs[name] = TaskCLass.getOpr(name=name, **kwargs)
+        return name
+
+    def setAgg(self, *args, **kwargs):
+        """
+        Set one aggregatorfor the job.
+        """
+        return self.setOpr(*args,
+                           **kwargs,
+                           agg=True,
+                           logger=self.logger,
+                           options=self.options)
 
     def setProject(self):
         """
@@ -203,7 +234,13 @@ class Runner:
         """
         Collect jobs and analyze for statics, chemical space, and states.
         """
-        task.BaseTask.getAgg(logger=self.logger, name=self.options.jobname)
+        pre_names = [
+            x for x, y in self.oprs.items()
+            if y.__name__.endswith(task.AggJob.NAME_EXT)
+        ]
+        name = self.setAgg(task.BaseTask, name=self.options.jobname)
+        for pre_name in pre_names:
+            self.setPreAfter(pre_name, name)
 
     def setAggProject(self):
         """
@@ -234,17 +271,15 @@ class Runner:
         """
         self.agg_project.run()
 
-    def setPrereq(self, cur, pre):
+    def setPreAfter(self, pre, cur):
         """
         Set the prerequisite of a job.
 
-        :param cur: the operation (function) who runs after the prerequisite job
-        :type cur: 'function'
-        :param pre: the operation (function) runs first
-        :type pre: 'function'
+        :param pre str: the operation name runs first
+        :param cur str: the operation name who runs after the prerequisite job
         """
-        flow.project.FlowProject.pre.after(pre)(cur)
-        self.prereq[cur.__name__].append(pre.__name__)
+        flow.project.FlowProject.pre.after(self.oprs[pre])(self.oprs[cur])
+        self.prereq[cur].append(pre)
 
     def log(self, msg, timestamp=False):
         """

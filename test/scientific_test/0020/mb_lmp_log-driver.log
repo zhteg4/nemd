@@ -1,0 +1,527 @@
+..........Command Options..........
+struct_rg: ('CCCC', 0.0, 360.0, 10.0)
+cru: CCCC
+cru_num: None
+mol_num: 1
+no_minimize: True
+rigid_bond: None
+rigid_angle: None
+buffer: 44.0
+substruct: None
+seed: 12345
+timestep: 1
+stemp: 10
+temp: 0
+tdamp: 100
+press: 1
+pdamp: 1000
+lj_cut: 11.0
+coul_cut: 11.0
+relax_time: 0
+prod_time: 0
+prod_ens: NVE
+force_field: FF_MODEL(ff='OPLSUA', model='TIP3P')
+interactive: False
+jobname: mb_lmp_log
+default_name: mb_lmp_log
+debug: False
+python: 2
+cpu: 36
+task: e_pair, e_mol, toteng
+last_pct: 0.2
+slice: None
+state_num: 1
+clean: True
+jtype: task, aggregator
+prj_path: .
+JobStart: 11:40:15 08/26/24
+...................................
+36 / 36 completed jobs.
+36 / 36 succeeded jobs.
+36 jobs found for aggregation.
+Aggregation Task: e_pair
+Aggregation Parameters (num=1): substruct=CCCC:0.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_0.csv
+E_pair: 27.51 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_0.png
+Aggregation Parameters (num=1): substruct=CCCC:10.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_1.csv
+E_pair: 26.08 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_1.png
+Aggregation Parameters (num=1): substruct=CCCC:100.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_2.csv
+E_pair: 0.8111 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_2.png
+Aggregation Parameters (num=1): substruct=CCCC:110.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_3.csv
+E_pair: 0.4891 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_3.png
+Aggregation Parameters (num=1): substruct=CCCC:120.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_4.csv
+E_pair: 0.2916 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_4.png
+Aggregation Parameters (num=1): substruct=CCCC:130.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_5.csv
+E_pair: 0.17 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_5.png
+Aggregation Parameters (num=1): substruct=CCCC:140.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_6.csv
+E_pair: 0.09511 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_6.png
+Aggregation Parameters (num=1): substruct=CCCC:150.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_7.csv
+E_pair: 0.04945 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_7.png
+Aggregation Parameters (num=1): substruct=CCCC:160.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_8.csv
+E_pair: 0.02244 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_8.png
+Aggregation Parameters (num=1): substruct=CCCC:170.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_9.csv
+E_pair: 0.008322 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_9.png
+Aggregation Parameters (num=1): substruct=CCCC:180.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_10.csv
+E_pair: 0.00393 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_10.png
+Aggregation Parameters (num=1): substruct=CCCC:190.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_11.csv
+E_pair: 0.008299 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_11.png
+Aggregation Parameters (num=1): substruct=CCCC:20.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_12.csv
+E_pair: 22.33 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_12.png
+Aggregation Parameters (num=1): substruct=CCCC:200.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_13.csv
+E_pair: 0.02243 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_13.png
+Aggregation Parameters (num=1): substruct=CCCC:210.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_14.csv
+E_pair: 0.04944 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_14.png
+Aggregation Parameters (num=1): substruct=CCCC:220.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_15.csv
+E_pair: 0.09511 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_15.png
+Aggregation Parameters (num=1): substruct=CCCC:230.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_16.csv
+E_pair: 0.17 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_16.png
+Aggregation Parameters (num=1): substruct=CCCC:240.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_17.csv
+E_pair: 0.2916 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_17.png
+Aggregation Parameters (num=1): substruct=CCCC:250.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_18.csv
+E_pair: 0.4893 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_18.png
+Aggregation Parameters (num=1): substruct=CCCC:260.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_19.csv
+E_pair: 0.8112 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_19.png
+Aggregation Parameters (num=1): substruct=CCCC:270.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_20.csv
+E_pair: 1.335 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_20.png
+Aggregation Parameters (num=1): substruct=CCCC:280.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_21.csv
+E_pair: 2.179 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_21.png
+Aggregation Parameters (num=1): substruct=CCCC:290.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_22.csv
+E_pair: 3.52 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_22.png
+Aggregation Parameters (num=1): substruct=CCCC:30.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_23.csv
+E_pair: 17.44 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_23.png
+Aggregation Parameters (num=1): substruct=CCCC:300.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_24.csv
+E_pair: 5.572 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_24.png
+Aggregation Parameters (num=1): substruct=CCCC:310.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_25.csv
+E_pair: 8.568 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_25.png
+Aggregation Parameters (num=1): substruct=CCCC:320.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_26.csv
+E_pair: 12.6 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_26.png
+Aggregation Parameters (num=1): substruct=CCCC:330.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_27.csv
+E_pair: 17.44 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_27.png
+Aggregation Parameters (num=1): substruct=CCCC:340.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_28.csv
+E_pair: 22.33 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_28.png
+Aggregation Parameters (num=1): substruct=CCCC:350.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_29.csv
+E_pair: 26.08 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_29.png
+Aggregation Parameters (num=1): substruct=CCCC:40.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_30.csv
+E_pair: 12.6 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_30.png
+Aggregation Parameters (num=1): substruct=CCCC:50.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_31.csv
+E_pair: 8.566 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_31.png
+Aggregation Parameters (num=1): substruct=CCCC:60.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_32.csv
+E_pair: 5.574 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_32.png
+Aggregation Parameters (num=1): substruct=CCCC:70.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_33.csv
+E_pair: 3.519 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_33.png
+Aggregation Parameters (num=1): substruct=CCCC:80.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_34.csv
+E_pair: 2.179 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_34.png
+Aggregation Parameters (num=1): substruct=CCCC:90.0 
+E_pair data written into workspace/mb_lmp_log_e_pair_35.csv
+E_pair: 1.335 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_pair figure saved as workspace/mb_lmp_log_e_pair_35.png
+E_pair of all parameters saved to mb_lmp_log_e_pair.csv
+The minimum E_pair (kcal/mol) of 0.0039302274 is found with the CCCC Dihedral Angle (Degree) being 180.0
+E_PAIR figure saved as mb_lmp_log_e_pair.png
+Aggregation Task: e_mol
+Aggregation Parameters (num=1): substruct=CCCC:0.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_0.csv
+E_mol: 4 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_0.png
+Aggregation Parameters (num=1): substruct=CCCC:10.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_1.csv
+E_mol: 3.732 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_1.png
+Aggregation Parameters (num=1): substruct=CCCC:100.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_2.csv
+E_mol: 3 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_2.png
+Aggregation Parameters (num=1): substruct=CCCC:110.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_3.csv
+E_mol: 3.732 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_3.png
+Aggregation Parameters (num=1): substruct=CCCC:120.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_4.csv
+E_mol: 4 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_4.png
+Aggregation Parameters (num=1): substruct=CCCC:130.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_5.csv
+E_mol: 3.732 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_5.png
+Aggregation Parameters (num=1): substruct=CCCC:140.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_6.csv
+E_mol: 3 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_6.png
+Aggregation Parameters (num=1): substruct=CCCC:150.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_7.csv
+E_mol: 2 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_7.png
+Aggregation Parameters (num=1): substruct=CCCC:160.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_8.csv
+E_mol: 1 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_8.png
+Aggregation Parameters (num=1): substruct=CCCC:170.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_9.csv
+E_mol: 0.2678 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_9.png
+Aggregation Parameters (num=1): substruct=CCCC:180.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_10.csv
+E_mol: 2.85e-06 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_10.png
+Aggregation Parameters (num=1): substruct=CCCC:190.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_11.csv
+E_mol: 0.268 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_11.png
+Aggregation Parameters (num=1): substruct=CCCC:20.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_12.csv
+E_mol: 3 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_12.png
+Aggregation Parameters (num=1): substruct=CCCC:200.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_13.csv
+E_mol: 1 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_13.png
+Aggregation Parameters (num=1): substruct=CCCC:210.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_14.csv
+E_mol: 2 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_14.png
+Aggregation Parameters (num=1): substruct=CCCC:220.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_15.csv
+E_mol: 3 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_15.png
+Aggregation Parameters (num=1): substruct=CCCC:230.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_16.csv
+E_mol: 3.732 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_16.png
+Aggregation Parameters (num=1): substruct=CCCC:240.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_17.csv
+E_mol: 4 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_17.png
+Aggregation Parameters (num=1): substruct=CCCC:250.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_18.csv
+E_mol: 3.732 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_18.png
+Aggregation Parameters (num=1): substruct=CCCC:260.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_19.csv
+E_mol: 3 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_19.png
+Aggregation Parameters (num=1): substruct=CCCC:270.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_20.csv
+E_mol: 2 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_20.png
+Aggregation Parameters (num=1): substruct=CCCC:280.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_21.csv
+E_mol: 0.9999 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_21.png
+Aggregation Parameters (num=1): substruct=CCCC:290.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_22.csv
+E_mol: 0.2678 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_22.png
+Aggregation Parameters (num=1): substruct=CCCC:30.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_23.csv
+E_mol: 2 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_23.png
+Aggregation Parameters (num=1): substruct=CCCC:300.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_24.csv
+E_mol: 3.762e-06 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_24.png
+Aggregation Parameters (num=1): substruct=CCCC:310.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_25.csv
+E_mol: 0.2681 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_25.png
+Aggregation Parameters (num=1): substruct=CCCC:320.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_26.csv
+E_mol: 1 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_26.png
+Aggregation Parameters (num=1): substruct=CCCC:330.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_27.csv
+E_mol: 2 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_27.png
+Aggregation Parameters (num=1): substruct=CCCC:340.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_28.csv
+E_mol: 3 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_28.png
+Aggregation Parameters (num=1): substruct=CCCC:350.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_29.csv
+E_mol: 3.732 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_29.png
+Aggregation Parameters (num=1): substruct=CCCC:40.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_30.csv
+E_mol: 0.9998 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_30.png
+Aggregation Parameters (num=1): substruct=CCCC:50.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_31.csv
+E_mol: 0.2678 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_31.png
+Aggregation Parameters (num=1): substruct=CCCC:60.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_32.csv
+E_mol: 2.809e-06 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_32.png
+Aggregation Parameters (num=1): substruct=CCCC:70.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_33.csv
+E_mol: 0.2679 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_33.png
+Aggregation Parameters (num=1): substruct=CCCC:80.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_34.csv
+E_mol: 1 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_34.png
+Aggregation Parameters (num=1): substruct=CCCC:90.0 
+E_mol data written into workspace/mb_lmp_log_e_mol_35.csv
+E_mol: 2 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+E_mol figure saved as workspace/mb_lmp_log_e_mol_35.png
+E_mol of all parameters saved to mb_lmp_log_e_mol.csv
+The minimum E_mol (kcal/mol) of 2.8093062e-06 is found with the CCCC Dihedral Angle (Degree) being 60.0
+E_MOL figure saved as mb_lmp_log_e_mol.png
+Aggregation Task: toteng
+Aggregation Parameters (num=1): substruct=CCCC:0.0 
+Toteng data written into workspace/mb_lmp_log_toteng_0.csv
+TotEng: 31.51 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_0.png
+Aggregation Parameters (num=1): substruct=CCCC:10.0 
+Toteng data written into workspace/mb_lmp_log_toteng_1.csv
+TotEng: 29.82 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_1.png
+Aggregation Parameters (num=1): substruct=CCCC:100.0 
+Toteng data written into workspace/mb_lmp_log_toteng_2.csv
+TotEng: 3.811 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_2.png
+Aggregation Parameters (num=1): substruct=CCCC:110.0 
+Toteng data written into workspace/mb_lmp_log_toteng_3.csv
+TotEng: 4.221 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_3.png
+Aggregation Parameters (num=1): substruct=CCCC:120.0 
+Toteng data written into workspace/mb_lmp_log_toteng_4.csv
+TotEng: 4.292 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_4.png
+Aggregation Parameters (num=1): substruct=CCCC:130.0 
+Toteng data written into workspace/mb_lmp_log_toteng_5.csv
+TotEng: 3.902 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_5.png
+Aggregation Parameters (num=1): substruct=CCCC:140.0 
+Toteng data written into workspace/mb_lmp_log_toteng_6.csv
+TotEng: 3.095 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_6.png
+Aggregation Parameters (num=1): substruct=CCCC:150.0 
+Toteng data written into workspace/mb_lmp_log_toteng_7.csv
+TotEng: 2.049 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_7.png
+Aggregation Parameters (num=1): substruct=CCCC:160.0 
+Toteng data written into workspace/mb_lmp_log_toteng_8.csv
+TotEng: 1.022 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_8.png
+Aggregation Parameters (num=1): substruct=CCCC:170.0 
+Toteng data written into workspace/mb_lmp_log_toteng_9.csv
+TotEng: 0.2761 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_9.png
+Aggregation Parameters (num=1): substruct=CCCC:180.0 
+Toteng data written into workspace/mb_lmp_log_toteng_10.csv
+TotEng: 0.003933 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_10.png
+Aggregation Parameters (num=1): substruct=CCCC:190.0 
+Toteng data written into workspace/mb_lmp_log_toteng_11.csv
+TotEng: 0.2763 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_11.png
+Aggregation Parameters (num=1): substruct=CCCC:20.0 
+Toteng data written into workspace/mb_lmp_log_toteng_12.csv
+TotEng: 25.33 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_12.png
+Aggregation Parameters (num=1): substruct=CCCC:200.0 
+Toteng data written into workspace/mb_lmp_log_toteng_13.csv
+TotEng: 1.023 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_13.png
+Aggregation Parameters (num=1): substruct=CCCC:210.0 
+Toteng data written into workspace/mb_lmp_log_toteng_14.csv
+TotEng: 2.05 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_14.png
+Aggregation Parameters (num=1): substruct=CCCC:220.0 
+Toteng data written into workspace/mb_lmp_log_toteng_15.csv
+TotEng: 3.095 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_15.png
+Aggregation Parameters (num=1): substruct=CCCC:230.0 
+Toteng data written into workspace/mb_lmp_log_toteng_16.csv
+TotEng: 3.902 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_16.png
+Aggregation Parameters (num=1): substruct=CCCC:240.0 
+Toteng data written into workspace/mb_lmp_log_toteng_17.csv
+TotEng: 4.292 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_17.png
+Aggregation Parameters (num=1): substruct=CCCC:250.0 
+Toteng data written into workspace/mb_lmp_log_toteng_18.csv
+TotEng: 4.221 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_18.png
+Aggregation Parameters (num=1): substruct=CCCC:260.0 
+Toteng data written into workspace/mb_lmp_log_toteng_19.csv
+TotEng: 3.811 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_19.png
+Aggregation Parameters (num=1): substruct=CCCC:270.0 
+Toteng data written into workspace/mb_lmp_log_toteng_20.csv
+TotEng: 3.334 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_20.png
+Aggregation Parameters (num=1): substruct=CCCC:280.0 
+Toteng data written into workspace/mb_lmp_log_toteng_21.csv
+TotEng: 3.179 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_21.png
+Aggregation Parameters (num=1): substruct=CCCC:290.0 
+Toteng data written into workspace/mb_lmp_log_toteng_22.csv
+TotEng: 3.787 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_22.png
+Aggregation Parameters (num=1): substruct=CCCC:30.0 
+Toteng data written into workspace/mb_lmp_log_toteng_23.csv
+TotEng: 19.44 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_23.png
+Aggregation Parameters (num=1): substruct=CCCC:300.0 
+Toteng data written into workspace/mb_lmp_log_toteng_24.csv
+TotEng: 5.572 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_24.png
+Aggregation Parameters (num=1): substruct=CCCC:310.0 
+Toteng data written into workspace/mb_lmp_log_toteng_25.csv
+TotEng: 8.836 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_25.png
+Aggregation Parameters (num=1): substruct=CCCC:320.0 
+Toteng data written into workspace/mb_lmp_log_toteng_26.csv
+TotEng: 13.6 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_26.png
+Aggregation Parameters (num=1): substruct=CCCC:330.0 
+Toteng data written into workspace/mb_lmp_log_toteng_27.csv
+TotEng: 19.44 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_27.png
+Aggregation Parameters (num=1): substruct=CCCC:340.0 
+Toteng data written into workspace/mb_lmp_log_toteng_28.csv
+TotEng: 25.33 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_28.png
+Aggregation Parameters (num=1): substruct=CCCC:350.0 
+Toteng data written into workspace/mb_lmp_log_toteng_29.csv
+TotEng: 29.81 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_29.png
+Aggregation Parameters (num=1): substruct=CCCC:40.0 
+Toteng data written into workspace/mb_lmp_log_toteng_30.csv
+TotEng: 13.6 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_30.png
+Aggregation Parameters (num=1): substruct=CCCC:50.0 
+Toteng data written into workspace/mb_lmp_log_toteng_31.csv
+TotEng: 8.834 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_31.png
+Aggregation Parameters (num=1): substruct=CCCC:60.0 
+Toteng data written into workspace/mb_lmp_log_toteng_32.csv
+TotEng: 5.574 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_32.png
+Aggregation Parameters (num=1): substruct=CCCC:70.0 
+Toteng data written into workspace/mb_lmp_log_toteng_33.csv
+TotEng: 3.787 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_33.png
+Aggregation Parameters (num=1): substruct=CCCC:80.0 
+Toteng data written into workspace/mb_lmp_log_toteng_34.csv
+TotEng: 3.179 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_34.png
+Aggregation Parameters (num=1): substruct=CCCC:90.0 
+Toteng data written into workspace/mb_lmp_log_toteng_35.csv
+TotEng: 3.335 ± nan kcal/mol ∈ [0.0000, 0.0000] ps
+Toteng figure saved as workspace/mb_lmp_log_toteng_35.png
+Toteng of all parameters saved to mb_lmp_log_toteng.csv
+The minimum TotEng (kcal/mol) of 0.0039330775 is found with the CCCC Dihedral Angle (Degree) being 180.0
+TOTENG figure saved as mb_lmp_log_toteng.png
+Task Total Timing: 00:05:16
+| lammps    | lmp_log   | mol_bldr   |
+|:----------|:----------|:-----------|
+| 00:03 ave | 00:04 ave | 00:01 ave  |
+| 00:04 e28 | 00:05 561 | 00:02 2bb  |
+| 00:04 c98 | 00:05 894 | 00:01 561  |
+| 00:04 294 | 00:05 9ca | 00:01 846  |
+| 00:04 c5b | 00:05 666 | 00:01 b73  |
+| 00:04 27a | 00:05 bbf | 00:01 808  |
+| 00:04 894 | 00:05 655 | 00:01 c98  |
+| 00:04 a43 | 00:05 b43 | 00:01 989  |
+| 00:04 e34 | 00:05 562 | 00:01 294  |
+| 00:04 e0c | 00:05 4e8 | 00:01 27a  |
+| 00:04 472 | 00:05 846 | 00:01 4e8  |
+| 00:04 786 | 00:05 27a | 00:01 a1b  |
+| 00:04 29b | 00:05 989 | 00:01 562  |
+| 00:04 4e8 | 00:05 786 | 00:01 b43  |
+| 00:04 d15 | 00:05 808 | 00:01 655  |
+| 00:04 562 | 00:05 b73 | 00:01 bbf  |
+| 00:04 b43 | 00:05 c5b | 00:01 666  |
+| 00:04 bbf | 00:05 597 | 00:01 9ca  |
+| 00:03 846 | 00:05 29b | 00:01 c5b  |
+| 00:03 655 | 00:05 e34 | 00:01 597  |
+| 00:03 666 | 00:05 e0c | 00:01 894  |
+| 00:03 9ca | 00:05 f61 | 00:01 270  |
+| 00:03 989 | 00:05 472 | 00:01 31a  |
+| 00:03 597 | 00:05 e28 | 00:01 33d  |
+| 00:03 542 | 00:04 209 | 00:01 e85  |
+| 00:03 808 | 00:04 2bb | 00:01 b29  |
+| 00:03 b73 | 00:04 31a | 00:01 209  |
+| 00:03 f61 | 00:04 33d | 00:01 d15  |
+| 00:03 b29 | 00:04 e85 | 00:01 29b  |
+| 00:03 33d | 00:04 b29 | 00:01 a43  |
+| 00:02 270 | 00:04 a43 | 00:01 e28  |
+| 00:02 209 | 00:04 d15 | 00:01 472  |
+| 00:02 e85 | 00:04 270 | 00:01 f61  |
+| 00:01 a1b | 00:04 a1b | 00:01 e0c  |
+| 00:01 31a | 00:04 294 | 00:01 e34  |
+| 00:01 561 | 00:04 c98 | 00:01 542  |
+| 00:00 2bb | 00:04 542 | 00:00 786  |
+Finished.
+11:46:30 08/26/24

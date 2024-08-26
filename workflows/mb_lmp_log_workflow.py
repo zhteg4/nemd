@@ -84,8 +84,10 @@ class AnalyzerAgg(analyzer.Agg):
             case 4:
                 name = f"{smiles} Dihedral Angle (Degree)"
         self.xvals = self.xvals.rename(columns={self.SUBSTRUCT: name})
-        xvals = vals[1] if vals.shape[1] > 1 else self.getSubstruct(smiles)
-        self.xvals.loc[:, name] = xvals
+        try:
+            self.xvals.loc[:, name] = vals[1]
+        except IndexError:
+            self.xvals.loc[:, name] = self.getSubstruct(smiles)
 
     def getSubstruct(self, smiles):
         """
@@ -119,13 +121,13 @@ class Runner(jobcontrol.Runner):
 
     def setJob(self):
         """
-        Set crystal builder, lammps runner, and log analyzer tasks.
+        Set molecule builder, lammps runner, and log analyzer tasks.
         """
-        mol_builder = MolBldr.getOpr(name='mol_builder')
-        lammps_runner = Lammps.getOpr(name='lammps_runner')
-        self.setPrereq(lammps_runner, mol_builder)
-        lmp_log = LmpLog.getOpr(name='lmp_log')
-        self.setPrereq(lmp_log, lammps_runner)
+        mol_bldr = self.setOpr(MolBldr)
+        lmp_runner = self.setOpr(Lammps)
+        self.setPreAfter(mol_bldr, lmp_runner)
+        lmp_log = self.setOpr(LmpLog)
+        self.setPreAfter(lmp_runner, lmp_log)
 
     def setState(self):
         """
@@ -144,7 +146,7 @@ class Runner(jobcontrol.Runner):
         """
         Aggregate post analysis jobs.
         """
-        LmpLog.getAgg(name='lmp_log', logger=logger)
+        self.setAgg(LmpLog)
         super().setAggJobs()
 
 

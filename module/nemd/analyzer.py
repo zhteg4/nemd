@@ -1,10 +1,10 @@
 import re
 import os
 import math
-import copy
 import numpy as np
 import pandas as pd
 from scipy import constants
+from types import SimpleNamespace
 from scipy.stats import linregress
 from scipy.signal import savgol_filter
 
@@ -594,13 +594,13 @@ class Agg(logutils.Base):
         if self.Anlz is None:
             return
         self.log(f"Aggregation Task: {self.task}")
+        shared = vars(self.options).copy()
+        shared['interactive'] = len(self.jobs) > 1
         for parm, jobs in self.jobs:
             if not parm.empty:
                 pstr = parm.to_csv(lineterminator=' ', sep='=', header=False)
                 self.log(f"Aggregation Parameters (num={len(jobs)}): {pstr}")
-            options = copy.deepcopy(self.options)
-            options.id = parm.index.name
-            options.jobs = jobs
+            options = SimpleNamespace(**shared, id=parm.index.name, jobs=jobs)
             anlz = self.Anlz(options=options, logger=self.logger)
             anlz.run()
             if anlz.result is None:
@@ -651,9 +651,11 @@ class Agg(logutils.Base):
                  f"is found with the {self.xvals.columns[0].replace('_',' ')} "
                  f"being {self.xvals.iloc[index, 0]}")
 
-    def plot(self):
+    def plot(self, xtick_num=12):
         """
         Plot the results.
+
+        :param xtick_num int: the maximum number of xticks to show
         """
         if self.xvals.empty:
             return
@@ -672,6 +674,9 @@ class Agg(logutils.Base):
                                 alpha=0.3)
                 ax.legend()
             ax.set_xlabel(self.xvals.columns[0])
+            if self.xvals.iloc[:, 0].size > xtick_num:
+                intvl = round(self.xvals.iloc[:, 0].size / xtick_num)
+                ax.set_xticks(self.xvals.iloc[:, 0].values[::intvl])
             ax.set_ylabel(self.yvals.name)
             pathname = self.outfile[:-len(self.DATA_EXT)] + self.FIG_EXT
             fig.savefig(pathname)

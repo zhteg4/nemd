@@ -323,14 +323,17 @@ class AggJob(BaseJob):
     MANE = symbols.NAME
     TIME = symbols.TIME.lower()
     ID = symbols.ID
+    NAME_EXT = f"{symbols.POUND_SEP}agg"
 
-    def __init__(self, *jobs, **kwargs):
+    def __init__(self, *jobs, options=None, **kwargs):
         """
         :param jobs: the signac job instances to aggregate
         :type jobs: 'list' of 'signac.contrib.job.Job'
+        :param options 'argparse.Namespace': commandline options
         """
         super().__init__(jobs[0], **kwargs)
         self.jobs = jobs
+        self.options = options
         self.project = self.job.project
 
     def run(self):
@@ -415,7 +418,9 @@ class AggJob(BaseJob):
             key = params.to_csv(lineterminator=' ', sep=' ', header=False)
             series[key] = params
             jobs[key].append(job)
-        keys = sorted(series.keys())
+        keys = sorted(
+            series.keys(),
+            key=lambda x: float(x.split()[-1].split(symbols.COLON)[-1]))
         for idx, key in enumerate(keys):
             series[key].index.name = idx
         return [tuple([series[x], jobs[x]]) for x in keys]
@@ -429,32 +434,20 @@ class LogJobAgg(AggJob):
     FLAG_TASK = jobutils.FLAG_TASK
     AnalyzerAgg = analyzer.Agg
 
-    def __init__(self, *args, **kwargs):
-        """
-        :param name: e.g. 'cb_lmp_log_#_lmp_log' is parsed as {jobname}_#_{name}
-        """
-        super().__init__(*args, **kwargs)
-        default = self.driver.DEFAULT_TASKS
-        self.tasks = self.getArg(self.FLAG_TASK, default=default, first=False)
-        self.tasks = [x.lower() for x in self.tasks]
-        jobname = self.getArg(self.FLAG_JOBNAME, default=self.driver.JOBNAME)
-        self.options = SimpleNamespace(
-            jobname=jobname,
-            interactive=self.getArg(jobutils.FLAG_INTERACTIVE),
-            id=None,
-            dir=os.path.relpath(self.project.workspace, self.project.path),
-            name=self.name.split(symbols.POUND_SEP)[0],
-            jobs=None)
-
     def run(self):
         """
         Main method to run the aggregator job.
         """
+        options = SimpleNamespace(jobname=self.options.jobname,
+                                  interactive=self.options.interactive,
+                                  name=self.name.split(symbols.POUND_SEP)[0],
+                                  dir=os.path.relpath(self.project.workspace,
+                                                      self.project.path))
         self.log(f"{len(self.jobs)} jobs found for aggregation.")
-        for task in self.tasks:
+        for task in self.options.task:
             anlz = self.AnalyzerAgg(task=task,
                                     jobs=self.groupJobs(),
-                                    options=self.options,
+                                    options=options,
                                     logger=self.logger)
             anlz.run()
         self.message = False
@@ -567,8 +560,6 @@ class BaseTask:
         :rtype: 'function'
         :raise ValueError: the function cannot be found
         """
-        if name is None:
-            name = cls.__class__.__name__.lower()
         if cmd is None:
             cmd = hasattr(cls.JobClass, 'getCmd')
         if post is None:
@@ -629,11 +620,9 @@ class BaseTask:
         :return: the operation to execute
         :rtype: 'function'
         """
-        if name is None:
-            name = cls.__class__.__name__.lower()
         if post is None:
             post = cls.aggPost
-        name = f"{name}{symbols.POUND_SEP}agg"
+        name = f"{name}{AggJob.NAME_EXT}"
         return cls.getOpr(aggregator=aggregator(),
                           cmd=cmd,
                           with_job=with_job,

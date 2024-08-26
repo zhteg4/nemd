@@ -1,0 +1,92 @@
+Fetching status:   0%|          | 0/108 [00:00<?, ?it/s]Fetching status: 100%|██████████| 108/108 [00:00<00:00, 1792.68it/s]
+Fetching labels:   0%|          | 0/36 [00:00<?, ?it/s]Fetching labels: 100%|██████████| 36/36 [00:00<00:00, 18817.91it/s]
+
+Overview: 36 jobs/aggregates, 0 jobs/aggregates with eligible operations.
+
+label                                       ratio
+------------------------------------------  -------------------------------------------------------
+{'-seed': '0', '-substruct': 'CCCC:0.0'}    |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:10.0'}   |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:100.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:110.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:120.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:130.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:140.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:150.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:160.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:170.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:180.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:190.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:20.0'}   |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:200.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:210.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:220.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:230.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:240.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:250.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:260.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:270.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:280.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:290.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:30.0'}   |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:300.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:310.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:320.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:330.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:340.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:350.0'}  |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:40.0'}   |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:50.0'}   |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:60.0'}   |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:70.0'}   |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:80.0'}   |█                                       | 1/36 (2.78%)
+{'-seed': '0', '-substruct': 'CCCC:90.0'}   |█                                       | 1/36 (2.78%)
+
+operation/group
+-----------------
+
+
+Detailed View:
+
+job id                            operation/group    labels
+--------------------------------  -----------------  ------------------------------------------
+2095efac297cdbd8c07dc33c38f33485  [ ]                {'-seed': '0', '-substruct': 'CCCC:70.0'}
+270d91f92078dbf627c24ae350a8f7d4  [ ]                {'-seed': '0', '-substruct': 'CCCC:300.0'}
+27a58090f2b8af05fed50d919aa9ec25  [ ]                {'-seed': '0', '-substruct': 'CCCC:350.0'}
+294d64cfa4cf2a8c7c085ab33f3b6191  [ ]                {'-seed': '0', '-substruct': 'CCCC:160.0'}
+29b98f6e64082b8909d6c48bf863dbc4  [ ]                {'-seed': '0', '-substruct': 'CCCC:90.0'}
+2bb775a7a8b8204734a2650335c75ae4  [ ]                {'-seed': '0', '-substruct': 'CCCC:310.0'}
+31aa4b8cd1871ad9ea617827dc70b08a  [ ]                {'-seed': '0', '-substruct': 'CCCC:220.0'}
+33df6983eb0210eeca44b9e2de1bb0dd  [ ]                {'-seed': '0', '-substruct': 'CCCC:200.0'}
+4726e5745b6413272932d7f9c4e221af  [ ]                {'-seed': '0', '-substruct': 'CCCC:250.0'}
+4e8cda643489740f3e4fd4facf4c9901  [ ]                {'-seed': '0', '-substruct': 'CCCC:270.0'}
+542ab27f559144f0ed496432ad82286d  [ ]                {'-seed': '0', '-substruct': 'CCCC:80.0'}
+561c2f87f21d10e437d2cf6348200f4b  [ ]                {'-seed': '0', '-substruct': 'CCCC:50.0'}
+56263cb458f482a97d832ceba01597a9  [ ]                {'-seed': '0', '-substruct': 'CCCC:110.0'}
+597e118d6875c13b0284f5886e6eef6b  [ ]                {'-seed': '0', '-substruct': 'CCCC:0.0'}
+655a73eda5a3d5c258549e4cc7739f7a  [ ]                {'-seed': '0', '-substruct': 'CCCC:30.0'}
+666aa8068713d8789fcf09bdd08ffd8f  [ ]                {'-seed': '0', '-substruct': 'CCCC:240.0'}
+7868128c85068415e3750c2e84cd7428  [ ]                {'-seed': '0', '-substruct': 'CCCC:180.0'}
+80862750b5b9b18a368aed4a52d15abb  [ ]                {'-seed': '0', '-substruct': 'CCCC:60.0'}
+846ca7604455cfd4847df78083193a37  [ ]                {'-seed': '0', '-substruct': 'CCCC:210.0'}
+894ae0d722b2f03e876ea81c5d48577d  [ ]                {'-seed': '0', '-substruct': 'CCCC:260.0'}
+9896c8bfca04094bc180d0c92847b112  [ ]                {'-seed': '0', '-substruct': 'CCCC:130.0'}
+9cabb914290313a485d2896b656d19cd  [ ]                {'-seed': '0', '-substruct': 'CCCC:140.0'}
+a1b1b040771bb9120f040b5565d9224a  [ ]                {'-seed': '0', '-substruct': 'CCCC:290.0'}
+a4335624937402c7fe68925a0b79b010  [ ]                {'-seed': '0', '-substruct': 'CCCC:40.0'}
+b2983f55dd92e1cad2e2028a1dd721bf  [ ]                {'-seed': '0', '-substruct': 'CCCC:280.0'}
+b4382941e0a44d9f645fa8372c1ec227  [ ]                {'-seed': '0', '-substruct': 'CCCC:120.0'}
+b738ce858ad64ec186f586de9161cae8  [ ]                {'-seed': '0', '-substruct': 'CCCC:230.0'}
+bbfddcc4730ec4271e971342cdce1755  [ ]                {'-seed': '0', '-substruct': 'CCCC:340.0'}
+c5bfd5f5558939bb61ca1200c4a97b47  [ ]                {'-seed': '0', '-substruct': 'CCCC:330.0'}
+c984b7a6734334166c0d37ff5beff4f7  [ ]                {'-seed': '0', '-substruct': 'CCCC:190.0'}
+d15c323b2e0e7ac54ced363e3c1ca005  [ ]                {'-seed': '0', '-substruct': 'CCCC:150.0'}
+e0c393e43c61c0475238b7a12a49be08  [ ]                {'-seed': '0', '-substruct': 'CCCC:320.0'}
+e28dbbfb352e051e1b16b6f5d5d5ae78  [ ]                {'-seed': '0', '-substruct': 'CCCC:100.0'}
+e34691f3df747bc744f62dfd613a2262  [ ]                {'-seed': '0', '-substruct': 'CCCC:10.0'}
+e8582b3002e2fff33316ba8a400f1e7a  [ ]                {'-seed': '0', '-substruct': 'CCCC:170.0'}
+f61bca97e80f82270e9ed525380e6e8a  [ ]                {'-seed': '0', '-substruct': 'CCCC:20.0'}
+
+[U]:unknown [R]:registered [I]:inactive [S]:submitted [H]:held [Q]:queued [A]:active [E]:error [GR]:group_registered [GI]:group_inactive [GS]:group_submitted [GH]:group_held [GQ]:group_queued [GA]:group_active [GE]:group_error
+
+
