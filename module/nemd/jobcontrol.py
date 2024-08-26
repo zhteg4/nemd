@@ -8,6 +8,7 @@ import pandas as pd
 import networkx as nx
 
 from nemd import task
+from nemd import symbols
 from nemd import logutils
 from nemd import jobutils
 from nemd import fileutils
@@ -26,6 +27,7 @@ class Runner:
     JOB_ID = 'job_id'
     FLAG_SEED = jobutils.FLAG_SEED
     MESSAGE = jobutils.MESSAGE
+    AGG_NAME_EXT = f"{symbols.POUND_SEP}agg"
 
     def __init__(self, options, argv, logger=None):
         """
@@ -42,6 +44,7 @@ class Runner:
         self.state = {}
         self.jobs = []
         self.oprs = {}
+        self.classes = {}
         self.project = None
         self.agg_project = None
         self.prereq = collections.defaultdict(list)
@@ -92,9 +95,12 @@ class Runner:
             words = re.findall('[A-Z][^A-Z]*', TaskCLass.__name__)
             name = '_'.join([x.lower() for x in words])
         if agg:
+            name = f"{name}{self.AGG_NAME_EXT}"
             self.oprs[name] = TaskCLass.getAgg(name=name, **kwargs)
-        else:
-            self.oprs[name] = TaskCLass.getOpr(name=name, **kwargs)
+            self.classes[name] = TaskCLass.AggClass
+            return name
+        self.oprs[name] = TaskCLass.getOpr(name=name, **kwargs)
+        self.classes[name] = TaskCLass.JobClass
         return name
 
     def setAgg(self, *args, **kwargs):
@@ -146,12 +152,11 @@ class Runner:
         """
         if not self.options.clean:
             return
-        for job in self.jobs:
-            for name, opr in self.project.operations.items():
-                if isinstance(opr, flow.project.FlowCmdOperation):
-                    task.Job(job, name)
-                elif isinstance(opr, flow.project.FlowOperation):
-                    task.BaseJob.clean(job, name)
+        for name, JobClass in self.classes.items():
+            if name.endswith(self.AGG_NAME_EXT):
+                continue
+            for job in self.jobs:
+                JobClass(job, name=name).clean()
 
     def runJobs(self):
         """
@@ -234,12 +239,9 @@ class Runner:
         """
         Collect jobs and analyze for statics, chemical space, and states.
         """
-        pre_names = [
-            x for x, y in self.oprs.items()
-            if y.__name__.endswith(task.AggJob.NAME_EXT)
-        ]
+        pnames = [x for x in self.oprs.keys() if x.endswith(self.AGG_NAME_EXT)]
         name = self.setAgg(task.BaseTask, name=self.options.jobname)
-        for pre_name in pre_names:
+        for pre_name in pnames:
             self.setPreAfter(pre_name, name)
 
     def setAggProject(self):
@@ -258,12 +260,10 @@ class Runner:
         """
         if not self.options.clean:
             return
-        if jobutils.AGGREGATOR not in self.options.jtype:
-            return
-        if self.MESSAGE not in self.agg_project.doc:
-            return
-        for name in self.agg_project.operations.keys():
-            self.agg_project.doc[self.MESSAGE].pop(name, None)
+        for name, JobClass in self.classes.items():
+            if not name.endswith(self.AGG_NAME_EXT):
+                continue
+            JobClass(*self.jobs, name=name).clean()
 
     def runAggJobs(self):
         """

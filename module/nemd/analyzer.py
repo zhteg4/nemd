@@ -594,8 +594,10 @@ class Agg(logutils.Base):
         if self.Anlz is None:
             return
         self.log(f"Aggregation Task: {self.task}")
-        shared = vars(self.options).copy()
-        shared['interactive'] = len(self.jobs) > 1
+        shared = vars(self.options)
+        if self.options.interactive:
+            shared = shared.copy()
+            shared['interactive'] = len(self.jobs) > 1
         for parm, jobs in self.jobs:
             if not parm.empty:
                 pstr = parm.to_csv(lineterminator=' ', sep='=', header=False)

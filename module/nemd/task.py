@@ -90,17 +90,13 @@ class BaseJob(logutils.Base):
         self.doc.setdefault(self.MESSAGE, {})
         self.doc[self.MESSAGE].update({self.name: value})
 
-    @classmethod
-    def clean(cls, job, name):
+    def clean(self):
         """
         Clean the previous job including the post criteria.
-
-        :param job 'signac.contrib.job.Job': the job to be cleaned
-        :param name str: the operation name to be cleaned
         """
-        if cls.MESSAGE not in job.doc:
+        if self.MESSAGE not in self.doc:
             return
-        job.doc[cls.MESSAGE].pop(name, None)
+        self.doc[self.MESSAGE].pop(self.name, None)
 
 
 class Job(BaseJob):
@@ -246,18 +242,14 @@ class Job(BaseJob):
         self.doc.setdefault(self.OUTFILE, {})
         self.doc[self.OUTFILE][self.name] = value
 
-    @classmethod
-    def clean(cls, job, name):
+    def clean(self):
         """
         Clean the previous job including the post criteria.
-
-        :param job 'signac.contrib.job.Job': the job to be cleaned
-        :param name str: the operation name to be cleaned
         """
-        for key in [cls.OUTFILE, jobutils.OUTFILES]:
-            if key not in job.doc:
+        for key in [self.OUTFILE, jobutils.OUTFILES]:
+            if key not in self.doc:
                 continue
-            job.doc[key].pop(name, None)
+            self.doc[key].pop(self.name, None)
 
 
 class LogJob(Job):
@@ -323,7 +315,6 @@ class AggJob(BaseJob):
     MANE = symbols.NAME
     TIME = symbols.TIME.lower()
     ID = symbols.ID
-    NAME_EXT = f"{symbols.POUND_SEP}agg"
 
     def __init__(self, *jobs, options=None, **kwargs):
         """
@@ -424,6 +415,14 @@ class AggJob(BaseJob):
         for idx, key in enumerate(keys):
             series[key].index.name = idx
         return [tuple([series[x], jobs[x]]) for x in keys]
+
+    def clean(self):
+        """
+        Clean the previous job including the post criteria.
+        """
+        if self.MESSAGE not in self.project.doc:
+            return
+        self.project.doc[self.MESSAGE].pop(self.name, None)
 
 
 class LogJobAgg(AggJob):
@@ -622,7 +621,6 @@ class BaseTask:
         """
         if post is None:
             post = cls.aggPost
-        name = f"{name}{AggJob.NAME_EXT}"
         return cls.getOpr(aggregator=aggregator(),
                           cmd=cmd,
                           with_job=with_job,
