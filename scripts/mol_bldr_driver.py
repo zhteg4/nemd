@@ -12,7 +12,6 @@ from nemd import structutils
 from nemd import parserutils
 
 FLAG_DEFAULTS = {
-    polymutils.FLAG_NO_MINIMIZE: True,
     polymutils.FLAG_BUFFER: f"{lammpsin.In.DEFAULT_CUT * 4}",
     polymutils.FLAG_MOL_NUM: [1],
     parserutils.FLAG_TEMP: 0,

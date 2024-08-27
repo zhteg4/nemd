@@ -1137,35 +1137,33 @@ class Struct(structure.Struct, lammpsin.In):
 
     mw = molecular_weight
 
-    def writeRun(self, *arg, **kwarg):
+    def writeRun(self, *arg, **kwargs):
         """
         Write command to further equilibrate the system with molecules
         information considered.
         """
-        if self.options.rigid_bond is None and self.options.rigid_angle is None:
-            self.options.rigid_bond, self.options.rigid_angle = self.getRigid()
         if self.atom_total == 1:
             self.options.temp = 0
         single_molecule = self.conformer_total == 1
         small_molecule = self.atom_total < 100
         single_point_energy = not self.options.temp
         testing = any([single_molecule, small_molecule, single_point_energy])
-        super().writeRun(*arg, testing=testing, **kwarg)
+        super().writeRun(*arg, testing=testing, **kwargs)
 
-    def getRigid(self):
+    def writeShake(self):
         """
-        Get the rigid bond and angle types.
-
-        :return: the rigid bond and angle types
-        :rtype: str, str
+        Write fix shake command to enforce constant bond length and angel values.
         """
-        data = [x.getRigid() for x in self.molecules]
-        bonds, angles = list(map(list, zip(*data)))
-        bonds = Bond.concat([x for x in bonds if not x.empty])
-        angles = Angle.concat([x for x in angles if not x.empty])
-        bond_types = self.bnd_types.map(bonds.values.flatten()) + 1
-        angle_types = self.ang_types.map(angles.values.flatten()) + 1
-        return [' '.join(map(str, x)) for x in [bond_types, angle_types]]
+        if self.options.rigid_bond is None and self.options.rigid_angle is None:
+            data = [x.getRigid() for x in self.molecules]
+            bonds, angles = list(map(list, zip(*data)))
+            bonds = Bond.concat([x for x in bonds if not x.empty])
+            angles = Angle.concat([x for x in angles if not x.empty])
+            bond_types = self.bnd_types.map(bonds.values.flatten()) + 1
+            angle_types = self.ang_types.map(angles.values.flatten()) + 1
+            self.options.rigid_bond = ' '.join(map(str, bond_types))
+            self.options.rigid_angle = ' '.join(map(str, angle_types))
+        super().writeShake()
 
     def hasCharge(self):
         """

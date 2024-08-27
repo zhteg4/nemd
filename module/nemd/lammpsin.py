@@ -1,7 +1,7 @@
 import os
 import math
+import rdkit
 import string
-import numpy as np
 
 from nemd import symbols
 from nemd import constants
@@ -60,7 +60,9 @@ class In:
     DEFAULT_LJ_CUT = DEFAULT_CUT
     DEFAULT_COUL_CUT = DEFAULT_CUT
     DUMP_ID, DUMP_Q = lammpsfix.DUMP_ID, lammpsfix.DUMP_Q
+    FIX_RESTRAIN = lammpsfix.FIX_RESTRAIN
     MINIMIZE = 'minimize'
+    FIX_RIGID_SHAKE = lammpsfix.FIX_RIGID_SHAKE
 
     def __init__(self, options=None):
         """
@@ -97,8 +99,11 @@ class In:
         with open(self.inscript, 'w') as self.fh:
             self.writeSetup()
             self.readData()
-            self.writeTimestep()
+            self.writeRestrain()
             self.writeMinimize()
+            self.writeShake()
+            self.writeTraj()
+            self.writeTimestep()
             self.writeRun()
 
     def writeSetup(self):
@@ -137,18 +142,34 @@ class In:
         """
         self.fh.write(f"{self.READ_DATA} {self.datafile}\n\n")
 
-    def writeMinimize(self, min_style=FIRE, dump=True):
+    def writeRestrain(self):
+        """
+        Write fix restrain command to enforce specified restrain geometry.
+        """
+        if self.options.substruct is None:
+            return
+        struct = rdkit.Chem.MolFromSmiles(self.options.substruct[0])
+        if not self.molecules[0].HasSubstructMatch(struct):
+            return
+        aids = self.molecules[0].GetSubstructMatch(struct)
+        gids = self.molecules[0].GetConformer().id_map[list(aids)] + 1
+        match len(gids):
+            case 2:
+                name = 'bond'
+            case 3:
+                name = 'angle'
+            case 4:
+                name = 'dihedral'
+        desc = f"{name} {' '.join(map(str, gids))}"
+        val = self.options.substruct[1]
+        self.fh.write(self.FIX_RESTRAIN.format(desc=desc, val=val))
+
+    def writeMinimize(self, min_style=FIRE):
         """
         Write commands related to minimization.
 
         :param min_style str: cg, fire, spin, etc.
-        :param dump bool: Whether dump out trajectory.
         """
-        if dump:
-            self.fh.write(
-                f"{self.DUMP} {self.DUMP_ID} all custom {self.DUMP_Q} "
-                f"dump{self.CUSTOM_EXT} id xu yu zu\n")
-            self.fh.write(f"{self.DUMP_MODIFY} 1 sort id\n")
         if self.options.no_minimize:
             return
         self.fh.write(f"{self.MIN_STYLE} {min_style}\n")
@@ -161,6 +182,27 @@ class In:
         self.fh.write(f'{self.TIMESTEP} {self.options.timestep}\n')
         self.fh.write(f'{self.THERMO_MODIFY} flush yes\n')
         self.fh.write(f'{self.THERMO} 1000\n')
+
+    def writeShake(self):
+        """
+        Write fix shake command to enforce constant bond length and angel values.
+        """
+        fixed_types = ''
+        if self.options.rigid_bond:
+            fixed_types += f' b {self.options.rigid_bond}'
+        if self.options.rigid_bond:
+            fixed_types += f' a {self.options.rigid_bond}'
+        if not fixed_types:
+            return
+        self.fh.write(self.FIX_RIGID_SHAKE.format(types=fixed_types))
+
+    def writeTraj(self):
+        """
+        Dump out trajectory.
+        """
+        self.fh.write(f"{self.DUMP} {self.DUMP_ID} all custom {self.DUMP_Q} "
+                      f"dump{self.CUSTOM_EXT} id xu yu zu\n")
+        self.fh.write(f"{self.DUMP_MODIFY} 1 sort id\n")
 
     def writeRun(self, testing=False):
         """
@@ -177,7 +219,6 @@ class FixWriter:
     This the wrapper for LAMMPS fix command writer. which usually includes an
     "unfix" after the run command.
     """
-    FIX_RIGID_SHAKE = lammpsfix.FIX_RIGID_SHAKE
     VELOCITY = lammpsfix.VELOCITY
     SET_VAR = lammpsfix.SET_VAR
     NVE = lammpsfix.NVE
@@ -249,7 +290,6 @@ class FixWriter:
         """
         Main method to run the writer.
         """
-        self.fixShake()
         self.velocity()
         self.test()
         self.startLow()
@@ -258,27 +298,14 @@ class FixWriter:
         self.production()
         self.write()
 
-    def fixShake(self):
-        """
-        Write fix shake command to enforce constant bond length and angel values.
-        """
-        fixed_types = ''
-        if self.options.rigid_bond:
-            fixed_types += f' b {self.options.rigid_bond}'
-        if self.options.rigid_bond:
-            fixed_types += f' a {self.options.rigid_bond}'
-        if not fixed_types:
-            return
-        self.fh.write(self.FIX_RIGID_SHAKE.format(types=fixed_types))
-
     def velocity(self):
         """
         Create initial velocity for the system.
         """
         if not self.options.temp:
             return
-        self.fh.write(
-            f"{self.VELOCITY} all create {self.options.stemp} {self.options.seed}\n"
+        self.cmd.append(
+            f"{self.VELOCITY} all create {self.options.stemp} {self.options.seed}"
         )
 
     def test(self, nstep=1E3):

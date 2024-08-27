@@ -5,6 +5,7 @@ DUMP_ID, DUMP_Q = 1, 1000
 
 FIX = 'fix'
 FIX_RIGID_SHAKE = f'{FIX} rigid all shake 0.0001 10 10000 {{types}}\n'
+FIX_RESTRAIN = f'fix restrain all restrain {{desc}} 2000.0 2000.0 {{val}}\n'
 VELOCITY = 'velocity'
 RUN_STEP = "run %i\n"
 UNFIX = "unfix %s\n"
