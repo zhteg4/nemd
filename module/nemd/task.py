@@ -406,12 +406,10 @@ class AggJob(BaseJob):
                 for x, y in statepoint.items()
             }
             params = pd.Series(params).sort_index()
-            key = params.to_csv(lineterminator=' ', sep=' ', header=False)
+            key = tuple(params.str.split(symbols.COLON).str[-1].astype(float))
             series[key] = params
             jobs[key].append(job)
-        keys = sorted(
-            series.keys(),
-            key=lambda x: float(x.split()[-1].split(symbols.COLON)[-1]))
+        keys = sorted(series.keys())
         for idx, key in enumerate(keys):
             series[key].index.name = idx
         return [tuple([series[x], jobs[x]]) for x in keys]

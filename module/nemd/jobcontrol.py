@@ -278,6 +278,8 @@ class Runner:
         :param pre str: the operation name runs first
         :param cur str: the operation name who runs after the prerequisite job
         """
+        if pre is None or cur is None:
+            return
         flow.project.FlowProject.pre.after(self.oprs[pre])(self.oprs[cur])
         self.prereq[cur].append(pre)
 

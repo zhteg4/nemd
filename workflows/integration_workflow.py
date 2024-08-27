@@ -65,20 +65,23 @@ class Integration(jobcontrol.Runner):
         """
         Set operators. For example, operators to run cmd and check results.
         """
-        if CMD in self.options.task:
-            cmd = itestutils.CmdTask.getOpr(name='cmd')
-        if CHECK in self.options.task:
-            check = itestutils.CheckTask.getOpr(name='check')
-            if CMD in self.options.task:
-                self.setPrereq(check, cmd)
-        if TAG in self.options.task:
-            tag = itestutils.TagTask.getOpr(name='tag')
-            if CMD in self.options.task:
-                self.setPrereq(tag, cmd)
-            if CHECK in self.options.task:
-                # cmd and check cannot be paralleled as they dump into the same
-                # job json file.
-                self.setPrereq(tag, check)
+        cmd = self.setOpr(itestutils.CmdTask) if self.has(CMD) else None
+        check = self.setOpr(itestutils.CheckTask) if self.has(CHECK) else None
+        self.setPreAfter(cmd, check)
+        tag = self.setOpr(itestutils.TagTask) if self.has(TAG) else None
+        # tag and check cannot be paralleled as they dump into the same
+        # job json file.
+        self.setPreAfter(check, tag)
+        self.setPreAfter(cmd, tag)
+
+    def has(self, task):
+        """
+        Check if the task is in the task list.
+
+        :param task str: the task name
+        :return bool: True if the task is in the task list.
+        """
+        return task in self.options.task
 
     def setState(self):
         """

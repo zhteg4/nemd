@@ -70,17 +70,17 @@ class Runner(jobcontrol.Runner):
         """
         Set polymer builder, lammps builder, and custom dump tasks.
         """
-        amorphous_builder = AmorpBldr.getOpr(name='amorphous_builder')
-        lammps_runner = Lammps.getOpr(name='lammps_runner')
-        self.setPrereq(lammps_runner, amorphous_builder)
-        lmp_traj = LmpTraj.getOpr(name='lmp_traj')
-        self.setPrereq(lmp_traj, lammps_runner)
+        amorphous_builder = self.setOpr(AmorpBldr, name='amorphous_builder')
+        lammps_runner = self.setOpr(Lammps, name='lammps_runner')
+        self.setPreAfter(amorphous_builder, lammps_runner)
+        lmp_traj = self.setOpr(LmpTraj, name='lmp_traj')
+        self.setPreAfter(lammps_runner, lmp_traj)
 
     def setAggJobs(self):
         """
         Aggregate post analysis jobs.
         """
-        LmpTraj.getAgg(name='lmp_traj', logger=logger)
+        self.setAgg(LmpTraj, name='lmp_traj')
         super().setAggJobs()
 
 

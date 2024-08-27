@@ -1,5 +1,6 @@
 import os
 import sys
+import types
 import shutil
 import pytest
 import datetime
@@ -149,10 +150,14 @@ class TestLogJobAgg:
     @pytest.fixture
     def agg(self, tmp_dir):
         jobs = get_jobs(basename='c1f776be48922ec50a6607f75c34c78f')
+        options = types.SimpleNamespace(jobname='cb_lmp_log',
+                                        task=['toteng'],
+                                        interactive=False)
         return task.LogJobAgg(*jobs,
                               logger=mock.Mock(),
                               name='lmp_log_#_agg',
-                              driver=task.LmpLog.DRIVER)
+                              driver=task.LmpLog.DRIVER,
+                              options=options)
 
     def testRun(self, agg):
         assert agg.post() is False

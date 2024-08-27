@@ -71,11 +71,11 @@ class Runner(jobcontrol.Runner):
         """
         Set crystal builder, lammps runner, and log analyzer tasks.
         """
-        crystal_builder = XtalBldr.getOpr(name='crystal_builder')
-        lammps_runner = Lammps.getOpr(name='lammps_runner')
-        self.setPrereq(lammps_runner, crystal_builder)
-        lmp_log = LmpLog.getOpr(name='lmp_log')
-        self.setPrereq(lmp_log, lammps_runner)
+        crystal_builder = self.setOpr(XtalBldr, name='crystal_builder')
+        lammps_runner = self.setOpr(Lammps, name='lammps_runner')
+        self.setPreAfter(crystal_builder, lammps_runner)
+        lmp_log = self.setOpr(LmpLog)
+        self.setPreAfter(lammps_runner, lmp_log)
 
     def setState(self):
         """
@@ -89,7 +89,7 @@ class Runner(jobcontrol.Runner):
         """
         Aggregate post analysis jobs.
         """
-        LmpLog.getAgg(name='lmp_log', logger=logger)
+        self.setAgg(LmpLog)
         super().setAggJobs()
 
 

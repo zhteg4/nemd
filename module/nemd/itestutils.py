@@ -449,8 +449,11 @@ class Tag(Opr):
         """
         if self.options.label is None:
             return True
-        labels = self.get(self.LABEL, [])
-        return bool(set(self.options.label).intersection(labels))
+        for tagged_label in self.get(self.LABEL, []):
+            for label in self.options.label:
+                if tagged_label.startswith(label):
+                    return True
+        return False
 
 
 class TagJob(CheckJob):
