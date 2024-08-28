@@ -9,10 +9,14 @@ pair_modify mix geometric
 special_bonds lj/coul 0 0 0.5
 read_data mol_bldr.data
 
+fix restrain all restrain angle 1 2 3 2000.0 2000.0 None
+min_style fire
+minimize 1.0e-6 1.0e-8 1000000 10000000
+
+dump 1 all custom 1000 dump.custom.gz id xu yu zu
+dump_modify 1 sort id
 timestep 1
 thermo_modify flush yes
 thermo 1000
-dump 1 all custom 1000 dump.custom.gz id xu yu zu
-dump_modify 1 sort id
 run 0
 quit 0

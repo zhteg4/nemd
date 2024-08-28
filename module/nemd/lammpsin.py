@@ -61,6 +61,7 @@ class In:
     DEFAULT_COUL_CUT = DEFAULT_CUT
     DUMP_ID, DUMP_Q = lammpsfix.DUMP_ID, lammpsfix.DUMP_Q
     FIX_RESTRAIN = lammpsfix.FIX_RESTRAIN
+    UNFIX_RESTRAIN = lammpsfix.UNFIX_RESTRAIN
     MINIMIZE = 'minimize'
     FIX_RIGID_SHAKE = lammpsfix.FIX_RIGID_SHAKE
 
@@ -73,6 +74,7 @@ class In:
         self.datafile = None
         self.lammps_dump = None
         self.fh = None
+        self.rest=None
         self.units = self.REAL
         self.atom_style = self.FULL
         self.bond_style = self.HARMONIC
@@ -99,10 +101,12 @@ class In:
         with open(self.inscript, 'w') as self.fh:
             self.writeSetup()
             self.readData()
+            self.writeTraj()
+            self.setRestrain()
             self.writeRestrain()
             self.writeMinimize()
+            self.unfixRestrain()
             self.writeShake()
-            self.writeTraj()
             self.writeTimestep()
             self.writeRun()
 
@@ -142,9 +146,9 @@ class In:
         """
         self.fh.write(f"{self.READ_DATA} {self.datafile}\n\n")
 
-    def writeRestrain(self):
+    def setRestrain(self):
         """
-        Write fix restrain command to enforce specified restrain geometry.
+        Set the restricted geometry based on the substructure.
         """
         if self.options.substruct is None:
             return
@@ -152,15 +156,22 @@ class In:
         if not self.molecules[0].HasSubstructMatch(struct):
             return
         aids = self.molecules[0].GetSubstructMatch(struct)
-        gids = self.molecules[0].GetConformer().id_map[list(aids)] + 1
-        match len(gids):
+        self.rest = self.molecules[0].GetConformer().id_map[list(aids)] + 1
+
+    def writeRestrain(self):
+        """
+        Write fix restrain command to enforce specified restrain geometry.
+        """
+        if self.rest is None:
+            return
+        match len(self.rest):
             case 2:
                 name = 'bond'
             case 3:
                 name = 'angle'
             case 4:
                 name = 'dihedral'
-        desc = f"{name} {' '.join(map(str, gids))}"
+        desc = f"{name} {' '.join(map(str, self.rest))}"
         val = self.options.substruct[1]
         self.fh.write(self.FIX_RESTRAIN.format(desc=desc, val=val))
 
@@ -174,6 +185,14 @@ class In:
             return
         self.fh.write(f"{self.MIN_STYLE} {min_style}\n")
         self.fh.write(f"{self.MINIMIZE} 1.0e-6 1.0e-8 1000000 10000000\n\n")
+
+    def unfixRestrain(self):
+        """
+        remove the restraints.
+        """
+        if self.rest is None:
+            return
+        self.fh.write(self.UNFIX_RESTRAIN)
 
     def writeTimestep(self):
         """

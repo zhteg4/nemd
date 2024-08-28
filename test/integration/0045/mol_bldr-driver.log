@@ -2,7 +2,7 @@
 cru: *C*
 cru_num: 3
 mol_num: 1
-no_minimize: True
+no_minimize: False
 rigid_bond: None
 rigid_angle: None
 buffer: 44.0
@@ -26,11 +26,11 @@ default_name: mol_bldr
 debug: False
 python: 2
 cpu: 6
-JobStart: 19:22:22 08/24/24
+JobStart: 18:44:10 08/27/24
 ...................................
 Polymer SMILES: CCC
 CCC angle: 112.40 deg
 Data file written into mol_bldr.data
 In script written into mol_bldr.in
 Finished.
-19:22:23 08/24/24
+18:44:10 08/27/24
