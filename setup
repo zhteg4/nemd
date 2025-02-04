@@ -9,7 +9,7 @@ case $(uname) in
   Darwin*)
     (xcode-select -v) || xcode-select --install
     brew -v || bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    brew -v || { grep brew ~/.zprofile || echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile; source ~/.zprofile }
+    brew -v || { grep brew ~/.zprofile || echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile; source ~/.zprofile; }
     brew install -q gh git vim python@3.10
     ;;
   Linux*)
