@@ -1,0 +1,47 @@
+#!/bin/sh
+# Under the BSD 3-Clause License by Teng Zhang (zhteg4@gmail.com)
+: '
+Setup MacBook (Sonoma 14.5) and Ubuntu (22.04 LTS) ready for nemd installation.
+'
+
+# Version, Packages, and Environment
+case $(uname) in
+  Darwin*)
+    (xcode-select -v) || xcode-select --install
+    brew -v || bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    brew -v || { grep brew ~/.zprofile || echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile; source ~/.zprofile }
+    brew install -q gh git vim python@3.10
+    ;;
+  Linux*)
+    lsb_release -sr  # 22.04
+    sudo apt update
+    sudo apt-get install -y gh git vim python3.10 python3-pip python3.10-venv
+    # pip uses --user automatically if not root
+    BIN=$(python3 -m site --user-base)/bin
+    [ ! -d $BIN ] && mkdir -p $BIN
+    echo $PATH | grep -q -v $BIN && export PATH="$BIN${PATH:+":$PATH"}"
+    ;;
+esac
+
+# Git
+if [ -z "$(git config user.name)" ]; then
+  git config --global user.email $(whoami)@gmail.com
+  git config --global user.name $(whoami)
+fi
+
+if [ ! -d ~/git/nemd ]; then
+  (gh auth status) || gh auth login --hostname GitHub.com --web
+  (git config --global credential.helper | grep 'gh auth') || gh auth setup-git
+  gh repo clone zhteg4pvt/nemd ~/git/nemd
+fi
+
+# Drivers
+[ $(uname) != Linux ] && exit 0
+nvidia-smi 2>/dev/null && exit 0
+# NVIDIA GPU: * NVIDIA Corporation GP104 [GeForce GTX 1080] *
+(lspci | grep VGA | grep -q -v NVIDIA) && echo 'No NVIDIA GPU found.' && exit 0
+sudo ubuntu-drivers --gpgpu install
+sudo apt upgrade -y
+read -p "Driver installed. Reboot? [y/n]? " answer
+case "$answer" in Y|y) echo "rebooting..."; reboot ;; *) ;; esac
+echo "no reboot. (GPU driver may not be working)"
