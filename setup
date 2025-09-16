@@ -27,7 +27,7 @@ esac
 if [ ! -d ~/git/nemd ]; then
   (gh auth status) || gh auth login --hostname GitHub.com --web
   (git config --global credential.helper | grep 'gh auth') || gh auth setup-git
-  gh repo clone zhteg4pvt/nemd ~/git/nemd
+  gh repo clone zhteg4pvt/nemd ~/git/nemd -- --depth=1
 fi
 
 # Drivers
