@@ -2,6 +2,8 @@
 # Under the BSD 3-Clause License by Teng Zhang (zhteg4@gmail.com)
 : '
 Setup MacBook (Sonoma 14.5) and Ubuntu (22.04 LTS) ready for nemd installation.
+bash -c "$(curl https://raw.githubusercontent.com/zhteg4/nemd/main/setup)"
+bash <(wget -qO- https://raw.githubusercontent.com/zhteg4/nemd/main/setup)
 '
 
 # Version, Packages, and Environment
