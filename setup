@@ -30,7 +30,7 @@ if [ ! -d ~/git/nemd ]; then
   # (gh auth status) || gh auth login --hostname GitHub.com --web
   # (git config --global credential.helper | grep 'gh auth') || gh auth setup-git
   # gh repo clone zhteg4pvt/nemd ~/git/nemd -- --depth=1
-  git clone https://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@github.com/zhteg4pvt/nemd.git --depth=1
+  git clone https://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@github.com/zhteg4pvt/nemd.git --depth=1 ~/git/nemd
 fi
 
 # Drivers
