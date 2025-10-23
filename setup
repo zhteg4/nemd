@@ -32,10 +32,6 @@ if [ ! -d ~/git/nemd ]; then
   gh repo clone zhteg4pvt/nemd ~/git/nemd -- --depth=1
 fi
 
-if [ ! -d ~/git/nemd ]; then
-  git clone https://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@github.com/zhteg4pvt/nemd.git --depth=1 ~/git/nemd
-fi
-
 # Drivers
 [ $(uname) != Linux ] && exit 0
 nvidia-smi 2>/dev/null && exit 0
