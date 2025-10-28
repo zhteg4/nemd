@@ -28,7 +28,7 @@ esac
 
 if [ ! -d ~/git/nemd ]; then
   read -p "Personal access token for github.com/zhteg4pvt/nemd: " tokens
-  git clone https://${tokens}@github.com/zhteg4pvt/nemd.git --depth=1 ~/git/nemd
+  [ ! -z $tokens ] && git clone https://${tokens}@github.com/zhteg4pvt/nemd.git --depth=1 ~/git/nemd
 fi
 
 if [ ! -d ~/git/nemd ]; then
